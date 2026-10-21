@@ -4,7 +4,7 @@
  * Laporan kepatuhan & kesehatan setiap sumber scraper:
  *   - ringkasan hasil peninjauan ToS (POLICY.tos di adapter)
  *   - robots.txt LIVE (RFC 9309): status, grup yang berlaku, Crawl-delay, boleh/tidak
- *   - --live : uji ambil data (latest → detail → episode terbaru), ±5 request per sumber,
+ *   - --live : uji ambil data (latest → detail → episode terbaru → jadwal), ±6 request per sumber,
  *              memakai throttle & User-Agent yang sama dengan produksi.
  *
  *   npm run check:sources
@@ -58,6 +58,11 @@ for (const id of SOURCES.enabled) {
         if (last) {
             const ep = await adapter.getEpisode(ref, last.number, { anime });
             line('episode', `#${ep.episode} · ${ep.servers.length} server (${ep.servers.slice(0, 3).map((s) => s.name).join(', ')}${ep.servers.length > 3 ? ', …' : ''}) · ${ep.downloads.length} grup download`);
+        }
+        if (typeof adapter.schedule === 'function') {
+            const days = await adapter.schedule({});
+            const all = Object.values(days).flat();
+            line('jadwal', `${all.length} anime di ${Object.values(days).filter((d) => d.length).length} hari · ${all.filter((x) => x.time).length} dengan jam rilis`);
         }
     } catch (err) {
         line('live', `GAGAL — ${err.kind || err.code || ''}: ${err.message}`);

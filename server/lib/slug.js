@@ -2,7 +2,7 @@
  * Kazanime backend — lib/slug.js
  * Slug backend "self-describing": nama sumber + bagian path situs, dipisah "~".
  *   animexin~tales-of-demons-and-gods-season-10
- *   kuramanime~2468~sousou-no-frieren
+ *   samehadaku~kusuriya-no-hitorigoto-season-3
  *
  * Kenapa: frontend hanya mengirim slug ke /api/anime/:slug (tanpa nama sumber),
  * dan routes.js di frontend hanya meloloskan [a-zA-Z0-9._~-] maks 160 karakter.

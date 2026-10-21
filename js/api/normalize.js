@@ -92,7 +92,7 @@ export function titleKey(text) {
 
 /**
  * Semua varian satu judul untuk dicocokkan lintas situs.
- * AnimeXin menulis "Yi Nian Yong Heng [A Will Eternal]" (pinyin [Inggris]), Kuramanime
+ * AnimeXin menulis "Yi Nian Yong Heng [A Will Eternal]" (pinyin [Inggris]), situs lain
  * "Black Clover 2nd Season (Black Clover Season 2)" → judul lengkap + bagian luar + bagian dalam kurung.
  * @param {string} text
  * @returns {string[]}
@@ -104,6 +104,25 @@ export function titleVariants(text) {
     const m = /^(.*?)\s*[[(]([^\])]+)[\])]\s*$/.exec(full);
     if (m) out.push(m[1].trim(), m[2].trim());
     return [...new Set(out.filter(Boolean))];
+}
+
+/**
+ * Judul tanpa penanda season/part di akhir: "Kusuriya no Hitorigoto 3rd Season" → "Kusuriya no Hitorigoto".
+ * Dipakai sebagai kata kunci pencarian tambahan: pencarian WordPress (Samehadaku, AnimeXin) mewajibkan
+ * SEMUA kata ada, jadi "3rd Season" tidak menemukan judul yang ditulis "Season 3".
+ * @param {string} text
+ */
+const SEASON_SUFFIXES = [
+    /\s*[:\-–]?\s*\b(?:season|s)\s*\d+\s*$/i,
+    /\s*\b\d+(?:st|nd|rd|th)\s+season\s*$/i,
+    /\s*\b(?:first|second|third|fourth|fifth|sixth)\s+season\s*$/i,
+    /\s*\b(?:part|cour)\s*\d+\s*$/i,
+    /\s+\d{1,2}\s*$/,
+];
+export function stripSeasonSuffix(text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    const rule = SEASON_SUFFIXES.find((re) => re.test(t)); // hanya SATU penanda (yang paling akhir) dibuang
+    return rule ? t.replace(rule, '').trim() || t : t;
 }
 
 const ORDINAL_WORDS = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };

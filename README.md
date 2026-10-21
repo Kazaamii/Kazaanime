@@ -11,7 +11,8 @@ beradapter.
 | **B** | Layer API (`js/api/`: cache, timeout, retry, fallback), auth & bookmark, pencarian, data homepage, jadwal WIB, status API | ✅ Selesai |
 | **C** | `watch.html`: satu player + fallback server otomatis, episode, info, download, rekomendasi | ✅ Selesai |
 | **D** | Backend Express + adapter `animexin` / `kuramanime` + fallback metadata (satu project Vercel) | ✅ Selesai |
-| **D+** | Perbaikan 22 Okt 2026: player memutar server **hasil scraping (AnimeXin / Kuramanime) lebih dulu** untuk semua anime; MegaPlay (`megaplay.buzz`) jadi cadangan; perkiraan jumlah episode saat AniList mati | ✅ Selesai |
+| **D+** | Perbaikan 22 Okt 2026: player memutar server **hasil scraping lebih dulu** untuk semua anime; MegaPlay (`megaplay.buzz`) jadi cadangan; perkiraan jumlah episode saat AniList mati | ✅ Selesai |
+| **D++** | Perbaikan 22 Okt 2026 (2): **Samehadaku** (anime Jepang, Sub Indo) menggantikan Kuramanime; tombol **Server 1, 2, …**; **Jadwal Rilis** dari Samehadaku + AnimeXin (`/api/anime/schedule`); poster donghua Kitsu → **Bangumi** → **MangaBaka**; donghua cadangan via Kitsu & bergambar; cadangan Vidnest/TryEmbed | ✅ Selesai |
 
 ---
 
@@ -99,12 +100,12 @@ kazanime/
     │   └── errors.js          error bertipe → status HTTP & pesan ramah
     ├── sources/
     │   ├── index.js           registry + aggregator + fallback (menambah sumber = 1 file + 1 baris)
-    │   ├── animexin.js        adapter AnimeXin (diverifikasi live)
-    │   ├── kuramanime.js      adapter Kuramanime (diblokir Cloudflare → otomatis dilewati)
-    │   └── metadata.js        fallback API publik Kitsu → Jikan → AniList
+    │   ├── animexin.js        adapter AnimeXin — donghua (diverifikasi live) + jadwal rilis
+    │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Sub Indo (diverifikasi live) + jadwal rilis
+    │   └── metadata.js        fallback API publik Kitsu → Jikan → AniList + poster Kitsu → Bangumi → MangaBaka
     ├── scripts/
     │   └── check-sources.js   `npm run check:sources [-- --live]`: laporan robots/ToS/kesehatan sumber
-    └── test/                  `npm test` (node:test, 88 test) + fixtures/ (HTML asli animexin, sintetis kuramanime)
+    └── test/                  `npm test` (node:test, 100 test) + fixtures/ (HTML asli animexin & samehadaku, dipangkas)
 ```
 
 ---
@@ -213,9 +214,9 @@ Satu implementasi player (`ui/player.js`) menggantikan **dua** salinan di file a
 
 ```
 watch.html?title=...&ep=3&anilist=...&mal=...[&alt=judul romaji]
-   │  1. cari episode di backend scraper (AnimeXin / Kuramanime) lewat judul + judul alternatif
+   │  1. cari episode di backend scraper (AnimeXin / Samehadaku) lewat judul, judul alternatif & judul tanpa season
    │     → ketemu: server hasil scraping diputar DULU (Sub Indo didahulukan)
-   │  2. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan MegaPlay
+   │  2. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan (MegaPlay, Vidnest, TryEmbed)
    │     (id ada di URL → langsung; tanpa id → setelah id ditemukan)
    ▼
 getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutnya + rekomendasi
@@ -226,7 +227,7 @@ getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutny
 
 | Fitur | Detail |
 |---|---|
-| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`), lalu `STREAMING_SERVERS` di `js/config.js` sebagai cadangan (urutan = urutan fallback). Server tanpa id yang dibutuhkan tampil 🔒 dan dilewati. Status player menyebut bahasa subtitle server (Sub Indo / Sub English) |
+| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`), lalu `STREAMING_SERVERS` di `js/config.js` sebagai cadangan (urutan = urutan fallback). Tombol tampil **"Server 1, 2, …"** + badge bahasa subtitle (SUB INDO / SUB ENG) — nama penyedia/situs tidak ditampilkan. Server yang belum tersedia tampil 🔒 dan dilewati |
 | Fallback otomatis | iframe tidak selesai dimuat dalam `PLAYER.loadTimeout` (15 dtk) **atau** player mengirim event `error` → server berikutnya + toast. Semua gagal → pesan + Bstation/YouTube + "Coba lagi" |
 | Batas browser | Halaman error **di dalam** iframe lintas-domain (mis. "video tidak ditemukan") tidak bisa dibaca JavaScript → tombol **⟳ Server Lain** |
 | Episode | Jumlah dari API (episode yang **sudah tayang**, bukan angka 24 tetap). Bila sumber tidak memberi nomor episode (Kitsu, atau Jikan dengan daftar episode kosong — mis. saat AniList mati) → **perkiraan tayang mingguan** dari tanggal mulai (maks. 26 episode, dibatasi total). > 100 episode → tab rentang. Tetap tidak diketahui → input nomor manual. Belum tayang → jadwal episode 1 |
@@ -245,22 +246,27 @@ Ganti episode: **0 request**. Membuka ulang anime yang sama dalam 30 menit: **0 
 | Urutan | Sumber | Isi | Subtitle |
 |---|---|---|---|
 | 1 | **AnimeXin** (backend scraper) | donghua — ±16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, …) + link download | Indonesia dulu, lalu Inggris |
-| 1 | **Kuramanime** (backend scraper) | anime Jepang — **saat ini tidak bisa** (lihat di bawah); otomatis dipakai bila situsnya mengizinkan bot | Indonesia |
+| 1 | **Samehadaku** (backend scraper) | anime Jepang — server Blogspot + Mega 480p/720p/1080p per episode + link download MKV/MP4/x265 | Indonesia |
 | 2 | **MegaPlay** `megaplay.buzz` (statis, cadangan) | hampir semua anime Jepang, via id AniList/MAL | Inggris |
+| 2 | **Vidnest** `vidnest.fun` · **TryEmbed** `tryembed.us.cc` (statis, cadangan) | pustaka HiAnime yang sama (embed yang dipakai hianime.ro), via id AniList | Inggris |
+
+Contoh nyata (22 Okt 2026): *The Apothecary Diaries Season 3* ep 2 → dicocokkan ke Samehadaku "Kusuriya no
+Hitorigoto Season 3" dalam ±1 dtk → **Server 1–4 Sub Indo** (Samehadaku) lalu **Server 5–8 Sub Eng** (cadangan).
 
 - **Pencocokan judul.** Anime yang dibuka dari kartu AniList/MAL/Kitsu tidak punya slug situs sumber, jadi
   `js/api/streams.js` mencarinya di `/api/anime/search` dengan judul utama **dan** judul alternatif (romaji —
   ikut di URL sebagai `alt`). Cocok bila judulnya sama persis, atau sama setelah penulisan season disamakan
   ("3rd Season" = "Season 3" = "S3"; format AnimeXin "Pinyin [English]" dipecah). Nomor season harus sama,
   jadi season lain tidak ikut tercocokkan. Hasil API metadata (saat semua scraper gagal) tidak dipakai.
-- **Menunggu.** Selama mencari, player menampilkan "🔍 Mencari server Episode N di AnimeXin & Kuramanime..."
+- **Menunggu.** Selama mencari, player menampilkan "🔍 Mencari server Sub Indo untuk Episode N..."
   (maks. `PLAYER.scrapeWaitMs`, default 8 dtk; biasanya 1–3 dtk, lalu ter-cache). Hasil yang datang setelah
   cadangan diputar tetap ditambahkan sebagai tombol server tanpa memutus video.
-- **Kuramanime diblokir.** Cloudflare menolak bot ini di semua URL termasuk `robots.txt` (403 "Attention Required!",
-  dicek ulang 22 Okt 2026), dan player-nya memakai token anti-bot. Proyek ini **tidak** mem-bypass proteksi
-  seperti itu (tanpa menyamar jadi browser, tanpa solver challenge, tanpa membongkar token). Adapternya siap:
-  bila situs mengizinkan bot ini (mis. IP server Vercel tidak diblokir dan robots.txt mengizinkan), episode &
-  link download Kuramanime otomatis dipakai — server streaming hanya bila tersedia di HTML publik.
+- **Kuramanime diganti Samehadaku.** Kuramanime (dan Otakudesu) menolak bot ini lewat Cloudflare (403 "Attention
+  Required!" di semua URL termasuk `robots.txt`), dan player Kuramanime memakai token anti-bot — tidak di-bypass.
+  Samehadaku (`v2.samehadaku.how`, atur lewat `SAMEHADAKU_BASE_URL`) bisa diakses bot, robots.txt hanya melarang
+  `/wp-admin/`, dan server videonya ada di HTML publik (`data-embed`). Kuronime juga terjangkau tetapi player-nya
+  dimuat lewat loader terenkripsi → tidak dipakai. hianime.ro terjangkau, tetapi isinya subtitle Inggris dan
+  servernya MegaPlay/Vidnest/TryEmbed (berbasis id) → tiga embed itu dipakai langsung sebagai cadangan, tanpa scraping.
 - **MegaPlay (cadangan).** Host di file asli, `animeplay.cfd`, adalah mirror MegaPlay yang kini di-suspend (semua URL
   → `/cgi-sys/suspendedpage.cgi` = halaman "Account Suspended" di dalam player). Diganti domain utamanya
   `megaplay.buzz` (pola path sama, dicek: episode 1–3 *Kusuriya no Hitorigoto* S3 ada). MegaPlay memutar pustaka
@@ -268,8 +274,30 @@ Ganti episode: **0 request**. Membuka ulang anime yang sama dalam 30 menit: **0 
   'origin'`), dan episode yang belum dipetakan menampilkan "Oops! Something went wrong" di dalam iframe →
   pakai **⟳ Server Lain**.
 - **Pengaturan** (`js/config.js`): `PLAYER.serverOrder = 'static-first'` → perilaku Tahap D (statis dulu).
-  Hanya ingin server hasil scraping → `enabled: false` pada kedua server MegaPlay (anime yang tidak ada di
+  Hanya ingin server hasil scraping → `enabled: false` pada keempat server cadangan (anime yang tidak ada di
   situs sumber lalu tidak bisa diputar).
+- **Pencarian WordPress.** Samehadaku & AnimeXin mewajibkan SEMUA kata ada, jadi "Kusuriya no Hitorigoto 3rd Season"
+  tidak menemukan "… Season 3". Karena itu judul tanpa penanda season ikut dicari (maks. 4 kata kunci, di-cache);
+  pencocokan tetap memakai judul lengkap sehingga season lain tidak ikut tercocokkan.
+
+### 📅 Jadwal Rilis (perbaikan 22 Okt 2026)
+Rantai: **backend** `GET /api/anime/schedule` → AniList (jam tayang Jepang → WIB) → MAL → data contoh.
+- Backend menggabungkan `/jadwal-rilis/` **Samehadaku** (jam rilis Sub Indo dalam WIB — dicek: Kikansha S2 terjadwal
+  Kamis 03:15, episode 3 terbit Kamis 01:38 WIB) dan `/schedule/` **AnimeXin** (hari rilis donghua, tanpa jam → "—").
+  Di-cache 1 jam (`CACHE_SCHEDULE_SEC`). Per hari maks. 8 anime berjam + 4 donghua.
+- Klik judul → `watch.html?...&ep=latest&slug=…` → halaman nonton menunggu detail lalu membuka **episode terbaru
+  yang ada di situs sumber** (tanpa memutar episode 1 dulu).
+- Dulu jadwal hanya dari AniList; karena API AniList sedang menolak semua request, yang tampil selalu "Jadwal contoh".
+
+### 🐉 Donghua & poster (perbaikan 22 Okt 2026)
+- Rantai section Donghua: backend (rilis terbaru AnimeXin) → AniList CN → **Kitsu** (ONA/TV yang sedang tayang dan
+  berjudul pinyin — bekerja tanpa backend & saat AniList mati) → data cadangan. Data cadangan kini **bergambar**
+  (poster Kitsu/Bangumi yang dicek HTTP 200), bukan kotak gradasi.
+- Poster AnimeXin dilindungi hotlink → backend mencari poster pengganti: **Kitsu** (judul persis) → **Bangumi**
+  (judul Mandarin dari halaman seri AnimeXin, nama harus persis sama) → **MangaBaka** (cover manhua, judul persis,
+  pilihan terakhir). Hasil live: 14 dari 16 rilis terbaru bergambar; 2 sisanya tidak ada di database mana pun →
+  placeholder (lebih baik daripada gambar anime lain). Atur lewat `METADATA_POSTER_SOURCES`.
+- Screenshot sebelumnya menampilkan data cadangan karena saat itu backend tidak terhubung **dan** AniList mati.
 
 ```js
 // js/config.js — contoh menambah server (pola URL dari penyedia yang kamu pakai)
@@ -296,7 +324,7 @@ server/sources/index.js  (registry + aggregator)
       │   latest/search: semua scraper paralel → gabung + dedupe  ─┐ semua gagal
       │   detail/episode: dirutekan lewat prefix slug               ├──────────────→ metadata.js
       ▼                                                             │                (Kitsu → Jikan → AniList)
-animexin.js · kuramanime.js  ── makeAnime()/makeEpisode() → format SERAGAM
+animexin.js · samehadaku.js  ── makeAnime()/makeEpisode() → format SERAGAM
       │
 server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt → throttle per host
                           → User-Agent jujur + timeout + retry terbatas → deteksi blokir Cloudflare
@@ -308,6 +336,7 @@ server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt 
 |---|---|
 | `GET /api/anime/latest` | daftar anime (rilis terbaru semua sumber; animexin = episode terbaru tiap seri) |
 | `GET /api/anime/search?q=` | daftar anime (2–100 karakter) |
+| `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
 | `GET /api/anime/:slug` | satu anime + `episodeList: [{ number, title, released, url }]` |
 | `GET /api/anime/:slug/episode/:ep` | `{ episode, title, released, url, servers: [{ name, url, lang }], downloads: [{ quality, size, format, subtitle, links: [{ provider, url }] }] }` |
 | `GET /api/health` | status backend, User-Agent, TTL cache, status robots/circuit tiap sumber |
@@ -316,7 +345,7 @@ server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt 
 ```jsonc
 // sukses
 { "ok": true, "source": "animexin", "fallback": false, "stale": false,
-  "errors": [{ "source": "kuramanime", "kind": "blocked", "message": "..." }],   // sumber lain yang gagal (opsional)
+  "errors": [{ "source": "samehadaku", "kind": "timeout", "message": "..." }],   // sumber lain yang gagal (opsional)
   "generatedAt": "2026-10-21T17:11:07.546Z", "data": [ /* anime */ ] }
 // gagal
 { "ok": false, "error": "Episode 999 belum tersedia di AnimeXin.", "code": "NOT_FOUND" }
@@ -325,7 +354,7 @@ server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt 
 - **Item anime** memakai field yang sama dengan `createAnime()` di frontend:
   `title, titleAlt, image, banner, description, episodes, latestEpisode, genres, score, status,
   format, year, popularity, country, ids, slug, source, studios, duration, season, nextAiring` (+ `url` halaman asli).
-- **Slug menyertakan sumber**: `animexin~soul-land-2-the-peerless-tang-clan`, `kuramanime~2468~sousou-no-frieren`
+- **Slug menyertakan sumber**: `animexin~soul-land-2-the-peerless-tang-clan`, `samehadaku~kusuriya-no-hitorigoto-season-3`
   (karakter `[a-zA-Z0-9._~-]`, lolos sanitasi `routes.js`). Frontend cukup mengirim slug, tanpa tahu sumbernya.
 - `fallback: true` = semua scraper gagal, data dari API metadata publik. `stale: true` = sumber gagal,
   dipakai cache lama (maks 1 jam).
@@ -346,35 +375,39 @@ server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt 
 | Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; diblokir / 429 → 30 mnt / sesuai `Retry-After` |
 | Anti-SSRF | hanya host milik sumber; redirect ke host lain tidak diikuti; respons > 3 MB ditolak |
 | Proteksi bot | **tidak** dilewati: tanpa spoof header/fingerprint TLS, tanpa solver challenge, tanpa token anti-bot |
-| Gambar | poster animexin dilindungi hotlink (403 + `Cross-Origin-Resource-Policy: same-origin`) → diganti poster **Kitsu** bila judulnya cocok persis (maks 2,5 dtk; selebihnya placeholder). Tidak ada proxy gambar |
+| Gambar | poster animexin dilindungi hotlink (403 + `Cross-Origin-Resource-Policy: same-origin`) → diganti poster **Kitsu** → **Bangumi** (judul Mandarin) → **MangaBaka**, hanya bila judul cocok persis (maks 2,5 dtk; sisanya dicari di belakang & respons diberi cache CDN 60 dtk). Poster Samehadaku boleh ditampilkan langsung. Tidak ada proxy gambar |
 
 `npm run check:sources` mencetak laporan ini untuk setiap sumber (tambahkan `-- --live` untuk uji ambil data).
 
-### Status sumber (dicek 21 Okt 2026)
+### Status sumber (dicek 21–22 Okt 2026)
 
 | Sumber | Status | Catatan |
 |---|---|---|
 | **AnimeXin** | ✅ aktif, diverifikasi live | robots.txt mengizinkan semua; tidak ada ToS (DMCA & Privacy Policy tanpa larangan bot). Latest = beranda + `/anime/?order=update` (2 request, slug asli digabung lewat ID seri). 16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, Mega, …) + link download Sub Indo/English |
-| **Kuramanime** | ⛔ diblokir Cloudflare | Semua URL termasuk `robots.txt` → 403 "Sorry, you have been blocked" / "Attention Required!" (juga dengan UA browser → blokir IP/WAF; dicek ulang 22 Okt 2026). Player-nya memakai token anti-bot berlapis. Adapter tetap lengkap (diuji dengan fixture sintetis) dan otomatis aktif — termasuk sebagai sumber player utama — bila situs suatu saat mengizinkan bot ini |
+| **Samehadaku** | ✅ aktif, diverifikasi live | Pengganti Kuramanime. robots.txt hanya melarang `/wp-admin/`; tidak ada ToS/DMCA tertaut → `unknown` (diakses hanya selama robots.txt terbaca & mengizinkan). Anime terbaru, pencarian, detail (judul Inggris, skor, musim, studio, daftar episode), 4 server Sub Indo per episode, link download, jadwal rilis WIB |
+| ~~Kuramanime~~ | ❌ dihapus | Semua URL termasuk `robots.txt` → Cloudflare 403 untuk bot ini (dicek ulang 22 Okt 2026) + player bertoken anti-bot → adapter dihapus (bisa diambil dari `kazanime-tahap-d.zip` bila suatu saat situsnya mengizinkan bot) |
+| Bangumi · MangaBaka | ✅ poster pengganti | `api.bgm.tv` (robots hanya melarang /pic/ /img/ /js/) & `api.mangabaka.org/v1` (robots mengizinkan /v1/) |
 | Kitsu | ✅ fallback utama | bisa dijangkau server; mapping id MAL/AniList; poster pengganti |
 | Jikan / AniList | ⚠️ fallback berikutnya | dari sandbox: Jikan timeout, AniList 403 "temporarily disabled" (juga dengan Referer) — di Vercel bisa berbeda; circuit breaker membuatnya cepat dilewati |
 
 ### Environment variable (semua opsional)
 Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di User-Agent),
-`SCRAPER_SOURCES` (urutan/aktifkan sumber), `KURAMANIME_BASE_URL` (domain sering berganti),
-`CACHE_*_SEC`, `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`. Lokal: `node --env-file=.env server/index.js`.
+`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku`), `SAMEHADAKU_BASE_URL` (domain sering
+berganti), `CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`,
+`METADATA_POSTER_SOURCES`. Lokal: `node --env-file=.env server/index.js`.
 
 ### Menambah / mengganti sumber
 1. Buat `server/sources/<nama>.js` → factory `create<Nama>({ network, createClient, baseUrl })` yang
-   mengembalikan `{ id, name, baseUrl, policy, parseRef, titleHint, latest, search, getAnime, getEpisode }`,
+   mengembalikan `{ id, name, baseUrl, policy, parseRef, titleHint, latest, search, getAnime, getEpisode }`
+   (+ opsional `schedule()` untuk Jadwal Rilis),
    semua hasil lewat `makeAnime()` / `makeEpisode()`. Isi `policy.tos` setelah membaca ToS situsnya.
 2. Daftarkan di `FACTORIES` (`server/sources/index.js`) + base URL di `server/config.js`.
 3. Tambahkan nama ke `SCRAPER_SOURCES`. **Frontend tidak perlu diubah sama sekali.**
 
 ### Tes
 ```bash
-npm test                          # 88 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal),
-                                  # parser animexin (fixture asli), kuramanime (sintetis), metadata, aggregator, routes
+npm test                          # 100 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal),
+                                  # parser animexin & samehadaku (fixture asli), jadwal, poster, metadata, aggregator, routes
 npm run check:sources -- --live   # uji langsung ke situs sumber (±5 request per sumber)
 ```
 
@@ -405,7 +438,7 @@ dan `.gitignore` sudah disiapkan:
 cd kazanime
 git init
 git add .
-git commit -m "Tahap D: backend scraper + adapter animexin/kuramanime"
+git commit -m "Tahap D: backend scraper + adapter animexin/samehadaku"
 git branch -M main
 git remote add origin https://github.com/USERNAME/kazanime.git
 git push -u origin main
@@ -440,7 +473,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   per instance (best effort) — perlindungan utama untuk situs sumber tetap cache CDN.
 - Hobby: function invocation & bandwidth terbatas per bulan; dengan cache CDN, satu kunjungan
   homepage biasanya tidak memanggil function sama sekali.
-- IP Vercel bisa saja diblokir situs sumber (seperti Kuramanime). Backend tidak mencoba
+- IP Vercel bisa saja diblokir situs sumber (seperti Kuramanime dulu). Backend tidak mencoba
   melewatinya: sumber ditandai "blocked" dan fallback metadata dipakai.
 
 ---
@@ -515,19 +548,23 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 
 **Tahap D**
 - [x] Backend Node.js + Express: `/api/anime/latest`, `/search?q=`, `/:slug`, `/:slug/episode/:ep` (+ `/api/health`, `/api/bot`)
-- [x] Adapter pattern `server/sources/` (animexin, kuramanime, metadata) — satu format anime, menambah sumber tanpa menyentuh frontend
+- [x] Adapter pattern `server/sources/` (animexin, samehadaku, metadata) — satu format anime, menambah sumber tanpa menyentuh frontend
 - [x] robots.txt (RFC 9309) + peninjauan ToS per sumber + skrip `check:sources`
 - [x] Rate limit keluar (1 req/dtk/host + Crawl-delay) & masuk (60/menit/IP), cache 10–15 mnt + CDN, User-Agent jelas, timeout, retry terbatas, circuit breaker
 - [x] Fallback ke API metadata publik (Kitsu → Jikan → AniList) bila scraper gagal
 - [x] Section Donghua homepage dari rilis terbaru AnimeXin (kartu → episode terbaru), cadangan AniList CN
 - [x] Server streaming & link download per episode dari backend di `watch.html` (Sub Indo didahulukan)
 - [x] Player memutar server hasil scraping **lebih dulu** untuk semua anime (pencocokan judul + judul alternatif), MegaPlay jadi cadangan otomatis
-- [x] Host embed cadangan diganti `megaplay.buzz` (`animeplay.cfd` suspended)
+- [x] Host embed cadangan diganti `megaplay.buzz` (`animeplay.cfd` suspended) + Vidnest & TryEmbed
+- [x] Samehadaku (Sub Indo) menggantikan Kuramanime sebagai sumber anime Jepang (adapter + fixture asli + 8 test)
+- [x] Tombol server "Server 1, 2, …" + badge bahasa subtitle, tanpa nama penyedia/database
+- [x] Jadwal Rilis live dari Samehadaku + AnimeXin (`/api/anime/schedule`), klik → episode terbaru (`ep=latest`)
+- [x] Poster donghua: Kitsu → Bangumi (judul Mandarin) → MangaBaka; section Donghua bisa dari Kitsu tanpa backend; data cadangan bergambar
 - [x] Frontend tetap normal di hosting statis tanpa backend (deteksi otomatis, tanpa pesan error)
 - [x] Satu project Vercel: frontend CDN + Express sebagai Function (`api/index.js`)
 
 ### Belum / di luar cakupan
-- [ ] Kuramanime: menunggu situsnya mengizinkan bot (tidak akan di-bypass) — sampai itu, anime Jepang diputar dari MegaPlay (subtitle Inggris)
+- [ ] Kuramanime: diblokir Cloudflare untuk bot (tidak di-bypass) → diganti Samehadaku. Anime Jepang yang tidak ada di Samehadaku tetap diputar dari server cadangan (subtitle Inggris)
 
 ### Perubahan perilaku kecil (Tahap C)
 - Kartu **"Baru Rilis"** (homepage & `search.html?browse=new`) membuka episode yang baru tayang (label "EP 9" → episode 9). Kartu lain tetap episode 1.
@@ -547,6 +584,14 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - URL nonton membawa judul alternatif latin (`&alt=...`) agar pencarian di situs sumber langsung memakai judul romaji. URL lama tanpa `alt` tetap jalan (judul dari detail dipakai mencari ulang).
 - Status player menyebut bahasa subtitle server yang diputar (MegaPlay = "Sub English", dulu selalu tertulis "Sub Indo").
 - Anime ongoing tanpa nomor episode dari sumber (Kitsu / Jikan saat AniList mati) kini mendapat daftar episode perkiraan mingguan, bukan input manual.
+
+### Perubahan perilaku (perbaikan 22 Okt 2026 — bagian 2)
+- Tombol server tampil "Server 1, 2, …" (urutan putar) + badge SUB INDO / SUB ENG; status player "✅ Server 1 | Episode 2 | Sub Indo". Nama MegaPlay/AniList/MAL/situs sumber tidak lagi tampil di tombol, tooltip, maupun pesan menunggu.
+- Server cadangan: 4 (MegaPlay ×2, Vidnest, TryEmbed), dulu 2.
+- Anime dari situs sumber (slug): episode terbaru = milik situs sumber (dulu nilai terbesar antara situs sumber & metadata, sehingga bisa menunjuk episode yang belum ada subtitle Indonesianya).
+- Jadwal Rilis: Samehadaku + AnimeXin dulu (jam rilis Sub Indo), AniList/MAL hanya cadangan. Item donghua tanpa jam tampil "—".
+- Section Donghua tanpa backend & tanpa AniList → Kitsu; data cadangan bergambar.
+- Endpoint backend bertambah satu: `GET /api/anime/schedule`.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
@@ -585,6 +630,15 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   `robots.txt` dan juga saat diuji dengan User-Agent browser (blokir IP/WAF). Sesuai aturan proyek
   (hormati robots/ToS, UA jelas), adapter **tidak** akan mem-bypass Cloudflare; sumber ditandai
   "blocked" (istirahat 30 menit) dan otomatis jatuh ke sumber lain / metadata.
+- **v2.samehadaku.how** (22 Okt 2026): robots.txt `Disallow: /wp-admin/` saja, bot tidak diblokir, server video di
+  atribut `data-embed` (HTML publik), poster bisa ditampilkan dari situs lain. Jam di `/jadwal-rilis/` = jam rilis
+  Sub Indo (WIB). Pencarian WordPress = semua kata wajib ada.
+- **otakudesu.blog** → Cloudflare 403 untuk bot. **kuronime.sbs** → terjangkau, tetapi daftar server dimuat lewat
+  loader terenkripsi (tidak dipakai). **hianime.ro** → terjangkau (REST `wp-json/v1/otakuthemes`), subtitle Inggris,
+  server = MegaPlay + `tryembed.us.cc` + `vidnest.fun` berbasis id AniList/MAL → dipakai langsung sebagai cadangan.
+- **Bangumi** `api.bgm.tv/search/subject/<kata>?type=2` — pencarian bahasa Inggris tidak bisa diverifikasi (nama
+  Mandarin), jadi hanya judul Mandarin yang cocok persis yang dipakai. **MangaBaka**: `api.mangabaka.dev` sudah
+  pensiun → `api.mangabaka.org/v1`; isinya manga/manhua (cover komik).
 - **animeplay.cfd** (host embed server 1 & 2 di file asli, mirror MegaPlay): semua URL → 302 ke `/cgi-sys/suspendedpage.cgi` ("Account Suspended") → diganti **megaplay.buzz** (pola path sama; butuh header Referer; subtitle Inggris). Lihat bagian Halaman nonton.
 - **AniList (22 Okt 2026)**: dari server ini API membalas `403 "The AniList API has been temporarily disabled due to severe stability issues"` — pesan yang menurut dokumentasi AniList berarti akses API sedang dihentikan sementara. Frontend otomatis memakai Jikan → Kitsu; untuk anime ongoing dari Kitsu jumlah episode diperkirakan dari tanggal mulai (tayang mingguan).
 - **Kitsu** `include=mappings` memberi id MyAnimeList & AniList (dicek langsung, mis. Frieren → MAL 52991, AniList 154587),

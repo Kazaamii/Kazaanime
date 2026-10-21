@@ -6,7 +6,7 @@ import { SourceError } from '../lib/errors.js';
 import { createRegistry, mergeLists } from '../sources/index.js';
 
 const TTL = {
-    latestTtlMs: 600000, searchTtlMs: 900000, detailTtlMs: 900000, episodeTtlMs: 900000,
+    latestTtlMs: 600000, searchTtlMs: 900000, detailTtlMs: 900000, episodeTtlMs: 900000, scheduleTtlMs: 3600000,
     notFoundTtlMs: 300000, staleMs: 3600000, cdnMaxAge: 600, cdnStale: 1800,
 };
 
@@ -31,6 +31,7 @@ function stub(id, impl = {}, policy = {}) {
         search: track('search', impl.search || (async () => [])),
         getAnime: track('getAnime', impl.getAnime || (async () => { throw fail('not_found', id); })),
         getEpisode: track('getEpisode', impl.getEpisode || (async () => { throw fail('not_found', id); })),
+        ...(impl.schedule ? { schedule: track('schedule', impl.schedule) } : {}),
         calls,
     };
 }
@@ -215,4 +216,71 @@ test('health(): ringkasan sumber, metadata & cache', () => {
     assert.equal(h.sources[0].circuit, 'closed');
     assert.equal(h.metadata.enabled, true);
     assert.equal(typeof h.cache.entries, 'number');
+});
+
+test('schedule: gabung per hari — berjam (urut jam) dulu, lalu tanpa jam; judul ganda dibuang; di-cache', async () => {
+    const S = stub('samehadaku', { schedule: async () => ({
+        0: [{ title: 'Kusuriya no Hitorigoto Season 3', time: '01:00', slug: 'samehadaku~kusuriya-no-hitorigoto-season-3', source: 'samehadaku', country: 'JP' },
+            { title: 'Ao no Hako Season 2', time: '00:30', slug: 'samehadaku~ao-no-hako-season-2', source: 'samehadaku', country: 'JP' }],
+        1: [{ title: 'One Piece', time: '00:00', slug: 'samehadaku~one-piece', source: 'samehadaku', country: 'JP' }],
+    }) });
+    const A = stub('animexin', { schedule: async () => ({
+        0: [{ title: 'Soul Land 2', time: null, slug: 'animexin~soul-land-2', source: 'animexin', country: 'CN' },
+            { title: 'ONE PIECE', time: null, slug: 'animexin~one-piece', source: 'animexin', country: 'CN' }],
+        1: [{ title: 'Renegade Immortal', time: null, slug: 'animexin~renegade-immortal', source: 'animexin', country: 'CN' }],
+    }) });
+    const N = stub('lain'); // tanpa schedule() → dilewati
+    const r = reg([S, A, N]);
+    const res = await r.schedule();
+    assert.equal(res.source, 'samehadaku,animexin');
+    assert.equal(res.data.timezone, 'Asia/Jakarta');
+    assert.deepEqual(res.data.days[0].map((x) => x.title), ['Ao no Hako Season 2', 'Kusuriya no Hitorigoto Season 3', 'Soul Land 2', 'ONE PIECE']);
+    assert.deepEqual(res.data.days[1].map((x) => x.title), ['One Piece', 'Renegade Immortal'], '"ONE PIECE" di hari lain bukan duplikat');
+    assert.deepEqual(res.data.days[5], []);
+    await r.schedule();
+    assert.equal(S.calls.filter((c) => c === 'schedule').length, 1, 'jadwal di-cache');
+});
+
+test('schedule: satu sumber gagal → hasil sebagian + errors; semua gagal → error 5xx', async () => {
+    const S = stub('samehadaku', { schedule: async () => { throw fail('network', 'samehadaku'); } });
+    const A = stub('animexin', { schedule: async () => ({ 2: [{ title: 'Martial Master', time: null, slug: 'animexin~martial-master', source: 'animexin' }] }) });
+    const res = await reg([S, A]).schedule();
+    assert.equal(res.source, 'animexin');
+    assert.deepEqual(res.errors.map((e) => [e.source, e.kind]), [['samehadaku', 'network']]);
+    const bad = stub('samehadaku', { schedule: async () => { throw fail('blocked', 'samehadaku'); } });
+    await assert.rejects(() => reg([bad]).schedule(), (err) => err.status >= 500);
+    await assert.rejects(() => reg([stub('lain')]).schedule(), (err) => err.code === 'NO_SOURCES');
+});
+
+test('withSafeImages: Kitsu tidak ketemu → judul Mandarin diambil dari detail situs sumber (di-cache) untuk poster Bangumi', async () => {
+    const asked = [];
+    const A = stub('animexin', {
+        latest: async () => [anime('animexin', 'the-guardian-of-daxia', 'The Guardian of Daxia'), anime('animexin', 'renegade-immortal', 'Renegade Immortal')],
+        getAnime: async (ref) => anime('animexin', ref.slug, ref.slug, { titleAlt: ref.slug === 'the-guardian-of-daxia' ? '大夏守墓人' : 'Xian Ni' }),
+    }, { imagePolicy: 'blocked' });
+    const meta = metaStub({
+        lookupImage: async (title, _ctx, { resolveNative } = {}) => {
+            if (title === 'Renegade Immortal') return { image: 'https://media.kitsu.app/ri.jpg', provider: 'kitsu' };
+            const native = await resolveNative();
+            asked.push(native);
+            return native === '大夏守墓人' ? { image: 'https://lain.bgm.tv/pic/cover/l/13/57/466756_xd3AT.jpg', provider: 'bangumi' } : null;
+        },
+    });
+    const r = reg([A], meta, { enrichBudgetMs: 2000 });
+    const res = await r.latest();
+    assert.deepEqual(res.data.map((x) => x.image), ['https://lain.bgm.tv/pic/cover/l/13/57/466756_xd3AT.jpg', 'https://media.kitsu.app/ri.jpg']);
+    assert.deepEqual(asked, ['大夏守墓人']);
+    // detail berikutnya memakai cache yang sama (tidak mengambil ulang halaman seri)
+    await r.detail('animexin~the-guardian-of-daxia');
+    assert.equal(A.calls.filter((c) => c === 'getAnime').length, 1);
+});
+
+test('latest: pencarian poster melewati batas waktu → hasil ditandai partial (cache CDN pendek)', async () => {
+    const A = stub('animexin', { latest: async () => [anime('animexin', 'a', 'A'), anime('animexin', 'b', 'B')] }, { imagePolicy: 'blocked' });
+    const slow = metaStub({ lookupImage: (title) => new Promise((r) => setTimeout(() => r(title === 'A' ? { image: 'https://x.test/a.jpg' } : null), title === 'A' ? 5 : 400)) });
+    const res = await reg([A], slow, { enrichBudgetMs: 100 }).latest();
+    assert.equal(res.partial, true);
+    assert.deepEqual(res.data.map((x) => x.image), ['https://x.test/a.jpg', null]);
+    const fast = await reg([A], metaStub({ lookupImage: async () => ({ image: 'https://x.test/z.jpg' }) }), { enrichBudgetMs: 500 }).latest();
+    assert.equal(fast.partial, false);
 });

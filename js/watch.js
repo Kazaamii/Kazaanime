@@ -9,8 +9,10 @@
  *  1. initLayout() → navbar, footer, modal, autocomplete, status API, auth.
  *  2. Parameter URL (title, ep, anilist, mal, kitsu, slug, src) → anime sementara:
  *     judul, label episode, bookmark & platform legal tampil instan.
- *  3. Server hasil SCRAPING didahulukan (PLAYER.serverOrder = 'scrape-first'): untuk setiap
- *     episode player menunggu backend (AnimeXin / Kuramanime) dulu — anime dari AniList/MAL/
+ *  3. Tombol server tampil "Server 1, 2, …" sesuai urutan putar + badge bahasa subtitle
+ *     (nama penyedia/situs sumber tidak ditampilkan).
+ *     Server hasil SCRAPING didahulukan (PLAYER.serverOrder = 'scrape-first'): untuk setiap
+ *     episode player menunggu backend (AnimeXin / Samehadaku) dulu — anime dari AniList/MAL/
  *     Kitsu dicarikan padanannya lewat judul + judul alternatif — maks. PLAYER.scrapeWaitMs.
  *     Tidak ada di situs sumber / gagal / kelamaan → server cadangan (MegaPlay) langsung
  *     diputar bila id anime sudah ada di URL; tanpa id → menunggu detail dulu.
@@ -76,11 +78,13 @@ const els = {
 /** @type {import('./api/normalize.js').Anime} */
 let anime = provisionalAnime(ref);
 let ep = params.ep;
+/** URL ep=latest (tautan Jadwal Rilis): episode ditentukan setelah detail dimuat. */
+let wantLatest = params.latest;
 /** Episode yang bisa dipilih: undefined = memuat · null = tidak diketahui · 0 = belum tayang · n */
 let total;
 let detailLoaded = false;
 let detailToken = 0;
-/** Server hasil scraping backend (AnimeXin / Kuramanime) untuk episode aktif. */
+/** Server hasil scraping backend (AnimeXin / Samehadaku) untuk episode aktif. */
 let backendServers = [];
 /** @type {AbortController|null} */
 let extrasCtrl = null;
@@ -107,7 +111,26 @@ const fromBackendSource = () => Boolean(ref.slug) && isBackendEnabled();
 /** Server hasil scraping diputar lebih dulu (PLAYER.serverOrder, atau anime dari kartu backend). */
 const scrapeFirst = () => isBackendEnabled() && (Boolean(ref.slug) || PLAYER.serverOrder !== 'static-first');
 const staticServers = () => listStreamServers(anime, ep);
-const servers = () => (scrapeFirst()
+
+/** Badge & keterangan bahasa subtitle untuk tombol server. */
+const LANG_BADGE = { id: 'Sub Indo', en: 'Sub Eng', multi: 'Multi Sub' };
+const LANG_DESC = { id: 'Subtitle Indonesia', en: 'Subtitle Inggris', multi: 'Beberapa pilihan subtitle' };
+
+/**
+ * Tombol server = "Server 1, 2, …" sesuai urutan putar. Nama penyedia / situs sumber tidak
+ * ditampilkan; yang terlihat hanya nomor + bahasa subtitle (badge & tooltip).
+ * @param {import('./api/streams.js').StreamServer[]} list
+ */
+function numbered(list) {
+    return list.map((s, i) => ({
+        ...s,
+        name: `Server ${i + 1}`,
+        flag: '',
+        badge: LANG_BADGE[s.lang] || '',
+        description: [LANG_DESC[s.lang], s.source === 'static' ? 'server cadangan' : ''].filter(Boolean).join(' • ') || `Server ${i + 1}`,
+    }));
+}
+const servers = () => numbered(scrapeFirst()
     ? [...backendServers, ...staticServers()]
     : [...staticServers(), ...backendServers]);
 /** Semua judul yang diketahui (URL + detail) untuk mencari padanan di situs sumber. */
@@ -154,8 +177,7 @@ function armHoldTimer(n, ms = PLAYER.scrapeWaitMs) {
 function holdForScrape(n) {
     holdFor = n;
     scrapeDoneFor = null;
-    const where = ref.slug && ref.src ? ref.src : PLAYER.scrapeLabel;
-    player.showWaiting(`🔍 Mencari server Episode ${n} di ${where}...`);
+    player.showWaiting(`🔍 Mencari server Sub Indo untuk Episode ${n}...`);
     armHoldTimer(n);
 }
 
@@ -417,6 +439,13 @@ function applyDetail(data) {
     });
     refreshWatched();
 
+    // Tautan Jadwal Rilis (ep=latest): buka episode terbaru yang sudah ada (atau episode 1)
+    if (wantLatest) {
+        wantLatest = false;
+        playEpisode(total > 0 ? total : 1, { announce: false });
+        return;
+    }
+
     // Episode di URL melewati episode yang sudah ada → buka episode terakhir
     if (total && ep > total) {
         showToast(`Episode ${ep} belum tersedia — membuka Episode ${total}.`, 'info');
@@ -492,7 +521,7 @@ async function loadExtras(n) {
                 // Datang setelah server cadangan diputar → tambahkan tombol tanpa memutus video
                 const wasPlaying = player.state === 'loading' || player.state === 'playing';
                 player.setServers(servers());
-                if (wasPlaying && scrapeFirst()) showToast(`🌐 ${res.servers.length} server dari ${res.source || 'sumber scraping'} tersedia — pilih di daftar server.`, 'info');
+                if (wasPlaying && scrapeFirst()) showToast(`🌐 ${res.servers.length} server tambahan tersedia — pilih di daftar server.`, 'info');
             }
         } else scrapeFinished(n);
         const realError = res.error && res.error.kind !== 'empty' ? res.error : null;
@@ -580,7 +609,10 @@ function start() {
     updateNav();
     showSkeleton(els.recs, 6);
 
-    if (scrapeFirst() || servers().some((s) => s.available)) {
+    if (wantLatest) {
+        // ep=latest: nomor episode terbaru baru diketahui setelah detail dimuat (applyDetail)
+        player.showWaiting('🔍 Mencari episode terbaru...');
+    } else if (scrapeFirst() || servers().some((s) => s.available)) {
         // scrape-first → menunggu hasil scraping dulu; id sudah ada di URL → tidak perlu menunggu detail
         playEpisode(ep, { initial: true });
     } else {
@@ -593,4 +625,4 @@ function start() {
 if (!ref.title && !ref.anilist && !ref.mal && !ref.kitsu && !ref.slug) renderNotFound();
 else start();
 
-console.info('%c🌸 Kazanime — Tahap D (player: server hasil scraping AnimeXin/Kuramanime dulu, MegaPlay cadangan)', 'color:#ff6b9d;font-weight:bold');
+console.info('%c🌸 Kazanime — Tahap D (player: server hasil scraping AnimeXin/Samehadaku dulu, server cadangan di belakang)', 'color:#ff6b9d;font-weight:bold');

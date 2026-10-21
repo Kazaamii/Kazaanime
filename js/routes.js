@@ -5,6 +5,7 @@
  *
  *   watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=...][&slug=...&src=...][&alt=...]
  *     alt = judul alternatif latin (romaji) → dipakai mencari anime yang sama di situs sumber scraping
+ *     ep=latest = buka episode terbaru setelah detail dimuat (tautan dari Jadwal Rilis)
  *   search.html?q=...[&sort=score][&format=TV,MOVIE][&source=mal]   → mode pencarian
  *   search.html?browse=ongoing                                     → "Lihat Semua" (ongoing|popular|new|donghua)
  *   search.html?genre=Action                                       → "Lihat Semua" untuk genre
@@ -47,13 +48,13 @@ export const latestEpisodeOf = (anime) => anime.latestEpisode || 1;
 /**
  * URL halaman nonton.
  * @param {import('./api/normalize.js').Anime} anime
- * @param {number} [ep=1]
+ * @param {number|'latest'} [ep=1]  'latest' = episode terbaru (ditentukan watch.html setelah detail dimuat)
  * @param {{src?: string|null, slug?: string|null}} [keep] pertahankan asal backend (slug + situs) dari URL sebelumnya
  */
 export function watchUrl(anime, ep = 1, keep = {}) {
     const p = new URLSearchParams();
     if (anime.title) p.set('title', anime.title);
-    p.set('ep', String(toEpisodeNumber(ep) || 1));
+    p.set('ep', ep === 'latest' ? 'latest' : String(toEpisodeNumber(ep) || 1));
     if (anime.ids?.mal) p.set('mal', String(anime.ids.mal));
     if (anime.ids?.anilist) p.set('anilist', String(anime.ids.anilist));
     if (anime.ids?.kitsu) p.set('kitsu', String(anime.ids.kitsu));
@@ -72,6 +73,7 @@ export function parseWatchParams(search = window.location.search) {
     return {
         title: (p.get('title') || '').trim().slice(0, 200),
         ep: toEpisodeNumber(p.get('ep')) || 1,
+        latest: p.get('ep') === 'latest',
         mal: toPositiveInt(p.get('mal')),
         anilist: toPositiveInt(p.get('anilist')),
         kitsu: (p.get('kitsu') || '').replace(/[^0-9]/g, '') || null,

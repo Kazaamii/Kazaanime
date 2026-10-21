@@ -92,6 +92,7 @@ export const CACHE = Object.freeze({
     searchTtlMs: int('CACHE_SEARCH_SEC', 900, { min: 60, max: 3600 }) * 1000,   // 15 menit
     detailTtlMs: int('CACHE_DETAIL_SEC', 900, { min: 60, max: 3600 }) * 1000,   // 15 menit
     episodeTtlMs: int('CACHE_EPISODE_SEC', 900, { min: 60, max: 3600 }) * 1000, // 15 menit
+    scheduleTtlMs: int('CACHE_SCHEDULE_SEC', 3600, { min: 300, max: 21600 }) * 1000, // 1 jam (jadwal jarang berubah)
     notFoundTtlMs: 5 * 60 * 1000,
     /** Bila sumber gagal, data lama (maks 1 jam) tetap dipakai & diberi tanda stale. */
     staleMs: 60 * 60 * 1000,
@@ -104,9 +105,11 @@ export const CACHE = Object.freeze({
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    enabled: list('SCRAPER_SOURCES', ['animexin', 'kuramanime']).map((s) => s.toLowerCase()),
+    // animexin = donghua (Sub Indo/English) · samehadaku = anime Jepang (Sub Indo), pengganti Kuramanime
+    // yang memblokir bot ini lewat Cloudflare (lihat README).
+    enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku']).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
-    kuramanime: Object.freeze({ baseUrl: (env.KURAMANIME_BASE_URL || 'https://v20.kuramanime.ing').replace(/\/+$/, '') }),
+    samehadaku: Object.freeze({ baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, '') }),
 });
 
 export const METADATA = Object.freeze({
@@ -118,7 +121,11 @@ export const METADATA = Object.freeze({
     enrichImages: bool('METADATA_ENRICH_IMAGES', true),
     enrichBudgetMs: 2500,
     enrichConcurrency: 4,
+    /** Sumber poster pengganti (urut): kitsu, bangumi (judul Mandarin), mangabaka (cover manhua). */
+    posterSources: list('METADATA_POSTER_SOURCES', ['kitsu', 'bangumi', 'mangabaka']).map((s) => s.toLowerCase()),
     kitsu: Object.freeze({ baseUrl: 'https://kitsu.app/api/edge', minIntervalMs: 200 }),
+    bangumi: Object.freeze({ baseUrl: 'https://api.bgm.tv', minIntervalMs: 500 }),
+    mangabaka: Object.freeze({ baseUrl: 'https://api.mangabaka.org/v1', minIntervalMs: 500 }),
     jikan: Object.freeze({ baseUrl: 'https://api.jikan.moe/v4', minIntervalMs: 400 }),           // batas resmi 3 req/dtk
     anilist: Object.freeze({ baseUrl: 'https://graphql.anilist.co', minIntervalMs: 2100 }),     // batas 30 req/menit (mode terdegradasi)
 });

@@ -1,8 +1,9 @@
 /**
  * Kazanime backend — routes/anime.js
- * Empat endpoint yang dipanggil frontend (js/api/sources.js):
+ * Endpoint yang dipanggil frontend (js/api/sources.js):
  *   GET /api/anime/latest
  *   GET /api/anime/search?q=
+ *   GET /api/anime/schedule          (jadwal rilis Sub Indo per hari, WIB — ditambahkan 22 Okt 2026)
  *   GET /api/anime/:slug
  *   GET /api/anime/:slug/episode/:ep
  *
@@ -38,7 +39,8 @@ export function readEpisode(value) {
  * supaya data asli segera muncul lagi begitu sumber pulih.
  */
 function setCacheHeaders(res, result, cdn) {
-    const sMax = result.fallback || result.stale ? Math.min(120, cdn.cdnMaxAge) : cdn.cdnMaxAge;
+    // partial = poster pengganti belum semuanya ketemu (masih dicari di belakang) → cache singkat
+    const sMax = result.fallback || result.stale ? Math.min(120, cdn.cdnMaxAge) : result.partial ? Math.min(60, cdn.cdnMaxAge) : cdn.cdnMaxAge;
     res.set('Cache-Control', `public, max-age=${result.fallback || result.stale ? 0 : 60}, s-maxage=${sMax}, stale-while-revalidate=${cdn.cdnStale}`);
 }
 
@@ -70,6 +72,8 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE }) {
 
     router.get('/latest', handle((req, ctx) => registry.latest(ctx)));
     router.get('/search', handle((req, ctx) => registry.search(readQuery(req.query.q), ctx)));
+    // Harus SEBELUM '/:slug' — kalau tidak, "schedule" dianggap slug anime.
+    router.get('/schedule', handle((req, ctx) => registry.schedule(ctx)));
     router.get('/:slug/episode/:ep', handle((req, ctx) => registry.episode(req.params.slug, readEpisode(req.params.ep), ctx)));
     router.get('/:slug', handle((req, ctx) => registry.detail(req.params.slug, ctx)));
 

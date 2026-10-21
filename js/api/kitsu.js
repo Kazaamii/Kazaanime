@@ -12,6 +12,9 @@
  *    hanya dipakai untuk halaman pertama (hasNext selalu false).
  *  - Sparse fieldset (fields[anime]) → respons jauh lebih kecil.
  *
+ * Perbaikan 22 Okt 2026: negara asal dari kunci judul (en_cn = pinyin → CN) + currentDonghua()
+ * untuk section Donghua saat backend & AniList tidak tersedia.
+ *
  * Tahap C: detail per id + pencarian satu judul, dengan `include=mappings`
  * → Kitsu memberi id MyAnimeList & AniList (dicek langsung: myanimelist/anime,
  * anilist/anime), sehingga server streaming tetap bisa dipakai untuk anime yang
@@ -44,6 +47,17 @@ const SORT = { score: '-averageRating', popularity: 'popularityRank', newest: '-
  * @param {object} item
  * @param {{genres?: string[], ids?: {anilist?:any, mal?:any}, duration?: number, nextAiring?: object|null}} [extra]
  */
+/**
+ * Negara asal dari kunci judul (Kitsu tidak punya field negara). Penanda andal = judul romanisasi:
+ * en_cn (pinyin) / en_kr / en_jp (romaji). zh_cn saja TIDAK cukup (anime Jepang pun punya zh_cn).
+ */
+export function kitsuCountry(titles = {}) {
+    if (titles.en_cn) return 'CN';
+    if (titles.en_kr) return 'KR';
+    if (titles.en_jp || titles.ja_jp) return 'JP';
+    return null;
+}
+
 export function fromKitsu(item, extra = {}) {
     const a = item?.attributes;
     if (!a || !item.id) return null;
@@ -66,6 +80,7 @@ export function fromKitsu(item, extra = {}) {
         source: 'kitsu',
         duration: extra.duration,
         nextAiring: extra.nextAiring,
+        country: kitsuCountry(t),
         // Kitsu tidak memberi nomor episode terbaru → perkiraan jadwal mingguan dari startDate
         firstAiredAt: firstAiringAt(a.startDate),
     });
@@ -139,6 +154,27 @@ export function listAnime({ status, category, season = false, sort = 'popularity
 }
 
 /** Trending Kitsu (punya coverImage lebar → cocok untuk hero cadangan). */
+/**
+ * Donghua yang sedang tayang: ONA & TV berstatus current (urut popularitas), disaring yang
+ * berjudul pinyin (en_cn). Dipakai section Donghua bila backend & AniList tidak tersedia.
+ */
+export async function currentDonghua({ limit = UI.sectionSize, signal } = {}) {
+    const lists = await Promise.allSettled(['ONA', 'TV'].map((subtype) => kitsu('/anime', {
+        'filter[status]': 'current',
+        'filter[subtype]': subtype,
+        sort: '-userCount',
+        'page[limit]': MAX_LIMIT,
+    }, { ttl: CACHE_TTL.home, signal })));
+    const ok = lists.filter((r) => r.status === 'fulfilled').map((r) => r.value.items);
+    if (!ok.length) throw lists[0].reason;
+    const seen = new Set();
+    const fresh = (key) => Boolean(key) && !seen.has(key) && Boolean(seen.add(key));
+    return ok.flat()
+        .filter((a) => a.country === 'CN' && fresh(`id:${a.ids.kitsu}`) && fresh(`t:${a.title.toLowerCase().replace(/[^a-z0-9]/g, '')}`))
+        .sort((x, y) => (y.popularity || 0) - (x.popularity || 0))
+        .slice(0, limit);
+}
+
 export function trending({ limit = 10, signal } = {}) {
     return kitsu('/trending/anime', { limit }, { ttl: CACHE_TTL.home, signal, fields: false });
 }

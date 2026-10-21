@@ -5,7 +5,8 @@
  * dinormalisasi — tidak pernah respons mentah, tidak pernah memanggil fetch.
  *
  * Rantai fallback metadata:  AniList → Jikan (MAL) → Kitsu → data statis
- * Section Donghua (Tahap D):  backend scraper (rilis terbaru animexin) → AniList CN → data statis
+ * Section Donghua (Tahap D):  backend scraper (rilis terbaru animexin) → AniList CN → Kitsu (judul pinyin) → data statis
+ * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin) → AniList → MAL → data statis
  *  - Sumber yang baru gagal "diistirahatkan" sementara (circuit breaker di
  *    http.js), jadi kunjungan berikutnya langsung ke sumber yang hidup.
  *  - Hasil memberi tahu sumber yang dipakai (`source`) dan apakah data cadangan
@@ -132,9 +133,12 @@ export async function getHomeSection(kind) {
         steps.push({ source: 'mal', run: () => jikan.seasonNow({ limit: size }) });
         steps.push({ source: 'kitsu', run: () => kitsu.listAnime({ season: true, limit: size }) });
     }
-    // donghua: rilis terbaru dari backend (animexin, episode bisa langsung diputar) → AniList CN.
-    // Jikan & Kitsu tidak punya filter negara → setelah itu langsung data cadangan.
-    if (kind === 'donghua') steps.unshift({ source: 'backend', run: async () => (await backendDonghua()).slice(0, size) });
+    // donghua: rilis terbaru dari backend (animexin, episode bisa langsung diputar) → AniList CN →
+    // Kitsu (ONA/TV tayang berjudul pinyin; bekerja tanpa backend & saat AniList mati) → data cadangan.
+    if (kind === 'donghua') {
+        steps.unshift({ source: 'backend', run: async () => (await backendDonghua()).slice(0, size) });
+        steps.push({ source: 'kitsu', run: () => kitsu.currentDonghua({ limit: size }) });
+    }
     const res = await firstAvailable(steps);
     const out = finishList(res, { fallbackItems: HOME_FALLBACK[kind] || [] });
     out.items = out.items.slice(0, size);
@@ -243,7 +247,10 @@ export async function browseAnime(kind, { page = 1, sort = 'relevance', formats 
             steps = [
                 { source: 'anilist', run: () => anilist.searchMedia({ country: 'CN', sort: pick('trending'), formats, page, perPage, signal }) },
             ];
-            if (page === 1) steps.push({ source: 'backend', run: async () => filterFormats(await backendDonghua({ signal }), formats) });
+            if (page === 1) {
+                steps.push({ source: 'backend', run: async () => filterFormats(await backendDonghua({ signal }), formats) });
+                steps.push({ source: 'kitsu', run: async () => filterFormats(await kitsu.currentDonghua({ limit: perPage, signal }), formats) });
+            }
             fallbackItems = FALLBACK_DONGHUA;
             break;
         default:
@@ -389,12 +396,44 @@ function groupJikanSchedule(list) {
 }
 
 /**
+ * Jadwal dari backend → per hari: anime berjam (maks SCHEDULE.perDay, urut jam) lalu donghua tanpa jam
+ * (maks SCHEDULE.perDayDonghua). Tautan item = episode terbaru (latest: true).
+ */
+async function backendSchedule() {
+    if (!backend.isBackendEnabled()) return null;
+    try {
+        const res = await backend.getSchedule();
+        const byDay = {};
+        let total = 0;
+        for (const [day, items] of Object.entries(res.days)) {
+            const timed = items.filter((it) => it.time).slice(0, SCHEDULE.perDay);
+            const untimed = items.filter((it) => !it.time).slice(0, SCHEDULE.perDayDonghua);
+            byDay[day] = [...timed, ...untimed].map((it) => ({ ...it, episode: null, aired: true, latest: true }));
+            total += byDay[day].length;
+        }
+        return total ? byDay : null;
+    } catch (err) {
+        if (err?.kind === 'disabled') return null; // hosting statis tanpa backend → bukan error
+        throw err;
+    }
+}
+
+/**
  * Jadwal 7 hari ke depan (mulai hari ini) dalam WIB.
- * @returns {Promise<{byDay: Record<number, Array<{time:string,title:string,episode:number|null,aired:boolean,anime?:Anime}>|Array<[string,string]>>, today:number, source:'anilist'|'mal'|'fallback', error?: ApiError}>}
+ * Urutan: backend (jadwal rilis Sub Indo Samehadaku + donghua AnimeXin — situs yang memang
+ * dipakai untuk memutar) → AniList (jam tayang Jepang) → MAL → data contoh.
+ * @returns {Promise<{byDay: Record<number, Array<{time:string|null,title:string,episode:number|null,aired:boolean,latest?:boolean,anime?:Anime}>|Array<[string,string]>>, today:number, source:'backend'|'anilist'|'mal'|'fallback', error?: ApiError}>}
  */
 export async function getWeeklySchedule() {
     const today = wibWeekday();
     const errors = [];
+
+    try {
+        const byDay = await backendSchedule();
+        if (byDay) return { byDay, today, source: 'backend' };
+    } catch (err) {
+        errors.push(err);
+    }
 
     try {
         const start = wibDayStart(Math.floor(Date.now() / 1000));
@@ -594,7 +633,10 @@ export async function getWatchData(ref, { signal } = {}) {
             if (res.source === 'backend' && base.slug) {
                 // Episode diputar dari situs sumber → jumlah/status episode situs itu yang dipakai untuk
                 // navigasi (judul bisa cocok ke season lain di AniList/MAL, mis. seri donghua bernomor lanjut).
-                merged.latestEpisode = Math.max(base.latestEpisode || 0, found.anime.latestEpisode || 0) || null;
+                // Episode terbaru = milik situs sumber (yang benar-benar bisa diputar Sub Indo); metadata hanya
+                // bila situs tidak mencantumkan daftar episode. (Dulu: nilai terbesar → bisa menunjuk episode
+                // yang sudah tayang di Jepang tetapi belum ada subtitle Indonesianya.)
+                merged.latestEpisode = base.latestEpisode || found.anime.latestEpisode || null;
                 if (base.episodes || base.latestEpisode) merged.episodes = base.episodes || null;
                 if (base.status !== 'UNKNOWN') merged.status = base.status;
                 // Perkiraan jadwal mingguan milik judul yang cocok (bisa season lain) tidak berlaku di sini.

@@ -8,7 +8,7 @@
  * Endpoint:
  *   GET /api/health                     status backend + sumber (dipakai indikator "Status API" di frontend)
  *   GET /api/bot                        info bot untuk admin situs sumber (tercantum di User-Agent)
- *   GET /api/anime/latest | /search?q= | /:slug | /:slug/episode/:ep
+ *   GET /api/anime/latest | /search?q= | /schedule | /:slug | /:slug/episode/:ep
  */
 import path from 'node:path';
 import express from 'express';

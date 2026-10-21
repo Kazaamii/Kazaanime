@@ -1,6 +1,6 @@
 /**
  * Kazanime backend — lib/anime.js
- * Bentuk data SERAGAM yang dikirim ke frontend. Semua adapter (animexin, kuramanime,
+ * Bentuk data SERAGAM yang dikirim ke frontend. Semua adapter (animexin, samehadaku,
  * metadata) wajib lewat fungsi ini, jadi frontend cukup mengenal satu format.
  *
  * Field anime sama dengan objek Anime di js/api/normalize.js (createAnime):

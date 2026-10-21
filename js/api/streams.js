@@ -2,7 +2,7 @@
  * Kazanime — api/streams.js
  * Sumber video & link download untuk SATU episode.
  *
- *  - Server scraping : backend (server/sources/ — AnimeXin, Kuramanime) lewat
+ *  - Server scraping : backend (server/sources/ — AnimeXin, Samehadaku) lewat
  *                      GET /api/anime/:slug/episode/:ep → server embed + link download
  *                      dari situs sumber. Anime yang dibuka dari AniList/MAL/Kitsu (tanpa slug)
  *                      dicarikan padanannya di backend lewat judul (findBackendMatch).
@@ -31,10 +31,8 @@
  */
 import { STREAMING_SERVERS } from '../config.js';
 import { ApiError } from './http.js';
-import { looseTitleKey, originOf, titleKey, titleVariants, toHttpUrl } from './normalize.js';
+import { looseTitleKey, originOf, stripSeasonSuffix, titleKey, titleVariants, toHttpUrl } from './normalize.js';
 import * as backend from './sources.js';
-
-const ID_LABELS = { anilist: 'AniList', mal: 'MyAnimeList', kitsu: 'Kitsu' };
 
 /**
  * Server statis untuk satu episode, urut sesuai config (= urutan fallback).
@@ -55,8 +53,12 @@ export function listStreamServers(anime, ep) {
                 console.warn(`[streams] url() server "${s.id}" error:`, err);
             }
         }
+        // Alasan untuk pengguna tanpa nama penyedia / database (detail teknis ada di console).
         let reason = '';
-        if (!url) reason = hasId ? 'URL server tidak valid (cek config.js)' : `ID ${ID_LABELS[s.needs] || s.needs} tidak tersedia untuk anime ini`;
+        if (!url) {
+            reason = hasId ? 'Server ini sedang tidak bisa dipakai' : 'Server ini belum tersedia untuk anime ini';
+            if (hasId) console.warn(`[streams] url() server "${s.id}" menghasilkan URL tidak valid (cek config.js).`);
+        }
         return {
             id: s.id,
             name: s.name,
@@ -76,7 +78,7 @@ export function listStreamServers(anime, ep) {
 /* ------------------------------------------------------------------ */
 /* Mencocokkan anime (AniList/MAL/Kitsu) dengan anime di situs sumber  */
 /* ------------------------------------------------------------------ */
-/** Maks. judul berbeda yang dicari per anime (tiap judul = 1 request backend, di-cache). */
+/** Maks. kata kunci berbeda yang dicari per anime (tiap kata kunci = 1 request backend, di-cache). */
 const MAX_SEARCH_TITLES = 4;
 
 /** Daftar judul → tanpa duplikat (titleKey), tanpa kosong. */
@@ -94,7 +96,7 @@ function uniqueTitles(list) {
 
 /**
  * Judul untuk dicari di backend: judul utama + judul alternatif (romaji), plus judul tambahan
- * (mis. judul dari URL dan dari detail). Kuramanime memakai judul romaji ("Kusuriya no
+ * (mis. judul dari URL dan dari detail). Samehadaku memakai judul romaji ("Kusuriya no
  * Hitorigoto 3rd Season"), AnimeXin pinyin + Inggris — judul Inggris saja sering tidak ketemu.
  * @param {{title?: string, titleAlt?: string}|string[]} source  objek anime atau daftar judul
  */
@@ -129,9 +131,12 @@ export function matchBackendItem(anime, items) {
  * @returns {Promise<{slug: string, title: string, source: string}|null>}
  */
 export async function findBackendMatch(anime, { titles: extra, signal } = {}) {
-    const titles = titleList(extra?.length ? extra : anime).slice(0, MAX_SEARCH_TITLES);
+    const titles = titleList(extra?.length ? extra : anime);
     if (!titles.length) return null;
-    const settled = await Promise.allSettled(titles.map((q) => backend.searchBackend(q, { signal })));
+    // Kata kunci: judul lengkap dulu, lalu judul tanpa penanda season (pencarian WordPress = semua kata
+    // wajib ada). Pencocokan tetap memakai judul LENGKAP, jadi season lain tidak ikut tercocokkan.
+    const queries = uniqueTitles([...titles, ...titles.map(stripSeasonSuffix)]).slice(0, MAX_SEARCH_TITLES);
+    const settled = await Promise.allSettled(queries.map((q) => backend.searchBackend(q, { signal })));
     const ok = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     if (!ok.length) throw settled[0].reason;
     const items = ok.filter((r) => !r.fallback).flatMap((r) => r.items).filter((a) => a.slug);
@@ -165,7 +170,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
         let matchedTitle = '';
         if (!target) {
             const match = await findBackendMatch(anime, { titles, signal });
-            if (!match) return empty('Anime ini belum ada di sumber scraping (AnimeXin / Kuramanime).');
+            if (!match) return empty('Anime ini belum ada di sumber scraping (AnimeXin / Samehadaku).');
             target = match.slug;
             matchedTitle = match.title;
         }

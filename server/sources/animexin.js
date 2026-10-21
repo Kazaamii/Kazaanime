@@ -9,6 +9,8 @@
  *   /?s=<kata kunci>               → pencarian seri
  *   /<slug-seri>/                  → detail + daftar SEMUA episode (.eplister)
  *   /<slug-episode>/               → server (select.mirror → iframe base64) + link download (.soraddlx)
+ *   /schedule/                     → jadwal rilis donghua per hari (tanpa jam; dicek 2026-10-22)
+ *   Poster pengganti: judul Mandarin dari halaman seri dipakai mencari poster di Bangumi (lihat metadata.js).
  *
  * Catatan gambar: file di /wp-content/uploads membalas 403 untuk akses langsung dan
  * mengirim "Cross-Origin-Resource-Policy: same-origin" → browser tidak akan menampilkan
@@ -54,6 +56,47 @@ export function seriesSlugFromUrl(url, base) {
     } catch {
         return null;
     }
+}
+
+/** URL di halaman jadwal: "/<slug>/" atau "/anime/<slug>/" (keduanya halaman seri yang sama) → slug. */
+export function scheduleSlugFromUrl(url, base) {
+    try {
+        const u = new URL(url, base);
+        if (u.hostname.replace(/^www\./, '') !== new URL(base).hostname.replace(/^www\./, '')) return null;
+        const segs = u.pathname.split('/').filter(Boolean);
+        const s = segs.length === 1 ? segs[0] : segs.length === 2 && segs[0] === 'anime' ? segs[1] : '';
+        const slug = decodeURIComponent(s).toLowerCase();
+        return SLUG_RE.test(slug) ? slug : null;
+    } catch {
+        return null;
+    }
+}
+
+const SCHEDULE_DAYS = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+
+/**
+ * /schedule/ : blok .listSchh per hari (h2 "Monday" …) berisi tautan seri. Tanpa jam rilis.
+ * @param {import('cheerio').CheerioAPI} $
+ * @returns {Record<number, {title: string, slug: string, url: string}[]>}
+ */
+export function parseSchedulePage($, base) {
+    const out = {};
+    $('.listSchh').each((_, el) => {
+        const box = $(el);
+        const day = SCHEDULE_DAYS[cleanText(box.find('h2').first().text()).toLowerCase()];
+        if (day === undefined) return;
+        const seen = new Set();
+        const items = [];
+        box.find('.subSchh a[href]').each((__, a) => {
+            const url = absoluteUrl($(a).attr('href'), base);
+            const slug = url ? scheduleSlugFromUrl(url, base) : null;
+            if (!slug || seen.has(slug)) return;
+            seen.add(slug);
+            items.push({ title: cleanText($(a).text()), slug, url });
+        });
+        out[day] = items;
+    });
+    return out;
 }
 
 /** Slug seri ditebak dari URL episode: "...-season-10-episode-34-466-indonesia-english-sub/" → "...-season-10". */
@@ -401,6 +444,27 @@ export function createAnimexin({ network, createClient, baseUrl }) {
                 servers: parsed.servers,
                 downloads: parsed.downloads,
             });
+        },
+
+        /** Jadwal rilis donghua per hari (0 = Minggu). AnimeXin tidak mencantumkan jam → time: null. */
+        async schedule(ctx = {}) {
+            const page = await client.html(`${base}/schedule/`, ctx);
+            const days = parseSchedulePage(page.$, base);
+            const total = Object.values(days).reduce((n, d) => n + d.length, 0);
+            if (!total) throw new SourceError('Struktur halaman Schedule AnimeXin berubah.', { kind: 'parse', source: ID });
+            const out = {};
+            for (const [day, items] of Object.entries(days)) {
+                out[day] = items.map((it) => ({
+                    title: it.title,
+                    time: null,
+                    slug: encodeSlug(ID, it.slug),
+                    url: it.url,
+                    image: null,
+                    country: 'CN',
+                    source: ID,
+                }));
+            }
+            return out;
         },
     };
 }

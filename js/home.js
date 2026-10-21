@@ -185,6 +185,7 @@ const scheduleGrid = $('#scheduleGrid');
 const scheduleNote = $('#scheduleNote');
 
 const SCHEDULE_NOTES = {
+    backend: `🕒 Jadwal rilis Sub Indo dalam ${SCHEDULE.label} (Samehadaku) · donghua dari AnimeXin (tanpa jam) · klik judul untuk episode terbaru.`,
     anilist: `🕒 Jam tayang dalam ${SCHEDULE.label} (UTC+7) · ${SCHEDULE.perDay} anime terpopuler per hari · sumber: AniList · klik judul untuk menonton.`,
     mal: `🕒 Jam tayang dalam ${SCHEDULE.label}, dikonversi dari jadwal siaran Jepang (sumber: MyAnimeList).`,
 };
@@ -198,6 +199,8 @@ async function loadSchedule() {
     Object.entries(res.byDay).forEach(([day, items]) => {
         byDay[day] = items.map((it) => {
             if (Array.isArray(it) || !it.anime) return it;
+            // Jadwal backend: tanpa nomor episode → buka episode terbaru (ditentukan halaman nonton)
+            if (it.latest) return { ...it, href: watchUrl(it.anime, 'latest') };
             // Episode yang belum tayang → tautkan ke episode sebelumnya (yang sudah ada)
             const ep = it.episode ? (it.aired ? it.episode : Math.max(1, it.episode - 1)) : 1;
             return { ...it, href: watchUrl(it.anime, ep) };

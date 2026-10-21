@@ -16,6 +16,8 @@
  *   detail          : dirutekan lewat prefix slug ("animexin~…"). Gagal → metadata (judul dari slug).
  *   episode         : hanya dari scraper (metadata tidak punya server streaming) → error yang jelas,
  *                     frontend lalu memakai server statisnya.
+ *   schedule        : adapter yang punya schedule() (samehadaku: jam rilis Sub Indo WIB, animexin:
+ *                     hari rilis donghua) paralel → digabung per hari. Di-cache 1 jam.
  *   Semua hasil di-cache (TTL 10–15 menit) + stale-if-error 1 jam; "tidak ditemukan" di-cache 5 menit.
  */
 import { CACHE, METADATA, SOURCES } from '../config.js';
@@ -25,13 +27,13 @@ import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnimexin } from './animexin.js';
-import { createKuramanime } from './kuramanime.js';
-import { createMetadata } from './metadata.js';
+import { createMetadata, hasCjk } from './metadata.js';
+import { createSamehadaku } from './samehadaku.js';
 
 /** id sumber → factory adapter. */
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
-    kuramanime: createKuramanime,
+    samehadaku: createSamehadaku,
 });
 
 /** Prefix slug untuk anime dari API metadata (kitsu~123, mal~456, anilist~789). */
@@ -114,9 +116,24 @@ export function createRegistry({
     }
 
     /**
+     * Judul Mandarin/Jepang sebuah item (untuk poster Bangumi): dari item itu sendiri (detail), atau
+     * dari halaman detail situs sumber yang di-cache (item daftar hanya punya judul Inggris/pinyin).
+     */
+    async function nativeTitleOf(it) {
+        if (hasCjk(it.titleAlt)) return it.titleAlt;
+        if (!it.slug) return null;
+        const target = resolveAdapter(it.slug);
+        if (target.kind !== 'adapter') return null;
+        const r = await wrapFound(`detail:${it.slug}`, ttl.detailTtlMs, () => target.adapter.getAnime(target.ref, {}));
+        return hasCjk(r.value?.titleAlt) ? r.value.titleAlt : null;
+    }
+
+    /**
      * Ganti gambar dari sumber yang dilindungi hotlink dengan poster metadata (maks enrichBudgetMs).
      * Mengembalikan salinan baru (cache sumber tidak diubah). Gambar yang belum ketemu → null
      * (frontend memakai placeholder); pencarian tetap jalan di belakang & mengisi cache.
+     * Array hasil diberi properti `partial = true` bila batas waktu habis sebelum semua pencarian
+     * selesai → route memakai cache CDN pendek supaya poster yang menyusul cepat terlihat.
      */
     async function withSafeImages(items) {
         const out = items.map((it) => ({ ...it }));
@@ -131,7 +148,7 @@ export function createRegistry({
             while (next < targets.length) {
                 const it = targets[next++];
                 try {
-                    results.set(it, await metadata.lookupImage(it.title));
+                    results.set(it, await metadata.lookupImage(it.title, {}, { resolveNative: () => nativeTitleOf(it) }));
                 } catch {
                     results.set(it, null);
                 }
@@ -146,6 +163,7 @@ export function createRegistry({
             if (hit?.image) it.image = hit.image;
             if (hit?.banner && !it.banner) it.banner = hit.banner;
         }
+        if (results.size < targets.length) Object.defineProperty(out, 'partial', { value: true });
         return out;
     }
 
@@ -183,7 +201,8 @@ export function createRegistry({
             const r = await fanOut((a) => `latest:${a.id}`, ttl.latestTtlMs, (a) => a.latest(ctx));
             const items = mergeLists(r.groups);
             if (items.length) {
-                return { source: r.used.join(','), data: await withSafeImages(items), fallback: false, stale: r.stale, errors: r.errors };
+                const data = await withSafeImages(items);
+                return { source: r.used.join(','), data, fallback: false, stale: r.stale, partial: Boolean(data.partial), errors: r.errors };
             }
             if (metadata) {
                 try {
@@ -248,6 +267,45 @@ export function createRegistry({
                 }
                 throw err;
             }
+        },
+
+        /**
+         * Jadwal rilis mingguan dari adapter yang punya schedule(): { timezone, days: { 0..6: item[] } }.
+         * Per hari: item berjam (urut jam) dulu, lalu item tanpa jam (donghua AnimeXin).
+         */
+        async schedule(ctx = {}) {
+            const active = usable().filter((a) => typeof a.schedule === 'function');
+            if (!active.length) throw new AppError('Tidak ada sumber jadwal yang aktif.', { status: 503, code: 'NO_SOURCES' });
+            const settled = await Promise.allSettled(active.map((a) => wrap(`schedule:${a.id}`, ttl.scheduleTtlMs, () => a.schedule(ctx))));
+            const days = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, []]));
+            const used = [];
+            const errors = [];
+            const raw = [];
+            let stale = false;
+            settled.forEach((r, i) => {
+                if (r.status !== 'fulfilled') {
+                    if (isAbort(r.reason)) throw r.reason;
+                    raw.push(r.reason);
+                    errors.push(describeError(r.reason));
+                    return;
+                }
+                used.push(active[i].id);
+                if (r.value.cache === 'stale') {
+                    stale = true;
+                    errors.push(describeError(r.value.error));
+                }
+                for (const [day, items] of Object.entries(r.value.value || {})) {
+                    if (days[day]) days[day].push(...items);
+                }
+            });
+            if (!used.length) throw combineErrors(raw, 'Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.');
+            for (const d of Object.keys(days)) {
+                const seen = new Set();
+                days[d] = days[d]
+                    .filter((it) => it?.title && !seen.has(titleKey(it.title)) && seen.add(titleKey(it.title)))
+                    .sort((a, b) => (a.time ? 0 : 1) - (b.time ? 0 : 1) || String(a.time || '').localeCompare(String(b.time || '')));
+            }
+            return { source: used.join(','), data: { timezone: 'Asia/Jakarta', days }, fallback: false, stale, errors };
         },
 
         async episode(slug, ep, ctx = {}) {

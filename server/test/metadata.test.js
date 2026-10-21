@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TtlCache } from '../lib/cache.js';
 import { SourceError } from '../lib/errors.js';
-import { createMetadata, kitsuCountry, normalizeAniList, normalizeJikan, normalizeKitsu } from '../sources/metadata.js';
+import { cjkKey, createMetadata, hasCjk, kitsuCountry, normalizeAniList, normalizeJikan, normalizeKitsu } from '../sources/metadata.js';
 import { fixture } from './helpers.js';
 
 test('normalizeKitsu: data asli Kitsu → anime seragam + id MAL/AniList dari mappings', () => {
@@ -136,6 +136,9 @@ test('metadata.lookupImage: judul ber-season → poster seri utama (query kedua 
             if (q === 'Swallowed Star Season 5') return { data: [kitsuItem(48061, { en_cn: 'Tunshi Xingkong 4' })] };
             return { data: [kitsuItem(1, { en: 'Judul Lain Sama Sekali' })] };
         },
+        // Sumber poster berikutnya menjawab "tidak ada" (bukan gagal) → hasil null boleh di-cache
+        bangumi: async () => ({ code: 404, error: 'Not Found' }),
+        mangabaka: async () => ({ status: 200, data: [] }),
     });
     assert.equal((await m.lookupImage('Swallowed Star Season 5')).image, 'https://media.kitsu.app/anime/43803/poster.jpg');
     assert.deepEqual(queries, ['Swallowed Star Season 5', 'Swallowed Star']);
@@ -173,4 +176,70 @@ test('metadata.getById: kitsu / mal (Jikan) / anilist (GraphQL POST)', async () 
     assert.equal((await m.getById('mal', 52991)).ids.mal, 52991);
     assert.equal((await m.getById('anilist', 154587)).ids.anilist, 154587);
     assert.equal(calls.find((c) => c.source === 'anilist').url, 'https://graphql.anilist.co');
+});
+
+test('metadata.lookupImage: Kitsu tidak punya → Bangumi lewat judul Mandarin (cocok persis) → MangaBaka (judul persis)', async () => {
+    const asked = [];
+    const { m, calls } = metaWith({
+        kitsu: async () => ({ data: [kitsuItem(1, { en: 'Judul Lain Sama Sekali' })] }),
+        bangumi: async (url) => {
+            const q = decodeURIComponent(new URL(url).pathname.split('/').pop());
+            if (q === '大夏守墓人') {
+                return { results: 3, list: [
+                    { id: 1, name: '大夏守墓人 前传', images: { large: 'http://lain.bgm.tv/pic/cover/l/xx/1_a.jpg' } },
+                    { id: 466756, name: '大夏守墓人', name_cn: '大夏守墓人', images: { large: 'http://lain.bgm.tv/pic/cover/l/13/57/466756_xd3AT.jpg' } },
+                ] };
+            }
+            // "顾安" → hasil tidak ada yang namanya persis sama → tidak dipakai
+            return { results: 2, list: [{ id: 9, name: '安菟！安菟！', images: { large: 'http://lain.bgm.tv/pic/cover/l/03/cb/259938_Ft888.jpg' } }] };
+        },
+        mangabaka: async (url) => {
+            const q = new URL(url).searchParams.get('q');
+            if (q === 'Coiling Dragon') {
+                return { status: 200, data: [
+                    { title: 'Coiling Dragon', native_title: '盘龙', content_rating: 'safe', cover: { raw: { url: 'https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx1-x.jpg' } } },
+                ] };
+            }
+            return { status: 200, data: [{ title: 'Guan Zhong and Bao Shu', content_rating: 'safe', cover: { raw: { url: 'https://s4.anilist.co/x.png' } } }] };
+        },
+    });
+    const daxia = await m.lookupImage('The Guardian of Daxia', {}, { resolveNative: async () => { asked.push('daxia'); return '大夏守墓人'; } });
+    assert.deepEqual(daxia, { image: 'https://lain.bgm.tv/pic/cover/l/13/57/466756_xd3AT.jpg', banner: null, provider: 'bangumi' }, 'nama persis, http → https');
+    const guan = await m.lookupImage('Gu An [One Slash to the Heavens]', {}, { resolveNative: async () => '顾安' });
+    assert.equal(guan, null, 'Bangumi & MangaBaka tanpa judul yang persis sama → tidak ada gambar (bukan gambar acak)');
+    const dragon = await m.lookupImage('Coiling Dragon', {}, { resolveNative: async () => null });
+    assert.equal(dragon.provider, 'mangabaka');
+    assert.equal(dragon.image, 'https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx1-x.jpg');
+    assert.deepEqual(asked, ['daxia']);
+    assert.ok(calls.some((c) => c.source === 'bangumi' && c.url.includes('responseGroup=small')));
+});
+
+test('metadata.lookupImage: Kitsu cocok → Bangumi/MangaBaka & resolveNative tidak dipanggil', async () => {
+    let resolved = 0;
+    const { m, calls } = metaWith({
+        kitsu: async () => ({ data: [kitsuItem(48036, { en: 'Renegade Immortal', en_cn: 'Xian Ni' })] }),
+    });
+    const hit = await m.lookupImage('Renegade Immortal', {}, { resolveNative: async () => { resolved++; return '仙逆'; } });
+    assert.equal(hit.provider, 'kitsu');
+    assert.equal(resolved, 0);
+    assert.ok(!calls.some((c) => c.source === 'bangumi' || c.source === 'mangabaka'));
+});
+
+test('metadata.lookupImage: sumber poster GAGAL → error (tidak di-cache sebagai "tidak ada poster"), percobaan berikutnya jalan lagi', async () => {
+    let kitsuUp = false;
+    const { m } = metaWith({
+        kitsu: async () => (kitsuUp ? { data: [kitsuItem(7, { en: 'Martial Master' })] } : new SourceError('kitsu timeout', { kind: 'timeout', source: 'kitsu' })),
+        bangumi: async () => ({ code: 404 }),
+        mangabaka: async () => ({ status: 200, data: [] }),
+    });
+    await assert.rejects(() => m.lookupImage('Martial Master'), /kitsu timeout/);
+    kitsuUp = true;
+    assert.equal((await m.lookupImage('Martial Master')).provider, 'kitsu');
+});
+
+test('metadata.hasCjk / cjkKey', () => {
+    assert.equal(hasCjk('一念永恒'), true);
+    assert.equal(hasCjk('Yi Nian Yong Heng'), false);
+    assert.equal(cjkKey(' 大夏 守墓人！'), cjkKey('大夏守墓人'));
+    assert.notEqual(cjkKey('炼气十万年特别篇'), cjkKey('炼气十万年'));
 });

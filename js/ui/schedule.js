@@ -6,13 +6,14 @@
  *  - Hari ini dihitung (dulu "Rabu ✨" ditulis mati di HTML sehingga yang
  *    disorot selalu Rabu). Tahap B: "hari ini" mengikuti WIB.
  *  - Tahap B: item bisa berupa link ke watch.html + nomor episode.
+ *  - 22 Okt 2026: item tanpa jam (donghua AnimeXin) tampil "—".
  */
 import { DAY_NAMES } from '../config.js';
 import { html } from './dom.js';
 
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Senin dulu, seperti tampilan asli
 
-/** @typedef {{time:string, title:string, episode?:number|null, href?:string}} ScheduleItem */
+/** @typedef {{time:string|null, title:string, episode?:number|null, href?:string}} ScheduleItem */
 
 /**
  * @param {HTMLElement} grid
@@ -29,8 +30,9 @@ export function renderSchedule(grid, byDay, { today = new Date().getDay(), timeL
             <h4>${DAY_NAMES[day]}${isToday ? ' ✨' : ''}</h4>
             ${items.length
                 ? items.map((it) => {
-                    const tip = `${it.title}${it.episode ? ` — Episode ${it.episode}` : ''} (${it.time}${timeLabel ? ` ${timeLabel}` : ''})`;
-                    const inner = html`<span class="schedule-time">${it.time}</span><span class="schedule-anime">${it.title}</span>${it.episode ? html`<span class="schedule-ep">EP ${it.episode}</span>` : ''}`;
+                    const when = it.time ? `${it.time}${timeLabel ? ` ${timeLabel}` : ''}` : 'jam rilis tidak dicantumkan';
+                    const tip = `${it.title}${it.episode ? ` — Episode ${it.episode}` : ''} (${when})`;
+                    const inner = html`<span class="schedule-time">${it.time || '—'}</span><span class="schedule-anime">${it.title}</span>${it.episode ? html`<span class="schedule-ep">EP ${it.episode}</span>` : ''}`;
                     return it.href
                         ? html`<a class="schedule-item" href="${it.href}" title="${tip}">${inner}</a>`
                         : html`<div class="schedule-item" title="${tip}">${inner}</div>`;

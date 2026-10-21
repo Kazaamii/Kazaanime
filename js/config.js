@@ -8,8 +8,9 @@
  * Tahap C : + STREAMING_SERVERS & PLAYER (watch.html), CACHE_TTL.detail, kunci riwayat/auto-next.
  * Tahap D : API_CONFIG.backend aktif (backend scraper Express di server/, endpoint /api/anime/*).
  * Perbaikan pasca-D (22 Okt 2026): player mendahulukan server hasil scraping backend
- *           (AnimeXin, Kuramanime) untuk SEMUA anime — PLAYER.serverOrder; host embed
- *           cadangan animeplay.cfd (suspended) → megaplay.buzz.
+ *           (AnimeXin, Samehadaku) untuk SEMUA anime — PLAYER.serverOrder; host embed
+ *           cadangan animeplay.cfd (suspended) → megaplay.buzz (+ Vidnest & TryEmbed, pustaka
+ *           HiAnime). Tombol server tampil "Server 1, 2, …" (nama penyedia tidak ditampilkan).
  */
 
 export const APP = Object.freeze({
@@ -196,7 +197,10 @@ export const CACHE_TTL = Object.freeze({
 export const SCHEDULE = Object.freeze({
     label: 'WIB',
     utcOffsetHours: 7,
+    /** Maks. anime berjam per hari (jadwal rilis Sub Indo / jadwal tayang). */
     perDay: 8,
+    /** Maks. donghua tanpa jam per hari (AnimeXin tidak mencantumkan jam rilis). */
+    perDayDonghua: 4,
 });
 
 /** Pengaturan UI umum. */
@@ -220,6 +224,8 @@ export const UI = Object.freeze({
 
 /**
  * Server streaming STATIS (embed iframe) = CADANGAN. URUTAN = urutan fallback otomatis.
+ *  - name     : nama internal (log & dokumentasi). Di halaman nonton SEMUA tombol server tampil
+ *               "Server 1, 2, …" sesuai urutan putar — nama penyedia tidak ditampilkan.
  *  - needs    : ID yang wajib ada ('anilist' | 'mal' | 'kitsu'). Tanpa ID itu server
  *               ditampilkan terkunci 🔒 dan dilewati otomatis.
  *  - url(ctx) : ctx = { anilist, mal, kitsu, ep, title } → URL embed (http/https).
@@ -229,7 +235,7 @@ export const UI = Object.freeze({
  *               Origin dari URL embed itu sendiri selalu diizinkan.
  *  - enabled  : false = disembunyikan tanpa menghapus definisinya.
  *
- * Server UTAMA datang dari backend scraper (server/sources/: AnimeXin, Kuramanime) per
+ * Server UTAMA datang dari backend scraper (server/sources/: AnimeXin, Samehadaku) per
  * episode — lihat PLAYER.serverOrder. Server di bawah hanya dipakai bila situs sumber tidak
  * punya anime/episode itu atau semua servernya gagal. Ingin HANYA server hasil scraping?
  * Set `enabled: false` pada kedua server di bawah (anime yang tidak ada di situs sumber
@@ -247,6 +253,9 @@ export const UI = Object.freeze({
  *    jangan diubah ke 'no-referrer'.
  *  - Episode yang belum tayang / belum dipetakan MegaPlay menampilkan "Oops! Something
  *    went wrong" DI DALAM iframe. Browser tidak bisa membacanya → pakai "⟳ Server Lain".
+ *  - Vidnest (vidnest.fun) & TryEmbed (tryembed.us.cc): embed lain berbasis id AniList yang dipakai
+ *    hianime.ro untuk pustaka HiAnime yang sama (dicek: bisa di-embed, tanpa X-Frame-Options/CSP).
+ *    Subtitle Inggris. Ketersediaan per episode tidak bisa dicek dari luar → pakai "⟳ Server Lain".
  * Ganti host: ubah STREAM_HOST (pola path sama) atau tambah entri baru di bawah.
  */
 const STREAM_HOST = 'https://megaplay.buzz';
@@ -273,6 +282,28 @@ export const STREAMING_SERVERS = Object.freeze([
         origins: Object.freeze([]),
         url: ({ mal, ep }) => `${STREAM_HOST}/stream/mal/${mal}/${ep}/sub`,
     }),
+    Object.freeze({
+        id: 'vidnest-anilist',
+        flag: '🌐',
+        name: 'Vidnest - AniList',
+        description: 'Cadangan - Vidnest via AniList ID (subtitle Inggris)',
+        needs: 'anilist',
+        lang: 'en',
+        enabled: true,
+        origins: Object.freeze([]),
+        url: ({ anilist, ep }) => `https://vidnest.fun/anime/${anilist}/${ep}/sub`,
+    }),
+    Object.freeze({
+        id: 'tryembed-anilist',
+        flag: '🌐',
+        name: 'TryEmbed - AniList',
+        description: 'Cadangan - TryEmbed via AniList ID (subtitle Inggris)',
+        needs: 'anilist',
+        lang: 'en',
+        enabled: true,
+        origins: Object.freeze([]),
+        url: ({ anilist, ep }) => `https://tryembed.us.cc/embed/anime/${anilist}/${ep}/sub`,
+    }),
 ]);
 
 /** Pengaturan player watch.html. */
@@ -280,7 +311,7 @@ export const PLAYER = Object.freeze({
     /**
      * Urutan sumber video:
      *  - 'scrape-first' (default): untuk SEMUA anime, player mencari episode itu di situs
-     *    sumber backend (AnimeXin / Kuramanime — dicocokkan lewat judul) dan memutar server
+     *    sumber backend (AnimeXin / Samehadaku — dicocokkan lewat judul) dan memutar server
      *    hasil scraping lebih dulu. STREAMING_SERVERS hanya cadangan otomatis.
      *  - 'static-first': perilaku Tahap D — server statis dulu, server scraping sebagai
      *    tambahan (kecuali anime yang dibuka dari kartu backend / URL ber-slug).
@@ -290,8 +321,6 @@ export const PLAYER = Object.freeze({
     /** Maks. menunggu hasil scraping sebelum memutar server cadangan (ms). Hasil yang datang
      *  belakangan tetap ditambahkan sebagai tombol server tanpa memutus video. */
     scrapeWaitMs: 8000,
-    /** Nama situs sumber scraping untuk pesan di player. */
-    scrapeLabel: 'AnimeXin & Kuramanime',
     /** iframe tidak selesai dimuat dalam waktu ini (ms) → otomatis pindah ke server berikutnya. */
     loadTimeout: 15000,
     /** Auto-next default (user bisa mengubahnya; pilihan tersimpan di localStorage). */

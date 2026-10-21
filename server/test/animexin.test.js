@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    createAnimexin, deriveSeriesSlug, describeServer, parseEpisodePage, parseLatestHome, parseSeriesCards, parseSeriesPage, seriesSlugFromUrl,
+    createAnimexin, deriveSeriesSlug, describeServer, parseEpisodePage, parseLatestHome, parseSchedulePage, parseSeriesCards, parseSeriesPage,
+    scheduleSlugFromUrl, seriesSlugFromUrl,
 } from '../sources/animexin.js';
 import { fakeClientFactory, fixture, fixture$ } from './helpers.js';
 
@@ -167,4 +168,26 @@ test('animexin adapter: parseRef & titleHint', () => {
     assert.equal(a.titleHint({ slug: 'swallowed-star-season-5' }), 'swallowed star season 5');
     assert.equal(a.policy.tos.verdict, 'allowed');
     assert.equal(a.policy.imagePolicy, 'blocked');
+});
+
+test('animexin: halaman Schedule asli → donghua per hari (tanpa jam), slug dari "/<slug>/" maupun "/anime/<slug>/"', () => {
+    const days = parseSchedulePage(fixture$('animexin-schedule.html'), BASE);
+    assert.deepEqual(Object.keys(days).sort(), ['0', '1', '2', '3', '4', '5', '6']);
+    assert.deepEqual(days[1].slice(0, 3), [
+        { title: 'Renegade Immortal', slug: 'renegade-immortal', url: 'https://animexin.dev/renegade-immortal/' },
+        { title: 'Supreme God Emperor', slug: 'supreme-god-emperor', url: 'https://animexin.dev/anime/supreme-god-emperor/' },
+        { title: 'Against Sky Supreme', slug: 'againts-the-sky-supreme', url: 'https://animexin.dev/anime/againts-the-sky-supreme/' },
+    ]);
+    assert.ok(Object.values(days).reduce((n, d) => n + d.length, 0) >= 30);
+    assert.equal(scheduleSlugFromUrl('https://animexin.dev/anime/gu-an/', BASE), 'gu-an');
+    assert.equal(scheduleSlugFromUrl('https://animexin.dev/a/b/c/', BASE), null);
+    assert.equal(scheduleSlugFromUrl('https://evil.example/gu-an/', BASE), null);
+});
+
+test('animexin: adapter.schedule() → item seragam (time null, country CN, slug animexin~)', async () => {
+    const { createClient } = fakeClientFactory({ [`${BASE}/schedule/`]: fixture('animexin-schedule.html') });
+    const a = createAnimexin({ network: {}, createClient, baseUrl: BASE });
+    const days = await a.schedule();
+    const first = days[1][0];
+    assert.deepEqual(first, { title: 'Renegade Immortal', time: null, slug: 'animexin~renegade-immortal', url: 'https://animexin.dev/renegade-immortal/', image: null, country: 'CN', source: 'animexin' });
 });

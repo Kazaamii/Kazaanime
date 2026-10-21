@@ -2,13 +2,14 @@
  * Kazanime — api/sources.js
  * Klien untuk BACKEND SCRAPER milik sendiri (server/ — aktif mulai Tahap D).
  *
- * Kenapa lewat backend? Situs sumber (animexin, kuramanime) tidak mengizinkan
+ * Kenapa lewat backend? Situs sumber (animexin, samehadaku) tidak mengizinkan
  * CORS dan dilindungi Cloudflare, jadi browser tidak bisa (dan tidak boleh)
- * mengambil halamannya langsung. Frontend HANYA memanggil 4 endpoint ini
+ * mengambil halamannya langsung. Frontend HANYA memanggil endpoint ini
  * (+ /api/health untuk indikator status):
  *
  *   GET /api/anime/latest
  *   GET /api/anime/search?q=
+ *   GET /api/anime/schedule        (jadwal rilis per hari — ditambahkan 22 Okt 2026)
  *   GET /api/anime/:slug
  *   GET /api/anime/:slug/episode/:ep
  *
@@ -163,6 +164,37 @@ function toEpisodeMedia(json) {
  */
 export function getBackendEpisode(slug, ep, { signal } = {}) {
     return call(`/${encodeURIComponent(slug)}/episode/${encodeURIComponent(ep)}`, { ttl: CACHE_TTL.search, signal, transform: toEpisodeMedia });
+}
+
+const CLOCK_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** Slug backend yang sah: "<sumber>~<bagian>" (sama dengan pola yang diterima routes.parseWatchParams). */
+const BACKEND_SLUG_RE = /^[a-z0-9-]{2,30}~[a-zA-Z0-9._~-]{1,150}$/;
+
+/**
+ * Jadwal rilis mingguan dari backend: Samehadaku (jam rilis Sub Indo, WIB) + AnimeXin (hari rilis
+ * donghua, tanpa jam). Item membawa Anime dengan slug → bisa langsung diputar dari situs sumber.
+ * @returns {Promise<{days: Record<number, {time: string|null, title: string, anime: import('./normalize.js').Anime}[]>, source: string}>}
+ */
+export function getSchedule({ signal } = {}) {
+    return call('/schedule', {
+        ttl: CACHE_TTL.schedule,
+        signal,
+        transform: (json) => {
+            const days = {};
+            const raw = json?.data?.days && typeof json.data.days === 'object' ? json.data.days : {};
+            for (const [day, items] of Object.entries(raw)) {
+                const d = Number(day);
+                if (!Number.isInteger(d) || d < 0 || d > 6 || !Array.isArray(items)) continue;
+                days[d] = items.slice(0, 40).map((it) => {
+                    if (!BACKEND_SLUG_RE.test(String(it?.slug || ''))) return null; // data scraping tidak dipercaya
+                    const anime = fromBackend({ title: it.title, slug: it.slug, image: toHttpUrl(it.image) || null, country: it.country, source: it.source }, json.source);
+                    if (!anime) return null;
+                    return { time: CLOCK_RE.test(String(it.time || '')) ? it.time : null, title: anime.title, anime };
+                }).filter(Boolean);
+            }
+            return { days, source: json.source || 'backend' };
+        },
+    });
 }
 
 /** Cek status backend (/api/health) — hanya jika diaktifkan. */

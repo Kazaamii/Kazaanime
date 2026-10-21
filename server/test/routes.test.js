@@ -30,6 +30,10 @@ function fakeRegistry() {
             if (slug === 'animexin~timeout') throw new SourceError('animexin terlalu lama merespons (6 dtk).', { kind: 'timeout', source: 'animexin' });
             return { source: 'animexin', data: makeEpisode({ episode: ep, servers: [{ name: 'Dailymotion (Sub Indo)', url: 'https://geo.dailymotion.com/player/x.html?video=1', lang: 'id' }] }), fallback: false, stale: false, errors: [] };
         },
+        async schedule() {
+            seen.push('schedule');
+            return { source: 'samehadaku,animexin', data: { timezone: 'Asia/Jakarta', days: { 0: [{ title: 'Kusuriya no Hitorigoto Season 3', time: '01:00', slug: 'samehadaku~kusuriya-no-hitorigoto-season-3', source: 'samehadaku' }] } }, fallback: false, stale: false, errors: [] };
+        },
         health: () => ({ sources: [{ id: 'animexin', circuit: 'closed' }], metadata: { enabled: true }, cache: { entries: 0 } }),
     };
 }
@@ -168,5 +172,19 @@ test('server lokal: hanya file frontend yang dilayani (server/, package.json tid
         for (const p of ['/server/app.js', '/package.json', '/api/index.js', '/.env.example', '/node_modules/express/package.json', '/js/../server/config.js', '/js/%2e%2e/server/config.js']) {
             assert.equal((await get(`${base}${p}`)).res.status, 404, p);
         }
+    });
+});
+
+test('GET /api/anime/schedule: dirutekan ke registry.schedule (BUKAN dianggap slug anime)', async () => {
+    await withApp({}, async (base, registry) => {
+        const { res, json } = await get(`${base}/api/anime/schedule`);
+        assert.equal(res.status, 200);
+        assert.equal(json.ok, true);
+        assert.equal(json.source, 'samehadaku,animexin');
+        assert.equal(json.data.timezone, 'Asia/Jakarta');
+        assert.equal(json.data.days[0][0].time, '01:00');
+        assert.match(res.headers.get('cache-control'), /s-maxage=/);
+        assert.ok(registry.seen.includes('schedule'));
+        assert.ok(!registry.seen.some((x) => x.startsWith('detail:')));
     });
 });

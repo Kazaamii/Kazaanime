@@ -54,13 +54,19 @@ export const FALLBACK_NEW = Object.freeze([
     item('Dr. Stone S4', 'Sci-Fi', 'EP 3', '8.6', '1080p', 'NEW', '#a3e635'),
 ]);
 
+/**
+ * Donghua cadangan. Perbaikan 22 Okt 2026: dulu tanpa gambar (kartu gradasi warna) → kini poster
+ * Kitsu / Bangumi yang dicek HTTP 200 dan boleh ditampilkan dari situs lain.
+ */
+const KITSU_POSTER = (id) => `https://media.kitsu.app/anime/poster_images/${id}/large.jpg`;
+const DONGHUA = (title, ep, rating, badge, color, image, alt) => item(title, 'Donghua', ep, rating, '1080p', badge, color, { format: 'DONGHUA', country: 'CN', image, titleAlt: alt });
 export const FALLBACK_DONGHUA = Object.freeze([
-    item('Battle Through the Heavens', 'Donghua', 'Ongoing', '8.5', '1080p', 'ONGOING', '#ef4444', { format: 'DONGHUA', country: 'CN' }),
-    item('Soul Land', 'Donghua', 'Ongoing', '8.8', '1080p', 'ONGOING', '#3b82f6', { format: 'DONGHUA', country: 'CN' }),
-    item('Martial Universe', 'Donghua', 'Completed', '8.3', '1080p', 'HD', '#10b981', { format: 'DONGHUA', country: 'CN' }),
-    item("The King's Avatar", 'Donghua', 'Completed', '8.7', '1080p', 'HD', '#f59e0b', { format: 'DONGHUA', country: 'CN' }),
-    item('Stellar Transformations', 'Donghua', 'Ongoing', '8.4', '1080p', 'ONGOING', '#8b5cf6', { format: 'DONGHUA', country: 'CN' }),
-    item('Coiling Dragon', 'Donghua', 'Ongoing', '8.2', '1080p', 'ONGOING', '#ec4899', { format: 'DONGHUA', country: 'CN' }),
+    DONGHUA('Battle Through the Heavens', 'Ongoing', '8.5', 'ONGOING', '#ef4444', KITSU_POSTER(14116), 'Doupo Cangqiong'),
+    DONGHUA('Soul Land', 'Ongoing', '8.8', 'ONGOING', '#3b82f6', KITSU_POSTER(41004), 'Douluo Dalu'),
+    DONGHUA('Martial Universe', 'Completed', '8.3', 'HD', '#10b981', KITSU_POSTER(42326), 'Wu Dong Qian Kun'),
+    DONGHUA("The King's Avatar", 'Completed', '8.7', 'HD', '#f59e0b', 'https://media.kitsu.app/anime/12611/poster_image/large-6ff8047fa2211c53a7dcbc947f92e74f.jpeg', 'Quanzhi Gaoshou'),
+    DONGHUA('Stellar Transformations', 'Ongoing', '8.4', 'ONGOING', '#8b5cf6', KITSU_POSTER(42908), 'Xing Chen Bian'),
+    DONGHUA('Coiling Dragon', 'Ongoing', '8.2', 'ONGOING', '#ec4899', 'https://lain.bgm.tv/pic/cover/l/be/e5/395220_33k6U.jpg', 'Pan Long'),
 ]);
 
 const KITSU = 'https://media.kitsu.app/anime';

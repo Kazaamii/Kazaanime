@@ -12,7 +12,16 @@
  *   latestDonghua()      → donghua yang sedang tayang (fallback /api/anime/latest)
  *   findByTitle(title)   → satu anime paling cocok (fallback /api/anime/:slug)
  *   getById(kind, id)    → detail by id (slug kitsu~123 / mal~123 / anilist~123)
- *   lookupImage(title)   → poster pengganti untuk sumber yang gambarnya dilindungi hotlink
+ *   lookupImage(title)   → poster pengganti untuk sumber yang gambarnya dilindungi hotlink:
+ *                          Kitsu → Bangumi (judul Mandarin persis) → MangaBaka (judul persis, cover manhua)
+ *
+ * Sumber poster tambahan (dicek 2026-10-22, METADATA_POSTER_SOURCES):
+ *   Bangumi   https://api.bgm.tv (robots.txt hanya melarang /pic/ /img/ /js/) — database anime Tiongkok;
+ *             dicari dengan judul MANDARIN dari halaman seri situs sumber, dipakai hanya bila nama
+ *             cocok persis (judul Inggris tidak bisa diverifikasi → tidak dipakai). Gambar lain.bgm.tv
+ *             bisa ditampilkan dari situs lain.
+ *   MangaBaka https://api.mangabaka.org/v1 (robots.txt mengizinkan /v1/) — database manga/manhua;
+ *             cover KOMIK sumber adaptasi, dipakai paling akhir dan hanya bila judul cocok persis.
  */
 import { BOT, CACHE, METADATA } from '../config.js';
 import { makeAnime } from '../lib/anime.js';
@@ -152,6 +161,14 @@ export const ANILIST_MEDIA_QUERY = `query ($id: Int, $idMal: Int) {
 /**
  * @param {{network: any, createClient: Function, cache: import('../lib/cache.js').TtlCache, config?: typeof METADATA}} deps
  */
+/** Ada huruf Han/Kana/Hangul? */
+export const hasCjk = (s) => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(String(s || ''));
+
+/** Kunci pembanding judul yang aman untuk huruf Mandarin: tanpa spasi/tanda baca, huruf kecil, NFKC. */
+export function cjkKey(s) {
+    return String(s || '').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
+}
+
 export function createMetadata({ network, createClient, cache, config = METADATA }) {
     const common = { robots: false, timeoutMs: config.timeoutMs, retries: 1 };
     const kitsu = createClient(network, { ...common, source: 'kitsu', allowedHosts: ['kitsu.app', 'kitsu.io'], intervalMs: config.kitsu.minIntervalMs });
@@ -194,6 +211,40 @@ export function createMetadata({ network, createClient, cache, config = METADATA
     /** Entri Kitsu yang SALAH SATU judulnya (en / romaji / pinyin / singkatan) persis sama dengan kandidat. */
     function pickExactKitsu(entries, keys) {
         return entries.find((e) => e.titles.some((t) => keys.has(titleKey(t))))?.anime || null;
+    }
+
+    /* ---------------- Poster tambahan: Bangumi & MangaBaka ---------------- */
+    const posterSources = new Set(config.posterSources || ['kitsu', 'bangumi', 'mangabaka']);
+    const bangumi = createClient(network, {
+        source: 'bangumi', allowedHosts: ['api.bgm.tv'], robots: true, timeoutMs: config.timeoutMs, retries: 0, intervalMs: config.bangumi.minIntervalMs,
+    });
+    const mangabaka = createClient(network, {
+        source: 'mangabaka', allowedHosts: ['api.mangabaka.org'], robots: true, timeoutMs: config.timeoutMs, retries: 0, intervalMs: config.mangabaka.minIntervalMs,
+    });
+
+    /** Poster Bangumi untuk judul Mandarin — hanya bila nama (asli / zh) cocok persis. */
+    async function bangumiPoster(native, ctx) {
+        const q = cleanText(native).slice(0, 60);
+        if (!q || !hasCjk(q)) return null;
+        const json = await bangumi.json(`${config.bangumi.baseUrl}/search/subject/${encodeURIComponent(q)}?type=2&responseGroup=small&max_results=10`, ctx);
+        const want = cjkKey(q);
+        const hit = (Array.isArray(json?.list) ? json.list : []).find((x) => [x?.name, x?.name_cn].some((n) => n && cjkKey(n) === want));
+        const img = hit?.images?.large || hit?.images?.common || '';
+        return /^https?:\/\/lain\.bgm\.tv\//.test(img) ? img.replace(/^http:\/\//, 'https://') : null;
+    }
+
+    /** Cover MangaBaka (manhua/novel sumber adaptasi) — hanya bila salah satu judul cocok persis. */
+    async function mangabakaPoster(titles, ctx) {
+        const keys = new Set(titles.map((t) => cjkKey(t)).filter((k) => k.length >= 2));
+        for (const q of titles.slice(0, 2)) {
+            const json = await mangabaka.json(`${config.mangabaka.baseUrl}/series/search?q=${encodeURIComponent(q)}&limit=5`, ctx);
+            const hit = (Array.isArray(json?.data) ? json.data : []).find((x) => ['safe', 'suggestive'].includes(x?.content_rating)
+                && [x.title, x.native_title, x.romanized_title].some((t) => t && keys.has(cjkKey(t))));
+            const raw = hit?.cover?.raw?.url;
+            const img = /^https:\/\//.test(raw || '') ? raw : hit?.cover?.x350?.x1 || hit?.cover?.x250?.x1 || null;
+            if (img && /^https:\/\//.test(img)) return img;
+        }
+        return null;
     }
 
     /* ---------------- Jikan ---------------- */
@@ -321,11 +372,16 @@ export function createMetadata({ network, createClient, cache, config = METADATA
         },
 
         /**
-         * Poster pengganti dari Kitsu (maks 2 request per judul, di-cache 24 jam; "tidak ketemu" 6 jam).
-         * Hanya GAMBAR yang dipakai — id tidak ditempel karena judul bisa cocok ke season lain.
-         * @returns {Promise<{image: string|null, banner: string|null}|null>}
+         * Poster pengganti (di-cache 24 jam; "tidak ketemu" 6 jam). Hanya GAMBAR yang dipakai — id
+         * tidak ditempel karena judul bisa cocok ke season lain. Urutan:
+         *   1. Kitsu      — judul (+ bagian dalam kurung, + tanpa penanda season) cocok persis (maks 2 request)
+         *   2. Bangumi    — judul Mandarin (dari resolveNative(): halaman seri situs sumber) cocok persis
+         *   3. MangaBaka  — cover manhua/novel sumber, judul cocok persis (pilihan terakhir)
+         * @param {string} title
+         * @param {{resolveNative?: () => Promise<string|null>}} [opts]  dipanggil hanya bila Kitsu tidak menemukan
+         * @returns {Promise<{image: string|null, banner: string|null, provider?: string}|null>}
          */
-        async lookupImage(title, ctx = {}) {
+        async lookupImage(title, ctx = {}, { resolveNative } = {}) {
             const t = cleanText(title);
             if (!t) return null;
             const key = `meta:img:${titleKey(t)}`;
@@ -334,15 +390,41 @@ export function createMetadata({ network, createClient, cache, config = METADATA
                 const base = stripSeason(main);
                 const fullKeys = new Set([t, main, alt].filter(Boolean).map(titleKey));
                 const baseKeys = new Set([base, stripSeason(alt)].filter(Boolean).map(titleKey));
-                const toHit = (a) => (a?.image ? { image: a.image, banner: a.banner } : null);
+                const toHit = (a) => (a?.image ? { image: a.image, banner: a.banner, provider: 'kitsu' } : null);
+                let failure = null;
+                const quiet = async (fn) => {
+                    try {
+                        return await fn();
+                    } catch (err) {
+                        if (isAbort(err)) throw err;
+                        failure ||= err; // satu sumber poster gagal → coba sumber berikutnya
+                        return null;
+                    }
+                };
 
-                const first = await kitsuFind(t, ctx, 5, { light: true });
-                const exact = pickExactKitsu(first, fullKeys) || pickExactKitsu(first, baseKeys);
-                if (exact) return toHit(exact);
-                const second = alt || (titleKey(base) !== titleKey(main) ? base : '');
-                if (!second) return null;
-                const more = await kitsuFind(second, ctx, 5, { light: true });
-                return toHit(pickExactKitsu(more, fullKeys) || pickExactKitsu(more, baseKeys));
+                if (posterSources.has('kitsu')) {
+                    const first = await quiet(() => kitsuFind(t, ctx, 5, { light: true }));
+                    const exact = pickExactKitsu(first || [], fullKeys) || pickExactKitsu(first || [], baseKeys);
+                    if (exact) return toHit(exact);
+                    const second = alt || (titleKey(base) !== titleKey(main) ? base : '');
+                    if (second) {
+                        const more = await quiet(() => kitsuFind(second, ctx, 5, { light: true }));
+                        const hit = toHit(pickExactKitsu(more || [], fullKeys) || pickExactKitsu(more || [], baseKeys));
+                        if (hit) return hit;
+                    }
+                }
+                const native = resolveNative ? await quiet(resolveNative) : null;
+                if (native && posterSources.has('bangumi')) {
+                    const img = await quiet(() => bangumiPoster(native, ctx));
+                    if (img) return { image: img, banner: null, provider: 'bangumi' };
+                }
+                if (posterSources.has('mangabaka')) {
+                    const img = await quiet(() => mangabakaPoster([native, main, alt].filter(Boolean), ctx));
+                    if (img) return { image: img, banner: null, provider: 'mangabaka' };
+                }
+                // Ada sumber yang GAGAL (bukan sekadar tidak ketemu) → jangan cache "tidak ada poster" 6 jam
+                if (failure) throw failure;
+                return null;
             });
             return r.value;
         },
