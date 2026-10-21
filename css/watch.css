@@ -30,6 +30,9 @@
 .player-message-actions a,.player-message-actions button{padding:10px 20px;border:0;border-radius:8px;font-size:13px;font-weight:600;color:#fff;text-decoration:none;cursor:pointer;font-family:'Poppins',sans-serif;background:var(--gradient-1)}
 .player-message-actions .btn-bstation{background:#00a1d6}
 .player-message-actions .btn-youtube{background:#ff0000}
+/* Tahap C: overlay "memuat" di atas iframe (dilepas saat iframe selesai dimuat) */
+.player-overlay{position:absolute;inset:0;z-index:2;height:auto}
+.streaming-player-wrapper .player-frame{background:#000}
 
 /* Status bar di bawah player (status server + navigasi episode cepat) */
 .player-statusbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 40px;background:var(--bg-dark-2);border-bottom:1px solid rgba(255,255,255,.04)}
@@ -53,6 +56,7 @@
 .watch-title-row .btn-bookmark-hero{flex-shrink:0;padding:10px 20px;font-size:13px}
 .streaming-title{font-size:24px;font-weight:700;margin-bottom:4px;word-break:break-word}
 .watch-episode-label{color:var(--text-secondary);font-size:13px}
+.watch-alt-title{color:var(--text-secondary);font-size:12px;opacity:.85;margin-bottom:2px;word-break:break-word}
 .streaming-meta{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 16px}
 .streaming-meta span{padding:4px 12px;background:var(--bg-card);border-radius:12px;font-size:12px;color:var(--text-secondary)}
 .streaming-meta .meta-score{color:#fbbf24}
@@ -72,6 +76,9 @@
 .watch-synopsis-toggle{margin-top:6px;background:0 0;border:0;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;padding:0}
 .watch-genres{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .watch-genres span{padding:3px 10px;border-radius:12px;font-size:11px;background:rgba(var(--primary-rgb),.1);color:var(--primary);border:1px solid rgba(var(--primary-rgb),.2)}
+.watch-genres a{padding:3px 10px;border-radius:12px;font-size:11px;background:rgba(var(--primary-rgb),.1);color:var(--primary);border:1px solid rgba(var(--primary-rgb),.2);text-decoration:none;transition:all .3s}
+.watch-genres a:hover{background:rgba(var(--primary-rgb),.2);border-color:var(--primary)}
+.watch-synopsis{white-space:pre-line}
 .watch-info .skeleton-line{height:12px}
 
 /* ==========================================================================
@@ -103,6 +110,8 @@
 .download-notice--warn strong{color:#ffc107}
 .download-notice--ok{background:rgba(var(--accent-rgb),0.05);border-left:3px solid var(--accent)}
 .download-notice--ok strong{color:var(--accent)}
+.download-notice p{margin:0}
+.download-retry{margin-top:10px;padding:6px 14px;border:0;border-radius:10px;background:var(--gradient-1);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif}
 
 /* ==========================================================================
    PLATFORM LEGAL (dulu inline style + onmouseover)
@@ -128,6 +137,14 @@
 .server-selector{margin-top:20px}
 .server-selector h4{font-size:14px;margin-bottom:10px}
 .server-hint{font-size:11px;color:var(--text-secondary);margin-bottom:8px}
+/* FIX Tahap C: aturan ini hilang saat migrasi Tahap A (tombol server jadi bertumpuk 1 kolom) */
+.server-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.server-empty{font-size:12px;color:var(--text-secondary)}
+.episode-list-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.episode-list-head h4{margin-bottom:0}
+.autonext-toggle{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);cursor:pointer;user-select:none;white-space:nowrap}
+.autonext-toggle input{accent-color:var(--primary);width:14px;height:14px;margin:0;cursor:pointer}
+.watch-next-airing{font-size:12px;color:var(--accent);margin:0 0 12px;padding:8px 12px;border-radius:10px;background:rgba(var(--accent-rgb),.06);border:1px solid rgba(var(--accent-rgb),.15)}
 .ep-range-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .ep-range-tab{padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s}
 .ep-range-tab:hover,.ep-range-tab.active{background:rgba(var(--primary-rgb),.15);border-color:var(--primary);color:var(--primary)}
@@ -138,6 +155,11 @@
 .ep-btn{padding:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-secondary);font-size:13px;cursor:pointer;text-align:center;transition:all .3s;font-family:'Poppins',sans-serif}
 .ep-btn:hover,.ep-btn.active{background:rgba(var(--primary-rgb),.15);border-color:var(--primary);color:var(--primary)}
 .ep-btn.is-watched:not(.active){color:var(--text-primary);border-color:rgba(var(--accent-rgb),.35)}
+a.ep-btn{display:block;text-decoration:none}
+.ep-btn:focus-visible,.ep-range-tab:focus-visible,.server-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.ep-btn.ep-skeleton{height:37px;padding:0;border:0;cursor:default}
+.episode-manual,.episode-empty{grid-column:1/-1}
+.episode-empty{font-size:12px;color:var(--text-secondary);padding:6px 0}
 /* Input episode manual saat jumlah episode tidak diketahui
    (dulu memakai variabel CSS yang tidak ada: --border-color, --bg-secondary) */
 .episode-manual{padding:16px;text-align:center}
@@ -152,6 +174,7 @@
 .server-btn:disabled,.server-btn.is-disabled{opacity:.5;cursor:not-allowed}
 .server-btn.is-failed:not(.active){border-color:rgba(239,68,68,.35);color:#f87171}
 .server-btn .server-badge{font-size:9px;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.08);text-transform:uppercase;letter-spacing:.3px}
+.server-btn .server-badge--failed{background:rgba(239,68,68,.18);color:#f87171}
 
 /* ==========================================================================
    REKOMENDASI
@@ -177,10 +200,17 @@
     .btn-download{width:100%;justify-content:center}
     .download-links{width:100%}
     .download-links .btn-download{width:auto;flex:1}
+    /* Tahap C (mobile-first): urutan baca = player → judul → episode & server → info.
+       Dulu daftar episode berada paling bawah, setelah sinopsis, download & platform. */
+    .streaming-details{display:flex;flex-direction:column;gap:0}
+    .streaming-main{display:contents}
+    .streaming-sidebar{order:1;margin:0 0 20px}
+    .watch-info,.download-section,.platforms-section{order:2}
 }
 @media(max-width:480px){
     .player-controls{width:100%}
-    .player-ctrl-btn{flex:1;text-align:center}
+    .player-ctrl-btn{flex:1;text-align:center;padding:6px 8px}
+    .ctrl-long{display:none}
     .watch-info{grid-template-columns:1fr}
     .watch-info-poster{display:none}
 }

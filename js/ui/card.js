@@ -37,11 +37,12 @@ export function rememberAnime(anime) {
 
 /**
  * @param {import('../api/normalize.js').Anime} anime
- * @param {{variant?: 'default'|'search'|'bookmark', bookmarked?: boolean, episodeText?: string}} [opts]
+ * @param {{variant?: 'default'|'search'|'bookmark', bookmarked?: boolean, episodeText?: string, episode?: number}} [opts]
+ *   episode: episode tujuan link (default 1; "Baru Rilis" memakai episode terbarunya)
  */
-export function cardHTML(anime, { variant = 'default', bookmarked = false, episodeText } = {}) {
+export function cardHTML(anime, { variant = 'default', bookmarked = false, episodeText, episode = 1 } = {}) {
     rememberAnime(anime);
-    const href = watchUrl(anime, 1);
+    const href = watchUrl(anime, episode);
     const img = anime.image || placeholderImage(anime.title, anime.color);
 
     let badge = statusBadge(anime);
@@ -81,22 +82,28 @@ export function cardHTML(anime, { variant = 'default', bookmarked = false, episo
     </article>`;
 }
 
+const cardsHTML = (list, { variant, isBookmarked, episodeOf }) => String(html`${list.map((a) => cardHTML(a, {
+    variant,
+    bookmarked: isBookmarked(a),
+    episode: episodeOf ? episodeOf(a) : 1,
+}))}`);
+
 /**
  * Render daftar kartu ke grid.
  * @param {Element} grid
  * @param {import('../api/normalize.js').Anime[]} list
- * @param {{variant?: string, isBookmarked?: (a) => boolean}} [opts]
+ * @param {{variant?: string, isBookmarked?: (a) => boolean, episodeOf?: (a) => number}} [opts]
  */
-export function renderCards(grid, list, { variant = 'default', isBookmarked = () => false } = {}) {
+export function renderCards(grid, list, { variant = 'default', isBookmarked = () => false, episodeOf } = {}) {
     if (!grid) return;
-    grid.innerHTML = String(html`${list.map((a) => cardHTML(a, { variant, bookmarked: isBookmarked(a) }))}`);
+    grid.innerHTML = cardsHTML(list, { variant, isBookmarked, episodeOf });
     grid.setAttribute('aria-busy', 'false');
 }
 
 /** Tambahkan kartu di akhir grid (untuk "Muat Lebih Banyak"). */
-export function appendCards(grid, list, { variant = 'default', isBookmarked = () => false } = {}) {
+export function appendCards(grid, list, { variant = 'default', isBookmarked = () => false, episodeOf } = {}) {
     if (!grid) return;
-    grid.insertAdjacentHTML('beforeend', String(html`${list.map((a) => cardHTML(a, { variant, bookmarked: isBookmarked(a) }))}`));
+    grid.insertAdjacentHTML('beforeend', cardsHTML(list, { variant, isBookmarked, episodeOf }));
 }
 
 /** Perbarui status tombol bookmark semua kartu yang tampil (tanpa render ulang). */

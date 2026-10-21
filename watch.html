@@ -46,9 +46,9 @@
                 <span class="player-status-text" id="playerStatusText">Menyiapkan player...</span>
             </div>
             <div class="player-controls">
-                <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled>◀ Episode Sebelumnya</button>
-                <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled>⟳ Server Lain</button>
-                <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled>Episode Berikutnya ▶</button>
+                <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled aria-label="Episode sebelumnya">◀ <span class="ctrl-long">Episode </span>Sebelumnya</button>
+                <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled title="Coba server streaming berikutnya">⟳ Server Lain</button>
+                <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled aria-label="Episode berikutnya"><span class="ctrl-long">Episode </span>Berikutnya ▶</button>
             </div>
         </div>
 
@@ -59,6 +59,7 @@
                 <div class="watch-title-row">
                     <div>
                         <h1 class="streaming-title" id="watchTitle">Memuat...</h1>
+                        <p class="watch-alt-title" id="watchAltTitle" hidden></p>
                         <p class="watch-episode-label" id="watchEpisodeLabel">Episode 1 • Subtitle Indonesia</p>
                     </div>
                     <button type="button" class="btn-bookmark-hero" id="watchBookmarkBtn" aria-pressed="false">
@@ -89,9 +90,9 @@
                 </section>
 
                 <!-- DOWNLOAD -->
-                <section class="download-section" id="downloadSection">
-                    <h4>📥 Download Episode</h4>
-                    <div class="download-list" id="downloadList">
+                <section class="download-section" id="downloadSection" aria-labelledby="downloadHeading">
+                    <h4 id="downloadHeading">📥 Download Episode</h4>
+                    <div class="download-list" id="downloadList" aria-live="polite">
                         <div class="download-loading">
                             <div class="loading-shimmer"></div>
                             <p>🔍 Mencari link download...</p>
@@ -100,25 +101,31 @@
                 </section>
 
                 <!-- PLATFORM LEGAL -->
-                <section class="platforms-section">
-                    <h4>📺 Tonton di Platform Legal</h4>
+                <section class="platforms-section" id="platformsSection" aria-labelledby="platformsHeading">
+                    <h4 id="platformsHeading">📺 Tonton di Platform Legal</h4>
                     <div class="platforms-grid" id="platformsGrid"></div>
                     <p class="platforms-tip">💡 <strong>Tips:</strong> Platform legal menyediakan subtitle Indonesia resmi dengan kualitas terbaik dan mendukung industri anime!</p>
                 </section>
             </div>
 
             <!-- SIDEBAR -->
-            <aside class="streaming-sidebar">
+            <aside class="streaming-sidebar" aria-label="Episode dan server">
                 <div class="episode-list">
-                    <h4>Pilih Episode:</h4>
-                    <div class="ep-range-tabs" id="epRangeTabs" hidden></div>
+                    <div class="episode-list-head">
+                        <h4 id="episodeHeading">Pilih Episode:</h4>
+                        <label class="autonext-toggle" title="Putar episode berikutnya otomatis saat episode selesai">
+                            <input type="checkbox" id="autoNextToggle"> Auto-next
+                        </label>
+                    </div>
+                    <p class="watch-next-airing" id="watchNextAiring" hidden></p>
+                    <div class="ep-range-tabs" id="epRangeTabs" role="group" aria-label="Rentang episode" hidden></div>
                     <div class="streaming-eps-scroll">
-                        <div class="episodes" id="episodeGrid"></div>
+                        <div class="episodes" id="episodeGrid" role="group" aria-labelledby="episodeHeading" aria-busy="true"></div>
                     </div>
                 </div>
                 <div class="server-selector">
                     <h4>🌐 Server Streaming:</h4>
-                    <p class="server-hint">Server dicoba otomatis berurutan. Pilih manual jika video tidak bisa diputar.</p>
+                    <p class="server-hint">Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik ⟳ Server Lain atau pilih manual.</p>
                     <div class="server-buttons" id="serverButtons"></div>
                 </div>
             </aside>

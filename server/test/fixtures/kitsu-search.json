@@ -1,0 +1,130 @@
+{
+ "_note": "Fixture dari https://kitsu.app/api/edge/anime?filter[text]=soul%20land&page[limit]=3&include=mappings (2026-10-21), dipangkas ke 2 item.",
+ "data": [
+  {
+   "id": "41004",
+   "type": "anime",
+   "attributes": {
+    "slug": "douluo-dalu",
+    "synopsis": "Tang San spent his life in the Tang Outer Sect, dedicated to the creation and mastery of hidden weapons. Once he stole the secret lore of the Inner Sect to reach the pinnacle of his art, his only way ",
+    "titles": {
+     "en_cn": "Douluo Dalu",
+     "en_jp": "Douluo Dalu",
+     "ja_jp": "斗罗大陆",
+     "zh_cn": "斗罗大陆"
+    },
+    "canonicalTitle": "Douluo Dalu",
+    "abbreviatedTitles": [
+     "Combat Continent",
+     "Soul Land"
+    ],
+    "averageRating": "77.54",
+    "startDate": "2018-01-20",
+    "status": "finished",
+    "posterImage": {
+     "medium": "https://media.kitsu.app/anime/poster_images/41004/medium.jpg",
+     "large": "https://media.kitsu.app/anime/poster_images/41004/large.jpg",
+     "original": "https://media.kitsu.app/anime/poster_images/41004/original.jpg"
+    },
+    "coverImage": null,
+    "episodeCount": 26,
+    "episodeLength": 20,
+    "subtype": "ONA",
+    "nextRelease": null
+   },
+   "relationships": {
+    "mappings": {
+     "data": [
+      {
+       "type": "mappings",
+       "id": "93337"
+      },
+      {
+       "type": "mappings",
+       "id": "254739"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "42037",
+   "type": "anime",
+   "attributes": {
+    "slug": "douluo-dalu-2",
+    "synopsis": "Season 2 of Douluo Dalu.",
+    "titles": {
+     "en_jp": "Douluo Dalu 2",
+     "ja_jp": "斗罗大陆2 - 绝世唐门"
+    },
+    "canonicalTitle": "Douluo Dalu 2",
+    "abbreviatedTitles": [
+     "Unrivaled Tang Sect",
+     "Soul Land 2",
+     "Douluo Dalu: Jingying Sai"
+    ],
+    "averageRating": "79.78",
+    "startDate": "2018-12-01",
+    "status": "finished",
+    "posterImage": {
+     "medium": "https://media.kitsu.app/anime/poster_images/42037/medium.jpg",
+     "large": "https://media.kitsu.app/anime/poster_images/42037/large.jpg",
+     "original": "https://media.kitsu.app/anime/poster_images/42037/original.jpg"
+    },
+    "coverImage": null,
+    "episodeCount": 52,
+    "episodeLength": 20,
+    "subtype": "ONA",
+    "nextRelease": null
+   },
+   "relationships": {
+    "mappings": {
+     "data": [
+      {
+       "type": "mappings",
+       "id": "250694"
+      },
+      {
+       "type": "mappings",
+       "id": "274305"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "included": [
+  {
+   "id": "93337",
+   "type": "mappings",
+   "attributes": {
+    "externalSite": "myanimelist/anime",
+    "externalId": "37150"
+   }
+  },
+  {
+   "id": "254739",
+   "type": "mappings",
+   "attributes": {
+    "externalSite": "anilist/anime",
+    "externalId": "101920"
+   }
+  },
+  {
+   "id": "250694",
+   "type": "mappings",
+   "attributes": {
+    "externalSite": "myanimelist/anime",
+    "externalId": "37822"
+   }
+  },
+  {
+   "id": "274305",
+   "type": "mappings",
+   "attributes": {
+    "externalSite": "anilist/anime",
+    "externalId": "103543"
+   }
+  }
+ ]
+}

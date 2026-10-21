@@ -58,6 +58,7 @@
 .search-dropdown-footer a:hover,.search-dropdown-footer button:hover{transform:scale(1.03)}
 .search-dropdown-footer span{font-size:11px;color:var(--text-secondary)}
 .search-loading{padding:20px;text-align:center;color:var(--text-secondary);font-size:13px}
+.search-loading--inline{padding:8px 12px;font-size:11px;text-align:left}
 .search-no-results{padding:25px;text-align:center;color:var(--text-secondary)}
 .search-no-results p{font-size:14px;margin-bottom:5px}
 .search-no-results small{font-size:11px;opacity:.7}
@@ -156,6 +157,11 @@
 .btn-ext--anilist{background:#3db4f2}
 .btn-ext--retry{background:var(--gradient-1);font-weight:600}
 
+/* ---------- Keterangan section (data cadangan / sumber tidak merespons) ---------- */
+.section-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px;padding:10px 14px;border-radius:12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);color:var(--text-secondary);font-size:12px;line-height:1.5}
+.section-note button{padding:6px 14px;border:0;border-radius:10px;background:var(--gradient-1);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;white-space:nowrap;transition:transform .2s}
+.section-note button:hover{transform:scale(1.03)}
+
 /* ---------- Tombol aksi bersama (hero & halaman watch) ---------- */
 .btn-watch,.btn-bookmark-hero{display:flex;align-items:center;gap:8px;padding:12px 28px;border:0;border-radius:30px;font-weight:600;cursor:pointer;font-size:14px;transition:all .3s;font-family:'Poppins',sans-serif;text-decoration:none}
 .btn-watch{background:var(--gradient-1);color:#fff}
@@ -253,6 +259,7 @@
    ========================================================================== */
 .api-status{position:fixed;bottom:20px;right:20px;z-index:3000;display:flex;flex-direction:column;gap:8px;transition:opacity .5s}
 .api-status.is-fading{opacity:0}
+.api-status{cursor:pointer}
 .api-badge{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:20px;font-size:12px;animation:slideIn .3s ease;backdrop-filter:blur(10px)}
 .api-badge .status-dot{width:8px;height:8px;border-radius:50%}
 .api-badge .status-dot.online{background:#10b981;box-shadow:0 0 8px #10b981}
@@ -276,6 +283,8 @@
 .footer-links{display:flex;gap:22px;flex-wrap:wrap}
 .footer-links a{color:var(--text-secondary);text-decoration:none;font-size:13px;transition:color .3s}
 .footer-links a:hover{color:var(--primary)}
+.footer-links button{background:none;border:0;padding:0;color:var(--text-secondary);font-family:inherit;font-size:13px;cursor:pointer;transition:color .3s}
+.footer-links button:hover,.footer-links button:focus-visible{color:var(--primary)}
 .social-links{display:flex;gap:10px}
 .social-link{width:36px;height:36px;background:var(--bg-card);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .3s;cursor:pointer}
 .social-link:hover{background:var(--gradient-1);transform:translateY(-3px)}

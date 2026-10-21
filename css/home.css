@@ -58,6 +58,10 @@ a.schedule-item:hover .schedule-anime{color:var(--primary)}
 .schedule-anime{font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s}
 .schedule-empty{font-size:11px;color:var(--text-secondary);opacity:.6;text-align:center;padding:8px 0}
 .schedule-note{margin-top:12px;font-size:11px;color:var(--text-secondary);opacity:.8}
+/* Tahap B: nomor episode, kerangka loading & tombol coba lagi jadwal */
+.schedule-ep{margin-left:auto;padding-left:4px;font-size:10px;font-weight:600;color:var(--primary);opacity:.85;flex-shrink:0;white-space:nowrap}
+.schedule-skeleton{height:12px;margin:12px 0}
+.schedule-retry{margin-left:6px;padding:3px 10px;border:0;border-radius:8px;background:var(--gradient-1);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif}
 
 /* ==========================================================================
    BOOKMARK KOSONG

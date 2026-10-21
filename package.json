@@ -1,0 +1,21 @@
+{
+  "name": "kazanime",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Kazanime — frontend statis + backend scraper (Express) dalam satu proyek Vercel.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "scripts": {
+    "dev": "node --watch-path=server --watch-path=api server/index.js",
+    "start": "node server/index.js",
+    "test": "node --test server/test/",
+    "check:sources": "node server/scripts/check-sources.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "express": "^5.3.0"
+  }
+}

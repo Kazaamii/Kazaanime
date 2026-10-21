@@ -86,7 +86,7 @@ export function createHeroSlider(root, { interval = UI.heroInterval, isBookmarke
                 <span>⭐ ${scoreLabel(slide)}</span>
                 <span>📺 ${genres}</span>
                 ${slide.year ? html`<span>📅 ${slide.year}</span>` : ''}
-                <span>🎬 ${episodeLabel(slide)}</span>
+                ${episodeLabel(slide) ? html`<span>🎬 ${episodeLabel(slide)}</span>` : ''}
                 <span>🇮🇩 Sub Indo</span>
             </div>
             <div class="hero-buttons">

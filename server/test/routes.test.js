@@ -1,0 +1,172 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp } from '../app.js';
+import { makeAnime, makeEpisode } from '../lib/anime.js';
+import { AppError, SourceError, badRequest, notFound } from '../lib/errors.js';
+
+/** Registry tiruan: perilaku per slug/kueri. */
+function fakeRegistry() {
+    const seen = [];
+    return {
+        seen,
+        async latest() {
+            seen.push('latest');
+            return { source: 'animexin', data: [makeAnime({ title: 'Renegade Immortal', slug: 'animexin~renegade-immortal', source: 'animexin', latestEpisode: 163, country: 'CN' })], fallback: false, stale: false, errors: [{ source: 'kuramanime', kind: 'blocked', message: 'diblokir' }] };
+        },
+        async search(q) {
+            seen.push(`search:${q}`);
+            if (q === 'gagal total') throw new AppError('Pencarian gagal: semua sumber sedang bermasalah.', { status: 503, code: 'SOURCES_UNAVAILABLE', retryAfter: 120 });
+            return { source: 'metadata', provider: 'kitsu', data: [], fallback: true, stale: false, errors: [] };
+        },
+        async detail(slug) {
+            seen.push(`detail:${slug}`);
+            if (slug === 'animexin~tidak-ada') throw notFound('Halaman tidak ditemukan di situs sumber.', 'animexin');
+            if (slug === 'animexin~meledak') throw new Error('bug tak terduga');
+            if (!slug.includes('~')) throw badRequest('Slug tidak valid.');
+            return { source: 'animexin', data: { ...makeAnime({ title: 'Judul', slug, source: 'animexin' }), episodeList: [] }, fallback: false, stale: false, errors: [] };
+        },
+        async episode(slug, ep) {
+            seen.push(`episode:${slug}:${ep}`);
+            if (slug === 'animexin~timeout') throw new SourceError('animexin terlalu lama merespons (6 dtk).', { kind: 'timeout', source: 'animexin' });
+            return { source: 'animexin', data: makeEpisode({ episode: ep, servers: [{ name: 'Dailymotion (Sub Indo)', url: 'https://geo.dailymotion.com/player/x.html?video=1', lang: 'id' }] }), fallback: false, stale: false, errors: [] };
+        },
+        health: () => ({ sources: [{ id: 'animexin', circuit: 'closed' }], metadata: { enabled: true }, cache: { entries: 0 } }),
+    };
+}
+
+async function withApp(opts, fn) {
+    const registry = opts.registry || fakeRegistry();
+    const app = createApp({ registry, log: false, rateLimitPerMinute: 0, budgetMs: 5000, ...opts });
+    const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+        await fn(base, registry);
+    } finally {
+        server.closeAllConnections?.();
+        await new Promise((r) => server.close(r));
+    }
+}
+
+const get = async (url, init) => {
+    const res = await fetch(url, init);
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* bukan JSON */ }
+    return { res, json, text };
+};
+
+test('GET /api/anime/latest: kontrak {ok, source, data} + header cache CDN', async () => {
+    await withApp({}, async (base) => {
+        const { res, json } = await get(`${base}/api/anime/latest`);
+        assert.equal(res.status, 200);
+        assert.equal(json.ok, true);
+        assert.equal(json.source, 'animexin');
+        assert.equal(json.fallback, false);
+        assert.equal(json.data[0].slug, 'animexin~renegade-immortal');
+        assert.equal(json.errors[0].kind, 'blocked');
+        assert.ok(json.generatedAt);
+        assert.match(res.headers.get('cache-control'), /s-maxage=600/);
+        assert.match(res.headers.get('content-type'), /application\/json/);
+        assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(res.headers.get('x-powered-by'), null);
+    });
+});
+
+test('GET /api/anime/search: validasi q; fallback → cache CDN lebih singkat', async () => {
+    await withApp({}, async (base, reg) => {
+        const ok = await get(`${base}/api/anime/search?q=${encodeURIComponent('  soul   land ')}`);
+        assert.equal(ok.res.status, 200);
+        assert.equal(ok.json.fallback, true);
+        assert.equal(ok.json.provider, 'kitsu');
+        assert.match(ok.res.headers.get('cache-control'), /max-age=0, s-maxage=120/);
+        assert.ok(reg.seen.includes('search:soul land'), 'spasi dirapikan');
+        for (const bad of ['', '?q=', '?q=a', `?q=${'x'.repeat(101)}`]) {
+            const r = await get(`${base}/api/anime/search${bad}`);
+            assert.equal(r.res.status, 400, bad);
+            assert.deepEqual([r.json.ok, r.json.code], [false, 'BAD_REQUEST']);
+        }
+        const multi = await get(`${base}/api/anime/search?q=naruto&q=bleach`);
+        assert.equal(multi.res.status, 200);
+        assert.ok(reg.seen.includes('search:naruto'));
+    });
+});
+
+test('GET /api/anime/:slug & /episode/:ep: sukses, 400, 404, 500 (pesan aman), 503 + Retry-After', async () => {
+    await withApp({}, async (base) => {
+        const d = await get(`${base}/api/anime/animexin~judul`);
+        assert.equal(d.res.status, 200);
+        assert.equal(d.json.data.slug, 'animexin~judul');
+
+        const nf = await get(`${base}/api/anime/animexin~tidak-ada`);
+        assert.equal(nf.res.status, 404);
+        assert.deepEqual([nf.json.ok, nf.json.code], [false, 'NOT_FOUND']);
+        assert.match(nf.res.headers.get('cache-control'), /s-maxage=300/);
+
+        const boom = await get(`${base}/api/anime/animexin~meledak`);
+        assert.equal(boom.res.status, 500);
+        assert.equal(boom.json.error, 'Terjadi kesalahan di server.', 'detail error internal tidak bocor');
+        assert.equal(boom.res.headers.get('cache-control'), 'no-store');
+
+        const ep = await get(`${base}/api/anime/animexin~judul/episode/12`);
+        assert.equal(ep.res.status, 200);
+        assert.equal(ep.json.data.episode, 12);
+        assert.equal(ep.json.data.servers[0].lang, 'id');
+
+        for (const bad of ['abc', '0', '5001', '1.5', '-1', '99999']) {
+            const r = await get(`${base}/api/anime/animexin~judul/episode/${bad}`);
+            assert.equal(r.res.status, 400, bad);
+        }
+        const to = await get(`${base}/api/anime/animexin~timeout/episode/1`);
+        assert.equal(to.res.status, 504);
+        assert.equal(to.json.code, 'UPSTREAM_TIMEOUT');
+
+        const busy = await get(`${base}/api/anime/search?q=gagal%20total`);
+        assert.equal(busy.res.status, 503);
+        assert.equal(busy.res.headers.get('retry-after'), '120');
+    });
+});
+
+test('/api/health, /api/bot, /api/<tidak-ada>', async () => {
+    await withApp({}, async (base) => {
+        const h = await get(`${base}/api/health`);
+        assert.equal(h.res.status, 200);
+        assert.equal(h.json.ok, true);
+        assert.equal(h.json.data.status, 'ok');
+        assert.match(h.json.data.userAgent, /^KazanimeBot\/1\.0 \(/);
+        assert.equal(h.res.headers.get('cache-control'), 'no-store');
+        const bot = await get(`${base}/api/bot`);
+        assert.match(bot.text, /User-agent: KazanimeBot\n\s+Disallow: \//);
+        assert.match(bot.res.headers.get('content-type'), /text\/plain/);
+        const none = await get(`${base}/api/tidak-ada`);
+        assert.equal(none.res.status, 404);
+        assert.equal(none.json.code, 'NOT_FOUND');
+    });
+});
+
+test('rate limit masuk per IP → 429 JSON dengan Retry-After', async () => {
+    await withApp({ rateLimitPerMinute: 3 }, async (base) => {
+        const statuses = [];
+        for (let i = 0; i < 4; i++) statuses.push((await get(`${base}/api/anime/latest`)).res.status);
+        assert.deepEqual(statuses, [200, 200, 200, 429]);
+        const r = await get(`${base}/api/anime/latest`);
+        assert.equal(r.json.code, 'RATE_LIMITED');
+        assert.ok(Number(r.res.headers.get('retry-after')) > 0);
+        assert.equal((await get(`${base}/api/health`)).res.status, 200, '/api/health tidak kena limit');
+    });
+});
+
+test('server lokal: hanya file frontend yang dilayani (server/, package.json tidak bocor)', async () => {
+    await withApp({ serveStatic: true }, async (base) => {
+        const home = await get(`${base}/`);
+        assert.equal(home.res.status, 200);
+        assert.match(home.text, /<html/i);
+        assert.equal(home.res.headers.get('x-frame-options'), null, 'lokal boleh dipratinjau dalam iframe');
+        for (const p of ['/watch.html', '/search.html', '/index.html', '/css/base.css', '/js/config.js']) {
+            assert.equal((await get(`${base}${p}`)).res.status, 200, p);
+        }
+        assert.match((await fetch(`${base}/js/config.js`)).headers.get('content-type'), /javascript/);
+        for (const p of ['/server/app.js', '/package.json', '/api/index.js', '/.env.example', '/node_modules/express/package.json', '/js/../server/config.js', '/js/%2e%2e/server/config.js']) {
+            assert.equal((await get(`${base}${p}`)).res.status, 404, p);
+        }
+    });
+});

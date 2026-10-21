@@ -32,9 +32,16 @@
  * @property {string|null} badge          (opsional) override label badge kartu
  * @property {string|null} quality        (opsional) override label kualitas kartu
  * @property {string|null} color          (opsional) warna placeholder bila gambar kosong
+ *
+ * Field detail (Tahap C, terisi di halaman nonton; di daftar biasanya kosong):
+ * @property {string[]}    studios        Studio utama
+ * @property {number|null} duration       Menit per episode
+ * @property {'WINTER'|'SPRING'|'SUMMER'|'FALL'|null} season
+ * @property {{episode:number|null, airingAt:number}|null} nextAiring  Episode berikutnya (airingAt = detik UNIX)
  */
 
 const STATUSES = new Set(['ONGOING', 'COMPLETED', 'UPCOMING', 'UNKNOWN']);
+const SEASONS = new Set(['WINTER', 'SPRING', 'SUMMER', 'FALL']);
 
 const toInt = (v) => {
     const n = typeof v === 'string' ? Number.parseInt(v, 10) : v;
@@ -81,6 +88,46 @@ export function titleKey(text) {
 }
 
 /**
+ * Hanya terima URL http(s) absolut (data scraping / config bisa berisi javascript:, data:, dll).
+ * @returns {string} URL yang sudah dinormalisasi, atau '' bila tidak aman
+ */
+export function toHttpUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+        const u = new URL(url);
+        return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
+    } catch {
+        return '';
+    }
+}
+
+/** Origin dari URL (mis. "https://contoh.com"), '' bila tidak valid. */
+export function originOf(url) {
+    try {
+        return new URL(url).origin;
+    } catch {
+        return '';
+    }
+}
+
+/** Waktu tayang berikutnya → { episode, airingAt } atau null. */
+function toNextAiring(v) {
+    if (!v || typeof v !== 'object') return null;
+    const at = Number(v.airingAt);
+    if (!Number.isFinite(at) || at <= 0) return null;
+    return { episode: toInt(v.episode), airingAt: Math.trunc(at) };
+}
+
+/** Aturan id: ID sumber metadata dulu (AniList → MAL → Kitsu), lalu slug backend, lalu judul. */
+function computeId(ids, { slug, source = '', title = '' } = {}) {
+    if (ids.anilist) return `anilist:${ids.anilist}`;
+    if (ids.mal) return `mal:${ids.mal}`;
+    if (ids.kitsu) return `kitsu:${ids.kitsu}`;
+    if (slug && source.startsWith('backend:')) return `${source.slice(8)}:${slug}`;
+    return `title:${slugify(title)}`;
+}
+
+/**
  * Pabrik objek Anime. Semua field selalu ada dengan tipe yang benar,
  * jadi UI tidak perlu cek `?.` / `|| 'N/A'` di mana-mana.
  * @param {Partial<Anime> & {ids?: Partial<Anime['ids']>}} p
@@ -96,18 +143,10 @@ export function createAnime(p = {}) {
     const source = p.source || 'fallback';
     const status = STATUSES.has(p.status) ? p.status : 'UNKNOWN';
     const score = typeof p.score === 'number' && Number.isFinite(p.score) ? Math.round(p.score * 10) / 10 : null;
-
-    let id = p.id;
-    if (!id) {
-        if (ids.anilist) id = `anilist:${ids.anilist}`;
-        else if (ids.mal) id = `mal:${ids.mal}`;
-        else if (ids.kitsu) id = `kitsu:${ids.kitsu}`;
-        else if (p.slug && source.startsWith('backend:')) id = `${source.slice(8)}:${p.slug}`;
-        else id = `title:${slugify(title)}`;
-    }
+    const season = String(p.season || '').toUpperCase();
 
     return {
-        id,
+        id: p.id || computeId(ids, { slug: p.slug, source, title }),
         title,
         titleAlt: String(p.titleAlt || '').trim(),
         image: p.image || null,
@@ -128,7 +167,46 @@ export function createAnime(p = {}) {
         badge: p.badge || null,
         quality: p.quality || null,
         color: p.color || null,
+        studios: Array.isArray(p.studios) ? p.studios.filter(Boolean).map(String) : [],
+        duration: toInt(p.duration),
+        season: SEASONS.has(season) ? season : null,
+        nextAiring: toNextAiring(p.nextAiring),
     };
+}
+
+/**
+ * Lengkapi ID yang KOSONG dengan ID lain (mis. dari URL atau mapping Kitsu),
+ * lalu hitung ulang `id` dengan aturan yang sama seperti createAnime().
+ * ID yang sudah ada tidak ditimpa.
+ * @param {Anime} anime
+ * @param {Partial<Anime['ids']>} extra
+ * @returns {Anime}
+ */
+export function withIds(anime, extra = {}) {
+    const ids = {
+        anilist: anime.ids?.anilist || toInt(extra.anilist),
+        mal: anime.ids?.mal || toInt(extra.mal),
+        kitsu: anime.ids?.kitsu || (extra.kitsu != null && extra.kitsu !== '' ? String(extra.kitsu) : null),
+    };
+    return { ...anime, ids, id: computeId(ids, { slug: anime.slug, source: anime.source, title: anime.title }) };
+}
+
+/**
+ * Apakah dua entri mewakili anime yang sama? (dipakai bookmark & riwayat tontonan)
+ * ID sejenis yang sama-sama ada = penentu. Judul hanya dipakai bila tidak ada ID
+ * yang bisa dibandingkan (mis. data lama, atau hasil Kitsu vs AniList).
+ * @param {{id?:string, title?:string, ids?:object}} stored
+ * @param {Anime} anime
+ */
+export function isSameAnime(stored, anime) {
+    const a = stored?.ids || {};
+    const b = anime?.ids || {};
+    if (a.anilist && b.anilist) return Number(a.anilist) === Number(b.anilist);
+    if (a.mal && b.mal) return Number(a.mal) === Number(b.mal);
+    if (a.kitsu && b.kitsu) return String(a.kitsu) === String(b.kitsu);
+    if (stored?.id && anime?.id && stored.id === anime.id) return true;
+    const key = titleKey(stored?.title);
+    return Boolean(key) && (key === titleKey(anime?.title) || key === titleKey(anime?.titleAlt));
 }
 
 /* ------------------------------------------------------------------ */
@@ -141,6 +219,9 @@ export function episodeLabel(a) {
     if (a.episodes) return `EP ${a.episodes}`;
     if (a.status === 'ONGOING') return 'Ongoing';
     if (a.status === 'UPCOMING') return 'Segera';
+    // Status tidak diketahui (mis. rekomendasi MAL yang hanya berisi judul + gambar):
+    // jangan mengaku "Completed".
+    if (a.status === 'UNKNOWN') return '';
     return 'Completed';
 }
 
@@ -162,7 +243,45 @@ export function statusLabel(a) {
     return { ONGOING: 'Sedang Tayang', COMPLETED: 'Tamat', UPCOMING: 'Segera Tayang', UNKNOWN: 'Status ?' }[a.status];
 }
 
-/** Jumlah episode yang aman dipakai untuk membuat tombol episode. */
-export function playableEpisodeCount(a) {
-    return a.latestEpisode || a.episodes || null;
+const FORMAT_LABELS = { TV: 'TV', MOVIE: 'Movie', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'Special', MUSIC: 'Music', DONGHUA: 'Donghua' };
+/** "TV" / "Movie" / "Special" ... */
+export function formatLabel(a) {
+    return FORMAT_LABELS[a.format] || a.format || 'TV';
+}
+
+const SEASON_LABELS = { WINTER: 'Winter', SPRING: 'Spring', SUMMER: 'Summer', FALL: 'Fall' };
+/** "Fall 2026" / "2026" / "". */
+export function seasonLabel(a) {
+    return [SEASON_LABELS[a.season], a.year].filter(Boolean).join(' ');
+}
+
+/**
+ * Jumlah episode yang SUDAH tayang (dasar tombol episode di watch.html).
+ *  - 0    → belum tayang sama sekali
+ *  - null → tidak diketahui (watch.html menampilkan input nomor episode manual)
+ * Total episode milik anime yang masih tayang TIDAK dipakai (episode-episode itu belum ada).
+ */
+export function airedEpisodeCount(a) {
+    if (a.status === 'UPCOMING') return 0;
+    if (a.latestEpisode) return a.latestEpisode;
+    if (a.nextAiring?.episode) return Math.max(0, a.nextAiring.episode - 1);
+    if (a.status === 'ONGOING') return null;
+    return a.episodes || null;
+}
+
+/** Nama sumber data untuk keterangan di UI. */
+export const SOURCE_LABELS = Object.freeze({
+    anilist: 'AniList',
+    mal: 'MyAnimeList',
+    jikan: 'MyAnimeList',
+    kitsu: 'Kitsu',
+    backend: 'Backend',
+    fallback: 'data cadangan',
+});
+
+/** "AniList" / "MyAnimeList" / "animexin" / ... */
+export function sourceLabel(source) {
+    if (!source) return '—';
+    if (source.startsWith('backend:')) return source.slice('backend:'.length);
+    return SOURCE_LABELS[source] || source;
 }

@@ -1,107 +1,532 @@
 /**
  * Kazanime — watch.js (entry point watch.html)
  *
- * ┌──────────────────────────────────────────────────────────────────┐
- * │ TAHAP A — PRATINJAU STRUKTUR & CSS                               │
- * │ Membaca parameter URL & merender kerangka halaman.               │
- * │ Tahap C: SATU implementasi player (gabungan modal + streaming    │
- * │ page lama) dengan fallback server otomatis, daftar episode asli, │
- * │ info anime, bookmark, download, rekomendasi.                     │
- * └──────────────────────────────────────────────────────────────────┘
+ * Halaman nonton = SATU implementasi player untuk seluruh situs. Modal player
+ * (#playerModal) dan "streaming page" di file asli — dua salinan logika yang
+ * saling override — digabung ke sini dan ke ui/player.js.
+ *
+ * Alur:
+ *  1. initLayout() → navbar, footer, modal, autocomplete, status API, auth.
+ *  2. Parameter URL (title, ep, anilist, mal, kitsu, slug, src) → anime sementara:
+ *     judul, label episode, bookmark & platform legal tampil instan.
+ *  3. URL sudah membawa id AniList/MAL → player LANGSUNG mulai (tidak menunggu
+ *     detail). Tanpa id → "Mencari ID anime..." lalu mulai setelah id ditemukan.
+ *     Anime dari backend (URL membawa slug, Tahap D) → server dari situs sumbernya
+ *     didahulukan: player menunggu server backend episode itu dulu, baru jatuh ke
+ *     server statis bila backend tidak punya / gagal.
+ *  4. getWatchData() → detail + jumlah episode tayang + rekomendasi
+ *     (AniList: 1 request; cadangan Jikan → Kitsu → data dari URL).
+ *  5. Ganti episode tanpa reload; URL ikut diperbarui (replaceState) → bisa di-share.
+ *  6. Auto-next lewat postMessage player, penanda episode yang sudah ditonton,
+ *     server + link download dari backend scraper (Tahap D), rekomendasi.
+ *
+ * Tidak ada fetch di sini: data dari js/api, tampilan dari js/ui.
  */
-import { initLayout, STAGE_B_NOTICE } from './ui/layout.js';
-import { renderCards, bindCardActions } from './ui/card.js';
+import { initLayout } from './ui/layout.js';
+import { createPlayer } from './ui/player.js';
+import { createEpisodeList } from './ui/episode-list.js';
+import { renderDownloads } from './ui/download-list.js';
+import { renderCards, bindCardActions, syncBookmarkButtons, gridMessage } from './ui/card.js';
+import { showSkeleton } from './ui/skeleton.js';
+import { setSectionNote } from './ui/notice.js';
 import { showToast } from './ui/toast.js';
-import { html, $, delegate, placeholderImage } from './ui/dom.js';
-import { parseWatchParams, PAGES } from './routes.js';
-import { titleKey } from './api/normalize.js';
-import { LEGAL_PLATFORMS } from './config.js';
-import { FALLBACK_HERO, FALLBACK_ONGOING, FALLBACK_POPULAR, FALLBACK_NEW, FALLBACK_DONGHUA } from './data/fallback.js';
+import { html, $, placeholderImage } from './ui/dom.js';
+import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
+import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
+import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel } from './api/normalize.js';
+import {
+    friendlyError, getEpisodeExtras, getRecommendations, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime, retrySourcesNow,
+} from './api/index.js';
+import { onBookmarksChange } from './services/bookmark.js';
+import { getWatchedEpisodes, markWatched } from './services/history.js';
+import { storage } from './services/storage.js';
 
-initLayout();
-
+const ctx = initLayout();
+const isBookmarked = (a) => ctx.isBookmarked(a);
 const params = parseWatchParams();
-const stage = $('#playerStage');
+/** @type {import('./api/index.js').AnimeRef} */
+const ref = { title: params.title, anilist: params.anilist, mal: params.mal, kitsu: params.kitsu, slug: params.slug, src: params.src };
 
-/* ---------- Tanpa judul → arahkan kembali ---------- */
-if (!params.title) {
-    stage.innerHTML = String(html`
-        <div class="player-message">
-            <div class="player-message-icon" aria-hidden="true">🎬</div>
-            <p class="player-message-title">Anime tidak ditemukan</p>
-            <p class="player-message-text">Link tidak lengkap. Pilih anime dari beranda atau pencarian.</p>
-            <div class="player-message-actions"><a href="${PAGES.home}">Kembali ke Beranda</a></div>
-        </div>`);
-    $('#watchTitle').textContent = 'Anime tidak ditemukan';
-} else {
-    renderPreview();
+const els = {
+    wrapper: $('#playerWrapper'),
+    title: $('#watchTitle'),
+    altTitle: $('#watchAltTitle'),
+    epLabel: $('#watchEpisodeLabel'),
+    meta: $('#watchMeta'),
+    bookmarkBtn: $('#watchBookmarkBtn'),
+    info: $('#watchInfo'),
+    poster: $('#watchPoster'),
+    synopsis: $('#watchSynopsis'),
+    genres: $('#watchGenres'),
+    downloads: $('#downloadList'),
+    platforms: $('#platformsGrid'),
+    platformsSection: $('#platformsSection'),
+    nextAiring: $('#watchNextAiring'),
+    autoNext: $('#autoNextToggle'),
+    prev: $('#btnPrevEp'),
+    next: $('#btnNextEp'),
+    nextServer: $('#btnNextServer'),
+    recs: $('#recommendationGrid'),
+};
+
+/* ------------------------------------------------------------------ */
+/* State                                                               */
+/* ------------------------------------------------------------------ */
+/** @type {import('./api/normalize.js').Anime} */
+let anime = provisionalAnime(ref);
+let ep = params.ep;
+/** Episode yang bisa dipilih: undefined = memuat · null = tidak diketahui · 0 = belum tayang · n */
+let total;
+let detailLoaded = false;
+let detailToken = 0;
+/** Server tambahan dari backend untuk episode aktif (Tahap D). */
+let backendServers = [];
+/** @type {AbortController|null} */
+let extrasCtrl = null;
+/**
+ * Episode yang sedang MENUNGGU server backend sebelum diputar (anime dari backend).
+ * Selama menunggu, server statis tidak dimulai — supaya yang pertama diputar adalah
+ * server dari situs sumber anime itu sendiri.
+ */
+let holdFor = null;
+/** Episode yang hasil backend-nya sudah datang TANPA server (menunggu detail untuk server statis). */
+let extrasFor = null;
+
+const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+const urlFor = (n) => watchUrl(anime, n, { src: ref.src, slug: ref.slug });
+/** Anime berasal dari backend scraper (URL membawa slug) → server backend didahulukan. */
+const preferBackend = () => Boolean(ref.slug) && isBackendEnabled();
+const servers = () => (preferBackend()
+    ? [...backendServers, ...listStreamServers(anime, ep)]
+    : [...listStreamServers(anime, ep), ...backendServers]);
+
+/**
+ * Selesai menunggu server backend untuk episode n → mulai putar dengan daftar server lengkap.
+ * Tanpa server backend (gagal / kosong) player menunggu detail dulu: server statis butuh id
+ * anime, dan jumlah episode menentukan apakah nomor episode di URL memang ada.
+ * @param {number} n
+ * @param {{force?: boolean}} [opts] force = mulai sekarang (server backend sudah ada / detail sudah dimuat)
+ */
+function releaseHold(n, { force = false } = {}) {
+    if (holdFor !== n) return false;
+    if (!force && !detailLoaded) {
+        extrasFor = n;
+        return false;
+    }
+    holdFor = null;
+    extrasFor = null;
+    if (total !== 0 && player.state === 'waiting') {
+        player.load(n, servers());
+        return true;
+    }
+    return false;
 }
 
-function renderPreview() {
-    const all = [...FALLBACK_HERO, ...FALLBACK_ONGOING, ...FALLBACK_POPULAR, ...FALLBACK_NEW, ...FALLBACK_DONGHUA];
-    const known = all.find((a) => titleKey(a.title) === titleKey(params.title));
-    let ep = params.ep;
+/* ------------------------------------------------------------------ */
+/* Komponen                                                            */
+/* ------------------------------------------------------------------ */
+const player = createPlayer({
+    stage: $('#playerStage'),
+    serverBox: $('#serverButtons'),
+    status: $('#playerStatus'),
+    statusText: $('#playerStatusText'),
+    getTitle: () => anime.title,
+});
 
-    document.title = `${params.title} - Episode ${ep} | Kazanime`;
-    $('#watchTitle').textContent = params.title;
-    const setEpisodeLabel = () => { $('#watchEpisodeLabel').textContent = `Episode ${ep} • Subtitle Indonesia`; };
-    setEpisodeLabel();
+const episodes = createEpisodeList({
+    grid: $('#episodeGrid'),
+    tabs: $('#epRangeTabs'),
+    hrefFor: urlFor,
+    onSelect: (n) => goToEpisode(n),
+});
 
-    $('#watchMeta').innerHTML = String(html`
-        ${known?.score != null ? html`<span class="meta-score">⭐ ${known.score.toFixed(1)}</span>` : ''}
-        <span>📺 Sub Indo</span><span>🎬 Streaming</span><span>📡 Multi-Server</span>
-        ${params.anilist ? html`<span>AniList #${params.anilist}</span>` : ''}
-        ${params.mal ? html`<span>MAL #${params.mal}</span>` : ''}`);
+/* ------------------------------------------------------------------ */
+/* Format waktu tayang (WIB)                                           */
+/* ------------------------------------------------------------------ */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const pad2 = (n) => String(n).padStart(2, '0');
 
-    stage.innerHTML = String(html`
-        <div class="player-message">
-            <div class="player-message-icon" aria-hidden="true">🛠️</div>
-            <p class="player-message-title">Player diaktifkan di Tahap C</p>
-            <p class="player-message-text">Satu player terpadu dengan fallback otomatis ke server berikutnya bila server gagal.</p>
-        </div>`);
-    $('#playerStatusText').textContent = 'Tahap A: pratinjau tata letak halaman nonton.';
+/** Detik UNIX → "Sabtu, 25 Okt • 23:00 WIB" (selalu WIB, apa pun zona waktu perangkat). */
+function formatWib(sec) {
+    const d = new Date((sec + SCHEDULE.utcOffsetHours * 3600) * 1000);
+    return `${DAY_NAMES[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} • ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} ${SCHEDULE.label}`;
+}
 
-    /* Info anime */
-    const poster = $('#watchPoster');
-    poster.classList.remove('loading-shimmer');
-    poster.innerHTML = String(html`<img src="${known?.image || placeholderImage(params.title)}" alt="${params.title}" data-fallback>`);
-    $('#watchSynopsis').innerHTML = String(html`<p class="watch-synopsis">${known?.description || 'Sinopsis akan dimuat dari AniList/Jikan/Kitsu di Tahap C.'}</p>`);
-    $('#watchGenres').innerHTML = String(html`${(known?.genres || []).map((g) => html`<span>${g}</span>`)}`);
+/* ------------------------------------------------------------------ */
+/* Render: judul, meta, info, platform, bookmark                       */
+/* ------------------------------------------------------------------ */
+function renderEpisodeLabel() {
+    els.epLabel.textContent = `Episode ${ep} • Subtitle Indonesia`;
+    document.title = anime.title ? `${anime.title} - Episode ${ep} | Kazanime` : 'Nonton Anime - Kazanime';
+}
 
-    /* Episode (pratinjau 12 tombol; Tahap C: jumlah asli + rentang untuk >100 ep) */
-    const epGrid = $('#episodeGrid');
-    const total = Math.max(12, ep);
-    epGrid.innerHTML = String(html`${Array.from({ length: total }, (_, i) => html`<button type="button" class="ep-btn${i + 1 === ep ? ' active' : ''}" data-ep="${i + 1}">EP ${i + 1}</button>`)}`);
-    delegate(epGrid, 'click', '.ep-btn', (_e, btn) => {
-        ep = Number(btn.dataset.ep);
-        epGrid.querySelectorAll('.ep-btn').forEach((b) => b.classList.toggle('active', b === btn));
-        setEpisodeLabel();
-        const url = new URL(window.location.href);
-        url.searchParams.set('ep', String(ep));
-        history.replaceState(null, '', url);
+function renderMeta() {
+    const a = anime;
+    const parts = [];
+    if (a.score != null) parts.push(html`<span class="meta-score">⭐ ${a.score.toFixed(1)}</span>`);
+    if (detailLoaded && a.status !== 'UNKNOWN') parts.push(html`<span>${statusLabel(a)}</span>`);
+    if (detailLoaded) parts.push(html`<span>${formatLabel(a)}</span>`);
+    const season = seasonLabel(a);
+    if (season) parts.push(html`<span>📅 ${season}</span>`);
+    if (a.episodes) parts.push(html`<span>🎞️ ${a.episodes} Episode</span>`);
+    if (a.duration) parts.push(html`<span>⏱️ ${a.duration} mnt</span>`);
+    if (a.studios?.length) parts.push(html`<span>🎨 ${a.studios[0]}</span>`);
+    parts.push(html`<span>📺 Sub Indo</span>`, html`<span>📡 Multi-Server</span>`);
+    els.meta.innerHTML = String(html`${parts}`);
+}
+
+function renderHeader() {
+    els.title.textContent = anime.title || (detailLoaded ? 'Judul tidak diketahui' : 'Memuat...');
+    els.altTitle.textContent = anime.titleAlt;
+    els.altTitle.hidden = !anime.titleAlt;
+    renderEpisodeLabel();
+    renderMeta();
+}
+
+function renderInfo() {
+    const a = anime;
+    els.poster.classList.remove('loading-shimmer');
+    els.poster.innerHTML = String(html`<img src="${a.image || placeholderImage(a.title || 'Kazanime', a.color)}" alt="Poster ${a.title}" decoding="async" data-fallback data-color="${a.color || ''}">`);
+
+    els.synopsis.innerHTML = String(html`
+        <p class="watch-synopsis" id="watchSynopsisText">${a.description || 'Sinopsis belum tersedia untuk anime ini.'}</p>
+        <button type="button" class="watch-synopsis-toggle" aria-controls="watchSynopsisText" aria-expanded="false" hidden>Selengkapnya ▾</button>`);
+    const text = els.synopsis.querySelector('.watch-synopsis');
+    const toggle = els.synopsis.querySelector('.watch-synopsis-toggle');
+    toggle.addEventListener('click', () => {
+        const open = text.classList.toggle('expanded');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.textContent = open ? 'Sembunyikan ▴' : 'Selengkapnya ▾';
     });
+    // Tombol hanya muncul bila teks benar-benar terpotong (line-clamp 4 baris)
+    requestAnimationFrame(() => { toggle.hidden = text.scrollHeight <= text.clientHeight + 2; });
 
-    /* Server (pratinjau, belum aktif) */
-    $('#serverButtons').innerHTML = String(html`
-        <button type="button" class="server-btn active" disabled>🇯🇵 Server 1 (MegaPlay - AniList)</button>
-        <button type="button" class="server-btn" disabled>🇺🇸 Server 2 (MegaPlay - MAL)</button>`);
+    // Genre yang ada di daftar genre situs → link ke search.html?genre=...
+    els.genres.innerHTML = String(html`${a.genres.slice(0, 10).map((g) => {
+        const known = GENRES.find((x) => x.label.toLowerCase() === g.toLowerCase());
+        return known ? html`<a href="${genreUrl(known.label)}">${g}</a>` : html`<span>${g}</span>`;
+    })}`);
+}
 
-    /* Download */
-    $('#downloadList').innerHTML = String(html`
-        <div class="download-notice download-notice--warn">
-            <strong>⚠️ Belum aktif.</strong> Link download diambil lewat backend (Tahap D) — tidak ada lagi tombol download palsu.
-        </div>`);
-
-    /* Platform legal (final) */
-    $('#platformsGrid').innerHTML = String(html`${LEGAL_PLATFORMS.map((p) => html`
-        <a class="platform-card" data-platform="${p.id}" href="${p.url(params.title)}" target="_blank" rel="noopener noreferrer">
+function renderPlatforms() {
+    const t = anime.title;
+    els.platformsSection.hidden = !t;
+    if (!t) return;
+    els.platforms.innerHTML = String(html`${LEGAL_PLATFORMS.map((p) => html`
+        <a class="platform-card" data-platform="${p.id}" href="${p.url(t)}" target="_blank" rel="noopener noreferrer">
             <span class="platform-icon" aria-hidden="true">${p.icon}</span>
             <div><div class="platform-name">${p.name}</div><div class="platform-desc">${p.description}</div></div>
         </a>`)}`);
-
-    /* Rekomendasi */
-    renderCards($('#recommendationGrid'), FALLBACK_POPULAR.filter((a) => titleKey(a.title) !== titleKey(params.title)).slice(0, 6));
 }
 
-$('#watchBookmarkBtn').addEventListener('click', () => showToast(STAGE_B_NOTICE, 'info'));
-bindCardActions($('#recommendationGrid'), () => showToast(STAGE_B_NOTICE, 'info'));
+function renderNextAiring() {
+    const n = anime.nextAiring;
+    const show = Boolean(n?.airingAt) && n.airingAt * 1000 > Date.now() && anime.status !== 'COMPLETED';
+    els.nextAiring.hidden = !show;
+    if (show) els.nextAiring.textContent = `⏰ ${n.episode ? `Episode ${n.episode}` : 'Episode berikutnya'} tayang ${formatWib(n.airingAt)}`;
+}
+
+function syncWatchBookmark() {
+    const usable = Boolean(anime.title);
+    const on = usable && ctx.isBookmarked(anime);
+    els.bookmarkBtn.classList.toggle('bookmarked', on);
+    els.bookmarkBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    els.bookmarkBtn.querySelector('.bookmark-label').textContent = on ? 'Bookmarked' : 'Bookmark';
+    els.bookmarkBtn.disabled = !usable;
+}
+
+/* ------------------------------------------------------------------ */
+/* Episode & navigasi                                                  */
+/* ------------------------------------------------------------------ */
+function updateNav() {
+    els.prev.disabled = ep <= 1;
+    els.next.disabled = typeof total === 'number' && ep >= total;
+}
+
+function replaceUrl() {
+    history.replaceState(history.state, '', urlFor(ep));
+}
+
+/** Jumlah tombol episode dari data API (toleransi kecil untuk anime yang baru saja tayang). */
+function computeTotal() {
+    const aired = airedEpisodeCount(anime);
+    if (aired == null || aired === 0) return aired;
+    // Anime dari backend: daftar episode situs sumber = yang benar-benar bisa diputar → tanpa toleransi.
+    if (preferBackend()) return aired;
+    return anime.status === 'ONGOING' ? Math.max(aired, Math.min(ep, aired + 2)) : aired;
+}
+
+/** Gulir ke player bila sedang tidak terlihat (mis. memilih episode dari daftar di bawah). */
+function revealPlayer() {
+    const navH = document.querySelector('.navbar')?.offsetHeight || 70;
+    const r = els.wrapper.getBoundingClientRect();
+    if (r.top < navH - 1 || r.top > window.innerHeight * 0.6) {
+        window.scrollTo({ top: Math.max(0, window.scrollY + r.top - navH - 8), behavior: smooth() });
+    }
+}
+
+function showUpcoming() {
+    const n = anime.nextAiring;
+    player.showMessage({
+        icon: '⏳',
+        title: 'Anime ini belum tayang',
+        text: n?.airingAt ? `Episode ${n.episode || 1} dijadwalkan tayang ${formatWib(n.airingAt)}.` : 'Belum ada episode yang bisa diputar.',
+        sub: 'Bookmark dulu agar mudah ditemukan saat sudah tayang.',
+        actions: [{ label: '▶ Coba putar', onClick: () => player.load(ep, servers()) }],
+        legal: true,
+        statusText: '⏳ Belum tayang',
+    });
+}
+
+/**
+ * Putar episode n (tanpa reload halaman).
+ * @param {number} n
+ * @param {{initial?: boolean, announce?: boolean}} [opts]
+ */
+function playEpisode(n, { initial = false, announce = true } = {}) {
+    ep = n;
+    backendServers = [];
+    holdFor = null;
+    extrasFor = null;
+    renderEpisodeLabel();
+    episodes.setCurrent(n);
+    updateNav();
+    if (!initial) replaceUrl();
+    if (total === 0) showUpcoming();
+    else if (preferBackend()) {
+        holdFor = n;
+        player.showWaiting(`🔍 Memuat server Episode ${n} dari ${ref.src || 'sumber'}...`);
+    } else player.load(n, servers());
+    loadExtras(n);
+    if (announce && !initial) showToast(`📺 Episode ${n} dimuat`, 'info');
+}
+
+/** Pilihan user (daftar episode, tombol prev/next, input manual). */
+function goToEpisode(n) {
+    if (!Number.isInteger(n) || n < 1 || n > PLAYER.maxEpisode) return;
+    if (typeof total === 'number' && total > 0 && n > total) {
+        showToast(`Episode ${n} belum tersedia.`, 'info');
+        return;
+    }
+    if (n === ep && (player.state === 'loading' || player.state === 'playing')) {
+        revealPlayer();
+        return;
+    }
+    playEpisode(n);
+    revealPlayer();
+}
+
+els.prev.addEventListener('click', () => goToEpisode(ep - 1));
+els.next.addEventListener('click', () => goToEpisode(ep + 1));
+els.nextServer.addEventListener('click', () => player.nextServer());
+
+/* ------------------------------------------------------------------ */
+/* Auto-next & riwayat tontonan                                        */
+/* ------------------------------------------------------------------ */
+els.autoNext.checked = (storage.getRaw(STORAGE_KEYS.autoNext) ?? (PLAYER.autoNextDefault ? '1' : '0')) === '1';
+els.autoNext.addEventListener('change', () => {
+    storage.setRaw(STORAGE_KEYS.autoNext, els.autoNext.checked ? '1' : '0');
+    showToast(els.autoNext.checked ? '▶️ Auto-next aktif' : '⏸️ Auto-next nonaktif', 'info');
+});
+
+function refreshWatched() {
+    episodes.setWatched(getWatchedEpisodes(anime));
+}
+
+player.on('loaded', ({ ep: n }) => {
+    if (anime.title) markWatched(anime, n);
+    refreshWatched();
+});
+
+player.on('complete', ({ ep: done }) => {
+    if (anime.title) markWatched(anime, done);
+    refreshWatched();
+    if (done !== ep) return;
+    const nextEp = done + 1;
+    if (typeof total === 'number' && nextEp > total) {
+        const n = anime.nextAiring;
+        if (anime.status === 'ONGOING' && n?.airingAt) showToast(`⏳ Episode ${nextEp} tayang ${formatWib(n.airingAt)}`, 'info');
+        else showToast('🎉 Selesai! Semua episode telah ditonton.', 'success');
+        return;
+    }
+    if (!els.autoNext.checked) return;
+    playEpisode(nextEp, { announce: false });
+    showToast(`▶️ Otomatis Episode ${nextEp}`, 'success');
+});
+
+player.on('servers', ({ count }) => { els.nextServer.disabled = count === 0; });
+player.on('retry', () => {
+    retrySourcesNow();
+    loadDetail();
+});
+
+/* ------------------------------------------------------------------ */
+/* Data: detail, link download/server backend, rekomendasi             */
+/* ------------------------------------------------------------------ */
+function applyDetail(data) {
+    anime = data.anime;
+    detailLoaded = true;
+    total = computeTotal();
+
+    renderHeader();
+    renderInfo();
+    renderPlatforms();
+    renderNextAiring();
+    syncWatchBookmark();
+    episodes.setTotal(total, {
+        emptyText: anime.nextAiring?.airingAt
+            ? `Belum ada episode yang tayang. Episode ${anime.nextAiring.episode || 1}: ${formatWib(anime.nextAiring.airingAt)}.`
+            : 'Belum ada episode yang tayang.',
+    });
+    refreshWatched();
+
+    // Episode di URL melewati episode yang sudah ada → buka episode terakhir
+    if (total && ep > total) {
+        showToast(`Episode ${ep} belum tersedia — membuka Episode ${total}.`, 'info');
+        playEpisode(total, { announce: false });
+        return;
+    }
+    updateNav();
+    replaceUrl(); // URL kini membawa id lengkap (mudah dibagikan)
+
+    if (total === 0) showUpcoming();
+    else if (holdFor === ep) {
+        // Anime dari backend: hasil backend sudah datang tanpa server → sekarang coba server statis.
+        // Belum datang → loadExtras yang akan memulai.
+        if (extrasFor === ep) releaseHold(ep, { force: true });
+    } else if (player.state !== 'message') player.setServers(servers()); // mulai bila menunggu; buka kunci server baru tanpa memutus video
+}
+
+async function loadDetail() {
+    const my = ++detailToken;
+    setSectionNote(els.info);
+    let data;
+    try {
+        data = await getWatchData(ref);
+    } catch (err) {
+        console.error('[watch] gagal memuat detail:', err);
+        data = { anime: provisionalAnime(ref), recommendations: null, source: 'fallback', fallback: true, error: err };
+    }
+    if (my !== detailToken) return;
+    applyDetail(data);
+    loadRecommendations(data.recommendations);
+    if (data.fallback) {
+        setSectionNote(els.info, {
+            text: `⚠️ Info anime tidak dapat dimuat. ${friendlyError(data.error)}`,
+            onRetry: () => {
+                retrySourcesNow();
+                loadDetail();
+            },
+        });
+    }
+}
+
+async function loadExtras(n) {
+    extrasCtrl?.abort();
+    const ctrl = new AbortController();
+    extrasCtrl = ctrl;
+    renderDownloads(els.downloads, { loading: true });
+    try {
+        const res = await getEpisodeExtras(anime, n, { slug: ref.slug, signal: ctrl.signal });
+        if (ctrl.signal.aborted || n !== ep) return;
+        if (res.servers.length) backendServers = res.servers;
+        // Anime dari backend: ada server → mulai sekarang (server backend dulu, statis sebagai cadangan)
+        if (!releaseHold(n, { force: res.servers.length > 0 }) && res.servers.length && holdFor !== n
+            && total !== 0 && player.state !== 'message') player.setServers(servers());
+        const realError = res.error && res.error.kind !== 'empty' ? res.error : null;
+        renderDownloads(els.downloads, {
+            items: res.downloads,
+            ep: n,
+            source: res.source,
+            disabled: res.disabled,
+            error: realError,
+            errorText: realError ? friendlyError(realError) : '',
+            onRetry: () => loadExtras(n),
+        });
+    } catch (err) {
+        if (err?.kind === 'abort' || ctrl.signal.aborted) return;
+        if (n === ep) releaseHold(n); // backend gagal → server statis (bila ada) tetap diputar
+        renderDownloads(els.downloads, {
+            error: err,
+            errorText: friendlyError(err),
+            onRetry: () => {
+                retrySourcesNow();
+                loadExtras(n);
+            },
+        });
+    }
+}
+
+async function loadRecommendations(preloaded) {
+    try {
+        const res = await getRecommendations(anime.title ? anime : null, { preloaded });
+        if (res.items.length) renderCards(els.recs, res.items, { isBookmarked });
+        else gridMessage(els.recs, { icon: '📭', text: 'Belum ada rekomendasi untuk anime ini.' });
+    } catch (err) {
+        gridMessage(els.recs, { icon: '⚠️', text: friendlyError(err) });
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Bookmark                                                            */
+/* ------------------------------------------------------------------ */
+els.bookmarkBtn.addEventListener('click', () => {
+    if (anime.title) ctx.toggleBookmark(anime);
+});
+bindCardActions(els.recs, (a) => ctx.toggleBookmark(a));
+onBookmarksChange(() => {
+    syncWatchBookmark();
+    syncBookmarkButtons(isBookmarked, els.recs);
+});
+
+/* ------------------------------------------------------------------ */
+/* Mulai                                                               */
+/* ------------------------------------------------------------------ */
+function renderNotFound() {
+    document.title = 'Anime tidak ditemukan - Kazanime';
+    els.title.textContent = 'Anime tidak ditemukan';
+    els.epLabel.textContent = 'Link tidak lengkap';
+    els.meta.replaceChildren();
+    syncWatchBookmark();
+    els.prev.disabled = true;
+    els.next.disabled = true;
+    player.showMessage({
+        icon: '🎬',
+        title: 'Anime tidak ditemukan',
+        text: 'Link tidak lengkap. Pilih anime dari beranda atau pencarian.',
+        actions: [{ label: 'Kembali ke Beranda', href: PAGES.home, newTab: false }],
+        statusText: 'Anime tidak ditemukan',
+    });
+    player.setServers(listStreamServers(anime, 1)); // tampil terkunci 🔒
+    episodes.setTotal(0, { emptyText: 'Pilih anime dari beranda atau pencarian.' });
+    els.poster.classList.remove('loading-shimmer');
+    els.synopsis.innerHTML = String(html`<p class="watch-synopsis">Tidak ada anime yang dipilih.</p>`);
+    renderDownloads(els.downloads, { disabled: true });
+    renderPlatforms();
+    showSkeleton(els.recs, 6);
+    loadRecommendations(null);
+}
+
+function start() {
+    renderHeader();
+    renderPlatforms();
+    syncWatchBookmark();
+    episodes.setCurrent(ep);
+    episodes.setLoading();
+    updateNav();
+    showSkeleton(els.recs, 6);
+
+    if (preferBackend() || servers().some((s) => s.available)) {
+        // id sudah ada di URL → tidak perlu menunggu detail; anime dari backend → menunggu server backend
+        playEpisode(ep, { initial: true });
+    } else {
+        player.showWaiting('🔍 Mencari ID anime untuk server streaming...');
+        loadExtras(ep);
+    }
+    loadDetail();
+}
+
+if (!ref.title && !ref.anilist && !ref.mal && !ref.kitsu && !ref.slug) renderNotFound();
+else start();
+
+console.info('%c🌸 Kazanime — Tahap D (player terpadu + server dari backend scraper)', 'color:#ff6b9d;font-weight:bold');
