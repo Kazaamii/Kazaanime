@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cari Anime - Kazanime</title>
+    <meta name="description" content="Cari anime subtitle Indonesia dari MyAnimeList, Kitsu, dan AniList.">
+    <meta name="robots" content="noindex, follow">
+    <script src="js/theme-preload.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/search.css">
+    <script type="module" src="js/search.js"></script>
+</head>
+<body data-page="search">
+
+<div id="app-navbar"></div>
+
+<noscript><p class="noscript-warning">Pencarian Kazanime membutuhkan JavaScript.</p></noscript>
+
+<main class="main-content" id="main">
+    <section class="search-results-section" id="searchResultsSection">
+
+        <div class="search-results-header">
+            <h2 id="searchResultsTitle">Hasil Pencarian</h2>
+            <p id="searchResultsSubtitle" aria-live="polite"></p>
+        </div>
+
+        <!-- Tab sumber data (hanya untuk mode pencarian) -->
+        <div class="search-source-tabs" id="searchSourceTabs" role="tablist" aria-label="Sumber data">
+            <button type="button" class="search-source-tab active" role="tab" aria-selected="true" data-source="all">📚 Semua <span class="count" data-count="all">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="mal">🔷 MyAnimeList <span class="count" data-count="mal">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="kitsu">🟠 Kitsu <span class="count" data-count="kitsu">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="anilist">💙 AniList <span class="count" data-count="anilist">0</span></button>
+        </div>
+
+        <!-- Urutan (eksklusif) + format (bisa lebih dari satu) -->
+        <div class="search-filters" id="searchFilters">
+            <button type="button" class="search-filter-btn active" data-sort="relevance" aria-pressed="true">🔍 Relevansi</button>
+            <button type="button" class="search-filter-btn" data-sort="score" aria-pressed="false">⭐ Rating</button>
+            <button type="button" class="search-filter-btn" data-sort="popularity" aria-pressed="false">🔥 Populer</button>
+            <button type="button" class="search-filter-btn" data-sort="newest" aria-pressed="false">🆕 Terbaru</button>
+            <span class="search-filters-divider" aria-hidden="true"></span>
+            <button type="button" class="search-filter-btn" data-format="TV" aria-pressed="false">📺 TV</button>
+            <button type="button" class="search-filter-btn" data-format="MOVIE" aria-pressed="false">🎬 Movie</button>
+            <button type="button" class="search-filter-btn" data-format="OVA" aria-pressed="false">💿 OVA</button>
+            <button type="button" class="search-filter-btn" data-format="ONA" aria-pressed="false">🌐 ONA</button>
+        </div>
+
+        <div class="anime-grid" id="searchResultsGrid" aria-busy="true"></div>
+
+        <div class="search-load-more" id="searchLoadMore" hidden>
+            <button type="button" class="btn-load-more" id="searchLoadMoreBtn">Muat Lebih Banyak ↓</button>
+        </div>
+
+    </section>
+</main>
+
+<div id="app-footer"></div>
+
+</body>
+</html>

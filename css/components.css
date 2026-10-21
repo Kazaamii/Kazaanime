@@ -1,0 +1,336 @@
+/* ==========================================================================
+   Kazanime — components.css
+   Komponen bersama semua halaman: navbar, search dropdown, profile dropdown,
+   section header, anime card, skeleton, empty state, tombol, modal (auth,
+   avatar, tema), toast, API status, footer.
+   ========================================================================== */
+
+/* ==========================================================================
+   NAVBAR
+   ========================================================================== */
+/* Placeholder sebelum JS merender navbar -> tidak ada "kedip" kosong */
+#app-navbar:empty{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:1000;background:rgba(15,15,26,.92);border-bottom:1px solid rgba(var(--primary-rgb),.1)}
+
+.navbar{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 40px;background:rgba(15,15,26,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(var(--primary-rgb),.1);transition:background .3s}
+.navbar-inner{max-width:var(--desktop-max);margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:70px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-icon{width:40px;height:40px;background:var(--gradient-1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
+.logo-icon img{width:100%;height:100%;object-fit:cover}
+.logo-text{font-size:24px;font-weight:700;background:var(--gradient-1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{color:var(--text-secondary);text-decoration:none;font-weight:500;transition:all .3s;position:relative;font-size:14px}
+.nav-links a:hover,.nav-links a.active{color:var(--primary)}
+.nav-links a.active::after{content:'';position:absolute;bottom:-8px;left:0;right:0;height:2px;background:var(--gradient-1);border-radius:10px}
+.nav-right{display:flex;align-items:center;gap:10px}
+
+/* ---------- Search box ---------- */
+.search-box{display:flex;align-items:center;background:var(--bg-card);border-radius:25px;padding:8px 16px;border:1px solid rgba(var(--primary-rgb),.12);transition:all .3s;position:relative}
+.search-box:focus-within{border-color:var(--primary);box-shadow:var(--shadow-glow)}
+.search-box input{background:0 0;border:0;outline:0;color:var(--text-primary);font-family:'Poppins',sans-serif;width:220px;font-size:13px}
+.search-box input::placeholder{color:var(--text-secondary)}
+.search-box svg{width:16px;height:16px;fill:var(--text-secondary);margin-right:8px;flex-shrink:0}
+.search-kbd{font-size:10px;color:var(--text-secondary);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:2px 6px;margin-left:8px;font-family:monospace;display:none}
+@media(min-width:769px){.search-kbd{display:inline}}
+/* Tombol kaca pembesar khusus layar kecil (<=480px), search box disembunyikan di sana.
+   Selector 2 kelas agar menang atas .nav-btn{display:flex} yang didefinisikan sesudahnya. */
+.nav-btn.search-toggle{display:none}
+
+/* ---------- Search dropdown / autocomplete ---------- */
+.search-dropdown{position:absolute;top:calc(100% + 8px);left:0;right:0;width:420px;max-height:480px;overflow-y:auto;background:var(--bg-card);border:1px solid rgba(var(--primary-rgb),.15);border-radius:16px;padding:8px;z-index:1001;display:none;box-shadow:0 20px 50px rgba(0,0,0,.5);backdrop-filter:blur(20px)}
+.search-dropdown.active{display:block}
+.search-dropdown::-webkit-scrollbar{width:4px}
+.search-dropdown::-webkit-scrollbar-thumb{background:var(--primary);border-radius:4px}
+.search-dropdown-header{padding:8px 12px;font-size:11px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;justify-content:space-between}
+.search-dropdown-header .source-badge{font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;text-transform:uppercase}
+.source-anilist{background:rgba(59,130,246,.15);color:#60a5fa}
+.source-mal{background:rgba(46,86,173,.15);color:#6b9bd2}
+.source-kitsu{background:rgba(255,165,0,.15);color:#ffa500}
+.search-result-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;transition:all .2s;color:inherit;text-decoration:none}
+.search-result-item:hover,.search-result-item:focus-visible,.search-result-item.is-active{background:rgba(var(--primary-rgb),.08);outline:0}
+.search-result-item img{width:45px;height:62px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.search-result-info{flex:1;min-width:0}
+.search-result-info h4{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-result-info p{font-size:11px;color:var(--text-secondary);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
+.search-result-info .sr-score{color:#fbbf24}
+.search-result-info .sr-format{padding:1px 6px;background:rgba(var(--primary-rgb),.1);border-radius:6px;font-size:10px;color:var(--primary)}
+.search-dropdown-footer{padding:8px 12px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px;display:flex;align-items:center;justify-content:space-between}
+.search-dropdown-footer a,.search-dropdown-footer button{padding:6px 14px;background:var(--gradient-1);border:0;border-radius:10px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .2s;text-decoration:none}
+.search-dropdown-footer a:hover,.search-dropdown-footer button:hover{transform:scale(1.03)}
+.search-dropdown-footer span{font-size:11px;color:var(--text-secondary)}
+.search-loading{padding:20px;text-align:center;color:var(--text-secondary);font-size:13px}
+.search-no-results{padding:25px;text-align:center;color:var(--text-secondary)}
+.search-no-results p{font-size:14px;margin-bottom:5px}
+.search-no-results small{font-size:11px;opacity:.7}
+
+/* ---------- Tombol navbar ---------- */
+.nav-btn{padding:8px 16px;border:0;border-radius:25px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;font-size:13px;transition:all .3s;display:flex;align-items:center;gap:6px}
+.btn-theme{background:var(--bg-card);color:var(--primary);border:1px solid rgba(var(--primary-rgb),.2)}
+.btn-theme:hover{background:rgba(var(--primary-rgb),.1)}
+.btn-login{background:var(--gradient-1);color:#fff}
+.btn-login:hover{transform:scale(1.05);box-shadow:var(--shadow-glow)}
+
+/* ---------- Profile dropdown ---------- */
+.profile-wrapper{position:relative}
+.profile-trigger{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 12px 4px 4px;border-radius:25px;background:var(--bg-card);border:1px solid rgba(var(--primary-rgb),.15);transition:all .3s;font-family:inherit;color:inherit}
+.profile-trigger:hover{border-color:var(--primary);box-shadow:var(--shadow-glow)}
+.profile-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--primary)}
+.profile-name{font-size:13px;font-weight:600;color:var(--text-primary);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-arrow{font-size:10px;color:var(--text-secondary);transition:transform .3s}
+.profile-wrapper.open .profile-arrow{transform:rotate(180deg)}
+.profile-dropdown{position:absolute;top:calc(100% + 10px);right:0;width:240px;background:var(--bg-card);border:1px solid rgba(var(--primary-rgb),.15);border-radius:16px;padding:8px;opacity:0;visibility:hidden;transform:translateY(-8px);transition:all .25s;z-index:100;box-shadow:0 15px 40px rgba(0,0,0,.4)}
+.profile-wrapper.open .profile-dropdown{opacity:1;visibility:visible;transform:translateY(0)}
+.dropdown-header{padding:12px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px;display:flex;align-items:center;gap:10px}
+.dropdown-header img{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--primary)}
+.dropdown-header-info h4{font-size:14px;font-weight:600}
+.dropdown-header-info p{font-size:11px;color:var(--text-secondary)}
+.dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:all .2s;font-size:13px;color:var(--text-secondary);border:0;background:0 0;width:100%;text-align:left;font-family:'Poppins',sans-serif;text-decoration:none}
+.dropdown-item:hover{background:rgba(var(--primary-rgb),.1);color:var(--primary)}
+.dropdown-item svg{width:18px;height:18px;fill:currentColor;flex-shrink:0}
+.dropdown-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0}
+.dropdown-item.danger:hover{background:rgba(239,68,68,.1);color:#ef4444}
+.bookmark-count{background:var(--gradient-1);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:auto}
+
+/* ==========================================================================
+   LAYOUT UMUM
+   ========================================================================== */
+.main-content{padding-top:70px}
+.section{padding:40px;max-width:var(--desktop-max);margin:0 auto;scroll-margin-top:var(--nav-h)}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}
+.section-title{font-size:22px;font-weight:700;display:flex;align-items:center;gap:10px}
+.section-title::before{content:'';width:4px;height:24px;background:var(--gradient-1);border-radius:4px}
+.see-all{color:var(--primary);text-decoration:none;font-size:13px;font-weight:500;transition:all .3s}
+.see-all:hover{color:var(--secondary)}
+
+/* ==========================================================================
+   ANIME GRID & CARD
+   ========================================================================== */
+.anime-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:22px}
+.anime-card{position:relative;border-radius:16px;overflow:hidden;background:var(--bg-card);transition:all .35s;cursor:pointer}
+.anime-card:hover{transform:translateY(-8px);box-shadow:0 15px 40px rgba(var(--primary-rgb),.2)}
+.anime-card:focus-within{outline:2px solid var(--primary);outline-offset:2px}
+.anime-card-img{position:relative;width:100%;height:270px;overflow:hidden}
+.anime-card-img img{width:100%;height:100%;object-fit:cover;transition:transform .35s}
+.anime-card:hover .anime-card-img img{transform:scale(1.08)}
+.anime-card-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(15,15,26,.9) 0%,transparent 55%);opacity:0;transition:opacity .3s;display:flex;align-items:center;justify-content:center}
+.anime-card:hover .anime-card-overlay{opacity:1}
+.play-btn-overlay{width:50px;height:50px;background:var(--gradient-1);border-radius:50%;display:flex;align-items:center;justify-content:center;transform:scale(0);transition:transform .3s}
+.anime-card:hover .play-btn-overlay{transform:scale(1)}
+.play-btn-overlay svg{width:20px;height:20px;fill:#fff;margin-left:3px}
+.anime-card-badge{position:absolute;top:10px;left:10px;padding:3px 10px;background:var(--gradient-1);border-radius:12px;font-size:10px;font-weight:600}
+/* Badge sumber di hasil pencarian (dulu inline style) */
+.anime-card-badge.src-anilist{background:#3db4f2;font-size:9px}
+.anime-card-badge.src-mal{background:#2e51a2;font-size:9px}
+.anime-card-badge.src-kitsu{background:#ffa500;font-size:9px}
+.anime-card-quality{position:absolute;top:10px;right:10px;padding:3px 8px;background:rgba(0,0,0,.7);border:1px solid var(--accent);border-radius:8px;font-size:10px;color:var(--accent);font-weight:600}
+.card-bookmark-btn{position:absolute;bottom:80px;right:10px;width:34px;height:34px;background:rgba(0,0,0,.6);border:0;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;opacity:0;z-index:5}
+.anime-card:hover .card-bookmark-btn,.card-bookmark-btn:focus-visible{opacity:1}
+.card-bookmark-btn svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2}
+.card-bookmark-btn.is-bookmarked{background:var(--primary);opacity:1}
+.card-bookmark-btn.is-bookmarked svg{fill:#fff;stroke:#fff}
+.card-bookmark-btn:hover{transform:scale(1.15)}
+.anime-card-info{padding:12px 14px}
+.anime-card-title{font-size:14px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* "Stretched link": seluruh kartu bisa diklik, tapi tetap <a href> asli
+   (bisa klik-tengah / buka tab baru) dan tombol bookmark tetap terpisah. */
+.anime-card-link{color:inherit;text-decoration:none;outline:0}
+.anime-card-link::after{content:'';position:absolute;inset:0;z-index:1}
+.anime-card-meta{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-secondary)}
+.anime-card-rating{display:flex;align-items:center;gap:3px;color:#fbbf24}
+
+/* ---------- Skeleton loading ---------- */
+.loading-shimmer{background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-card-hover) 50%,var(--bg-card) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+.skeleton-card{pointer-events:none}
+.skeleton-card .anime-card-img{border-radius:16px 16px 0 0}
+.skeleton-line{height:16px;border-radius:8px;margin-bottom:8px}
+.skeleton-line--short{height:12px;width:60%;margin-bottom:0}
+
+/* ---------- Empty / error state ---------- */
+.empty-state{grid-column:1/-1;text-align:center;padding:40px;color:var(--text-secondary)}
+.empty-state--lg{padding:60px}
+.empty-state-icon{font-size:48px;margin-bottom:15px}
+.empty-state h3{font-size:18px;color:var(--text-primary);margin-bottom:8px}
+.empty-state p{font-size:14px}
+.empty-actions{margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn-ext{padding:10px 20px;color:#fff;text-decoration:none;border-radius:8px;font-size:13px;border:0;cursor:pointer;font-family:'Poppins',sans-serif}
+.btn-ext--mal{background:#2e51a2}
+.btn-ext--anilist{background:#3db4f2}
+.btn-ext--retry{background:var(--gradient-1);font-weight:600}
+
+/* ---------- Tombol aksi bersama (hero & halaman watch) ---------- */
+.btn-watch,.btn-bookmark-hero{display:flex;align-items:center;gap:8px;padding:12px 28px;border:0;border-radius:30px;font-weight:600;cursor:pointer;font-size:14px;transition:all .3s;font-family:'Poppins',sans-serif;text-decoration:none}
+.btn-watch{background:var(--gradient-1);color:#fff}
+.btn-watch:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(var(--primary-rgb),.4)}
+.btn-bookmark-hero{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff}
+.btn-bookmark-hero:hover{background:rgba(255,255,255,.12);border-color:var(--primary)}
+.btn-bookmark-hero.bookmarked{background:rgba(var(--primary-rgb),.15);border-color:var(--primary);color:var(--primary)}
+.btn-bookmark-hero.bookmarked svg{fill:currentColor}
+
+/* Tombol "Muat Lebih Banyak" (dulu inline style + onmouseover) */
+.btn-load-more{padding:12px 30px;background:var(--gradient-1);border:0;border-radius:25px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s}
+.btn-load-more:hover{transform:translateY(-2px)}
+.btn-load-more:disabled{opacity:.6;cursor:wait;transform:none}
+
+/* ==========================================================================
+   MODAL — tombol tutup bersama
+   ========================================================================== */
+.modal-close{width:36px;height:36px;background:rgba(255,255,255,.1);border:0;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;flex-shrink:0}
+.modal-close:hover{background:var(--primary)}
+.modal-close svg{width:16px;height:16px;fill:#fff}
+
+/* ---------- Auth modal (juga dipakai modal ganti avatar) ---------- */
+.auth-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;align-items:center;justify-content:center;padding:20px}
+.auth-modal.active{display:flex}
+.auth-container{position:relative;background:var(--bg-card);border-radius:24px;width:100%;max-width:460px;max-height:calc(100vh - 40px);overflow-y:auto;animation:modalIn .3s ease;border:1px solid rgba(var(--primary-rgb),.12)}
+.auth-header{padding:30px 30px 0;text-align:center}
+.auth-header .auth-logo{font-size:40px;margin-bottom:10px}
+.auth-header h2{font-size:24px;font-weight:700;margin-bottom:5px}
+.auth-header p{font-size:13px;color:var(--text-secondary)}
+.auth-tabs{display:flex;margin:25px 30px 0;background:var(--bg-dark);border-radius:14px;padding:4px}
+.auth-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:all .3s;color:var(--text-secondary);background:0 0;border:0;font-family:'Poppins',sans-serif}
+.auth-tab.active{background:var(--gradient-1);color:#fff}
+.auth-form{padding:20px 30px 30px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+.form-group input{width:100%;padding:12px 16px;background:var(--bg-dark);border:1px solid rgba(255,255,255,.08);border-radius:12px;color:var(--text-primary);font-size:14px;font-family:'Poppins',sans-serif;transition:all .3s;outline:0}
+.form-group input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.15)}
+.btn-auth{width:100%;padding:13px;background:var(--gradient-1);border:0;border-radius:14px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s;margin-top:8px}
+.btn-auth:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(var(--primary-rgb),.4)}
+.btn-auth--spaced{margin-top:16px}
+.auth-close{position:absolute;top:15px;right:15px;width:32px;height:32px;background:rgba(255,255,255,.1);border:0;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;z-index:2}
+.auth-close:hover{background:rgba(255,255,255,.2)}
+.auth-close svg{width:14px;height:14px;fill:#fff}
+.auth-note{margin-top:12px;font-size:11px;color:var(--text-secondary);text-align:center;opacity:.8}
+
+/* ---------- Avatar picker ---------- */
+.avatar-section{margin-bottom:16px}
+.avatar-section label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:10px}
+.avatar-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;max-height:240px;overflow-y:auto;padding:4px}
+.avatar-grid--tall{max-height:300px}
+.avatar-grid::-webkit-scrollbar{width:4px}
+.avatar-grid::-webkit-scrollbar-thumb{background:var(--primary);border-radius:4px}
+.avatar-option{display:block;width:100%;aspect-ratio:1;border-radius:12px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:all .3s;position:relative;padding:0;background:var(--bg-dark)}
+.avatar-option:hover{border-color:rgba(var(--primary-rgb),.5);transform:scale(1.05)}
+.avatar-option.selected{border-color:var(--primary);box-shadow:0 0 15px rgba(var(--primary-rgb),.4)}
+.avatar-option.selected::after{content:'✓';position:absolute;inset:0;background:rgba(var(--primary-rgb),.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#fff}
+.avatar-option img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-name{font-size:9px;color:var(--text-secondary);text-align:center;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Upload avatar ---------- */
+.avatar-upload-area{width:100%;padding:20px;border:2px dashed rgba(var(--primary-rgb),.3);border-radius:16px;text-align:center;cursor:pointer;transition:all .3s;margin-bottom:12px;position:relative;overflow:hidden;background:0 0;color:inherit;font-family:inherit;display:block}
+.avatar-upload-area:hover{border-color:var(--primary);background:rgba(var(--primary-rgb),.05)}
+.avatar-upload-area.has-image{border-style:solid;border-color:var(--primary)}
+.avatar-upload-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin:0 auto 8px;display:none}
+.avatar-upload-area.has-image .avatar-upload-preview{display:block}
+.avatar-upload-area .upload-icon{font-size:32px;margin-bottom:6px}
+.avatar-upload-area .upload-text{font-size:12px;color:var(--text-secondary)}
+.avatar-upload-area .upload-text strong{color:var(--primary)}
+.avatar-upload-area input[type=file]{display:none}
+
+/* ---------- Theme picker ---------- */
+.theme-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:3000;align-items:center;justify-content:center;padding:20px}
+.theme-modal.active{display:flex}
+.theme-modal-content{background:var(--bg-card);border-radius:24px;padding:35px;max-width:700px;width:100%;max-height:calc(100vh - 40px);overflow-y:auto;animation:modalIn .3s ease;border:1px solid rgba(var(--primary-rgb),.12)}
+.theme-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}
+.theme-modal-header h2{font-size:24px;font-weight:700;display:flex;align-items:center;gap:10px}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.theme-card{position:relative;padding:20px;border-radius:16px;cursor:pointer;transition:all .3s;border:2px solid transparent;overflow:hidden;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end;text-align:left;font-family:inherit;color:inherit}
+.theme-card:hover{transform:translateY(-4px)}
+.theme-card.active{border-color:var(--primary)}
+.theme-card.active::after{content:'✓';position:absolute;top:10px;right:10px;width:24px;height:24px;background:var(--gradient-1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.theme-card-icon{font-size:30px;margin-bottom:6px}
+.theme-card-name{font-size:14px;font-weight:600;color:#fff}
+.theme-card-desc{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
+.tc-sakura{background:linear-gradient(135deg,#ff6b9d33,#c084fc33),#1a1a2e}
+.tc-autumn{background:linear-gradient(135deg,#e67e2233,#c0392b33),#2e1a12}
+.tc-winter{background:linear-gradient(135deg,#74b9ff33,#a29bfe33),#121e36}
+.tc-summer{background:linear-gradient(135deg,#fdcb6e33,#00cec933),#1a2e28}
+.tc-midnight{background:linear-gradient(135deg,#a855f733,#6366f133),#0f0f24}
+.tc-neon{background:linear-gradient(135deg,#ff00ff33,#00ffff33),#1a1a1a}
+.tc-forest{background:linear-gradient(135deg,#00b89433,#55efc433),#142e1a}
+
+/* ==========================================================================
+   API STATUS
+   ========================================================================== */
+.api-status{position:fixed;bottom:20px;right:20px;z-index:3000;display:flex;flex-direction:column;gap:8px;transition:opacity .5s}
+.api-status.is-fading{opacity:0}
+.api-badge{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:20px;font-size:12px;animation:slideIn .3s ease;backdrop-filter:blur(10px)}
+.api-badge .status-dot{width:8px;height:8px;border-radius:50%}
+.api-badge .status-dot.online{background:#10b981;box-shadow:0 0 8px #10b981}
+.api-badge .status-dot.offline{background:#ef4444;box-shadow:0 0 8px #ef4444}
+.api-badge .status-dot.loading{background:#f59e0b;animation:pulse 1s infinite}
+.api-badge span{color:var(--text-secondary)}
+
+/* ==========================================================================
+   TOAST — sekarang ditumpuk dalam satu container (dulu saling menimpa)
+   ========================================================================== */
+.toast-stack{position:fixed;top:85px;right:20px;z-index:3000;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+.toast{position:relative;padding:14px 22px;background:var(--bg-card);border:1px solid rgba(var(--primary-rgb),.2);border-radius:14px;color:var(--text-primary);font-size:13px;display:flex;align-items:center;gap:10px;animation:toastIn .4s ease;max-width:380px;box-shadow:0 10px 30px rgba(0,0,0,.3);pointer-events:auto}
+.toast.hide{animation:toastOut .3s ease forwards}
+
+/* ==========================================================================
+   FOOTER
+   ========================================================================== */
+.footer{padding:40px;border-top:1px solid rgba(255,255,255,.04);margin-top:40px}
+.footer-inner{max-width:var(--desktop-max);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:30px;flex-wrap:wrap}
+.footer-left p{color:var(--text-secondary);font-size:13px;margin-top:8px;max-width:300px}
+.footer-links{display:flex;gap:22px;flex-wrap:wrap}
+.footer-links a{color:var(--text-secondary);text-decoration:none;font-size:13px;transition:color .3s}
+.footer-links a:hover{color:var(--primary)}
+.social-links{display:flex;gap:10px}
+.social-link{width:36px;height:36px;background:var(--bg-card);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .3s;cursor:pointer}
+.social-link:hover{background:var(--gradient-1);transform:translateY(-3px)}
+.social-link svg{width:16px;height:16px;fill:var(--text-secondary)}
+.social-link:hover svg{fill:#fff}
+.wm-credit{text-align:center;padding:16px;margin-top:12px;border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:var(--text-secondary)}
+.wm-credit strong{color:var(--primary);font-weight:700}
+
+/* ==========================================================================
+   RESPONSIVE (breakpoint & nilai sama dengan file asli)
+   ========================================================================== */
+@media(max-width:1200px){
+    .anime-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px}
+}
+@media(max-width:768px){
+    .navbar{padding:0 12px}
+    .navbar-inner{height:60px;overflow-x:hidden}
+    .nav-links{display:none}
+    .section{padding:25px 16px}
+    .anime-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .anime-card-img{height:200px}
+    .footer{padding:25px 16px}
+    .footer-inner{flex-direction:column;gap:20px;text-align:center}
+    .search-box{padding:6px 12px!important}
+    .search-box input{width:60px;font-size:12px}
+    .search-box svg{width:14px;height:14px}
+    /* FIX: dulu dropdown terpotong oleh overflow .navbar-inner di 481–768px.
+       position:fixed (relatif ke navbar karena backdrop-filter) lolos dari clipping. */
+    .search-dropdown{position:fixed;top:calc(var(--nav-h) + 8px);left:12px;right:12px;width:auto;max-height:calc(100vh - 90px)}
+    .btn-theme .theme-label{display:none}
+    .btn-theme{padding:6px 8px!important;font-size:11px!important}
+    .btn-login{padding:6px 10px!important;font-size:11px!important}
+    .nav-right{gap:4px!important}
+    .theme-grid{grid-template-columns:repeat(2,1fr)}
+    .theme-modal-content{padding:20px}
+    .avatar-grid{grid-template-columns:repeat(4,1fr)}
+    .profile-name{display:none}
+}
+@media(max-width:480px){
+    .anime-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+    .anime-card-img{height:180px}
+    .theme-grid{grid-template-columns:1fr 1fr;gap:8px}
+    .avatar-grid{grid-template-columns:repeat(3,1fr)}
+    .navbar-inner{gap:4px!important}
+    .search-box{display:none}
+    .btn-theme{padding:5px 6px!important;font-size:10px!important}
+    .btn-login{padding:5px 8px!important;font-size:10px!important}
+    .profile-name{max-width:50px!important;font-size:10px!important}
+    /* FIX mobile: dulu pencarian hilang total di <=480px. Sekarang ada tombol 🔍
+       yang membuka search bar selebar layar di bawah navbar. */
+    .nav-btn.search-toggle{display:flex}
+    .navbar.search-open .search-box{display:flex;position:absolute;top:calc(100% + 8px);left:12px;right:12px;padding:10px 14px!important}
+    .navbar.search-open .search-box input{width:100%;font-size:14px}
+    .navbar.search-open .search-dropdown{top:calc(var(--nav-h) + 64px);max-height:calc(100vh - 150px)}
+    .toast-stack{left:12px;right:12px;align-items:stretch}
+    .toast{max-width:none}
+    .api-status{right:12px;bottom:12px}
+}

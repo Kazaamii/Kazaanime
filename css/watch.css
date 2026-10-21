@@ -1,0 +1,186 @@
+/* ==========================================================================
+   Kazanime — watch.css
+   Khusus watch.html: player, status bar, pilihan server, daftar episode,
+   info anime, download, platform legal, rekomendasi.
+   Menggabungkan gaya "streaming page" + bagian modal player yang masih relevan
+   (modal player lama dihapus).
+   ========================================================================== */
+
+/* ---------- Kerangka halaman ---------- */
+/* FIX: dulu .streaming-page punya margin-top:70px DI DALAM .main-content yang
+   sudah padding-top:70px → celah ganda 140px. Sekarang hanya offset navbar. */
+.streaming-page-inner{max-width:var(--desktop-max);margin:0 auto;padding:0}
+.streaming-back-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg-card);border:1px solid rgba(255,255,255,.1);border-radius:12px;color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer;margin:16px 40px;transition:all .3s;font-family:'Poppins',sans-serif;text-decoration:none}
+.streaming-back-btn:hover{border-color:var(--primary);color:var(--primary)}
+
+/* ==========================================================================
+   PLAYER
+   ========================================================================== */
+.streaming-player-wrapper{position:relative;width:100%;padding-top:56.25%;background:#000}
+.streaming-player-wrapper iframe,.streaming-player-wrapper>div{position:absolute;top:0;left:0;width:100%;height:100%;border:none}
+
+/* Pesan di dalam player: loading / error / info (dulu inline style berulang) */
+.player-message{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#000;padding:30px;text-align:center}
+.player-message .spinner{width:50px;height:50px;border:3px solid rgba(255,255,255,0.1);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+.player-message-icon{font-size:48px;margin-bottom:12px}
+.player-message-title{color:#fff;font-size:16px;font-weight:600;margin:15px 0 8px}
+.player-message-text{color:var(--text-secondary);font-size:13px;max-width:460px}
+.player-message-sub{color:var(--text-secondary);font-size:12px;margin-top:5px;opacity:.8}
+.player-message-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:center}
+.player-message-actions a,.player-message-actions button{padding:10px 20px;border:0;border-radius:8px;font-size:13px;font-weight:600;color:#fff;text-decoration:none;cursor:pointer;font-family:'Poppins',sans-serif;background:var(--gradient-1)}
+.player-message-actions .btn-bstation{background:#00a1d6}
+.player-message-actions .btn-youtube{background:#ff0000}
+
+/* Status bar di bawah player (status server + navigasi episode cepat) */
+.player-statusbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 40px;background:var(--bg-dark-2);border-bottom:1px solid rgba(255,255,255,.04)}
+.player-status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);min-width:0}
+.player-status .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#f59e0b;animation:pulse 1s infinite}
+.player-status.is-ok .status-dot{background:#10b981;animation:none;box-shadow:0 0 8px #10b981}
+.player-status.is-error .status-dot{background:#ef4444;animation:none;box-shadow:0 0 8px #ef4444}
+.player-status-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player-controls{display:flex;gap:8px;flex-wrap:wrap}
+.player-ctrl-btn{padding:6px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s;white-space:nowrap}
+.player-ctrl-btn:hover:not(:disabled){background:rgba(var(--primary-rgb),.12);border-color:var(--primary);color:var(--primary)}
+.player-ctrl-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ==========================================================================
+   DETAIL (kolom utama + sidebar)
+   ========================================================================== */
+.streaming-details{display:grid;grid-template-columns:1fr 350px;gap:24px;padding:24px 40px}
+.streaming-main{min-width:0}
+.streaming-sidebar{position:sticky;top:90px;max-height:calc(100vh - 110px);overflow-y:auto;align-self:start}
+.watch-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px}
+.watch-title-row .btn-bookmark-hero{flex-shrink:0;padding:10px 20px;font-size:13px}
+.streaming-title{font-size:24px;font-weight:700;margin-bottom:4px;word-break:break-word}
+.watch-episode-label{color:var(--text-secondary);font-size:13px}
+.streaming-meta{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 16px}
+.streaming-meta span{padding:4px 12px;background:var(--bg-card);border-radius:12px;font-size:12px;color:var(--text-secondary)}
+.streaming-meta .meta-score{color:#fbbf24}
+
+.sub-info{display:flex;align-items:center;gap:8px;margin-bottom:20px;padding:10px 15px;background:rgba(var(--accent-rgb),.06);border-radius:12px;border:1px solid rgba(var(--accent-rgb),.15)}
+.sub-info svg{width:18px;height:18px;fill:var(--accent);flex-shrink:0}
+.sub-info span{font-size:13px;color:var(--accent)}
+
+/* ---------- Info anime (poster + sinopsis + genre) ---------- */
+.watch-info{display:grid;grid-template-columns:120px 1fr;gap:18px;padding:20px;background:rgba(var(--primary-rgb),.04);border:1px solid rgba(var(--primary-rgb),.1);border-radius:16px}
+.watch-info-poster{width:120px;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--bg-card)}
+.watch-info-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.watch-info-body{min-width:0}
+.watch-info-body h4{font-size:16px;font-weight:600;margin-bottom:8px}
+.watch-synopsis{font-size:13px;line-height:1.7;color:var(--text-secondary);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.watch-synopsis.expanded{display:block;-webkit-line-clamp:unset}
+.watch-synopsis-toggle{margin-top:6px;background:0 0;border:0;color:var(--primary);font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;padding:0}
+.watch-genres{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.watch-genres span{padding:3px 10px;border-radius:12px;font-size:11px;background:rgba(var(--primary-rgb),.1);color:var(--primary);border:1px solid rgba(var(--primary-rgb),.2)}
+.watch-info .skeleton-line{height:12px}
+
+/* ==========================================================================
+   DOWNLOAD
+   ========================================================================== */
+.download-section{margin-top:20px;padding:20px;background:rgba(var(--primary-rgb),.04);border:1px solid rgba(var(--primary-rgb),.1);border-radius:16px}
+.download-section h4{font-size:16px;font-weight:600;margin-bottom:15px;display:flex;align-items:center;gap:8px}
+.download-list{display:flex;flex-direction:column;gap:8px}
+.download-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:12px;transition:all .3s;gap:10px}
+.download-item:hover{border-color:rgba(var(--primary-rgb),.3);background:var(--bg-card-hover)}
+.download-info{display:flex;align-items:center;gap:12px}
+.download-quality{padding:4px 12px;border-radius:10px;font-size:12px;font-weight:700;min-width:65px;text-align:center}
+.dq-1080{background:linear-gradient(135deg,#ff6b9d,#c084fc);color:#fff}
+.dq-720{background:rgba(var(--primary-rgb),.2);color:var(--primary)}
+.dq-480{background:rgba(var(--accent-rgb),.15);color:var(--accent)}
+.dq-360{background:rgba(255,255,255,.1);color:var(--text-secondary)}
+.download-detail{font-size:12px;color:var(--text-secondary)}
+.download-detail strong{color:var(--text-primary);font-size:13px;display:block;margin-bottom:2px}
+.download-links{display:flex;gap:6px;flex-wrap:wrap}
+.btn-download{display:flex;align-items:center;gap:6px;padding:8px 18px;background:var(--gradient-1);border:0;border-radius:20px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s;white-space:nowrap;text-decoration:none}
+.btn-download:hover{transform:scale(1.05);box-shadow:var(--shadow-glow)}
+.btn-download svg{width:14px;height:14px;fill:#fff}
+.btn-download--sm{font-size:11px;padding:6px 12px}
+.download-loading{text-align:center;padding:20px;color:var(--text-secondary);font-size:12px}
+.download-loading .loading-shimmer{height:60px;border-radius:10px;margin-bottom:10px}
+.download-notice{margin-top:15px;padding:12px;border-radius:10px;font-size:12px;color:var(--text-secondary)}
+.download-notice strong{display:inline}
+.download-notice--warn{background:rgba(255,193,7,0.1);border-left:3px solid #ffc107}
+.download-notice--warn strong{color:#ffc107}
+.download-notice--ok{background:rgba(var(--accent-rgb),0.05);border-left:3px solid var(--accent)}
+.download-notice--ok strong{color:var(--accent)}
+
+/* ==========================================================================
+   PLATFORM LEGAL (dulu inline style + onmouseover)
+   ========================================================================== */
+.platforms-section{margin-top:20px;padding:20px;background:rgba(var(--primary-rgb),0.04);border:1px solid rgba(var(--primary-rgb),0.1);border-radius:16px}
+.platforms-section h4{font-size:16px;font-weight:600;margin-bottom:15px}
+.platforms-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.platform-card{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:12px;text-decoration:none;transition:all .3s}
+.platform-card:hover{transform:translateY(-2px);border-color:var(--primary)}
+.platform-card[data-platform="bstation"]:hover{border-color:#00a1d6}
+.platform-card[data-platform="muse"]:hover{border-color:#ff0000}
+.platform-card[data-platform="anione"]:hover{border-color:#6c5ce7}
+.platform-card[data-platform="vidio"]:hover{border-color:#e74c3c}
+.platform-icon{font-size:24px}
+.platform-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.platform-desc{font-size:10px;color:var(--text-secondary)}
+.platforms-tip{margin-top:15px;padding:12px;background:rgba(255,255,255,0.03);border-radius:10px;font-size:12px;color:var(--text-secondary)}
+
+/* ==========================================================================
+   EPISODE & SERVER (sidebar)
+   ========================================================================== */
+.episode-list h4,.server-selector h4{font-size:15px;margin-bottom:12px;color:var(--text-secondary)}
+.server-selector{margin-top:20px}
+.server-selector h4{font-size:14px;margin-bottom:10px}
+.server-hint{font-size:11px;color:var(--text-secondary);margin-bottom:8px}
+.ep-range-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ep-range-tab{padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s}
+.ep-range-tab:hover,.ep-range-tab.active{background:rgba(var(--primary-rgb),.15);border-color:var(--primary);color:var(--primary)}
+.streaming-eps-scroll{max-height:300px;overflow-y:auto;padding-right:8px}
+.streaming-eps-scroll::-webkit-scrollbar{width:4px}
+.streaming-eps-scroll::-webkit-scrollbar-thumb{background:var(--primary);border-radius:4px}
+.episodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:8px}
+.ep-btn{padding:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-secondary);font-size:13px;cursor:pointer;text-align:center;transition:all .3s;font-family:'Poppins',sans-serif}
+.ep-btn:hover,.ep-btn.active{background:rgba(var(--primary-rgb),.15);border-color:var(--primary);color:var(--primary)}
+.ep-btn.is-watched:not(.active){color:var(--text-primary);border-color:rgba(var(--accent-rgb),.35)}
+/* Input episode manual saat jumlah episode tidak diketahui
+   (dulu memakai variabel CSS yang tidak ada: --border-color, --bg-secondary) */
+.episode-manual{padding:16px;text-align:center}
+.episode-manual p{color:var(--text-secondary);margin-bottom:12px;font-size:13px}
+.episode-manual form{display:flex;gap:8px;justify-content:center;align-items:center}
+.episode-manual input{width:80px;padding:8px 12px;border:2px solid rgba(var(--primary-rgb),.3);border-radius:8px;background:var(--bg-dark);color:var(--text-primary);font-size:16px;text-align:center;font-family:'Poppins',sans-serif;outline:0}
+.episode-manual input:focus{border-color:var(--primary)}
+.episode-manual button{padding:8px 16px;background:var(--gradient-1);color:#fff;border:0;border-radius:8px;cursor:pointer;font-weight:600;font-family:'Poppins',sans-serif}
+.server-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.server-btn{padding:8px 16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s;display:flex;align-items:center;gap:6px}
+.server-btn:hover:not(:disabled),.server-btn.active{background:rgba(var(--primary-rgb),.12);border-color:var(--primary);color:var(--primary)}
+.server-btn:disabled,.server-btn.is-disabled{opacity:.5;cursor:not-allowed}
+.server-btn.is-failed:not(.active){border-color:rgba(239,68,68,.35);color:#f87171}
+.server-btn .server-badge{font-size:9px;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.08);text-transform:uppercase;letter-spacing:.3px}
+
+/* ==========================================================================
+   REKOMENDASI
+   ========================================================================== */
+.watch-recommendations{padding-top:16px}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media(max-width:1024px){
+    .streaming-details{grid-template-columns:1fr 300px}
+}
+@media(max-width:768px){
+    .streaming-details{grid-template-columns:1fr;padding:16px}
+    .streaming-sidebar{position:static;max-height:none}
+    .streaming-back-btn{margin:12px 16px}
+    .streaming-title{font-size:18px}
+    .player-statusbar{padding:10px 16px}
+    .watch-title-row{flex-direction:column;gap:10px}
+    .watch-info{grid-template-columns:90px 1fr;gap:14px;padding:16px}
+    .watch-info-poster{width:90px}
+    .download-item{flex-direction:column;align-items:flex-start}
+    .btn-download{width:100%;justify-content:center}
+    .download-links{width:100%}
+    .download-links .btn-download{width:auto;flex:1}
+}
+@media(max-width:480px){
+    .player-controls{width:100%}
+    .player-ctrl-btn{flex:1;text-align:center}
+    .watch-info{grid-template-columns:1fr}
+    .watch-info-poster{display:none}
+}

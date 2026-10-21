@@ -1,0 +1,118 @@
+/* ==========================================================================
+   Kazanime — base.css
+   Reset, design token (CSS variables), 7 tema, elemen global, keyframes
+   bersama, efek partikel per tema, dan utilitas kecil.
+   Dipakai oleh SEMUA halaman. Nilai disalin 1:1 dari index-final-v4.html.
+   ========================================================================== */
+
+/* ---------- Reset ---------- */
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ---------- Token default = tema Sakura ---------- */
+:root{
+    --primary:#ff6b9d;--primary-rgb:255,107,157;--primary-dark:#e8548a;
+    --secondary:#c084fc;--secondary-rgb:192,132,252;
+    --accent:#67e8f9;--accent-rgb:103,232,249;
+    --bg-dark:#0f0f1a;--bg-dark-2:#141425;
+    --bg-card:#1a1a2e;--bg-card-hover:#222240;
+    --text-primary:#fff;--text-secondary:#a0a0c0;
+    --gradient-1:linear-gradient(135deg,var(--primary),var(--secondary));
+    --gradient-2:linear-gradient(135deg,var(--accent),var(--secondary));
+    --shadow-glow:0 0 20px rgba(var(--primary-rgb),.3);
+    --hero-bg:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+    --particle-color:var(--primary);--desktop-max:1400px;
+    /* Tinggi navbar dipakai untuk offset konten & scroll-margin */
+    --nav-h:70px;
+}
+
+/* ---------- 6 tema tambahan (total 7 bersama Sakura) ---------- */
+[data-theme="autumn"]{--primary:#e67e22;--primary-rgb:230,126,34;--primary-dark:#d35400;--secondary:#c0392b;--secondary-rgb:192,57,43;--accent:#f39c12;--accent-rgb:243,156,18;--bg-dark:#1a0f0a;--bg-dark-2:#241410;--bg-card:#2e1a12;--bg-card-hover:#3d2418;--text-secondary:#c0a080;--hero-bg:linear-gradient(135deg,#2e1a12,#3d2418,#5d3a1a)}
+[data-theme="winter"]{--primary:#74b9ff;--primary-rgb:116,185,255;--primary-dark:#0984e3;--secondary:#a29bfe;--secondary-rgb:162,155,254;--accent:#81ecec;--accent-rgb:129,236,236;--bg-dark:#0a0f1a;--bg-dark-2:#0e1525;--bg-card:#121e36;--bg-card-hover:#1a2a4a;--text-secondary:#8ab4d0;--hero-bg:linear-gradient(135deg,#121e36,#1a2a4a,#0e3460)}
+[data-theme="summer"]{--primary:#fdcb6e;--primary-rgb:253,203,110;--primary-dark:#e17055;--secondary:#00cec9;--secondary-rgb:0,206,201;--accent:#55efc4;--accent-rgb:85,239,196;--bg-dark:#0f1a18;--bg-dark-2:#142520;--bg-card:#1a2e28;--bg-card-hover:#224038;--text-secondary:#a0c0b0;--hero-bg:linear-gradient(135deg,#1a2e28,#16403e,#0f6050)}
+[data-theme="midnight"]{--primary:#a855f7;--primary-rgb:168,85,247;--primary-dark:#7c3aed;--secondary:#6366f1;--secondary-rgb:99,102,241;--accent:#c4b5fd;--accent-rgb:196,181,253;--bg-dark:#050510;--bg-dark-2:#0a0a1a;--bg-card:#0f0f24;--bg-card-hover:#1a1a3e;--text-secondary:#8080b0;--hero-bg:linear-gradient(135deg,#0f0f24,#1a0a3e,#0f0460)}
+[data-theme="neon"]{--primary:#ff00ff;--primary-rgb:255,0,255;--primary-dark:#c0c;--secondary:#0ff;--secondary-rgb:0,255,255;--accent:#39ff14;--accent-rgb:57,255,20;--bg-dark:#0a0a0a;--bg-dark-2:#111;--bg-card:#1a1a1a;--bg-card-hover:#2a2a2a;--text-secondary:#808080;--hero-bg:linear-gradient(135deg,#1a1a1a,#0a0a2e,#1a0a2e)}
+[data-theme="forest"]{--primary:#00b894;--primary-rgb:0,184,148;--primary-dark:#00a381;--secondary:#55efc4;--secondary-rgb:85,239,196;--accent:#ffeaa7;--accent-rgb:255,234,167;--bg-dark:#0a1a0f;--bg-dark-2:#0f2514;--bg-card:#142e1a;--bg-card-hover:#1a4022;--text-secondary:#80b090;--hero-bg:linear-gradient(135deg,#142e1a,#1a4022,#0f6030)}
+
+/* ---------- Elemen global ---------- */
+body{font-family:'Poppins',sans-serif;background:var(--bg-dark);color:var(--text-primary);min-height:100vh;overflow-x:hidden;transition:background .4s}
+/* Pengganti document.body.style.overflow='hidden' saat modal terbuka */
+body.modal-open{overflow:hidden}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:var(--bg-dark)}::-webkit-scrollbar-thumb{background:var(--primary);border-radius:10px}
+
+/* Atribut [hidden] harus selalu menang atas aturan display komponen */
+[hidden]{display:none!important}
+
+/* ---------- Utilitas ---------- */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.noscript-warning{position:relative;z-index:2;max-width:640px;margin:110px auto 0;padding:20px 24px;background:var(--bg-card);border:1px solid rgba(var(--primary-rgb),.2);border-radius:16px;color:var(--text-secondary);font-size:14px;text-align:center}
+
+/* ---------- Keyframes bersama ---------- */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes modalIn{from{opacity:0;transform:scale(.92) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(-10px) translateX(20px)}to{opacity:1;transform:translateY(0) translateX(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(100px)}}
+
+/* ==========================================================================
+   EFEK VISUAL TEMA — partikel jatuh (dibuat oleh js/services/theme.js)
+   ========================================================================== */
+.visual-effects{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:hidden}
+.particle-effect{position:absolute;animation:fall linear infinite;opacity:0.7}
+
+@keyframes fall{
+    0%{transform:translateY(-100px) rotate(0deg);opacity:0}
+    10%{opacity:0.7}
+    90%{opacity:0.7}
+    100%{transform:translateY(100vh) rotate(360deg);opacity:0}
+}
+
+/* Sakura - kelopak bunga */
+.sakura-petal{width:15px;height:15px;background:radial-gradient(circle,#ffb7c5 0%,#ff69b4 100%);border-radius:150% 0 150% 0;transform-origin:center}
+
+/* Autumn - daun gugur */
+.autumn-leaf{width:20px;height:20px;background:linear-gradient(135deg,#d2691e 0%,#ff8c00 50%,#8b4513 100%);border-radius:0 50% 50% 50%;transform-origin:bottom left}
+
+/* Winter - salju */
+.winter-snow{width:8px;height:8px;background:radial-gradient(circle,#fff 0%,#e0e0e0 100%);border-radius:50%;box-shadow:0 0 10px rgba(255,255,255,0.5)}
+
+/* Summer - gelembung naik */
+.summer-bubble{width:12px;height:12px;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,0.8) 0%,rgba(253,203,110,0.3) 100%);border-radius:50%;border:1px solid rgba(255,255,255,0.3);animation:float-up linear infinite}
+@keyframes float-up{
+    0%{transform:translateY(100vh) scale(0.5);opacity:0}
+    10%{opacity:0.7}
+    90%{opacity:0.7}
+    100%{transform:translateY(-100px) scale(1);opacity:0}
+}
+
+/* Midnight - bintang jatuh */
+.midnight-star{width:2px;height:2px;background:#fff;border-radius:50%;box-shadow:0 0 6px #fff,0 0 12px var(--primary);animation:shooting-star linear infinite}
+@keyframes shooting-star{
+    0%{transform:translate(0,0) rotate(-45deg);opacity:0}
+    10%{opacity:1}
+    90%{opacity:1}
+    100%{transform:translate(-300px,300px) rotate(-45deg);opacity:0}
+}
+
+/* Neon - partikel berpendar */
+.neon-particle{width:6px;height:6px;background:var(--primary);border-radius:50%;box-shadow:0 0 10px var(--primary),0 0 20px var(--secondary);animation:neon-float linear infinite}
+@keyframes neon-float{
+    0%{transform:translateY(-100px) translateX(0) scale(0.5);opacity:0}
+    10%{opacity:1}
+    50%{transform:translateY(50vh) translateX(50px) scale(1)}
+    90%{opacity:1}
+    100%{transform:translateY(100vh) translateX(-50px) scale(0.5);opacity:0}
+}
+
+/* Forest - daun hijau */
+.forest-leaf{width:18px;height:18px;background:linear-gradient(135deg,#00b894 0%,#55efc4 50%,#00a381 100%);border-radius:0 50% 50% 50%;transform-origin:bottom left}
+
+/* Hormati preferensi pengguna yang mengurangi animasi */
+@media (prefers-reduced-motion: reduce){
+    .visual-effects{display:none}
+}
+
+@media(max-width:768px){
+    :root{--nav-h:60px}
+}

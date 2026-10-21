@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kazanime - Streaming Anime Subtitle Indonesia</title>
+    <meta name="description" content="Nonton & download anime subtitle Indonesia gratis dengan kualitas HD 480p, 720p, 1080p">
+    <!-- Terapkan tema tersimpan SEBELUM render pertama (mencegah kedip tema) -->
+    <script src="js/theme-preload.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/home.css">
+    <script type="module" src="js/home.js"></script>
+</head>
+<body data-page="home">
+
+<!-- Navbar (komponen bersama, dirender oleh js/ui/navbar.js) -->
+<div id="app-navbar"></div>
+
+<noscript><p class="noscript-warning">Kazanime membutuhkan JavaScript untuk memuat daftar anime. Aktifkan JavaScript lalu muat ulang halaman.</p></noscript>
+
+<main class="main-content" id="main">
+
+    <!-- HERO SLIDER -->
+    <section class="hero" id="hero" aria-roledescription="carousel" aria-label="Anime trending">
+        <div class="hero-slider" id="heroSlider"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div id="heroContent" aria-live="polite">
+                <div class="hero-skeleton" aria-hidden="true">
+                    <div class="skeleton-line loading-shimmer"></div>
+                    <div class="skeleton-line loading-shimmer"></div>
+                    <div class="skeleton-line loading-shimmer"></div>
+                    <div class="skeleton-line loading-shimmer"></div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-navigation">
+            <button class="hero-nav-btn hero-prev" type="button" data-hero="prev" aria-label="Slide sebelumnya">❮</button>
+            <button class="hero-nav-btn hero-next" type="button" data-hero="next" aria-label="Slide berikutnya">❯</button>
+        </div>
+        <div class="hero-dots" id="heroDots"></div>
+    </section>
+
+    <!-- ONGOING -->
+    <section class="section" id="ongoing">
+        <div class="section-header">
+            <h2 class="section-title">Ongoing Anime</h2>
+            <a href="search.html?browse=ongoing" class="see-all">Lihat Semua →</a>
+        </div>
+        <div class="anime-grid" id="ongoingGrid" aria-busy="true"></div>
+    </section>
+
+    <!-- POPULER (juga target filter genre) -->
+    <section class="section" id="popular">
+        <div class="section-header">
+            <h2 class="section-title" id="popularTitle">Anime Populer</h2>
+            <a href="search.html?browse=popular" class="see-all" id="popularSeeAll">Lihat Semua →</a>
+        </div>
+        <div class="anime-grid" id="popularGrid" aria-busy="true"></div>
+    </section>
+
+    <!-- BOOKMARK (hanya tampil saat login) -->
+    <section class="section" id="bookmarks" hidden>
+        <div class="section-header"><h2 class="section-title">🔖 Bookmark Saya</h2></div>
+        <div class="anime-grid" id="bookmarkGrid"></div>
+    </section>
+
+    <!-- GENRE (tombol dirender dari js/config.js → GENRES) -->
+    <section class="section" id="genre">
+        <div class="section-header"><h2 class="section-title">Jelajahi Genre</h2></div>
+        <div class="genre-tags" id="genreTags" role="toolbar" aria-label="Filter genre"></div>
+    </section>
+
+    <!-- BARU RILIS -->
+    <section class="section" id="baru-rilis">
+        <div class="section-header">
+            <h2 class="section-title">Baru Rilis</h2>
+            <a href="search.html?browse=new" class="see-all">Lihat Semua →</a>
+        </div>
+        <div class="anime-grid" id="newReleaseGrid" aria-busy="true"></div>
+    </section>
+
+    <!-- DONGHUA -->
+    <section class="section" id="donghua">
+        <div class="section-header">
+            <h2 class="section-title">🐉 Donghua (Anime China)</h2>
+            <a href="search.html?browse=donghua" class="see-all">Lihat Semua →</a>
+        </div>
+        <div class="anime-grid" id="donghuaGrid" aria-busy="true"></div>
+    </section>
+
+    <!-- JADWAL RILIS -->
+    <section class="section" id="jadwal">
+        <div class="section-header"><h2 class="section-title">Jadwal Rilis</h2></div>
+        <div class="schedule-grid" id="scheduleGrid"></div>
+        <p class="schedule-note" id="scheduleNote"></p>
+    </section>
+
+</main>
+
+<!-- Footer (komponen bersama, dirender oleh js/ui/footer.js) -->
+<div id="app-footer"></div>
+
+</body>
+</html>
