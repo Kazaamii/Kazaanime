@@ -13,10 +13,11 @@
  *
  * Tahap C (cadangan halaman nonton bila AniList gagal): detail per id MAL,
  * jumlah episode yang sudah tayang (/episodes), dan rekomendasi.
+ * Perbaikan pasca-D: `firstAiredAt` (aired.from + broadcast) untuk perkiraan episode tayang.
  */
 import { API_CONFIG, CACHE_TTL, UI } from '../config.js';
 import { fetchJSON, hashKey } from './http.js';
-import { createAnime, toScore10 } from './normalize.js';
+import { createAnime, firstAiringAt, toScore10 } from './normalize.js';
 
 const BASE = API_CONFIG.jikan.url;
 const THROTTLE = { key: 'jikan', interval: API_CONFIG.jikan.minInterval };
@@ -66,6 +67,8 @@ export function fromJikan(a) {
         studios: (a.studios || []).map((x) => x?.name),
         duration: parseDuration(a.duration),
         season: SEASON[a.season] || null,
+        // Tanggal mulai + jam siaran (JST) → perkiraan jumlah episode tayang bila daftar episode MAL masih kosong
+        firstAiredAt: firstAiringAt(a.aired?.from, a.broadcast),
     });
 }
 

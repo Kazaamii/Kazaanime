@@ -11,6 +11,7 @@ beradapter.
 | **B** | Layer API (`js/api/`: cache, timeout, retry, fallback), auth & bookmark, pencarian, data homepage, jadwal WIB, status API | ✅ Selesai |
 | **C** | `watch.html`: satu player + fallback server otomatis, episode, info, download, rekomendasi | ✅ Selesai |
 | **D** | Backend Express + adapter `animexin` / `kuramanime` + fallback metadata (satu project Vercel) | ✅ Selesai |
+| **D+** | Perbaikan 22 Okt 2026: player memutar server **hasil scraping (AnimeXin / Kuramanime) lebih dulu** untuk semua anime; MegaPlay (`megaplay.buzz`) jadi cadangan; perkiraan jumlah episode saat AniList mati | ✅ Selesai |
 
 ---
 
@@ -211,9 +212,11 @@ Satu implementasi player (`ui/player.js`) menggantikan **dua** salinan di file a
 (modal `#playerModal` + "streaming page" yang saling override).
 
 ```
-watch.html?title=...&ep=3&anilist=...&mal=...
-   │  id ada di URL → player LANGSUNG mulai (tidak menunggu detail)
-   │  tanpa id      → "Mencari ID anime..." → mulai setelah id ditemukan
+watch.html?title=...&ep=3&anilist=...&mal=...[&alt=judul romaji]
+   │  1. cari episode di backend scraper (AnimeXin / Kuramanime) lewat judul + judul alternatif
+   │     → ketemu: server hasil scraping diputar DULU (Sub Indo didahulukan)
+   │  2. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan MegaPlay
+   │     (id ada di URL → langsung; tanpa id → setelah id ditemukan)
    ▼
 getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutnya + rekomendasi
                  └ gagal → Kitsu by id (mapping id MAL/AniList) → Jikan by id MAL (+ jumlah episode tayang)
@@ -223,10 +226,10 @@ getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutny
 
 | Fitur | Detail |
 |---|---|
-| Server | `STREAMING_SERVERS` di `js/config.js` (urutan = urutan fallback). Server tanpa id yang dibutuhkan tampil 🔒 dan dilewati |
+| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`), lalu `STREAMING_SERVERS` di `js/config.js` sebagai cadangan (urutan = urutan fallback). Server tanpa id yang dibutuhkan tampil 🔒 dan dilewati. Status player menyebut bahasa subtitle server (Sub Indo / Sub English) |
 | Fallback otomatis | iframe tidak selesai dimuat dalam `PLAYER.loadTimeout` (15 dtk) **atau** player mengirim event `error` → server berikutnya + toast. Semua gagal → pesan + Bstation/YouTube + "Coba lagi" |
 | Batas browser | Halaman error **di dalam** iframe lintas-domain (mis. "video tidak ditemukan") tidak bisa dibaca JavaScript → tombol **⟳ Server Lain** |
-| Episode | Jumlah dari API (episode yang **sudah tayang**, bukan angka 24 tetap). > 100 episode → tab rentang. Jumlah tidak diketahui → input nomor manual. Belum tayang → jadwal episode 1 |
+| Episode | Jumlah dari API (episode yang **sudah tayang**, bukan angka 24 tetap). Bila sumber tidak memberi nomor episode (Kitsu, atau Jikan dengan daftar episode kosong — mis. saat AniList mati) → **perkiraan tayang mingguan** dari tanggal mulai (maks. 26 episode, dibatasi total). > 100 episode → tab rentang. Tetap tidak diketahui → input nomor manual. Belum tayang → jadwal episode 1 |
 | Ganti episode | Tanpa reload, URL ikut berubah (`replaceState`) → bisa di-share. Tombol episode = link asli (klik-tengah = tab baru) |
 | Auto-next | Event `complete` dari player (postMessage) → episode berikutnya. Bisa dimatikan (tersimpan). Episode terakhir → "🎉 Selesai!" / jadwal episode berikutnya |
 | Keamanan postMessage | Hanya dari iframe aktif / origin server terdaftar (dulu: dari origin mana pun) |
@@ -237,26 +240,42 @@ getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutny
 Jumlah request saat membuka halaman nonton dari kartu: **1 AniList** (detail + rekomendasi).
 Ganti episode: **0 request**. Membuka ulang anime yang sama dalam 30 menit: **0 request** (cache).
 
-### ⚠️ Status server streaming (dicek 21 Okt 2026)
-Host embed di file asli, `animeplay.cfd`, mengalihkan **semua** URL ke
-`/cgi-sys/suspendedpage.cgi` ("Account Suspended"). Karena itu iframe akan menampilkan
-halaman tersebut, dan browser tidak bisa mendeteksinya (isi iframe lintas-domain tidak
-terbaca). Ini bukan akibat refactor — file asli mengalami hal yang sama.
-Cara mengganti: ubah `STREAM_HOST` (pola path sama) atau isi ulang `STREAMING_SERVERS`
-di `js/config.js`. Tidak ada file lain yang perlu disentuh. Sampai host pengganti diisi,
-server 1 & 2 tetap menampilkan halaman "Account Suspended" → pakai **⟳ Server Lain**, atau
-matikan keduanya dengan `enabled: false`.
+### ▶️ Urutan server: hasil scraping dulu (perbaikan 22 Okt 2026)
 
-Tahap D: backend menambahkan server per episode. Untuk anime yang **berasal dari backend**
-(kartu Donghua → URL membawa `slug`), server situs sumber **didahulukan** dan player menunggu
-server itu dulu; server statis jadi cadangan. Untuk anime dari AniList/MAL, server statis tetap
-pertama dan server backend (hasil pencocokan judul persis) ditaruh sesudahnya.
+| Urutan | Sumber | Isi | Subtitle |
+|---|---|---|---|
+| 1 | **AnimeXin** (backend scraper) | donghua — ±16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, …) + link download | Indonesia dulu, lalu Inggris |
+| 1 | **Kuramanime** (backend scraper) | anime Jepang — **saat ini tidak bisa** (lihat di bawah); otomatis dipakai bila situsnya mengizinkan bot | Indonesia |
+| 2 | **MegaPlay** `megaplay.buzz` (statis, cadangan) | hampir semua anime Jepang, via id AniList/MAL | Inggris |
+
+- **Pencocokan judul.** Anime yang dibuka dari kartu AniList/MAL/Kitsu tidak punya slug situs sumber, jadi
+  `js/api/streams.js` mencarinya di `/api/anime/search` dengan judul utama **dan** judul alternatif (romaji —
+  ikut di URL sebagai `alt`). Cocok bila judulnya sama persis, atau sama setelah penulisan season disamakan
+  ("3rd Season" = "Season 3" = "S3"; format AnimeXin "Pinyin [English]" dipecah). Nomor season harus sama,
+  jadi season lain tidak ikut tercocokkan. Hasil API metadata (saat semua scraper gagal) tidak dipakai.
+- **Menunggu.** Selama mencari, player menampilkan "🔍 Mencari server Episode N di AnimeXin & Kuramanime..."
+  (maks. `PLAYER.scrapeWaitMs`, default 8 dtk; biasanya 1–3 dtk, lalu ter-cache). Hasil yang datang setelah
+  cadangan diputar tetap ditambahkan sebagai tombol server tanpa memutus video.
+- **Kuramanime diblokir.** Cloudflare menolak bot ini di semua URL termasuk `robots.txt` (403 "Attention Required!",
+  dicek ulang 22 Okt 2026), dan player-nya memakai token anti-bot. Proyek ini **tidak** mem-bypass proteksi
+  seperti itu (tanpa menyamar jadi browser, tanpa solver challenge, tanpa membongkar token). Adapternya siap:
+  bila situs mengizinkan bot ini (mis. IP server Vercel tidak diblokir dan robots.txt mengizinkan), episode &
+  link download Kuramanime otomatis dipakai — server streaming hanya bila tersedia di HTML publik.
+- **MegaPlay (cadangan).** Host di file asli, `animeplay.cfd`, adalah mirror MegaPlay yang kini di-suspend (semua URL
+  → `/cgi-sys/suspendedpage.cgi` = halaman "Account Suspended" di dalam player). Diganti domain utamanya
+  `megaplay.buzz` (pola path sama, dicek: episode 1–3 *Kusuriya no Hitorigoto* S3 ada). MegaPlay memutar pustaka
+  HiAnime → subtitle **Inggris**, hanya mau diputar bila iframe mengirim header Referer (`PLAYER.referrerPolicy:
+  'origin'`), dan episode yang belum dipetakan menampilkan "Oops! Something went wrong" di dalam iframe →
+  pakai **⟳ Server Lain**.
+- **Pengaturan** (`js/config.js`): `PLAYER.serverOrder = 'static-first'` → perilaku Tahap D (statis dulu).
+  Hanya ingin server hasil scraping → `enabled: false` pada kedua server MegaPlay (anime yang tidak ada di
+  situs sumber lalu tidak bisa diputar).
 
 ```js
 // js/config.js — contoh menambah server (pola URL dari penyedia yang kamu pakai)
 Object.freeze({
     id: 'server-3', flag: '🌐', name: 'Server 3', description: 'Cadangan',
-    needs: 'mal', enabled: true, origins: Object.freeze([]),
+    needs: 'mal', lang: 'en', enabled: true, origins: Object.freeze([]),
     url: ({ mal, ep }) => `https://penyedia-kamu.example/embed/${mal}/${ep}`,
 }),
 ```
@@ -336,7 +355,7 @@ server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt 
 | Sumber | Status | Catatan |
 |---|---|---|
 | **AnimeXin** | ✅ aktif, diverifikasi live | robots.txt mengizinkan semua; tidak ada ToS (DMCA & Privacy Policy tanpa larangan bot). Latest = beranda + `/anime/?order=update` (2 request, slug asli digabung lewat ID seri). 16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, Mega, …) + link download Sub Indo/English |
-| **Kuramanime** | ⛔ diblokir Cloudflare | Semua URL termasuk `robots.txt` → 403 "Sorry, you have been blocked" (juga dengan UA browser → blokir IP/WAF). Player-nya memakai token anti-bot berlapis. Adapter tetap lengkap (diuji dengan fixture sintetis) dan otomatis aktif bila situs suatu saat mengizinkan bot ini |
+| **Kuramanime** | ⛔ diblokir Cloudflare | Semua URL termasuk `robots.txt` → 403 "Sorry, you have been blocked" / "Attention Required!" (juga dengan UA browser → blokir IP/WAF; dicek ulang 22 Okt 2026). Player-nya memakai token anti-bot berlapis. Adapter tetap lengkap (diuji dengan fixture sintetis) dan otomatis aktif — termasuk sebagai sumber player utama — bila situs suatu saat mengizinkan bot ini |
 | Kitsu | ✅ fallback utama | bisa dijangkau server; mapping id MAL/AniList; poster pengganti |
 | Jikan / AniList | ⚠️ fallback berikutnya | dari sandbox: Jikan timeout, AniList 403 "temporarily disabled" (juga dengan Referer) — di Vercel bisa berbeda; circuit breaker membuatnya cepat dilewati |
 
@@ -502,12 +521,13 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - [x] Fallback ke API metadata publik (Kitsu → Jikan → AniList) bila scraper gagal
 - [x] Section Donghua homepage dari rilis terbaru AnimeXin (kartu → episode terbaru), cadangan AniList CN
 - [x] Server streaming & link download per episode dari backend di `watch.html` (Sub Indo didahulukan)
+- [x] Player memutar server hasil scraping **lebih dulu** untuk semua anime (pencocokan judul + judul alternatif), MegaPlay jadi cadangan otomatis
+- [x] Host embed cadangan diganti `megaplay.buzz` (`animeplay.cfd` suspended)
 - [x] Frontend tetap normal di hosting statis tanpa backend (deteksi otomatis, tanpa pesan error)
 - [x] Satu project Vercel: frontend CDN + Express sebagai Function (`api/index.js`)
 
 ### Belum / di luar cakupan
-- [ ] Host embed pengganti untuk server statis 1 & 2 (`animeplay.cfd` masih suspended — perlu URL dari kamu)
-- [ ] Kuramanime: menunggu situsnya mengizinkan bot (tidak akan di-bypass)
+- [ ] Kuramanime: menunggu situsnya mengizinkan bot (tidak akan di-bypass) — sampai itu, anime Jepang diputar dari MegaPlay (subtitle Inggris)
 
 ### Perubahan perilaku kecil (Tahap C)
 - Kartu **"Baru Rilis"** (homepage & `search.html?browse=new`) membuka episode yang baru tayang (label "EP 9" → episode 9). Kartu lain tetap episode 1.
@@ -521,6 +541,12 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - Detail download menampilkan format & bahasa subtitle dari backend (default tetap "MP4 • Sub Indo").
 - Pesan "sumber sedang dilewati" kini menyebut penyebab terakhir (mis. 403 → "dibatasi oleh penyedianya").
 - `watch.html?slug=...` tanpa judul kini didukung (dulu "Anime tidak ditemukan").
+
+### Perubahan perilaku (perbaikan 22 Okt 2026)
+- Semua anime: player menunggu server hasil scraping dulu (maks. 8 dtk), baru server MegaPlay. Sebelumnya hanya anime dari kartu backend.
+- URL nonton membawa judul alternatif latin (`&alt=...`) agar pencarian di situs sumber langsung memakai judul romaji. URL lama tanpa `alt` tetap jalan (judul dari detail dipakai mencari ulang).
+- Status player menyebut bahasa subtitle server yang diputar (MegaPlay = "Sub English", dulu selalu tertulis "Sub Indo").
+- Anime ongoing tanpa nomor episode dari sumber (Kitsu / Jikan saat AniList mati) kini mendapat daftar episode perkiraan mingguan, bukan input manual.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
@@ -559,7 +585,8 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   `robots.txt` dan juga saat diuji dengan User-Agent browser (blokir IP/WAF). Sesuai aturan proyek
   (hormati robots/ToS, UA jelas), adapter **tidak** akan mem-bypass Cloudflare; sumber ditandai
   "blocked" (istirahat 30 menit) dan otomatis jatuh ke sumber lain / metadata.
-- **animeplay.cfd** (host embed server 1 & 2): semua URL → 302 ke `/cgi-sys/suspendedpage.cgi` ("Account Suspended"). Lihat bagian Halaman nonton.
+- **animeplay.cfd** (host embed server 1 & 2 di file asli, mirror MegaPlay): semua URL → 302 ke `/cgi-sys/suspendedpage.cgi` ("Account Suspended") → diganti **megaplay.buzz** (pola path sama; butuh header Referer; subtitle Inggris). Lihat bagian Halaman nonton.
+- **AniList (22 Okt 2026)**: dari server ini API membalas `403 "The AniList API has been temporarily disabled due to severe stability issues"` — pesan yang menurut dokumentasi AniList berarti akses API sedang dihentikan sementara. Frontend otomatis memakai Jikan → Kitsu; untuk anime ongoing dari Kitsu jumlah episode diperkirakan dari tanggal mulai (tayang mingguan).
 - **Kitsu** `include=mappings` memberi id MyAnimeList & AniList (dicek langsung, mis. Frieren → MAL 52991, AniList 154587),
   jadi anime dari hasil Kitsu tetap bisa diputar. Jumlah episode Kitsu untuk anime tayang tidak dapat diandalkan → tidak dipakai.
 - 34 dari 35 URL gambar statis di file asli **404** (logo, 25 avatar, 9 gambar hero). Logo + 16 avatar +

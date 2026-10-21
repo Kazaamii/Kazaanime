@@ -9,16 +9,17 @@
  *  1. initLayout() → navbar, footer, modal, autocomplete, status API, auth.
  *  2. Parameter URL (title, ep, anilist, mal, kitsu, slug, src) → anime sementara:
  *     judul, label episode, bookmark & platform legal tampil instan.
- *  3. URL sudah membawa id AniList/MAL → player LANGSUNG mulai (tidak menunggu
- *     detail). Tanpa id → "Mencari ID anime..." lalu mulai setelah id ditemukan.
- *     Anime dari backend (URL membawa slug, Tahap D) → server dari situs sumbernya
- *     didahulukan: player menunggu server backend episode itu dulu, baru jatuh ke
- *     server statis bila backend tidak punya / gagal.
+ *  3. Server hasil SCRAPING didahulukan (PLAYER.serverOrder = 'scrape-first'): untuk setiap
+ *     episode player menunggu backend (AnimeXin / Kuramanime) dulu — anime dari AniList/MAL/
+ *     Kitsu dicarikan padanannya lewat judul + judul alternatif — maks. PLAYER.scrapeWaitMs.
+ *     Tidak ada di situs sumber / gagal / kelamaan → server cadangan (MegaPlay) langsung
+ *     diputar bila id anime sudah ada di URL; tanpa id → menunggu detail dulu.
+ *     'static-first' = perilaku Tahap D (server statis dulu, kecuali URL membawa slug).
  *  4. getWatchData() → detail + jumlah episode tayang + rekomendasi
  *     (AniList: 1 request; cadangan Jikan → Kitsu → data dari URL).
  *  5. Ganti episode tanpa reload; URL ikut diperbarui (replaceState) → bisa di-share.
  *  6. Auto-next lewat postMessage player, penanda episode yang sudah ditonton,
- *     server + link download dari backend scraper (Tahap D), rekomendasi.
+ *     server + link download dari backend scraper, rekomendasi.
  *
  * Tidak ada fetch di sini: data dari js/api, tampilan dari js/ui.
  */
@@ -33,7 +34,7 @@ import { showToast } from './ui/toast.js';
 import { html, $, placeholderImage } from './ui/dom.js';
 import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
 import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
-import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel } from './api/normalize.js';
+import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
     friendlyError, getEpisodeExtras, getRecommendations, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime, retrySourcesNow,
 } from './api/index.js';
@@ -45,7 +46,7 @@ const ctx = initLayout();
 const isBookmarked = (a) => ctx.isBookmarked(a);
 const params = parseWatchParams();
 /** @type {import('./api/index.js').AnimeRef} */
-const ref = { title: params.title, anilist: params.anilist, mal: params.mal, kitsu: params.kitsu, slug: params.slug, src: params.src };
+const ref = { title: params.title, alt: params.alt, anilist: params.anilist, mal: params.mal, kitsu: params.kitsu, slug: params.slug, src: params.src };
 
 const els = {
     wrapper: $('#playerWrapper'),
@@ -79,47 +80,83 @@ let ep = params.ep;
 let total;
 let detailLoaded = false;
 let detailToken = 0;
-/** Server tambahan dari backend untuk episode aktif (Tahap D). */
+/** Server hasil scraping backend (AnimeXin / Kuramanime) untuk episode aktif. */
 let backendServers = [];
 /** @type {AbortController|null} */
 let extrasCtrl = null;
 /**
- * Episode yang sedang MENUNGGU server backend sebelum diputar (anime dari backend).
- * Selama menunggu, server statis tidak dimulai — supaya yang pertama diputar adalah
- * server dari situs sumber anime itu sendiri.
+ * Episode yang sedang MENUNGGU hasil scraping sebelum diputar (scrape-first).
+ * Selama menunggu, server cadangan tidak dimulai — supaya yang pertama diputar adalah
+ * server dari situs sumber (subtitle Indonesia).
  */
 let holdFor = null;
-/** Episode yang hasil backend-nya sudah datang TANPA server (menunggu detail untuk server statis). */
-let extrasFor = null;
+/** Episode yang pencarian scraping-nya sudah selesai TANPA server (atau batas tunggu habis). */
+let scrapeDoneFor = null;
+let holdTimer = 0;
+/** Judul yang terakhir dipakai mencari padanan di backend (dicari ulang bila detail membawa judul baru). */
+let scrapedTitles = '';
+/** Pencarian/permintaan server backend sedang berjalan. */
+let extrasBusy = false;
+/** Detail membawa judul baru saat pencarian masih berjalan → cari lagi bila hasilnya kosong. */
+let rescrapePending = false;
 
 const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 const urlFor = (n) => watchUrl(anime, n, { src: ref.src, slug: ref.slug });
-/** Anime berasal dari backend scraper (URL membawa slug) → server backend didahulukan. */
-const preferBackend = () => Boolean(ref.slug) && isBackendEnabled();
-const servers = () => (preferBackend()
-    ? [...backendServers, ...listStreamServers(anime, ep)]
-    : [...listStreamServers(anime, ep), ...backendServers]);
+/** Anime berasal dari backend scraper (URL membawa slug) → daftar episode situs sumber = yang bisa diputar. */
+const fromBackendSource = () => Boolean(ref.slug) && isBackendEnabled();
+/** Server hasil scraping diputar lebih dulu (PLAYER.serverOrder, atau anime dari kartu backend). */
+const scrapeFirst = () => isBackendEnabled() && (Boolean(ref.slug) || PLAYER.serverOrder !== 'static-first');
+const staticServers = () => listStreamServers(anime, ep);
+const servers = () => (scrapeFirst()
+    ? [...backendServers, ...staticServers()]
+    : [...staticServers(), ...backendServers]);
+/** Semua judul yang diketahui (URL + detail) untuk mencari padanan di situs sumber. */
+const scrapeTitles = () => [ref.title, ref.alt, anime.title, anime.titleAlt];
+/** Kunci himpunan judul (untuk tahu apakah detail membawa judul yang belum dicari). */
+const titlesKey = (list) => [...new Set(list.map(titleKey).filter(Boolean))].sort().join('|');
 
 /**
- * Selesai menunggu server backend untuk episode n → mulai putar dengan daftar server lengkap.
- * Tanpa server backend (gagal / kosong) player menunggu detail dulu: server statis butuh id
- * anime, dan jumlah episode menentukan apakah nomor episode di URL memang ada.
+ * Lepas penahanan episode n dan mulai putar.
+ *  - force: server scraping sudah datang → server scraping dulu, server cadangan di belakangnya
+ *  - tanpa force: hanya bila pencarian scraping sudah selesai tanpa server (atau batas tunggu
+ *    habis) DAN server cadangan siap (id anime diketahui) atau detail sudah dimuat —
+ *    anime dari backend tanpa id menunggu detail (id + jumlah episode) dulu.
  * @param {number} n
- * @param {{force?: boolean}} [opts] force = mulai sekarang (server backend sudah ada / detail sudah dimuat)
+ * @param {{force?: boolean}} [opts]
  */
 function releaseHold(n, { force = false } = {}) {
     if (holdFor !== n) return false;
-    if (!force && !detailLoaded) {
-        extrasFor = n;
-        return false;
-    }
+    if (!force && (scrapeDoneFor !== n || (!detailLoaded && !staticServers().some((s) => s.available)))) return false;
     holdFor = null;
-    extrasFor = null;
+    scrapeDoneFor = null;
+    clearTimeout(holdTimer);
     if (total !== 0 && player.state === 'waiting') {
         player.load(n, servers());
         return true;
     }
     return false;
+}
+
+/** Pencarian scraping episode n selesai tanpa server / kelamaan → coba server cadangan. */
+function scrapeFinished(n) {
+    if (holdFor !== n) return;
+    scrapeDoneFor = n;
+    releaseHold(n);
+}
+
+/** Batas tunggu hasil scraping untuk episode n. */
+function armHoldTimer(n, ms = PLAYER.scrapeWaitMs) {
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => scrapeFinished(n), ms);
+}
+
+/** Tahan episode n sampai server hasil scraping datang (atau batas tunggu habis). */
+function holdForScrape(n) {
+    holdFor = n;
+    scrapeDoneFor = null;
+    const where = ref.slug && ref.src ? ref.src : PLAYER.scrapeLabel;
+    player.showWaiting(`🔍 Mencari server Episode ${n} di ${where}...`);
+    armHoldTimer(n);
 }
 
 /* ------------------------------------------------------------------ */
@@ -252,7 +289,7 @@ function computeTotal() {
     const aired = airedEpisodeCount(anime);
     if (aired == null || aired === 0) return aired;
     // Anime dari backend: daftar episode situs sumber = yang benar-benar bisa diputar → tanpa toleransi.
-    if (preferBackend()) return aired;
+    if (fromBackendSource()) return aired;
     return anime.status === 'ONGOING' ? Math.max(aired, Math.min(ep, aired + 2)) : aired;
 }
 
@@ -287,16 +324,16 @@ function playEpisode(n, { initial = false, announce = true } = {}) {
     ep = n;
     backendServers = [];
     holdFor = null;
-    extrasFor = null;
+    scrapeDoneFor = null;
+    rescrapePending = false;
+    clearTimeout(holdTimer);
     renderEpisodeLabel();
     episodes.setCurrent(n);
     updateNav();
     if (!initial) replaceUrl();
     if (total === 0) showUpcoming();
-    else if (preferBackend()) {
-        holdFor = n;
-        player.showWaiting(`🔍 Memuat server Episode ${n} dari ${ref.src || 'sumber'}...`);
-    } else player.load(n, servers());
+    else if (scrapeFirst()) holdForScrape(n);
+    else player.load(n, servers());
     loadExtras(n);
     if (announce && !initial) showToast(`📺 Episode ${n} dimuat`, 'info');
 }
@@ -389,12 +426,22 @@ function applyDetail(data) {
     updateNav();
     replaceUrl(); // URL kini membawa id lengkap (mudah dibagikan)
 
+    // Detail membawa judul yang belum dicari (mis. romaji, URL lama tanpa `alt`) → cari lagi dengan SEMUA judul.
+    // Pencarian yang sedang berjalan tidak dibatalkan; bila hasilnya kosong baru dicari ulang.
+    const rescrape = scrapeFirst() && !ref.slug && !backendServers.length && total !== 0 && titlesKey(scrapeTitles()) !== scrapedTitles;
+    if (rescrape && extrasBusy) rescrapePending = true;
+    const rescrapeNow = rescrape && !extrasBusy;
     if (total === 0) showUpcoming();
     else if (holdFor === ep) {
-        // Anime dari backend: hasil backend sudah datang tanpa server → sekarang coba server statis.
-        // Belum datang → loadExtras yang akan memulai.
-        if (extrasFor === ep) releaseHold(ep, { force: true });
-    } else if (player.state !== 'message') player.setServers(servers()); // mulai bila menunggu; buka kunci server baru tanpa memutus video
+        if (rescrapeNow) {
+            scrapeDoneFor = null;
+            loadExtras(ep);
+            armHoldTimer(ep, Math.round(PLAYER.scrapeWaitMs / 2));
+        } else releaseHold(ep); // pencarian sudah selesai tanpa server → server cadangan (belum selesai → menunggu)
+    } else {
+        if (player.state !== 'message') player.setServers(servers()); // mulai bila menunggu; buka kunci server baru tanpa memutus video
+        if (rescrapeNow) loadExtras(ep);
+    }
 }
 
 async function loadDetail() {
@@ -425,14 +472,29 @@ async function loadExtras(n) {
     extrasCtrl?.abort();
     const ctrl = new AbortController();
     extrasCtrl = ctrl;
+    extrasBusy = true;
+    scrapedTitles = titlesKey(scrapeTitles());
     renderDownloads(els.downloads, { loading: true });
     try {
-        const res = await getEpisodeExtras(anime, n, { slug: ref.slug, signal: ctrl.signal });
+        const res = await getEpisodeExtras(anime, n, { slug: ref.slug, titles: scrapeTitles(), signal: ctrl.signal });
+        if (extrasCtrl === ctrl) extrasBusy = false;
         if (ctrl.signal.aborted || n !== ep) return;
-        if (res.servers.length) backendServers = res.servers;
-        // Anime dari backend: ada server → mulai sekarang (server backend dulu, statis sebagai cadangan)
-        if (!releaseHold(n, { force: res.servers.length > 0 }) && res.servers.length && holdFor !== n
-            && total !== 0 && player.state !== 'message') player.setServers(servers());
+        if (!res.servers.length && rescrapePending) {
+            // Detail datang dengan judul baru selama pencarian ini → cari lagi dengan semua judul
+            rescrapePending = false;
+            loadExtras(n);
+            return;
+        }
+        if (res.servers.length) {
+            backendServers = res.servers;
+            if (holdFor === n) releaseHold(n, { force: true }); // server scraping dulu, cadangan di belakangnya
+            else if (total !== 0 && player.state !== 'message') {
+                // Datang setelah server cadangan diputar → tambahkan tombol tanpa memutus video
+                const wasPlaying = player.state === 'loading' || player.state === 'playing';
+                player.setServers(servers());
+                if (wasPlaying && scrapeFirst()) showToast(`🌐 ${res.servers.length} server dari ${res.source || 'sumber scraping'} tersedia — pilih di daftar server.`, 'info');
+            }
+        } else scrapeFinished(n);
         const realError = res.error && res.error.kind !== 'empty' ? res.error : null;
         renderDownloads(els.downloads, {
             items: res.downloads,
@@ -444,8 +506,10 @@ async function loadExtras(n) {
             onRetry: () => loadExtras(n),
         });
     } catch (err) {
+        if (extrasCtrl === ctrl) extrasBusy = false;
         if (err?.kind === 'abort' || ctrl.signal.aborted) return;
-        if (n === ep) releaseHold(n); // backend gagal → server statis (bila ada) tetap diputar
+        rescrapePending = false;
+        if (n === ep) scrapeFinished(n); // backend gagal → server cadangan (bila ada) tetap diputar
         renderDownloads(els.downloads, {
             error: err,
             errorText: friendlyError(err),
@@ -516,8 +580,8 @@ function start() {
     updateNav();
     showSkeleton(els.recs, 6);
 
-    if (preferBackend() || servers().some((s) => s.available)) {
-        // id sudah ada di URL → tidak perlu menunggu detail; anime dari backend → menunggu server backend
+    if (scrapeFirst() || servers().some((s) => s.available)) {
+        // scrape-first → menunggu hasil scraping dulu; id sudah ada di URL → tidak perlu menunggu detail
         playEpisode(ep, { initial: true });
     } else {
         player.showWaiting('🔍 Mencari ID anime untuk server streaming...');
@@ -529,4 +593,4 @@ function start() {
 if (!ref.title && !ref.anilist && !ref.mal && !ref.kitsu && !ref.slug) renderNotFound();
 else start();
 
-console.info('%c🌸 Kazanime — Tahap D (player terpadu + server dari backend scraper)', 'color:#ff6b9d;font-weight:bold');
+console.info('%c🌸 Kazanime — Tahap D (player: server hasil scraping AnimeXin/Kuramanime dulu, MegaPlay cadangan)', 'color:#ff6b9d;font-weight:bold');

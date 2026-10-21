@@ -11,6 +11,7 @@
  *   c) player di dalam iframe mengirim event error lewat postMessage
  * Halaman error DI DALAM iframe (mis. "video tidak ditemukan", "Account Suspended")
  * tidak bisa dibaca browser karena lintas-domain — untuk itu ada tombol "⟳ Server Lain".
+ * Urutan server (hasil scraping dulu, cadangan statis di belakang) ditentukan watch.js.
  *
  * Event postMessage dari player (format asli MegaPlay, plus variasi umum):
  *   {event:'complete'|'ended'}             → 'complete' (auto-next diurus watch.js)
@@ -42,9 +43,17 @@ import { showToast } from './toast.js';
  */
 const OVERLAY_MAX_MS = 3000;
 const COMPLETE_EVENTS = new Set(['complete', 'ended', 'finish', 'finished']);
+/** Label bahasa subtitle server (StreamServer.lang) untuk status bar. */
+const LANG_LABELS = { id: 'Sub Indo', en: 'Sub English', multi: 'Multi-sub' };
 const PROGRESS_EVENTS = new Set(['time', 'timeupdate', 'progress', 'watching-log']);
 
 const clamp01 = (n) => Math.min(1, Math.max(0, n));
+
+/** " | Sub Indo" — kosong bila bahasa tidak diketahui atau sudah tertulis di nama server. */
+function langSuffix(server) {
+    const label = LANG_LABELS[server.lang];
+    return label && !String(server.name).includes(label) ? ` | ${label}` : '';
+}
 
 /** Persentase tonton dari payload player (0–1), null bila tidak ada. */
 function percentOf(data) {
@@ -196,7 +205,7 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
             clearTimeout(overlayTimer);
             state = 'playing';
             overlay.remove();
-            setStatus(`✅ ${server.name} | Episode ${ep} | Sub Indo`, 'ok');
+            setStatus(`✅ ${server.name} | Episode ${ep}${langSuffix(server)}`, 'ok');
             renderServers();
             emit('loaded', { ep, server });
         };

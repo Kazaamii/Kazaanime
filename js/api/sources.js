@@ -137,6 +137,7 @@ function toEpisodeMedia(json) {
                 available: true,
                 reason: '',
                 source: `backend:${site}`,
+                lang: ['id', 'en', 'multi'].includes(x.lang) ? x.lang : '',
                 origins: [originOf(url)].filter(Boolean),
             };
         })

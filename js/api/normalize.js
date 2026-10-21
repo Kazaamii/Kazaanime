@@ -38,6 +38,9 @@
  * @property {number|null} duration       Menit per episode
  * @property {'WINTER'|'SPRING'|'SUMMER'|'FALL'|null} season
  * @property {{episode:number|null, airingAt:number}|null} nextAiring  Episode berikutnya (airingAt = detik UNIX)
+ * @property {number|null} firstAiredAt   Perkiraan waktu episode 1 tersedia (detik UNIX) dari tanggal mulai
+ *                                        tayang (Kitsu/Jikan) — dasar perkiraan jumlah episode anime ongoing
+ *                                        bila sumber tidak memberi jadwal episode (mis. AniList sedang mati)
  */
 
 const STATUSES = new Set(['ONGOING', 'COMPLETED', 'UPCOMING', 'UNKNOWN']);
@@ -85,6 +88,43 @@ export function slugify(text) {
 /** Kunci pembanding judul (dedupe lintas sumber). */
 export function titleKey(text) {
     return String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Semua varian satu judul untuk dicocokkan lintas situs.
+ * AnimeXin menulis "Yi Nian Yong Heng [A Will Eternal]" (pinyin [Inggris]), Kuramanime
+ * "Black Clover 2nd Season (Black Clover Season 2)" → judul lengkap + bagian luar + bagian dalam kurung.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function titleVariants(text) {
+    const full = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!full) return [];
+    const out = [full];
+    const m = /^(.*?)\s*[[(]([^\])]+)[\])]\s*$/.exec(full);
+    if (m) out.push(m[1].trim(), m[2].trim());
+    return [...new Set(out.filter(Boolean))];
+}
+
+const ORDINAL_WORDS = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };
+
+/**
+ * Kunci judul "longgar": penulisan season disamakan ("3rd Season" = "Season 3" = "S3",
+ * "Season 1" = tanpa season), kata sandang & tanda baca diabaikan. Nomor season tetap
+ * dibandingkan (season berbeda = anime berbeda). '' bila terlalu pendek untuk dipercaya.
+ * @param {string} text
+ * @returns {string}
+ */
+export function looseTitleKey(text) {
+    let s = ` ${String(text || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')} `;
+    s = s
+        .replace(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/g, ' s$1 ')
+        .replace(/\bseason\s+(\d{1,2})\b/g, ' s$1 ')
+        .replace(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+season\b/g, (_, w) => ` s${ORDINAL_WORDS[w]} `)
+        .replace(/\bs0*1\b/g, ' ')
+        .replace(/\b(?:the|a|an)\b/g, ' ')
+        .replace(/[^a-z0-9]+/g, '');
+    return s.length >= 4 ? s : '';
 }
 
 /**
@@ -171,6 +211,7 @@ export function createAnime(p = {}) {
         duration: toInt(p.duration),
         season: SEASONS.has(season) ? season : null,
         nextAiring: toNextAiring(p.nextAiring),
+        firstAiredAt: toInt(p.firstAiredAt),
     };
 }
 
@@ -255,18 +296,80 @@ export function seasonLabel(a) {
     return [SEASON_LABELS[a.season], a.year].filter(Boolean).join(' ');
 }
 
+/* ------------------------------------------------------------------ */
+/* Perkiraan jadwal tayang mingguan                                    */
+/* ------------------------------------------------------------------ */
+const DAY_SEC = 86400;
+const WEEK_SEC = 7 * DAY_SEC;
+const JST_OFFSET_SEC = 9 * 3600;
+/** Jeda dari siaran Jepang sampai episode biasanya sudah ada (ber-subtitle) di server embed. */
+const RELEASE_LAG_SEC = 2 * 3600;
+/** Jam siaran tidak diketahui → episode dianggap ada keesokan harinya pukul 06:00 JST (konservatif). */
+const UNKNOWN_TIME_OFFSET_SEC = 30 * 3600;
+/** Perkiraan mingguan hanya dipercaya sampai ±2 cour; anime panjang sering libur sehingga meleset. */
+const ESTIMATE_MAX_EPISODES = 26;
+const BROADCAST_DAYS = { sundays: 0, mondays: 1, tuesdays: 2, wednesdays: 3, thursdays: 4, fridays: 5, saturdays: 6 };
+
+/**
+ * Perkiraan waktu episode 1 tersedia (detik UNIX) dari tanggal mulai tayang di Jepang.
+ * @param {string|null|undefined} date  'YYYY-MM-DD…' (tanggal JST: Kitsu startDate / Jikan aired.from)
+ * @param {{day?: string|null, time?: string|null, timezone?: string|null}|null} [broadcast]  jadwal siaran MAL
+ * @returns {number|null}
+ */
+export function firstAiringAt(date, broadcast = null) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date || ''));
+    if (!m) return null;
+    let midnight = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 1000 - JST_OFFSET_SEC; // 00:00 JST
+    if (!Number.isFinite(midnight)) return null;
+    const t = /^(\d{1,2}):(\d{2})$/.exec(String(broadcast?.time || ''));
+    const tz = broadcast?.timezone;
+    if (!t || (tz && tz !== 'Asia/Tokyo')) return midnight + UNKNOWN_TIME_OFFSET_SEC;
+    // Siaran lewat tengah malam: MAL menulis "Saturdays at 01:00" padahal tanggal mulainya hari Jumat.
+    const want = BROADCAST_DAYS[String(broadcast.day || '').toLowerCase()];
+    const have = new Date((midnight + JST_OFFSET_SEC) * 1000).getUTCDay();
+    if (want !== undefined && (want - have + 7) % 7 === 1) midnight += DAY_SEC;
+    return midnight + Number(t[1]) * 3600 + Number(t[2]) * 60 + RELEASE_LAG_SEC;
+}
+
+/**
+ * Perkiraan jumlah episode yang sudah tersedia, dengan asumsi tayang mingguan sejak firstAiredAt
+ * (dibatasi total episode). null = tidak bisa diperkirakan dengan aman (tanpa tanggal mulai,
+ * belum mulai, atau anime panjang > ESTIMATE_MAX_EPISODES minggu tanpa total episode).
+ * @param {Anime} a
+ * @param {number} [now] waktu sekarang (ms)
+ * @returns {number|null}
+ */
+export function estimateAiredEpisodes(a, now = Date.now()) {
+    const start = a?.firstAiredAt;
+    if (!start) return null;
+    const elapsed = Math.floor(now / 1000) - start;
+    if (elapsed < 0) return null;
+    const n = Math.floor(elapsed / WEEK_SEC) + 1;
+    const total = a.episodes || null;
+    if (n > ESTIMATE_MAX_EPISODES) return total && total <= ESTIMATE_MAX_EPISODES ? total : null;
+    return total ? Math.min(n, total) : n;
+}
+
 /**
  * Jumlah episode yang SUDAH tayang (dasar tombol episode di watch.html).
  *  - 0    → belum tayang sama sekali
  *  - null → tidak diketahui (watch.html menampilkan input nomor episode manual)
  * Total episode milik anime yang masih tayang TIDAK dipakai (episode-episode itu belum ada).
+ * Anime ongoing: angka dari sumber (episode terbaru / episode berikutnya − 1) digabung perkiraan
+ * jadwal mingguan (estimateAiredEpisodes) — yang terbesar dipakai, karena daftar episode MAL
+ * sering tertinggal untuk season baru dan Kitsu tidak memberi nomor episode sama sekali.
+ * @param {Anime} a
+ * @param {number} [now] waktu sekarang (ms)
  */
-export function airedEpisodeCount(a) {
+export function airedEpisodeCount(a, now = Date.now()) {
     if (a.status === 'UPCOMING') return 0;
-    if (a.latestEpisode) return a.latestEpisode;
-    if (a.nextAiring?.episode) return Math.max(0, a.nextAiring.episode - 1);
-    if (a.status === 'ONGOING') return null;
-    return a.episodes || null;
+    let known = null;
+    if (a.latestEpisode) known = a.latestEpisode;
+    else if (a.nextAiring?.episode) known = Math.max(0, a.nextAiring.episode - 1);
+    if (a.status !== 'ONGOING') return known ?? (a.episodes || null);
+    const estimate = estimateAiredEpisodes(a, now);
+    if (known == null) return estimate;
+    return estimate ? Math.max(known, estimate) : known;
 }
 
 /** Nama sumber data untuk keterangan di UI. */

@@ -19,7 +19,7 @@
  */
 import { API_CONFIG, CACHE_TTL, UI } from '../config.js';
 import { fetchJSON, hashKey } from './http.js';
-import { createAnime, toScore10 } from './normalize.js';
+import { createAnime, firstAiringAt, toScore10 } from './normalize.js';
 
 const BASE = API_CONFIG.kitsu.url;
 const FIELDS = 'canonicalTitle,titles,synopsis,posterImage,coverImage,episodeCount,averageRating,status,subtype,startDate,popularityRank,userCount';
@@ -66,6 +66,8 @@ export function fromKitsu(item, extra = {}) {
         source: 'kitsu',
         duration: extra.duration,
         nextAiring: extra.nextAiring,
+        // Kitsu tidak memberi nomor episode terbaru → perkiraan jadwal mingguan dari startDate
+        firstAiredAt: firstAiringAt(a.startDate),
     });
 }
 

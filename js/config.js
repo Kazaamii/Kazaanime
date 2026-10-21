@@ -7,6 +7,9 @@
  * Tahap B : + API_CONFIG (AniList/Jikan/Kitsu/backend), timeout, TTL cache, jadwal WIB.
  * Tahap C : + STREAMING_SERVERS & PLAYER (watch.html), CACHE_TTL.detail, kunci riwayat/auto-next.
  * Tahap D : API_CONFIG.backend aktif (backend scraper Express di server/, endpoint /api/anime/*).
+ * Perbaikan pasca-D (22 Okt 2026): player mendahulukan server hasil scraping backend
+ *           (AnimeXin, Kuramanime) untuk SEMUA anime — PLAYER.serverOrder; host embed
+ *           cadangan animeplay.cfd (suspended) → megaplay.buzz.
  */
 
 export const APP = Object.freeze({
@@ -216,32 +219,45 @@ export const UI = Object.freeze({
 /* ========================================================================== */
 
 /**
- * Server streaming (embed iframe). URUTAN = urutan fallback otomatis.
+ * Server streaming STATIS (embed iframe) = CADANGAN. URUTAN = urutan fallback otomatis.
  *  - needs    : ID yang wajib ada ('anilist' | 'mal' | 'kitsu'). Tanpa ID itu server
  *               ditampilkan terkunci 🔒 dan dilewati otomatis.
  *  - url(ctx) : ctx = { anilist, mal, kitsu, ep, title } → URL embed (http/https).
+ *  - lang     : bahasa subtitle ('id' | 'en' | 'multi') — tampil di status player.
  *  - origins  : origin TAMBAHAN yang boleh mengirim postMessage (auto-next & progres),
  *               mis. bila player asli berada di iframe bersarang domain lain.
  *               Origin dari URL embed itu sendiri selalu diizinkan.
  *  - enabled  : false = disembunyikan tanpa menghapus definisinya.
- * Tahap D: backend juga menambahkan server per episode — ditaruh SETELAH daftar ini,
- * kecuali untuk anime yang berasal dari backend (URL membawa slug): server situs
- * sumbernya didahulukan. Tidak ada kode UI yang perlu diubah.
  *
- * ⚠️ Dicek 21 Okt 2026: host asli `animeplay.cfd` mengalihkan SEMUA URL ke
- *    /cgi-sys/suspendedpage.cgi ("Account Suspended"), jadi iframe hanya akan
- *    menampilkan halaman itu. Halaman di dalam iframe lintas-domain tidak bisa
- *    dibaca browser, sehingga kondisi ini tidak terdeteksi otomatis. Ganti
- *    STREAM_HOST (pola path sama) atau tambah/ubah server di bawah.
+ * Server UTAMA datang dari backend scraper (server/sources/: AnimeXin, Kuramanime) per
+ * episode — lihat PLAYER.serverOrder. Server di bawah hanya dipakai bila situs sumber tidak
+ * punya anime/episode itu atau semua servernya gagal. Ingin HANYA server hasil scraping?
+ * Set `enabled: false` pada kedua server di bawah (anime yang tidak ada di situs sumber
+ * lalu tidak bisa diputar).
+ *
+ * Host embed (dicek 22 Okt 2026):
+ *  - `animeplay.cfd` (host di file asli) hanyalah mirror MegaPlay dan kini di-suspend:
+ *    SEMUA URL dialihkan ke /cgi-sys/suspendedpage.cgi → iframe hanya menampilkan
+ *    "Account Suspended".
+ *  - Diganti domain utama MegaPlay, `megaplay.buzz` — pola path SAMA:
+ *    /stream/ani/{anilist}/{ep}/sub dan /stream/mal/{mal}/{ep}/sub.
+ *  - MegaPlay = pustaka HiAnime → "sub" berarti subtitle INGGRIS (bukan Indonesia).
+ *  - MegaPlay hanya memutar bila request iframe membawa header Referer (tanpa Referer
+ *    → halaman "Error - MegaPlay"). Karena itu PLAYER.referrerPolicy = 'origin' —
+ *    jangan diubah ke 'no-referrer'.
+ *  - Episode yang belum tayang / belum dipetakan MegaPlay menampilkan "Oops! Something
+ *    went wrong" DI DALAM iframe. Browser tidak bisa membacanya → pakai "⟳ Server Lain".
+ * Ganti host: ubah STREAM_HOST (pola path sama) atau tambah entri baru di bawah.
  */
-const STREAM_HOST = 'https://animeplay.cfd';
+const STREAM_HOST = 'https://megaplay.buzz';
 export const STREAMING_SERVERS = Object.freeze([
     Object.freeze({
         id: 'megaplay-anilist',
         flag: '🇯🇵',
         name: 'Server 1 (MegaPlay - AniList)',
-        description: 'Server tercepat - menggunakan AniList ID',
+        description: 'Cadangan - MegaPlay via AniList ID (subtitle Inggris)',
         needs: 'anilist',
+        lang: 'en',
         enabled: true,
         origins: Object.freeze([]),
         url: ({ anilist, ep }) => `${STREAM_HOST}/stream/ani/${anilist}/${ep}/sub`,
@@ -250,8 +266,9 @@ export const STREAMING_SERVERS = Object.freeze([
         id: 'megaplay-mal',
         flag: '🇺🇸',
         name: 'Server 2 (MegaPlay - MAL)',
-        description: 'Server alternatif - menggunakan MAL ID',
+        description: 'Cadangan - MegaPlay via MAL ID (subtitle Inggris)',
         needs: 'mal',
+        lang: 'en',
         enabled: true,
         origins: Object.freeze([]),
         url: ({ mal, ep }) => `${STREAM_HOST}/stream/mal/${mal}/${ep}/sub`,
@@ -260,6 +277,21 @@ export const STREAMING_SERVERS = Object.freeze([
 
 /** Pengaturan player watch.html. */
 export const PLAYER = Object.freeze({
+    /**
+     * Urutan sumber video:
+     *  - 'scrape-first' (default): untuk SEMUA anime, player mencari episode itu di situs
+     *    sumber backend (AnimeXin / Kuramanime — dicocokkan lewat judul) dan memutar server
+     *    hasil scraping lebih dulu. STREAMING_SERVERS hanya cadangan otomatis.
+     *  - 'static-first': perilaku Tahap D — server statis dulu, server scraping sebagai
+     *    tambahan (kecuali anime yang dibuka dari kartu backend / URL ber-slug).
+     * Tanpa backend (situs statis / backend nonaktif) keduanya sama: hanya server statis.
+     */
+    serverOrder: 'scrape-first',
+    /** Maks. menunggu hasil scraping sebelum memutar server cadangan (ms). Hasil yang datang
+     *  belakangan tetap ditambahkan sebagai tombol server tanpa memutus video. */
+    scrapeWaitMs: 8000,
+    /** Nama situs sumber scraping untuk pesan di player. */
+    scrapeLabel: 'AnimeXin & Kuramanime',
     /** iframe tidak selesai dimuat dalam waktu ini (ms) → otomatis pindah ke server berikutnya. */
     loadTimeout: 15000,
     /** Auto-next default (user bisa mengubahnya; pilihan tersimpan di localStorage). */
@@ -270,12 +302,12 @@ export const PLAYER = Object.freeze({
     maxEpisode: 3000,
     /** Izin iframe. Tanpa camera/microphone/display-capture (dulu diberikan tanpa perlu). */
     allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
-    /** Sama dengan file asli: sebagian penyedia embed memeriksa Referer (cukup origin). */
+    /** Sebagian penyedia embed memeriksa Referer (cukup origin) — MegaPlay WAJIB ada Referer. */
     referrerPolicy: 'origin',
     /**
      * Atribut sandbox iframe. Kosong = tanpa sandbox (sama seperti asli).
      * Contoh pemblokir pop-up: 'allow-scripts allow-same-origin allow-presentation allow-forms'
-     * — tetapi banyak player embed menolak diputar bila di-sandbox.
+     * — tetapi banyak player embed (termasuk MegaPlay) menolak diputar bila di-sandbox.
      */
     sandbox: '',
     /** Jumlah kartu rekomendasi. */

@@ -3,7 +3,8 @@
  * Pembuat & pembaca URL antar halaman. Semua link ke watch/search WAJIB
  * dibuat lewat fungsi di sini supaya format query string konsisten.
  *
- *   watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=...][&slug=...&src=...]
+ *   watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=...][&slug=...&src=...][&alt=...]
+ *     alt = judul alternatif latin (romaji) → dipakai mencari anime yang sama di situs sumber scraping
  *   search.html?q=...[&sort=score][&format=TV,MOVIE][&source=mal]   → mode pencarian
  *   search.html?browse=ongoing                                     → "Lihat Semua" (ongoing|popular|new|donghua)
  *   search.html?genre=Action                                       → "Lihat Semua" untuk genre
@@ -32,6 +33,14 @@ export function toEpisodeNumber(v) {
     return n && n <= PLAYER.maxEpisode ? n : null;
 }
 
+/** Judul alternatif yang berguna untuk pencarian di situs sumber: huruf latin, beda dari judul utama. */
+function altTitleOf(anime) {
+    const alt = String(anime.titleAlt || '').replace(/\s+/g, ' ').trim();
+    if (!alt || alt.toLowerCase() === String(anime.title || '').trim().toLowerCase()) return '';
+    if (!/[a-z]/i.test(alt) || /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(alt)) return '';
+    return alt.slice(0, 150);
+}
+
 /** Episode tujuan kartu "Baru Rilis": episode terbaru yang sudah tayang (selain itu episode 1). */
 export const latestEpisodeOf = (anime) => anime.latestEpisode || 1;
 
@@ -52,6 +61,8 @@ export function watchUrl(anime, ep = 1, keep = {}) {
     const src = keep.src || (anime.source?.startsWith('backend:') ? anime.source.slice('backend:'.length) : '');
     if (slug) p.set('slug', slug);
     if (src) p.set('src', src);
+    const alt = altTitleOf(anime);
+    if (alt) p.set('alt', alt);
     return `${PAGES.watch}?${p.toString()}`;
 }
 
@@ -66,6 +77,7 @@ export function parseWatchParams(search = window.location.search) {
         kitsu: (p.get('kitsu') || '').replace(/[^0-9]/g, '') || null,
         slug: (p.get('slug') || '').replace(/[^a-zA-Z0-9._~-]/g, '').slice(0, 160) || null,
         src: (p.get('src') || '').replace(/[^a-z0-9-]/g, '').slice(0, 40) || null,
+        alt: (p.get('alt') || '').replace(/\s+/g, ' ').trim().slice(0, 150),
     };
 }
 

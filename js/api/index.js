@@ -452,7 +452,7 @@ function findFallbackAnime(title) {
 }
 
 /**
- * @typedef {{title?:string, anilist?:number|null, mal?:number|null, kitsu?:string|null, slug?:string|null, src?:string|null}} AnimeRef
+ * @typedef {{title?:string, alt?:string, anilist?:number|null, mal?:number|null, kitsu?:string|null, slug?:string|null, src?:string|null}} AnimeRef
  *   Isi URL watch.html (lihat routes.parseWatchParams).
  */
 
@@ -470,6 +470,7 @@ export function provisionalAnime(ref) {
         ...(known || {}),
         id: undefined,
         title: ref.title || known?.title || '',
+        titleAlt: ref.alt || known?.titleAlt || '',
         ids: { anilist: ref.anilist, mal: ref.mal, kitsu: ref.kitsu },
         slug: ref.slug || null,
         source,
@@ -581,6 +582,7 @@ export async function getWatchData(ref, { signal } = {}) {
     };
 
     if (!res && ref.title) res = await byTitle(ref.title);
+    if (!res && ref.alt) res = await byTitle(ref.alt);
 
     // Hasil tanpa id AniList/MAL (mis. Kitsu tanpa mapping, atau backend) → server streaming
     // tidak bisa dipakai. Cari id-nya lewat judul; hasil AniList/Jikan dipakai bila tidak bertentangan.
@@ -595,6 +597,8 @@ export async function getWatchData(ref, { signal } = {}) {
                 merged.latestEpisode = Math.max(base.latestEpisode || 0, found.anime.latestEpisode || 0) || null;
                 if (base.episodes || base.latestEpisode) merged.episodes = base.episodes || null;
                 if (base.status !== 'UNKNOWN') merged.status = base.status;
+                // Perkiraan jadwal mingguan milik judul yang cocok (bisa season lain) tidak berlaku di sini.
+                merged.firstAiredAt = null;
                 // Jadwal "episode berikutnya" milik season lain (nomornya sudah lewat) → jangan ditampilkan.
                 if (merged.nextAiring?.episode && merged.nextAiring.episode <= (merged.latestEpisode || 0)) merged.nextAiring = null;
             }
