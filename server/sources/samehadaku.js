@@ -323,7 +323,7 @@ export function parseSchedulePage(html, base) {
 /**
  * @param {{network: any, createClient: Function, baseUrl: string}} deps
  */
-export function createSamehadaku({ network, createClient, baseUrl }) {
+export function createSamehadaku({ network, createClient, baseUrl, sourceConfig = {} }) {
     const base = String(baseUrl || 'https://v2.samehadaku.how').replace(/\/+$/, '');
     const host = new URL(base).hostname;
     const client = createClient(network, {
@@ -333,7 +333,8 @@ export function createSamehadaku({ network, createClient, baseUrl }) {
         requireExplicitRobots: POLICY.tos.verdict !== 'allowed',
         // Baseline GitHub Actions (2026-10-22): homepage challenged. Don't repeat content requests;
         // back off 30 minutes and use other permitted sources as fallback.
-        challengeRetries: 0,
+        cookies: sourceConfig.cookiesEnabled ?? true,
+        renderJavaScript: Boolean(sourceConfig.renderJavaScript),
         blockedMs: 30 * 60 * 1000,
     });
 

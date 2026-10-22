@@ -32,6 +32,7 @@ import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
 import { createAnimexin } from './animexin.js';
 import { createHianime } from './hianime.js';
+import { createKuramanime } from './kuramanime.js';
 import { createMetadata, hasCjk } from './metadata.js';
 import { createOtakudesu } from './otakudesu.js';
 import { createSamehadaku } from './samehadaku.js';
@@ -43,6 +44,7 @@ export const FACTORIES = Object.freeze({
     anichin: createAnichin,
     otakudesu: createOtakudesu,
     hianime: createHianime,
+    kuramanime: createKuramanime,
 });
 
 /** Prefix slug untuk anime dari API metadata (kitsu~123, mal~456, anilist~789). */
@@ -99,7 +101,12 @@ export function createRegistry({
     const byId = new Map(list.map((a) => [a.id, a]));
     const usable = () => list.filter((a) => a.policy?.tos?.verdict !== 'forbidden');
 
-    const wrap = (key, ttlMs, producer, opts = {}) => cache.wrap(key, { ttl: ttlMs, stale: ttl.staleMs, ...opts }, producer);
+    const wrap = (key, ttlMs, producer, opts = {}) => {
+        const settings = { ttl: ttlMs, stale: ttl.staleMs, ...opts };
+        return network?.requestManager?.cache && network.requestManager.cached
+            ? network.requestManager.cached(key, settings, producer)
+            : cache.wrap(key, settings, producer);
+    };
 
     /** Seperti wrap, tapi "tidak ditemukan" juga di-cache (singkat) supaya slug salah tidak terus menembak sumber. */
     async function wrapFound(key, ttlMs, producer, opts = {}) {
@@ -358,7 +365,7 @@ export function createRegistry({
                     return {
                         id: a.id,
                         name: a.name,
-                        baseUrl: a.baseUrl,
+                        baseUrl: origin,
                         tos: a.policy?.tos?.verdict || 'unknown',
                         robots: robots[origin]?.state || 'unchecked',
                         circuit: circuits[a.id]?.state || 'closed',
@@ -370,6 +377,12 @@ export function createRegistry({
                     ? { enabled: true, order: metadata.order, circuits: Object.fromEntries(metadata.order.map((p) => [p, circuits[p]?.state || 'closed'])) }
                     : { enabled: false },
                 cache: { entries: cache.size, ...cache.stats },
+                runtime: {
+                    requests: network?.requestManager?.snapshot?.() || null,
+                    proxies: network?.proxyManager?.snapshot?.() || null,
+                    cookies: network?.cookieManager?.snapshot?.() || null,
+                    browser: network?.browserAutomation?.snapshot?.() || null,
+                },
             };
         },
     };
@@ -377,8 +390,8 @@ export function createRegistry({
 
 /** Registry produksi: adapter dari SOURCES.enabled + metadata, berbagi throttle/robots/circuit/cache. */
 export function createDefaultRegistry() {
-    const network = createNetwork();
     const cache = new TtlCache({ max: CACHE.maxEntries });
+    const network = createNetwork({ cache });
     const adapters = SOURCES.enabled
         .map((id) => {
             const factory = FACTORIES[id];
@@ -386,7 +399,7 @@ export function createDefaultRegistry() {
                 console.warn(`[sources] adapter "${id}" tidak dikenal — dilewati.`);
                 return null;
             }
-            return factory({ network, createClient, baseUrl: SOURCES[id]?.baseUrl });
+            return factory({ network, createClient, baseUrl: SOURCES[id]?.baseUrl, sourceConfig: SOURCES[id] });
         })
         .filter(Boolean);
     const metadata = METADATA.enabled ? createMetadata({ network, createClient, cache }) : null;

@@ -200,7 +200,7 @@ export function createHianime({ network, createClient, baseUrl }) {
     const base = String(baseUrl || 'https://hianime.ro').replace(/\/+$/, '');
     const host = new URL(base).hostname.replace(/^www\./, '');
     const rest = `${base}/wp-json/v1/otakuthemes`;
-    const client = createClient(network, { source: ID, allowedHosts: [host, `www.${host}`], challengeRetries: 1, blockedMs: 5 * 60 * 1000 });
+    const client = createClient(network, { source: ID, allowedHosts: [host, `www.${host}`], blockedMs: 5 * 60 * 1000 });
 
     const toAnime = (c) => makeAnime({
         title: c.title,

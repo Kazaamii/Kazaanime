@@ -95,10 +95,11 @@ test('anichin adapter: parseRef (slug & anime~slug), schedule() seragam', async 
     assert.equal(item.country, 'CN');
 });
 
-test('anichin adapter: klien memakai challengeRetries (challenge Cloudflare acak)', () => {
+test('anichin adapter: konfigurasi host dibatasi dan challenge tidak diberi retry', () => {
     const { createClient } = fakeClientFactory({});
     let opts = null;
     createAnichin({ network: {}, createClient: (n, o) => { opts = o; return createClient(n, o); }, baseUrl: BASE });
-    assert.ok(opts.challengeRetries >= 1);
+    assert.equal(opts.challengeRetries, undefined, 'challenge tidak diulang');
+    assert.equal(opts.blockedMs, 5 * 60 * 1000);
     assert.deepEqual(opts.allowedHosts, ['anichin.moe', 'www.anichin.moe']);
 });

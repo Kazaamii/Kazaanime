@@ -16,8 +16,7 @@
  *   /schedule/            → jadwal per hari (.bixbox.schedulepage) + jam rilis perkiraan
  * Semua subtitle Anichin berbahasa Indonesia → server diberi lang 'id'.
  * Gambar /wp-content/uploads boleh ditampilkan di situs lain (200 tanpa Referer, tanpa CORP).
- * Cloudflare men-challenge sebagian request secara ACAK (request yang sama berikutnya lolos)
- * → klien memakai challengeRetries (lihat lib/fetcher.js).
+ * Cloudflare challenge → request dihentikan tanpa retry, circuit dibuka, dan aggregator memakai fallback.
  */
 import { makeAnime, makeEpisode } from '../lib/anime.js';
 import { SourceError, notFound } from '../lib/errors.js';
@@ -139,7 +138,6 @@ export function createAnichin({ network, createClient, baseUrl }) {
     const client = createClient(network, {
         source: ID,
         allowedHosts: [host, `www.${host}`],
-        challengeRetries: 2,
         blockedMs: 5 * 60 * 1000,
     });
 

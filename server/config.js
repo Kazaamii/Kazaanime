@@ -65,7 +65,7 @@ export const BOT = Object.freeze({
 export const SCRAPER = Object.freeze({
     /** Timeout per request ke situs sumber (ms). */
     timeoutMs: int('SCRAPER_TIMEOUT_MS', 6000, { min: 1000, max: 20000 }),
-    /** Retry terbatas: hanya untuk error jaringan & HTTP 5xx (bukan 4xx, bukan timeout). */
+    /** Retry terbatas hanya untuk gangguan jaringan dan HTTP 5xx; 403/429/challenge tidak diulang. */
     retries: int('SCRAPER_RETRIES', 1, { min: 0, max: 2 }),
     /** Jeda minimal antar-request ke host yang SAMA (ms). Crawl-delay robots.txt bisa memperbesar. */
     minIntervalMs: int('SCRAPER_MIN_INTERVAL_MS', 1000, { min: 250, max: 30000 }),
@@ -83,7 +83,45 @@ export const SCRAPER = Object.freeze({
     circuit: Object.freeze({
         failures: 2,            // gagal beruntun sebelum sumber "diistirahatkan"
         openMs: 60 * 1000,      // istirahat setelah gagal biasa
-        blockedMs: 30 * 60 * 1000, // istirahat setelah diblokir (Cloudflare/WAF) — jangan dipaksa
+        blockedMs: 30 * 60 * 1000, // istirahat setelah diblokir (WAF/challenge) — jangan dipaksa
+    }),
+});
+
+const proxyListRaw = env.SCRAPER_PROXY_URLS || env.SCRAPER_PROXY_URL
+    || env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy || env.ALL_PROXY || env.all_proxy || '';
+const proxyRotation = String(env.SCRAPER_PROXY_ROTATION || 'round-robin').toLowerCase();
+const cookieEncryptionKey = String(env.SCRAPER_COOKIE_STORE_KEY || '');
+
+/** Runtime scraper modular; proxy/cookie secrets hanya dikonsumsi server dan tidak masuk health/log. */
+export const SCRAPER_RUNTIME = Object.freeze({
+    request: Object.freeze({
+        maxConcurrencyPerHost: int('SCRAPER_MAX_CONCURRENCY_PER_HOST', 2, { min: 1, max: 20 }),
+    }),
+    proxy: Object.freeze({
+        urls: Object.freeze(proxyListRaw.split(/[;,]/).map((value) => value.trim()).filter(Boolean)),
+        rotation: ['round-robin', 'sticky', 'disabled'].includes(proxyRotation) ? proxyRotation : 'round-robin',
+        healthCheck: bool('SCRAPER_PROXY_HEALTH_CHECK', true),
+        connectTimeoutMs: int('SCRAPER_PROXY_CONNECT_TIMEOUT_MS', 2000, { min: 250, max: 30000 }),
+        healthTtlMs: int('SCRAPER_PROXY_HEALTH_TTL_MS', 30000, { min: 1000, max: 600000 }),
+        failureCooldownMs: int('SCRAPER_PROXY_COOLDOWN_MS', 30000, { min: 1000, max: 3600000 }),
+    }),
+    cookies: Object.freeze({
+        enabled: bool('SCRAPER_COOKIES_ENABLED', true),
+        encryptionKey: cookieEncryptionKey,
+        storePath: env.SCRAPER_COOKIE_STORE_PATH
+            ? path.resolve(ROOT_DIR, env.SCRAPER_COOKIE_STORE_PATH)
+            : path.join(ROOT_DIR, '.scraper-data', 'cookies.enc'),
+    }),
+    browser: Object.freeze({
+        enabled: bool('SCRAPER_BROWSER_ENABLED', true),
+        settleMs: int('SCRAPER_BROWSER_SETTLE_MS', 350, { min: 0, max: 5000 }),
+        executablePath: env.PLAYWRIGHT_EXECUTABLE_PATH || '',
+        locale: env.SCRAPER_BROWSER_LOCALE || 'id-ID',
+        timezoneId: env.SCRAPER_BROWSER_TIMEZONE || 'Asia/Jakarta',
+        viewport: Object.freeze({
+            width: int('SCRAPER_BROWSER_VIEWPORT_WIDTH', 1280, { min: 320, max: 3840 }),
+            height: int('SCRAPER_BROWSER_VIEWPORT_HEIGHT', 800, { min: 240, max: 2160 }),
+        }),
     }),
 });
 
@@ -106,15 +144,25 @@ export const CACHE = Object.freeze({
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // animexin = donghua (Sub Indo/English) · samehadaku = anime Jepang (Sub Indo), pengganti Kuramanime
-    // yang memblokir bot ini lewat Cloudflare (lihat README).
-    // Ditambahkan 22 Okt 2026: anichin = donghua (Sub Indo) · otakudesu = anime Jepang (Sub Indo; diblokir
-    // Cloudflare untuk IP pusat data, lihat README) · hianime = anime Jepang (subtitle Inggris, hianime.ro).
+    // Kuramanime didaftarkan namun tidak aktif secara default: akses/robots diblokir, tidak dicoba dilewati.
     enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku', 'anichin', 'otakudesu', 'hianime']).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
-    samehadaku: Object.freeze({ baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, '') }),
+    samehadaku: Object.freeze({
+        baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, ''),
+        renderJavaScript: bool('SAMEHADAKU_RENDER_JAVASCRIPT', false),
+        cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('SAMEHADAKU_COOKIES', true),
+    }),
     anichin: Object.freeze({ baseUrl: (env.ANICHIN_BASE_URL || 'https://anichin.moe').replace(/\/+$/, '') }),
-    otakudesu: Object.freeze({ baseUrl: (env.OTAKUDESU_BASE_URL || 'https://otakudesu.blog').replace(/\/+$/, '') }),
+    otakudesu: Object.freeze({
+        baseUrl: (env.OTAKUDESU_BASE_URL || 'https://otakudesu.blog').replace(/\/+$/, ''),
+        renderJavaScript: bool('OTAKUDESU_RENDER_JAVASCRIPT', false),
+        cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('OTAKUDESU_COOKIES', true),
+    }),
+    kuramanime: Object.freeze({
+        baseUrl: (env.KURAMANIME_BASE_URL || 'https://v20.kuramanime.ing').replace(/\/+$/, ''),
+        renderJavaScript: bool('KURAMANIME_RENDER_JAVASCRIPT', false),
+        cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('KURAMANIME_COOKIES', true),
+    }),
     hianime: Object.freeze({ baseUrl: (env.HIANIME_BASE_URL || 'https://hianime.ro').replace(/\/+$/, '') }),
 });
 
@@ -148,7 +196,8 @@ export const STREAMS = Object.freeze({
     proxyRateLimitPerMinute: int('STREAM_PROXY_RATE_LIMIT_PER_MIN', 900, { min: 0, max: 100000 }),
     proxyTimeoutMs: int('STREAM_PROXY_TIMEOUT_MS', 20000, { min: 3000, max: 28000 }),
     maxSegmentBytes: 40 * 1024 * 1024,
-    subtitleAttempts: 3,
+    // Challenge/HTTP 403/429 never trigger retries, regardless of other retry settings.
+    subtitleAttempts: 1,
 });
 
 /**

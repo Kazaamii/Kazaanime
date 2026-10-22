@@ -16,6 +16,7 @@ const KIND_MAP = Object.freeze({
     disabled: { status: 503, code: 'SOURCE_DISABLED' },
     circuit: { status: 503, code: 'SOURCE_COOLDOWN' },
     rate_limited: { status: 503, code: 'SOURCE_BUSY' },
+    proxy_unavailable: { status: 503, code: 'PROXY_UNAVAILABLE' },
     not_found: { status: 404, code: 'NOT_FOUND' },
     abort: { status: 499, code: 'CLIENT_CLOSED' },
 });
