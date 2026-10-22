@@ -1,11 +1,11 @@
 {
-  "startedAt": "2026-10-22T09:25:39.227Z",
+  "startedAt": "2026-10-22T09:38:15.973Z",
   "steps": [
     {
       "name": "health",
       "path": "/api/health",
       "status": 200,
-      "ms": 3,
+      "ms": 4,
       "type": "application/json; charset=utf-8",
       "cache": "no-store",
       "summary": {
@@ -41,7 +41,7 @@
       "name": "latest (semua adapter)",
       "path": "/api/anime/latest",
       "status": 200,
-      "ms": 6336,
+      "ms": 6815,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
       "summary": {
@@ -70,7 +70,7 @@
       "name": "search kusuriya",
       "path": "/api/anime/search?q=Kusuriya%20no%20Hitorigoto",
       "status": 200,
-      "ms": 3482,
+      "ms": 4001,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
       "summary": {
@@ -99,7 +99,7 @@
       "name": "search renegade",
       "path": "/api/anime/search?q=Renegade%20Immortal",
       "status": 200,
-      "ms": 1161,
+      "ms": 1033,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
       "summary": {
@@ -108,10 +108,10 @@
         "fallback": false,
         "stale": false,
         "errors": [
-          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±297 dtk.",
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±296 dtk.",
           "samehadaku:blocked:samehadaku sedang diistirahatkan (blocked), dicoba lagi ±300 dtk.",
-          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±297 dtk.",
-          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1793 dtk."
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±296 dtk.",
+          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1792 dtk."
         ],
         "count": 2,
         "bySource": {
@@ -127,7 +127,7 @@
       "name": "search cyberpunk",
       "path": "/api/anime/search?q=Cyberpunk%20Edgerunners",
       "status": 200,
-      "ms": 1105,
+      "ms": 1234,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
       "summary": {
@@ -136,10 +136,10 @@
         "fallback": false,
         "stale": false,
         "errors": [
-          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±296 dtk.",
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±295 dtk.",
           "samehadaku:blocked:samehadaku sedang diistirahatkan (blocked), dicoba lagi ±299 dtk.",
-          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±296 dtk.",
-          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1792 dtk."
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±295 dtk.",
+          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1791 dtk."
         ],
         "count": 0,
         "bySource": {},
@@ -150,7 +150,7 @@
       "name": "detail anichin",
       "path": "/api/anime/anichin~renegade-immortal",
       "status": 200,
-      "ms": 258,
+      "ms": 317,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=0, s-maxage=120, stale-while-revalidate=1800",
       "summary": {
@@ -159,7 +159,7 @@
         "fallback": true,
         "stale": false,
         "errors": [
-          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±295 dtk."
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±294 dtk."
         ],
         "title": "Renegade Immortal",
         "slug": "anichin~renegade-immortal",
@@ -171,7 +171,7 @@
       "name": "episode anichin 163",
       "path": "/api/anime/anichin~renegade-immortal/episode/163",
       "status": 503,
-      "ms": 3,
+      "ms": 4,
       "type": "application/json; charset=utf-8",
       "cache": "no-store",
       "summary": {
@@ -184,7 +184,7 @@
       "name": "detail hianime",
       "path": "/api/anime/hianime~cyberpunk-edgerunners-2",
       "status": 200,
-      "ms": 1242,
+      "ms": 1176,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
       "summary": {
@@ -204,7 +204,7 @@
       "name": "episode hianime 1",
       "path": "/api/anime/hianime~cyberpunk-edgerunners-2/episode/1",
       "status": 200,
-      "ms": 924,
+      "ms": 942,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
       "summary": {
@@ -224,20 +224,20 @@
       "name": "detail otakudesu",
       "path": "/api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo",
       "status": 503,
-      "ms": 256,
+      "ms": 273,
       "type": "application/json; charset=utf-8",
       "cache": "no-store",
       "summary": {
         "ok": false,
         "errors": [],
-        "error": "SOURCE_BLOCKED: otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1788 dtk."
+        "error": "SOURCE_BLOCKED: otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1787 dtk."
       }
     },
     {
       "name": "schedule",
       "path": "/api/anime/schedule",
       "status": 503,
-      "ms": 2,
+      "ms": 3,
       "type": "application/json; charset=utf-8",
       "cache": "no-store",
       "summary": {
@@ -250,7 +250,7 @@
       "name": "stream servers One Piece ep1",
       "path": "/api/stream/servers?ep=1&anilist=21&title=One%20Piece&year=1999",
       "status": 200,
-      "ms": 4871,
+      "ms": 5456,
       "type": "application/json; charset=utf-8",
       "cache": "public, max-age=0, s-maxage=60",
       "summary": {
@@ -352,5 +352,5 @@
       }
     }
   ],
-  "finishedAt": "2026-10-22T09:25:59.504Z"
+  "finishedAt": "2026-10-22T09:38:38.001Z"
 }

@@ -1,0 +1,507 @@
+{
+  "console": [
+    {
+      "page": "home-desktop",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "page": "home-desktop",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "page": "home-mobile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "page": "home-mobile",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "page": "watch-desktop",
+      "type": "warning",
+      "text": "Unrecognized feature: 'web-share'."
+    },
+    {
+      "page": "watch-desktop",
+      "type": "warning",
+      "text": "Allow attribute will take precedence over 'allowfullscreen'."
+    },
+    {
+      "page": "watch-desktop",
+      "type": "warning",
+      "text": "document.domain mutation is ignored because the surrounding agent cluster is origin-keyed."
+    },
+    {
+      "page": "watch-desktop",
+      "type": "error",
+      "text": "Permissions policy violation: screen-wake-lock is not allowed in this document."
+    },
+    {
+      "page": "watch-desktop",
+      "type": "error",
+      "text": "Permissions policy violation: screen-wake-lock is not allowed in this document."
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "Unrecognized feature: 'web-share'."
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "Allow attribute will take precedence over 'allowfullscreen'."
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "document.domain mutation is ignored because the surrounding agent cluster is origin-keyed."
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "JW Player Warning 324003. For more information see https://developer.jwplayer.com/jw-player/docs/developer-guide/api/errors-reference#324003"
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "JW Player Warning 324003. For more information see https://developer.jwplayer.com/jw-player/docs/developer-guide/api/errors-reference#324003"
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "JW Player Warning 324003. For more information see https://developer.jwplayer.com/jw-player/docs/developer-guide/api/errors-reference#324003"
+    },
+    {
+      "page": "watch-mobile",
+      "type": "error",
+      "text": "MediaError"
+    },
+    {
+      "page": "watch-mobile",
+      "type": "error",
+      "text": "JW Player Error 224003. For more information see https://developer.jwplayer.com/jw-player/docs/developer-guide/api/errors-reference#224003"
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "[player] Server 1 gagal (error dari player) — episode 1"
+    },
+    {
+      "page": "watch-mobile",
+      "type": "warning",
+      "text": "document.domain mutation is ignored because the surrounding agent cluster is origin-keyed."
+    },
+    {
+      "page": "watch-mobile",
+      "type": "pageerror",
+      "text": "SecurityError: Failed to read a named property 'addEventListener' from 'Window': Blocked a frame with origin \"https://vidnest.fun\" from accessing a cross-origin frame.\n    at t.exports.Object.assign.isRunning (https://vidnest.fun/_next/static/chunks/e6c280afb7c0f9d3.js:1:16509)\n    at https://vidnest.fun/_next/static/chunks/14d8770da655df11.js:1:4726"
+    }
+  ],
+  "api": [
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/index.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/normalize.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/anilist.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/kitsu.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/sources.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/http.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/js/api/streams.js"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "/api/anime/latest"
+    },
+    {
+      "page": "home-desktop",
+      "status": 503,
+      "url": "/api/anime/schedule"
+    },
+    {
+      "page": "home-desktop",
+      "status": 503,
+      "url": "/api/anime/schedule"
+    },
+    {
+      "page": "home-desktop",
+      "status": 200,
+      "url": "https://kitsu.app/api/edge/anime?page%5Blimit%5D=1&fields%5Banime%5D=slug"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/index.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/normalize.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/anilist.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/kitsu.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/sources.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/streams.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/js/api/http.js"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "/api/anime/latest"
+    },
+    {
+      "page": "home-mobile",
+      "status": 503,
+      "url": "/api/anime/schedule"
+    },
+    {
+      "page": "home-mobile",
+      "status": 503,
+      "url": "/api/anime/schedule"
+    },
+    {
+      "page": "home-mobile",
+      "status": 200,
+      "url": "https://kitsu.app/api/edge/anime?page%5Blimit%5D=1&fields%5Banime%5D=slug"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/normalize.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/index.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/anilist.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/kitsu.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/sources.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/http.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/js/api/streams.js"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/api/stream/servers?ep=3&anilist=159042&title=Reincarnated+as+a+Sword+Season+2&title=Tensei+Shitara+Ken+Deshita+2nd+Season"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/api/anime/search?q=Reincarnated%20as%20a%20Sword%20Season%202"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/api/anime/search?q=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/api/anime/search?q=Reincarnated%20as%20a%20Sword"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/api/anime/search?q=Tensei%20Shitara%20Ken%20Deshita"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "/api/anime/hianime~reincarnated-as-a-sword-season-2~215377/episode/3"
+    },
+    {
+      "page": "watch-desktop",
+      "status": 200,
+      "url": "https://kitsu.app/api/edge/anime?page%5Blimit%5D=1&fields%5Banime%5D=slug"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/normalize.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/index.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/anilist.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/kitsu.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/sources.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/http.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/js/api/streams.js"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/api/stream/servers?ep=1&anilist=21&title=One+Piece"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/api/anime/search?q=One%20Piece"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "/api/anime/hianime~one-piece-choppers-kingdom-on-the-island-of-strange-animals~209818/episode/1"
+    },
+    {
+      "page": "watch-mobile",
+      "status": 200,
+      "url": "https://kitsu.app/api/edge/anime?page%5Blimit%5D=1&fields%5Banime%5D=slug"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/index.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/normalize.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/anilist.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/kitsu.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/sources.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/http.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/js/api/streams.js"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "https://kitsu.app/api/edge/anime?filter%5Btext%5D=frieren&page%5Blimit%5D=20&fields%5Banime%5D=canonicalTitle%2Ctitles%2Csynopsis%2CposterImage%2CcoverImage%2CepisodeCount%2CaverageRating%2Cstatus%2Cs"
+    },
+    {
+      "page": "search",
+      "status": 200,
+      "url": "/api/health"
+    }
+  ],
+  "pages": {
+    "home-desktop": {
+      "order": [
+        "hero",
+        "genre",
+        "jadwal",
+        "ongoing",
+        "popular",
+        "bookmarks",
+        "baru-rilis",
+        "donghua"
+      ],
+      "iconsHydrated": true,
+      "svgIcons": 72,
+      "bodyFont": "Figtree, system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+      "titleFont": "\"Bricolage Grotesque\", Figtree, system-ui, sans-serif",
+      "fontsLoaded": [
+        "Bricolage Grotesque 700",
+        "Bricolage Grotesque 800",
+        "Figtree 400",
+        "Figtree 500",
+        "Figtree 600",
+        "Figtree 700"
+      ],
+      "cards": 48,
+      "bookmarkBtn": {
+        "top": 8,
+        "right": 8,
+        "opacity": "1",
+        "w": 34
+      },
+      "schedule": 56,
+      "scheduleNote": "Jam tayang dalam WIB (UTC+7) · 8 anime terpopuler per hari · sumber: AniList · klik judul untuk menonton.",
+      "emojiLeft": []
+    },
+    "genre-click": {
+      "visible": true,
+      "title": "Genre: Action",
+      "cards": 12,
+      "popularTitle": "Anime Populer"
+    },
+    "genre-close": {
+      "hidden": true
+    },
+    "home-mobile": {
+      "order": [
+        "hero",
+        "genre",
+        "jadwal",
+        "ongoing",
+        "popular",
+        "bookmarks",
+        "baru-rilis",
+        "donghua"
+      ],
+      "iconsHydrated": true,
+      "svgIcons": 72,
+      "bodyFont": "Figtree, system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+      "titleFont": "\"Bricolage Grotesque\", Figtree, system-ui, sans-serif",
+      "fontsLoaded": [
+        "Bricolage Grotesque 700",
+        "Bricolage Grotesque 800",
+        "Figtree 400",
+        "Figtree 500",
+        "Figtree 600",
+        "Figtree 700",
+        "Figtree 800"
+      ],
+      "cards": 48,
+      "bookmarkBtn": {
+        "top": 8,
+        "right": 8,
+        "opacity": "1",
+        "w": 34
+      },
+      "schedule": 56,
+      "scheduleNote": "Jam tayang dalam WIB (UTC+7) · 8 anime terpopuler per hari · sumber: AniList · klik judul untuk menonton.",
+      "emojiLeft": []
+    },
+    "watch-desktop": {
+      "title": "Reincarnated as a Sword Season 2",
+      "status": "Server 1 | EP 3 | 1%",
+      "servers": [
+        "Server 1 Sub Eng [active] (Subtitle Inggris • server cadangan)",
+        "Server 2 Sub Eng [is-disabled] (Server ini sedang tidak bisa dipakai)",
+        "Server 3 Multi Sub [is-disabled] (Server ini sedang tidak bisa dipakai)",
+        "Server 4 Sub Eng [] (Subtitle Inggris • server cadangan)",
+        "Server 5 Sub Eng [] (Subtitle Inggris • server cadangan)",
+        "Server 6 Sub Eng [] (Subtitle Inggris)",
+        "Server 7 Sub Eng [] (Subtitle Inggris)"
+      ],
+      "iframe": "https://megaplay.buzz/stream/ani/159042/3/sub",
+      "meta": "7.5 Sedang Tayang ONA Fall 2026 12 Episode 23 mnt C2C Sub Indo Multi-Server",
+      "downloads": 0
+    },
+    "watch-desktop-anizone": {
+      "button": "Server ini sedang tidak bisa dipakai"
+    },
+    "watch-mobile": {
+      "title": "ONE PIECE",
+      "status": "Server 4 | Episode 1 | Sub English",
+      "servers": [
+        "Server 1 Sub Eng gagal [is-failed] (Subtitle Inggris • server cadangan)",
+        "Server 2 Sub Eng [is-disabled] (Server ini sedang tidak bisa dipakai)",
+        "Server 3 Multi Sub [is-disabled] (Server ini sedang tidak bisa dipakai)",
+        "Server 4 Sub Eng [active] (Subtitle Inggris • server cadangan)",
+        "Server 5 Sub Eng [] (Subtitle Inggris • server cadangan)"
+      ],
+      "iframe": "https://vidnest.fun/anime/21/1/sub",
+      "meta": "8.7 Sedang Tayang TV Fall 1999 24 mnt Toei Animation Sub Indo Multi-Server",
+      "downloads": 0
+    },
+    "search": {
+      "tabs": [
+        "Semua 8",
+        "Kitsu 6",
+        "AniList 6"
+      ],
+      "cards": 8
+    }
+  }
+}

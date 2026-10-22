@@ -4,22 +4,42 @@
    Sumber   : animexin, samehadaku, anichin, otakudesu, hianime
    UA bot   : KazanimeBot/1.0 (local development)
 
-[api] GET /api/health 200 4ms
+[api] GET /api/health 200 6ms
 [api] GET /api/health 200 1ms
-[api] GET /api/anime/latest 200 6334ms source=samehadaku,hianime
-[api] GET /api/anime/search?q=Kusuriya%20no%20Hitorigoto 200 3479ms source=hianime
-[api] GET /api/anime/search?q=Renegade%20Immortal 200 1158ms source=hianime
-[api] GET /api/anime/search?q=Cyberpunk%20Edgerunners 200 1103ms source=hianime
-[api] GET /api/anime/anichin~renegade-immortal 200 256ms source=metadata fallback
+[api] GET /api/anime/latest 200 6813ms source=samehadaku,hianime
+[api] GET /api/anime/search?q=Kusuriya%20no%20Hitorigoto 200 3999ms source=hianime
+[api] GET /api/anime/search?q=Renegade%20Immortal 200 1031ms source=hianime
+[api] GET /api/anime/search?q=Cyberpunk%20Edgerunners 200 1232ms source=hianime
+[api] GET /api/anime/anichin~renegade-immortal 200 311ms source=metadata fallback
 [api] GET /api/anime/anichin~renegade-immortal/episode/163 → 503 SOURCE_BLOCKED anichin sedang diistirahatkan (blocked), dicoba lagi ±294 dtk.
-[api] GET /api/anime/anichin~renegade-immortal/episode/163 503 1ms
-[api] GET /api/anime/hianime~cyberpunk-edgerunners-2 200 1240ms source=hianime
-[api] GET /api/anime/hianime~cyberpunk-edgerunners-2/episode/1 200 923ms source=hianime
-[api] GET /api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo → 503 SOURCE_BLOCKED otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1788 dtk.
-[api] GET /api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo 503 255ms
+[api] GET /api/anime/anichin~renegade-immortal/episode/163 503 2ms
+[api] GET /api/anime/hianime~cyberpunk-edgerunners-2 200 1175ms source=hianime
+[api] GET /api/anime/hianime~cyberpunk-edgerunners-2/episode/1 200 940ms source=hianime
+[api] GET /api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo → 503 SOURCE_BLOCKED otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1787 dtk.
+[api] GET /api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo 503 271ms
 [api] GET /api/anime/schedule → 503 SOURCES_UNAVAILABLE Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.
 [api] GET /api/anime/schedule 503 1ms
-[api] GET /api/stream/servers?ep=1&anilist=21&title=One%20Piece&year=1999 200 4870ms
+[api] GET /api/stream/servers?ep=1&anilist=21&title=One%20Piece&year=1999 200 5456ms
 [api] GET /api/stream/servers?ep=3&anilist=159042&title=Reincarnated%20as%20a%20Sword%20Season%202&title=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season&year=2026 200 1ms
 [api] GET /api/stream/servers?ep=1&title=Frieren%3A%20Beyond%20Journey%27s%20End&title=Sousou%20no%20Frieren&year=2023 200 1ms
+[api] GET /api/health 200 2ms
+[api] GET /api/anime/latest 200 1ms source=samehadaku,hianime
+[api] GET /api/anime/schedule → 503 SOURCES_UNAVAILABLE Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.
+[api] GET /api/anime/schedule 503 3ms
+[api] GET /api/anime/schedule → 503 SOURCES_UNAVAILABLE Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.
+[api] GET /api/anime/schedule 503 1ms
+[api] GET /api/anime/latest 200 2ms source=samehadaku,hianime
+[api] GET /api/anime/schedule → 503 SOURCES_UNAVAILABLE Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.
+[api] GET /api/anime/schedule 503 1ms
+[api] GET /api/anime/schedule → 503 SOURCES_UNAVAILABLE Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.
+[api] GET /api/anime/schedule 503 1ms
+[api] GET /api/stream/servers?ep=3&anilist=159042&title=Reincarnated+as+a+Sword+Season+2&title=Tensei+Shitara+Ken+Deshita+2nd+Season 200 0ms
+[api] GET /api/anime/search?q=Reincarnated%20as%20a%20Sword%20Season%202 200 1296ms source=hianime
+[api] GET /api/anime/search?q=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season 200 2469ms source=hianime
+[api] GET /api/anime/search?q=Reincarnated%20as%20a%20Sword 200 3282ms source=hianime
+[api] GET /api/anime/search?q=Tensei%20Shitara%20Ken%20Deshita 200 4284ms source=hianime
+[api] GET /api/anime/hianime~reincarnated-as-a-sword-season-2~215377/episode/3 200 2171ms source=hianime
+[api] GET /api/stream/servers?ep=1&anilist=21&title=One+Piece 200 1ms
+[api] GET /api/anime/search?q=One%20Piece 200 1367ms source=hianime
+[api] GET /api/anime/hianime~one-piece-choppers-kingdom-on-the-island-of-strange-animals~209818/episode/1 200 2110ms source=hianime
 [api] GET /api/health 200 1ms
