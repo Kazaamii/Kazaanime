@@ -328,6 +328,10 @@ export function createSamehadaku({ network, createClient, baseUrl }) {
         allowedHosts: [host],
         // ToS belum bisa ditinjau → robots.txt WAJIB terbaca & mengizinkan sebelum halaman apa pun diambil.
         requireExplicitRobots: POLICY.tos.verdict !== 'allowed',
+        // Challenge Cloudflare acak juga terukur di situs ini dari IP pusat data (22 Okt 2026) → ulangi maks 2x,
+        // lalu istirahat 5 menit (dulu langsung 30 menit).
+        challengeRetries: 2,
+        blockedMs: 5 * 60 * 1000,
     });
 
     const toAnime = (c, extra = {}) => makeAnime({
