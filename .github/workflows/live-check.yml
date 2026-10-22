@@ -1,14 +1,31 @@
 name: live-check (sementara)
+# Workflow SEMENTARA untuk verifikasi langsung situs sumber dari runner ber-internet.
+# Akan dihapus setelah pengujian selesai.
 on:
   push:
     branches: [arena/adbff310-kazaanime]
     paths: ['.github/workflows/live-check.yml', 'tools/live-check/**']
 permissions:
   contents: write
+concurrency:
+  group: live-check
+  cancel-in-progress: false
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - run: echo "probe ok"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probe
+        run: node tools/live-check/probe.mjs
+      - name: Commit hasil
+        run: |
+          git config user.name "live-check[bot]"
+          git config user.email "live-check@users.noreply.github.com"
+          git add -f .live-check
+          git commit -m "chore: hasil live-check (sementara) [skip ci]" || exit 0
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
