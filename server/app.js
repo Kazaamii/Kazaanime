@@ -176,8 +176,8 @@ export function createApp({
         intervalMs: 0,
         retries: 0,
         timeoutMs: STREAMS.proxyTimeoutMs,
-        // Seperti player AniZone sendiri (dan semua implementasi referensi): key AES/berkas tertentu di CDN
-        // hanya diberikan untuk Referer/Origin anizone.to. Spoof header diizinkan pemilik proyek (22 Okt 2026).
+        // CDN media tertentu memerlukan Origin/Referer AniZone sebagaimana pemutar sumbernya; ini kebutuhan
+        // protokol media, bukan penyamaran browser atau cara melewati challenge pada halaman situs.
         headers: { Referer: `${STREAMS.anizone.baseUrl}/`, Origin: STREAMS.anizone.baseUrl },
     });
     // Subtitle Indonesia (AI): klien Gemini hanya dibuat bila GEMINI_API_KEY ada (key tidak pernah keluar dari server).

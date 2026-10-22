@@ -1,7 +1,7 @@
 /**
  * Kazanime backend — providers/anizone.js
- * Penyedia server "AniZone — Multi Sub" (https://anizone.to), ditambahkan 22 Okt 2026 atas
- * permintaan pemilik proyek (larangan proxy dicabut untuk keperluan ini).
+ * Penyedia server "AniZone — Multi Sub" (https://anizone.to), ditambahkan 22 Okt 2026.
+ * HLS media memakai proxy same-origin bertanda tangan untuk kompatibilitas CORS; bukan proxy egress/anti-bot.
  *
  * Diverifikasi langsung 22 Okt 2026 dari runner GitHub Actions:
  *   robots.txt               : "User-agent: * / Disallow:" (semua diizinkan)
@@ -147,8 +147,10 @@ export function createAnizone({ network, createClient, baseUrl = 'https://anizon
     const client = createClient(network, {
         source: ID,
         allowedHosts: [host, `www.${host}`],
-        challengeRetries: 2,
-        blockedMs: 3 * 60 * 1000,
+        // Baseline GitHub Actions (2026-10-22): homepage challenged. Don't repeat content requests;
+        // open the source circuit for 30 minutes and let other providers/scrapers serve as fallback.
+        challengeRetries: 0,
+        blockedMs: 30 * 60 * 1000,
     });
 
     async function findSlug(titles, year, ctx) {
