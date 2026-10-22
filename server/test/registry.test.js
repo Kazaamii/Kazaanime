@@ -284,3 +284,18 @@ test('latest: pencarian poster melewati batas waktu → hasil ditandai partial (
     const fast = await reg([A], metaStub({ lookupImage: async () => ({ image: 'https://x.test/z.jpg' }) }), { enrichBudgetMs: 500 }).latest();
     assert.equal(fast.partial, false);
 });
+
+test('search: judul sama dari sumber BERBEDA tetap dikirim (halaman nonton menggabungkan server); latest tetap dedupe lintas sumber', async () => {
+    const mk = (id, items) => ({
+        id, name: id, baseUrl: `https://${id}.example`, policy: { tos: { verdict: 'allowed' } },
+        parseRef: (p) => ({ slug: p[0] }), titleHint: (r) => r.slug,
+        latest: async () => items, search: async () => items, getAnime: async () => ({}), getEpisode: async () => ({}),
+    });
+    const a = makeAnime({ title: 'Kusuriya no Hitorigoto Season 3', slug: 'samehadaku~k3', source: 'samehadaku' });
+    const b = makeAnime({ title: 'Kusuriya no Hitorigoto Season 3', slug: 'otakudesu~k3', source: 'otakudesu' });
+    const reg = createRegistry({ adapters: [mk('samehadaku', [a]), mk('otakudesu', [b])], metadata: null, enrichImages: false });
+    const s = await reg.search('kusuriya');
+    assert.deepEqual(s.data.map((x) => x.slug), ['samehadaku~k3', 'otakudesu~k3']);
+    const l = await reg.latest();
+    assert.deepEqual(l.data.map((x) => x.slug), ['samehadaku~k3'], 'latest: kartu ganda lintas sumber dibuang');
+});

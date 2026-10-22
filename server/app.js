@@ -12,13 +12,17 @@
  */
 import path from 'node:path';
 import express from 'express';
-import { BOT, CACHE, ROOT_DIR, SERVER, SOURCES } from './config.js';
+import { BOT, CACHE, ROOT_DIR, SERVER, SOURCES, STREAMS } from './config.js';
 import { AppError } from './lib/errors.js';
+import { createClient, createNetwork } from './lib/fetcher.js';
 import { ipRateLimit } from './lib/rate-limit.js';
+import { createSigner } from './lib/stream-proxy.js';
+import { createDefaultStreamProviders } from './providers/index.js';
 import { animeRouter } from './routes/anime.js';
+import { streamRouter } from './routes/stream.js';
 import { createDefaultRegistry } from './sources/index.js';
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 
 /** Header keamanan yang sama dengan vercel.json (tanpa X-Frame-Options: lihat mountStatic). */
 function securityHeaders(req, res, next) {
@@ -49,6 +53,8 @@ function cors(origins) {
 function requestLogger(req, res, next) {
     const started = Date.now();
     res.on('finish', () => {
+        // Proxy segmen video = ratusan request per episode → hanya yang gagal dicatat.
+        if (req.originalUrl.startsWith('/api/stream/hls') && res.statusCode < 400) return;
         const r = res.locals.result;
         const extra = r ? ` source=${r.source}${r.fallback ? ' fallback' : ''}${r.stale ? ' stale' : ''}` : '';
         console.log(`[api] ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - started}ms${extra}`);
@@ -68,8 +74,9 @@ function botInfo(req, res) {
         '  - obeys robots.txt (RFC 9309): group "KazanimeBot", otherwise "*"; honours Crawl-delay',
         '  - at most 1 request per second per host, limited retries, 6 s timeout',
         '  - responses cached 10-15 minutes (plus CDN cache), so most visits never reach your site',
-        '  - never solves CAPTCHAs/challenges and never disguises itself as a browser;',
-        '    a Cloudflare block or challenge makes the bot back off for 30 minutes',
+        '  - never solves CAPTCHAs/challenges; a Cloudflare block makes the bot back off (3-30 minutes);',
+        '    a challenge on a site where challenges are random is retried at most twice',
+        '  - video segments/subtitles for the in-site player are fetched on demand per viewer (not crawling)',
         'Opt out: add these lines to your robots.txt (picked up within 6 hours):',
         '  User-agent: KazanimeBot',
         '  Disallow: /',
@@ -79,7 +86,7 @@ function botInfo(req, res) {
         '',
         '— Bahasa Indonesia —',
         'Bot backend Kazanime: hanya membaca halaman publik, patuh robots.txt, maks 1 request/detik per host,',
-        'hasil di-cache 10–15 menit, tidak pernah melewati proteksi bot. Tolak bot ini lewat robots.txt di atas.',
+        'hasil di-cache 10–15 menit, tanpa solver CAPTCHA/challenge. Tolak bot ini lewat robots.txt di atas.',
     ].join('\n'));
 }
 
@@ -130,19 +137,41 @@ function errorHandler(err, req, res, next) {
 /**
  * @param {{
  *   registry?: ReturnType<typeof createDefaultRegistry>,
+ *   streams?: ReturnType<typeof createDefaultStreamProviders>,
+ *   mediaClient?: {stream: Function},
+ *   signer?: ReturnType<typeof createSigner>,
  *   serveStatic?: boolean,
  *   rateLimitPerMinute?: number,
+ *   proxyRateLimitPerMinute?: number,
  *   budgetMs?: number,
  *   log?: boolean,
  * }} [opts]
  */
 export function createApp({
     registry = createDefaultRegistry(),
+    streams,
+    mediaClient,
+    signer = createSigner(STREAMS.secret),
     serveStatic = false,
     rateLimitPerMinute = SERVER.rateLimitPerMinute,
+    proxyRateLimitPerMinute = STREAMS.proxyRateLimitPerMinute,
     budgetMs = SERVER.requestBudgetMs,
     log = SERVER.logRequests,
 } = {}) {
+    const network = registry.network || createNetwork();
+    const providers = streams || createDefaultStreamProviders({ network, createClient, cache: registry.cache });
+    const media = mediaClient || createClient(network, {
+        source: 'anizone-media',
+        allowedHosts: [],
+        allowedHostSuffixes: STREAMS.anizone.mediaHosts,
+        robots: false,
+        intervalMs: 0,
+        retries: 0,
+        timeoutMs: STREAMS.proxyTimeoutMs,
+    });
+    if (SERVER.isVercel && !STREAMS.secretFromEnv) {
+        console.warn('[streams] STREAM_SECRET belum diatur — secret proxy diturunkan dari ID deployment (lihat README).');
+    }
     const app = express();
     app.disable('x-powered-by');
     // Di Vercel IP pengunjung datang lewat proxy; di server biasa header proxy tidak dipercaya.
@@ -165,11 +194,19 @@ export function createApp({
                 userAgent: BOT.userAgent,
                 cacheTtlSec: { latest: CACHE.latestTtlMs / 1000, search: CACHE.searchTtlMs / 1000, detail: CACHE.detailTtlMs / 1000, episode: CACHE.episodeTtlMs / 1000 },
                 ...registry.health(),
+                streams: providers.health(),
             },
         });
     });
     app.get('/api/bot', botInfo);
     app.use('/api/anime', ipRateLimit({ limit: rateLimitPerMinute }), animeRouter(registry, { budgetMs }));
+    const serversLimit = ipRateLimit({ limit: rateLimitPerMinute });
+    const proxyLimit = ipRateLimit({ limit: proxyRateLimitPerMinute });
+    app.use(
+        '/api/stream',
+        (req, res, next) => (req.path === '/servers' ? serversLimit(req, res, next) : proxyLimit(req, res, next)),
+        streamRouter({ providers, mediaClient: media, signer, budgetMs }),
+    );
     app.use('/api', (req, res) => {
         res.set('Cache-Control', 'no-store');
         res.status(404).json({ ok: false, error: 'Endpoint tidak ditemukan.', code: 'NOT_FOUND' });

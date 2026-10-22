@@ -15,7 +15,7 @@ const FAST = {
     circuit: { failures: 2, openMs: 60000, blockedMs: 120000 },
 };
 
-function setup(routes, { scraper = FAST, robots = true, requireExplicitRobots = false } = {}) {
+function setup(routes, { scraper = FAST, robots = true, requireExplicitRobots = false, clientOpts = {} } = {}) {
     const hits = [];
     let srv;
     const ready = startServer((req, res) => {
@@ -30,7 +30,7 @@ function setup(routes, { scraper = FAST, robots = true, requireExplicitRobots = 
     }).then((s) => {
         srv = s;
         const net = createNetwork({ userAgent: 'KazanimeBot/1.0 (+test)', scraper });
-        const client = createClient(net, { source: 'uji', allowedHosts: ['127.0.0.1'], robots, requireExplicitRobots });
+        const client = createClient(net, { source: 'uji', allowedHosts: ['127.0.0.1'], robots, requireExplicitRobots, ...clientOpts });
         return { srv, net, client, hits, base: s.url };
     });
     return { ready, close: () => srv?.close() };
@@ -100,7 +100,8 @@ test('fetcher: robots.txt diblokir Cloudflare → seluruh sumber blocked (kasus 
     const { client, hits, base } = await t.ready;
     try {
         await assert.rejects(client.request(`${base}/anime?order_by=updated`), (e) => e.kind === 'blocked');
-        assert.deepEqual(hits.map((h) => h.url), ['/robots.txt'], 'hanya robots.txt yang sempat diminta');
+        // robots.txt yang kena challenge diulang SEKALI (challenge Cloudflare bisa acak) — halaman konten tetap tidak diminta.
+        assert.deepEqual(hits.map((h) => h.url), ['/robots.txt', '/robots.txt'], 'hanya robots.txt yang sempat diminta');
     } finally {
         await t.close();
     }
@@ -183,4 +184,85 @@ test('looksLikeChallenge & retryAfterSeconds', () => {
     assert.equal(retryAfterSeconds('120'), 120);
     assert.equal(retryAfterSeconds(''), 0);
     assert.ok(retryAfterSeconds(new Date(Date.now() + 5000).toUTCString()) >= 4);
+});
+
+test('fetcher: challenge acak → diulang (challengeRetries) lalu berhasil', async () => {
+    let n = 0;
+    const t = setup({
+        '/robots.txt': send(200, 'User-agent: *\nDisallow:'),
+        '/acak': (req, res) => {
+            n++;
+            if (n === 1) send(403, '<title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/x"></script>', { server: 'cloudflare', 'cf-ray': 'x' })(req, res);
+            else send(200, '<p>lolos</p>')(req, res);
+        },
+    }, { clientOpts: { challengeRetries: 1 } });
+    const { client, net, base } = await t.ready;
+    try {
+        const r = await client.request(`${base}/acak`);
+        assert.equal(r.text, '<p>lolos</p>');
+        assert.equal(n, 2, 'diulang tepat sekali');
+        assert.equal(net.circuit.check('uji').open, false, 'sumber tidak diistirahatkan');
+    } finally {
+        await t.close();
+    }
+});
+
+test('fetcher: challenge terus-menerus → blocked setelah jatah ulang habis, istirahat = blockedMs', async () => {
+    let n = 0;
+    const t = setup({
+        '/robots.txt': send(200, 'User-agent: *\nDisallow:'),
+        '/cf': (req, res) => { n++; send(403, fixture('cloudflare-block.html'), { server: 'cloudflare', 'cf-ray': 'abc' })(req, res); },
+    }, { clientOpts: { challengeRetries: 2, blockedMs: 90_000 } });
+    const { client, net, base } = await t.ready;
+    try {
+        await assert.rejects(client.request(`${base}/cf`), (e) => e.kind === 'blocked');
+        assert.equal(n, 3, '1 percobaan + 2 ulangan');
+        const c = net.circuit.check('uji');
+        assert.equal(c.open, true);
+        assert.ok(c.retryAfter > 0 && c.retryAfter <= 90, `retryAfter ${c.retryAfter} mengikuti blockedMs`);
+    } finally {
+        await t.close();
+    }
+});
+
+test('fetcher: stream() meneruskan byte biner + Range/206, host di luar allowlist ditolak tanpa request', async () => {
+    const bytes = Buffer.from(Array.from({ length: 300 }, (_, i) => i % 256));
+    const t = setup({
+        '/seg.ts': (req, res) => {
+            const m = /bytes=(\d+)-(\d+)/.exec(req.headers.range || '');
+            const part = m ? bytes.subarray(Number(m[1]), Number(m[2]) + 1) : bytes;
+            res.writeHead(m ? 206 : 200, { 'content-type': 'video/mp2t', ...(m ? { 'content-range': `bytes ${m[1]}-${m[2]}/300` } : {}) });
+            res.end(part);
+        },
+    }, { robots: false, clientOpts: { allowedHostSuffixes: ['xin-cdn.xyz'] } });
+    const { client, hits, base } = await t.ready;
+    try {
+        const r = await client.stream(`${base}/seg.ts`, { headers: { Range: 'bytes=10-19' } });
+        assert.equal(r.status, 206);
+        assert.equal(r.headers.get('content-range'), 'bytes 10-19/300');
+        const got = Buffer.from(await new Response(r.body).arrayBuffer());
+        assert.deepEqual([...got], [...bytes.subarray(10, 20)]);
+        await assert.rejects(client.stream('https://evil.example/x.ts'), (e) => e.kind === 'policy');
+        await assert.rejects(client.stream('https://xin-cdn.xyz.evil.example/x.ts'), (e) => e.kind === 'policy');
+        assert.equal(hits.filter((h) => h.url === '/robots.txt').length, 0, 'media tidak memeriksa robots.txt');
+    } finally {
+        await t.close();
+    }
+});
+
+test('fetcher: stream() memutus berkas yang melebihi maxBytes', async () => {
+    const t = setup({
+        // Content-Length diumumkan → ditolak sebelum body dibaca
+        '/besar.ts': (req, res) => { res.setHeader('content-type', 'video/mp2t'); res.end('x'.repeat(5000)); },
+        // chunked (tanpa Content-Length) → diputus saat body melewati batas
+        '/chunked.ts': (req, res) => { res.writeHead(200, { 'content-type': 'video/mp2t' }); res.write('x'.repeat(3000)); res.end('y'.repeat(3000)); },
+    }, { robots: false });
+    const { client, base } = await t.ready;
+    try {
+        await assert.rejects(client.stream(`${base}/besar.ts`, { maxBytes: 1000 }), (e) => e.kind === 'parse');
+        const r = await client.stream(`${base}/chunked.ts`, { maxBytes: 1000 });
+        await assert.rejects(new Response(r.body).arrayBuffer(), (e) => e.kind === 'parse');
+    } finally {
+        await t.close();
+    }
 });

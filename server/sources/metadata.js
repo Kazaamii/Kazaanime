@@ -2,8 +2,9 @@
  * Kazanime backend — sources/metadata.js
  * Fallback ke API metadata PUBLIK (resmi, memang untuk diakses program) bila scraper gagal:
  *   Kitsu   https://kitsu.app/api/edge   — bisa dijangkau dari server, punya mapping id MAL/AniList
- *   Jikan   https://api.jikan.moe/v4     — MyAnimeList tidak resmi, batas 3 req/dtk
  *   AniList https://graphql.anilist.co   — sejak 2026-09 butuh Referer & sering "temporarily disabled"
+ * Jikan (MyAnimeList tidak resmi) DIHAPUS 22 Okt 2026 atas permintaan pemilik proyek; slug lama
+ * "mal~<id>" tetap bisa dibuka lewat AniList (idMal).
  * Urutan bisa diatur lewat METADATA_ORDER. API resmi tidak melewati cek robots.txt (robots
  * mengatur crawling halaman web), tapi tetap kena timeout, throttle per host & circuit breaker.
  *
@@ -11,7 +12,7 @@
  *   search(q)            → daftar anime (fallback /api/anime/search)
  *   latestDonghua()      → donghua yang sedang tayang (fallback /api/anime/latest)
  *   findByTitle(title)   → satu anime paling cocok (fallback /api/anime/:slug)
- *   getById(kind, id)    → detail by id (slug kitsu~123 / mal~123 / anilist~123)
+ *   getById(kind, id)    → detail by id (slug kitsu~123 / anilist~123; mal~123 via AniList idMal)
  *   lookupImage(title)   → poster pengganti untuk sumber yang gambarnya dilindungi hotlink:
  *                          Kitsu → Bangumi (judul Mandarin persis) → MangaBaka (judul persis, cover manhua)
  *
@@ -88,29 +89,6 @@ export function kitsuTitles(item) {
     return [at.canonicalTitle, ...Object.values(at.titles || {}), ...(at.abbreviatedTitles || [])].filter(Boolean);
 }
 
-export function normalizeJikan(a) {
-    const status = a?.airing ? 'ONGOING' : /finished/i.test(a?.status || '') ? 'COMPLETED' : /not yet/i.test(a?.status || '') ? 'UPCOMING' : 'UNKNOWN';
-    return makeAnime({
-        title: a?.title_english || a?.title,
-        titleAlt: a?.title_english ? a?.title : (a?.title_japanese || ''),
-        image: a?.images?.webp?.large_image_url || a?.images?.jpg?.large_image_url || a?.images?.jpg?.image_url,
-        description: String(a?.synopsis || '').replace(/\s*\[Written by MAL Rewrite\]\s*$/i, ''),
-        episodes: a?.episodes,
-        genres: (a?.genres || []).map((g) => g?.name),
-        score: a?.score,
-        status,
-        format: parseFormat(a?.type),
-        year: a?.year || parseYear(a?.aired?.from),
-        ids: { mal: a?.mal_id },
-        source: 'jikan',
-        studios: (a?.studios || []).map((s) => s?.name),
-        duration: parseDurationMinutes(a?.duration),
-        season: typeof a?.season === 'string' ? a.season.toUpperCase() : null,
-        popularity: a?.members,
-        url: a?.url,
-    });
-}
-
 const AL_STATUS = { RELEASING: 'ONGOING', FINISHED: 'COMPLETED', NOT_YET_RELEASED: 'UPCOMING', HIATUS: 'ONGOING', CANCELLED: 'COMPLETED' };
 const AL_FORMAT = { TV: 'TV', TV_SHORT: 'TV', MOVIE: 'MOVIE', SPECIAL: 'SPECIAL', OVA: 'OVA', ONA: 'ONA', MUSIC: 'MUSIC' };
 
@@ -172,7 +150,6 @@ export function cjkKey(s) {
 export function createMetadata({ network, createClient, cache, config = METADATA }) {
     const common = { robots: false, timeoutMs: config.timeoutMs, retries: 1 };
     const kitsu = createClient(network, { ...common, source: 'kitsu', allowedHosts: ['kitsu.app', 'kitsu.io'], intervalMs: config.kitsu.minIntervalMs });
-    const jikan = createClient(network, { ...common, source: 'jikan', allowedHosts: ['api.jikan.moe'], intervalMs: config.jikan.minIntervalMs });
     const anilist = createClient(network, {
         ...common,
         source: 'anilist',
@@ -247,16 +224,6 @@ export function createMetadata({ network, createClient, cache, config = METADATA
         return null;
     }
 
-    /* ---------------- Jikan ---------------- */
-    async function jikanSearch(q, ctx, limit = 10) {
-        const url = new URL(`${config.jikan.baseUrl}/anime`);
-        url.searchParams.set('q', q);
-        url.searchParams.set('limit', String(Math.min(25, limit)));
-        url.searchParams.set('sfw', 'true');
-        const json = await jikan.json(url.href, ctx);
-        return (json.data || []).map(normalizeJikan);
-    }
-
     /* ---------------- AniList ---------------- */
     async function anilistQuery(query, variables, ctx) {
         const json = await anilist.json(config.anilist.baseUrl, { ...ctx, method: 'POST', body: JSON.stringify({ query, variables }) });
@@ -269,7 +236,7 @@ export function createMetadata({ network, createClient, cache, config = METADATA
         return (data?.Page?.media || []).map(normalizeAniList);
     }
 
-    const SEARCHERS = { kitsu: kitsuSearch, jikan: jikanSearch, anilist: anilistSearch };
+    const SEARCHERS = { kitsu: kitsuSearch, anilist: anilistSearch };
     const order = config.order.filter((p) => SEARCHERS[p]);
 
     /** Coba penyedia sesuai urutan; yang pertama berhasil dipakai. */
@@ -301,7 +268,7 @@ export function createMetadata({ network, createClient, cache, config = METADATA
 
         /** Donghua yang sedang tayang: AniList (filter negara CN) atau Kitsu (ONA/TV tayang, judul zh_cn). */
         async latestDonghua(ctx = {}) {
-            const providers = order.filter((p) => p !== 'jikan'); // Jikan tidak bisa memfilter negara asal
+            const providers = order;
             const r = await firstProvider(async (p) => {
                 if (p === 'anilist') {
                     const data = await anilistQuery(ANILIST_PAGE_QUERY, { page: 1, perPage: 20, country: 'CN', status: 'RELEASING', sort: ['TRENDING_DESC'] }, ctx);
@@ -355,14 +322,9 @@ export function createMetadata({ network, createClient, cache, config = METADATA
                 return data[0] ? normalizeKitsu(data[0], included) : null;
             }
             if (kind === 'mal') {
-                try {
-                    const json = await jikan.json(`${config.jikan.baseUrl}/anime/${id}`, ctx);
-                    return json.data ? normalizeJikan(json.data) : null;
-                } catch (err) {
-                    if (isAbort(err) || err.kind === 'not_found') throw err;
-                    const data = await anilistQuery(ANILIST_MEDIA_QUERY, { idMal: id }, ctx);
-                    return data?.Media ? normalizeAniList(data.Media) : null;
-                }
+                // Jikan dihapus → id MAL dicari lewat AniList (field idMal).
+                const data = await anilistQuery(ANILIST_MEDIA_QUERY, { idMal: id }, ctx);
+                return data?.Media ? normalizeAniList(data.Media) : null;
             }
             if (kind === 'anilist') {
                 const data = await anilistQuery(ANILIST_MEDIA_QUERY, { id }, ctx);

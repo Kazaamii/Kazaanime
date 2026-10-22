@@ -8,7 +8,14 @@
  *   5. User-Agent jujur, timeout, batas ukuran respons
  *   6. retry terbatas (hanya error jaringan & HTTP 5xx), backoff + jitter
  *   7. halaman blokir/challenge Cloudflare dikenali → "blocked" → sumber diistirahatkan.
- *      TIDAK ada upaya melewati proteksi (tanpa spoof header/fingerprint, tanpa solver).
+ *      Tanpa solver CAPTCHA/challenge. Sumber yang challenge-nya terbukti ACAK per request
+ *      (diukur 22 Okt 2026: AniZone, ReAnime, Anichin — request yang sama berikutnya lolos)
+ *      boleh mengulang maks `challengeRetries` kali dengan jeda, lalu diistirahatkan `blockedMs`.
+ *
+ * Sejak 22 Okt 2026 (instruksi pemilik proyek) larangan spoof header & proxy dicabut. Header
+ * khusus per sumber bisa diberikan lewat opsi `headers`. Catatan pengukuran: UA browser palsu
+ * justru LEBIH sering di-challenge Cloudflare daripada UA bot jujur, jadi default tetap UA jujur.
+ * `stream()` dipakai proxy HLS (server/routes/stream.js) untuk meneruskan segmen video biner.
  */
 import { load } from 'cheerio';
 import { BOT, SCRAPER } from '../config.js';
@@ -87,14 +94,22 @@ export function createNetwork({ fetchImpl = globalThis.fetch, userAgent = BOT.us
         now,
         fetchRobots: async (origin, signal) => {
             const url = `${origin}/robots.txt`;
-            await throttle.acquire(new URL(url).host, { signal });
-            const res = await fetchImpl(url, {
-                headers: { 'User-Agent': userAgent, Accept: 'text/plain,*/*;q=0.5' },
-                redirect: 'follow',
-                signal: combineSignals(scraper.robots.timeoutMs, signal),
-            });
-            const text = await readBody(res, scraper.robots.maxBytes, { truncate: true });
-            return { status: res.status, text, blocked: looksLikeChallenge({ status: res.status, headers: res.headers, text }) };
+            let out = null;
+            // Challenge Cloudflare yang acak juga bisa mengenai robots.txt → ulangi SEKALI sebelum
+            // menyimpulkan situs memblokir (hasil "blocked" di-cache beberapa menit oleh RobotsGate).
+            for (let attempt = 0; attempt < 2; attempt++) {
+                if (attempt) await sleep(1200 + Math.random() * 800, signal);
+                await throttle.acquire(new URL(url).host, { signal });
+                const res = await fetchImpl(url, {
+                    headers: { 'User-Agent': userAgent, Accept: 'text/plain,*/*;q=0.5' },
+                    redirect: 'follow',
+                    signal: combineSignals(scraper.robots.timeoutMs, signal),
+                });
+                const text = await readBody(res, scraper.robots.maxBytes, { truncate: true });
+                out = { status: res.status, text, blocked: looksLikeChallenge({ status: res.status, headers: res.headers, text }) };
+                if (!out.blocked) break;
+            }
+            return out;
         },
     });
     return { fetchImpl, userAgent, throttle, circuit, robots, scraper };
@@ -123,6 +138,9 @@ function robotsError(reason, source, url) {
  *   requireExplicitRobots?: boolean,  ToS belum bisa ditinjau → robots.txt wajib terbaca & mengizinkan
  *   timeoutMs?: number, retries?: number, intervalMs?: number,
  *   headers?: Record<string, string>,
+ *   allowedHostSuffixes?: string[],   host lain yang diizinkan bila = sufiks atau subdomain-nya (CDN media)
+ *   challengeRetries?: number,        ulangi maks n kali bila kena challenge Cloudflare (default 0)
+ *   blockedMs?: number,               lama sumber diistirahatkan setelah diblokir (default config)
  * }} opts
  */
 export function createClient(net, opts) {
@@ -135,8 +153,16 @@ export function createClient(net, opts) {
         retries = net.scraper.retries,
         intervalMs = net.scraper.minIntervalMs,
         headers: baseHeaders = {},
+        allowedHostSuffixes = [],
+        challengeRetries = 0,
+        blockedMs = net.scraper.circuit.blockedMs,
     } = opts;
-    const blockedMs = net.scraper.circuit.blockedMs;
+    const suffixes = allowedHostSuffixes.map((s) => String(s).toLowerCase().replace(/^\.+/, '')).filter(Boolean);
+    /** Host boleh diakses klien ini? (daftar persis + sufiks domain, mis. "xin-cdn.xyz" → "suzaku.xin-cdn.xyz") */
+    const hostAllowed = (host) => {
+        const h = String(host || '').toLowerCase();
+        return Boolean(h) && (allowedHosts.includes(h) || suffixes.some((s) => h === s || h.endsWith(`.${s}`)));
+    };
 
     /**
      * @param {string} url
@@ -150,7 +176,7 @@ export function createClient(net, opts) {
         } catch {
             throw new SourceError('URL sumber tidak valid.', { kind: 'policy', source });
         }
-        if (!/^https?:$/.test(u.protocol) || !allowedHosts.includes(u.hostname)) {
+        if (!/^https?:$/.test(u.protocol) || !hostAllowed(u.hostname)) {
             throw new SourceError(`Host ${u.hostname} tidak diizinkan untuk ${source}.`, { kind: 'policy', source });
         }
 
@@ -172,6 +198,7 @@ export function createClient(net, opts) {
         }
 
         let lastErr = null;
+        let challenges = 0;
         for (let attempt = 0; attempt <= retries; attempt++) {
             if (attempt > 0) await sleep(400 * 2 ** (attempt - 1) + Math.random() * 200, signal);
             await net.throttle.acquire(u.host, { intervalMs: Math.max(intervalMs, crawlDelayMs), signal, source });
@@ -196,7 +223,7 @@ export function createClient(net, opts) {
                     signal: combineSignals(t, signal),
                 });
                 const finalHost = hostOf(res.url) || u.hostname;
-                if (!allowedHosts.includes(finalHost)) {
+                if (!hostAllowed(finalHost)) {
                     await res.body?.cancel().catch(() => {});
                     throw new SourceError(`${source} mengalihkan ke host lain (${finalHost}) — tidak diikuti.`, { kind: 'policy', source });
                 }
@@ -213,6 +240,14 @@ export function createClient(net, opts) {
             }
 
             if (looksLikeChallenge({ status: res.status, headers: res.headers, text })) {
+                const left2 = deadline ? deadline - Date.now() : Infinity;
+                if (challenges < challengeRetries && left2 > 3500) {
+                    // Challenge acak (bukan blokir permanen): request berikutnya biasanya lolos.
+                    challenges++;
+                    attempt--; // tidak menghabiskan jatah retry error jaringan
+                    await sleep(1200 + Math.random() * 1300, signal);
+                    continue;
+                }
                 net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
                 throw new SourceError(`${source} memblokir akses bot (Cloudflare) — tidak dipaksa.`, { kind: 'blocked', source, httpStatus: res.status });
             }
@@ -240,9 +275,64 @@ export function createClient(net, opts) {
         throw lastErr || new SourceError(`${source} gagal dihubungi.`, { kind: 'network', source });
     }
 
+    /**
+     * Teruskan respons BINER apa adanya (segmen video / key HLS) untuk proxy media.
+     * Tetap: allowlist host (anti-SSRF, termasuk host akhir setelah redirect), timeout, batas ukuran.
+     * Tanpa robots.txt/throttle/circuit: ini bukan crawling, melainkan 1 request per permintaan
+     * pemutaran pengguna ke CDN media.
+     * @param {string} url
+     * @param {{signal?: AbortSignal, headers?: Record<string,string>, timeoutMs?: number, maxBytes?: number}} [o]
+     * @returns {Promise<{status: number, headers: Headers, body: ReadableStream<Uint8Array>|null, url: string}>}
+     */
+    async function stream(url, { signal, headers, timeoutMs: t = timeoutMs, maxBytes = 64 * 1024 * 1024 } = {}) {
+        let u;
+        try {
+            u = new URL(url);
+        } catch {
+            throw new SourceError('URL media tidak valid.', { kind: 'policy', source });
+        }
+        if (!/^https?:$/.test(u.protocol) || !hostAllowed(u.hostname)) {
+            throw new SourceError(`Host ${u.hostname} tidak diizinkan untuk ${source}.`, { kind: 'policy', source });
+        }
+        let res;
+        try {
+            res = await net.fetchImpl(u.href, {
+                headers: { 'User-Agent': net.userAgent, Accept: '*/*', ...baseHeaders, ...headers },
+                redirect: 'follow',
+                signal: combineSignals(t, signal),
+            });
+        } catch (err) {
+            if (signal?.aborted) throw new SourceError('Permintaan dibatalkan.', { kind: 'abort', source });
+            if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+                throw new SourceError(`${source} terlalu lama merespons.`, { kind: 'timeout', source });
+            }
+            throw new SourceError(`Tidak dapat terhubung ke ${source}.`, { kind: 'network', source, cause: err });
+        }
+        const finalHost = hostOf(res.url) || u.hostname;
+        if (!hostAllowed(finalHost)) {
+            await res.body?.cancel().catch(() => {});
+            throw new SourceError(`${source} mengalihkan ke host lain (${finalHost}) — tidak diikuti.`, { kind: 'policy', source });
+        }
+        const declared = Number(res.headers.get('content-length'));
+        if (Number.isFinite(declared) && declared > maxBytes) {
+            await res.body?.cancel().catch(() => {});
+            throw new SourceError('Berkas media terlalu besar.', { kind: 'parse', source });
+        }
+        let seen = 0;
+        const limiter = new TransformStream({
+            transform(chunk, controller) {
+                seen += chunk.byteLength;
+                if (seen > maxBytes) controller.error(new SourceError('Berkas media terlalu besar.', { kind: 'parse', source }));
+                else controller.enqueue(chunk);
+            },
+        });
+        return { status: res.status, headers: res.headers, body: res.body ? res.body.pipeThrough(limiter) : null, url: res.url || u.href };
+    }
+
     return {
         source,
         request,
+        stream,
         /** HTML → cheerio. */
         async html(url, o) {
             const res = await request(url, o);

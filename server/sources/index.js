@@ -12,6 +12,9 @@
  *
  * Alur & fallback:
  *   latest / search : semua scraper paralel → digabung (selang-seling) & dedupe judul.
+ *                     latest: dedupe lintas sumber (kartu donghua AnimeXin & Anichin tidak dobel);
+ *                     search: dedupe PER SUMBER (22 Okt 2026) — judul yang sama dari Samehadaku &
+ *                     Otakudesu tetap dikirim agar halaman nonton bisa menggabungkan server keduanya.
  *                     Semua gagal → API metadata publik (fallback: true).
  *   detail          : dirutekan lewat prefix slug ("animexin~…"). Gagal → metadata (judul dari slug).
  *   episode         : hanya dari scraper (metadata tidak punya server streaming) → error yang jelas,
@@ -26,22 +29,33 @@ import { AppError, SourceError, badRequest, combineErrors, describeError, isAbor
 import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
+import { createAnichin } from './anichin.js';
 import { createAnimexin } from './animexin.js';
+import { createHianime } from './hianime.js';
 import { createMetadata, hasCjk } from './metadata.js';
+import { createOtakudesu } from './otakudesu.js';
 import { createSamehadaku } from './samehadaku.js';
 
 /** id sumber → factory adapter. */
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
     samehadaku: createSamehadaku,
+    anichin: createAnichin,
+    otakudesu: createOtakudesu,
+    hianime: createHianime,
 });
 
 /** Prefix slug untuk anime dari API metadata (kitsu~123, mal~456, anilist~789). */
 const METADATA_KINDS = new Set(['kitsu', 'mal', 'anilist']);
 const NOT_FOUND = Symbol('notFound');
 
-/** Gabungkan beberapa daftar secara selang-seling + buang judul ganda. */
-export function mergeLists(groups, limit = 60) {
+/**
+ * Gabungkan beberapa daftar secara selang-seling + buang judul ganda.
+ * @param {any[][]} groups
+ * @param {number} [limit]
+ * @param {{perSource?: boolean}} [opts] perSource = judul sama dari sumber BERBEDA tetap dipertahankan
+ */
+export function mergeLists(groups, limit = 60, { perSource = false } = {}) {
     const out = [];
     const seen = new Set();
     const max = Math.max(0, ...groups.map((g) => g.length));
@@ -49,7 +63,8 @@ export function mergeLists(groups, limit = 60) {
         for (const g of groups) {
             const it = g[i];
             if (!it) continue;
-            const k = titleKey(it.title) || it.slug;
+            const base = titleKey(it.title) || it.slug;
+            const k = base && perSource ? `${it.source}:${base}` : base;
             if (!k || seen.has(k)) continue;
             seen.add(k);
             out.push(it);
@@ -196,6 +211,7 @@ export function createRegistry({
     return {
         adapters: list,
         cache,
+        network,
 
         async latest(ctx = {}) {
             const r = await fanOut((a) => `latest:${a.id}`, ttl.latestTtlMs, (a) => a.latest(ctx));
@@ -221,7 +237,7 @@ export function createRegistry({
             const key = q.toLowerCase();
             const r = await fanOut((a) => `search:${a.id}:${key}`, ttl.searchTtlMs, (a) => a.search(q, ctx));
             if (r.used.length) {
-                return { source: r.used.join(','), data: mergeLists(r.groups, 40), fallback: false, stale: r.stale, errors: r.errors };
+                return { source: r.used.join(','), data: mergeLists(r.groups, 60, { perSource: true }), fallback: false, stale: r.stale, errors: r.errors };
             }
             if (metadata) {
                 try {

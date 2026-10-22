@@ -6,6 +6,7 @@
  * Kebijakan sopan-santun scraper (robots.txt, ToS, rate limit, cache, User-Agent)
  * diatur di sini + di objek `policy` milik tiap adapter (server/sources/*.js).
  */
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,15 +108,54 @@ export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
     // animexin = donghua (Sub Indo/English) · samehadaku = anime Jepang (Sub Indo), pengganti Kuramanime
     // yang memblokir bot ini lewat Cloudflare (lihat README).
-    enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku']).map((s) => s.toLowerCase()),
+    // Ditambahkan 22 Okt 2026: anichin = donghua (Sub Indo) · otakudesu = anime Jepang (Sub Indo; diblokir
+    // Cloudflare untuk IP pusat data, lihat README) · hianime = anime Jepang (subtitle Inggris, hianime.ro).
+    enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku', 'anichin', 'otakudesu', 'hianime']).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
     samehadaku: Object.freeze({ baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, '') }),
+    anichin: Object.freeze({ baseUrl: (env.ANICHIN_BASE_URL || 'https://anichin.moe').replace(/\/+$/, '') }),
+    otakudesu: Object.freeze({ baseUrl: (env.OTAKUDESU_BASE_URL || 'https://otakudesu.blog').replace(/\/+$/, '') }),
+    hianime: Object.freeze({ baseUrl: (env.HIANIME_BASE_URL || 'https://hianime.ro').replace(/\/+$/, '') }),
+});
+
+/**
+ * Penyedia server stream berbasis id/judul (server/providers/*) — ditambahkan 22 Okt 2026:
+ *   reanime : server cadangan #2 (embed flixcloud, Sub English) menggantikan MegaPlay-MAL
+ *   anizone : server "Multi Sub" (HLS) yang diputar lewat proxy /api/stream/hls
+ */
+const STREAM_SECRET_ENV = env.STREAM_SECRET && env.STREAM_SECRET.length >= 16 ? env.STREAM_SECRET : '';
+export const STREAMS = Object.freeze({
+    enabled: list('STREAM_PROVIDERS', ['reanime', 'anizone']).map((s) => s.toLowerCase()),
+    reanime: Object.freeze({
+        baseUrl: (env.REANIME_BASE_URL || 'https://reanime.to').replace(/\/+$/, ''),
+        /** Host embed yang boleh dipasang sebagai iframe dari respons API ReAnime. */
+        embedHosts: list('REANIME_EMBED_HOSTS', ['flixcloud.cc']).map((s) => s.toLowerCase()),
+    }),
+    anizone: Object.freeze({
+        baseUrl: (env.ANIZONE_BASE_URL || 'https://anizone.to').replace(/\/+$/, ''),
+        /** Sufiks host CDN video/subtitle AniZone yang boleh diambil proxy (anti open-proxy/SSRF). */
+        mediaHosts: list('ANIZONE_MEDIA_HOSTS', ['xin-cdn.xyz']).map((s) => s.toLowerCase()),
+    }),
+    /**
+     * Secret HMAC untuk URL proxy. Sebaiknya diisi STREAM_SECRET (≥ 16 karakter acak) di Vercel.
+     * Tanpa itu dipakai turunan dari ID project/deployment Vercel (konsisten antar-instance satu
+     * deployment) — host media tetap dibatasi allowlist di atas.
+     */
+    secret: STREAM_SECRET_ENV || createHash('sha256').update(['kazanime-stream-v1', env.VERCEL_PROJECT_ID, env.VERCEL_DEPLOYMENT_ID || env.VERCEL_URL,
+        env.VERCEL_PROJECT_PRODUCTION_URL].filter(Boolean).join('|')).digest('hex'),
+    secretFromEnv: Boolean(STREAM_SECRET_ENV),
+    /** Rate limit request proxy (/api/stream/hls & /sub) per IP per menit. 0 = nonaktif. */
+    proxyRateLimitPerMinute: int('STREAM_PROXY_RATE_LIMIT_PER_MIN', 900, { min: 0, max: 100000 }),
+    proxyTimeoutMs: int('STREAM_PROXY_TIMEOUT_MS', 20000, { min: 3000, max: 28000 }),
+    maxSegmentBytes: 40 * 1024 * 1024,
+    subtitleAttempts: 3,
 });
 
 export const METADATA = Object.freeze({
     /** Fallback ke API metadata publik bila semua scraper gagal. */
     enabled: bool('METADATA_FALLBACK', true),
-    order: list('METADATA_ORDER', ['kitsu', 'jikan', 'anilist']).map((s) => s.toLowerCase()),
+    // Jikan (MyAnimeList) dihapus 22 Okt 2026 atas permintaan pemilik proyek.
+    order: list('METADATA_ORDER', ['kitsu', 'anilist']).map((s) => s.toLowerCase()).filter((s) => s !== 'jikan'),
     timeoutMs: int('METADATA_TIMEOUT_MS', 6000, { min: 1000, max: 15000 }),
     /** Ganti gambar yang dilindungi hotlink (mis. animexin) dengan poster dari Kitsu. */
     enrichImages: bool('METADATA_ENRICH_IMAGES', true),
@@ -126,6 +166,5 @@ export const METADATA = Object.freeze({
     kitsu: Object.freeze({ baseUrl: 'https://kitsu.app/api/edge', minIntervalMs: 200 }),
     bangumi: Object.freeze({ baseUrl: 'https://api.bgm.tv', minIntervalMs: 500 }),
     mangabaka: Object.freeze({ baseUrl: 'https://api.mangabaka.org/v1', minIntervalMs: 500 }),
-    jikan: Object.freeze({ baseUrl: 'https://api.jikan.moe/v4', minIntervalMs: 400 }),           // batas resmi 3 req/dtk
     anilist: Object.freeze({ baseUrl: 'https://graphql.anilist.co', minIntervalMs: 2100 }),     // batas 30 req/menit (mode terdegradasi)
 });
