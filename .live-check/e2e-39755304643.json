@@ -1,0 +1,356 @@
+{
+  "startedAt": "2026-10-22T09:25:39.227Z",
+  "steps": [
+    {
+      "name": "health",
+      "path": "/api/health",
+      "status": 200,
+      "ms": 3,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": true,
+        "source": "kazanime-backend",
+        "errors": [],
+        "sources": [
+          "animexin:unchecked/closed",
+          "samehadaku:unchecked/closed",
+          "anichin:unchecked/closed",
+          "otakudesu:unchecked/closed",
+          "hianime:unchecked/closed"
+        ],
+        "streams": [
+          {
+            "id": "reanime",
+            "name": "ReAnime",
+            "baseUrl": "https://reanime.to",
+            "circuit": "closed",
+            "reason": ""
+          },
+          {
+            "id": "anizone",
+            "name": "AniZone",
+            "baseUrl": "https://anizone.to",
+            "circuit": "closed",
+            "reason": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "latest (semua adapter)",
+      "path": "/api/anime/latest",
+      "status": 200,
+      "ms": 6336,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "samehadaku,hianime",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin memblokir akses bot (Cloudflare) — tidak dipaksa.",
+          "anichin:blocked:anichin memblokir akses bot (Cloudflare) — tidak dipaksa.",
+          "otakudesu:blocked:otakudesu memblokir akses bot (Cloudflare) — tidak diakses."
+        ],
+        "count": 47,
+        "bySource": {
+          "samehadaku": 14,
+          "hianime": 33
+        },
+        "sample": [
+          "samehadaku~kikansha-no-mahou-wa-tokubetsu-desu-season-2 | Kikansha no Mahou wa Tokubetsu desu Season 2 | ep3 | img:y",
+          "hianime~a-returners-magic-should-be-special-season-2~215603 | A Returner’s Magic Should be Special Season 2 | ep3 | img:y",
+          "samehadaku~shin-tennis-no-oujisama-u-17-world-cup-kesshou-member-ketteisen | Shin Tennis no Oujisama: U-17 World Cup – Kesshou Member Ketteisen | ep4 | img:y"
+        ]
+      }
+    },
+    {
+      "name": "search kusuriya",
+      "path": "/api/anime/search?q=Kusuriya%20no%20Hitorigoto",
+      "status": 200,
+      "ms": 3482,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "hianime",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±300 dtk.",
+          "samehadaku:blocked:samehadaku memblokir akses bot (Cloudflare) — tidak dipaksa.",
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±300 dtk.",
+          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1796 dtk."
+        ],
+        "count": 4,
+        "bySource": {
+          "hianime": 4
+        },
+        "sample": [
+          "hianime~the-apothecary-diaries-season-3~215422 | The Apothecary Diaries Season 3 | ep1 | img:y",
+          "hianime~kusuriya-no-hitorigoto-movie~196174 | Kusuriya no Hitorigoto Movie | ep1 | img:y",
+          "hianime~kusuriya-no-hitorigoto-3rd-season-part-2~162169 | Kusuriya no Hitorigoto 3rd Season Part 2 | ep24 | img:y"
+        ]
+      }
+    },
+    {
+      "name": "search renegade",
+      "path": "/api/anime/search?q=Renegade%20Immortal",
+      "status": 200,
+      "ms": 1161,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "hianime",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±297 dtk.",
+          "samehadaku:blocked:samehadaku sedang diistirahatkan (blocked), dicoba lagi ±300 dtk.",
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±297 dtk.",
+          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1793 dtk."
+        ],
+        "count": 2,
+        "bySource": {
+          "hianime": 2
+        },
+        "sample": [
+          "hianime~renegade-immortal~204630 | Renegade Immortal | ep151 | img:y",
+          "hianime~renegade-immortal-battle-of-gods~148569 | Renegade Immortal: Battle of Gods | ep1 | img:y"
+        ]
+      }
+    },
+    {
+      "name": "search cyberpunk",
+      "path": "/api/anime/search?q=Cyberpunk%20Edgerunners",
+      "status": 200,
+      "ms": 1105,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "hianime",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±296 dtk.",
+          "samehadaku:blocked:samehadaku sedang diistirahatkan (blocked), dicoba lagi ±299 dtk.",
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±296 dtk.",
+          "otakudesu:blocked:otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1792 dtk."
+        ],
+        "count": 0,
+        "bySource": {},
+        "sample": []
+      }
+    },
+    {
+      "name": "detail anichin",
+      "path": "/api/anime/anichin~renegade-immortal",
+      "status": 200,
+      "ms": 258,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=120, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "metadata",
+        "fallback": true,
+        "stale": false,
+        "errors": [
+          "anichin:blocked:anichin sedang diistirahatkan (blocked), dicoba lagi ±295 dtk."
+        ],
+        "title": "Renegade Immortal",
+        "slug": "anichin~renegade-immortal",
+        "latestEpisode": null,
+        "image": true
+      }
+    },
+    {
+      "name": "episode anichin 163",
+      "path": "/api/anime/anichin~renegade-immortal/episode/163",
+      "status": 503,
+      "ms": 3,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "SOURCE_BLOCKED: anichin sedang diistirahatkan (blocked), dicoba lagi ±294 dtk."
+      }
+    },
+    {
+      "name": "detail hianime",
+      "path": "/api/anime/hianime~cyberpunk-edgerunners-2",
+      "status": 200,
+      "ms": 1242,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "hianime",
+        "fallback": false,
+        "stale": false,
+        "errors": [],
+        "title": "Cyberpunk: Edgerunners 2",
+        "slug": "hianime~cyberpunk-edgerunners-2~215883",
+        "latestEpisode": 10,
+        "episodeCount": 10,
+        "image": true
+      }
+    },
+    {
+      "name": "episode hianime 1",
+      "path": "/api/anime/hianime~cyberpunk-edgerunners-2/episode/1",
+      "status": 200,
+      "ms": 924,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "hianime",
+        "fallback": false,
+        "stale": false,
+        "errors": [],
+        "servers": [
+          "  Fast en https://hianime.ro/wp-content/themes/hianime-child/player/?source=blogger&url=TDQ0YVNoQmVK",
+          "  mega en https://megaplay.su/embed.php?sid=YlhLTEhIQ2lOdUNRQlpYSUNURXM2dz09"
+        ],
+        "downloads": 0
+      }
+    },
+    {
+      "name": "detail otakudesu",
+      "path": "/api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo",
+      "status": 503,
+      "ms": 256,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "SOURCE_BLOCKED: otakudesu sedang diistirahatkan (blocked), dicoba lagi ±1788 dtk."
+      }
+    },
+    {
+      "name": "schedule",
+      "path": "/api/anime/schedule",
+      "status": 503,
+      "ms": 2,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "SOURCES_UNAVAILABLE: Jadwal rilis tidak tersedia: semua sumber sedang bermasalah."
+      }
+    },
+    {
+      "name": "stream servers One Piece ep1",
+      "path": "/api/stream/servers?ep=1&anilist=21&title=One%20Piece&year=1999",
+      "status": 200,
+      "ms": 4871,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=60",
+      "summary": {
+        "ok": true,
+        "source": "streams",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "reanime:blocked:reanime memblokir akses bot (Cloudflare) — tidak dipaksa.",
+          "anizone:blocked:anizone memblokir akses bot (Cloudflare) — tidak dipaksa."
+        ],
+        "servers": [],
+        "status": {
+          "reanime": "blocked",
+          "anizone": "blocked"
+        }
+      }
+    },
+    {
+      "name": "stream servers Ken Deshita S2 ep3",
+      "path": "/api/stream/servers?ep=3&anilist=159042&title=Reincarnated%20as%20a%20Sword%20Season%202&title=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season&year=2026",
+      "status": 200,
+      "ms": 3,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=60",
+      "summary": {
+        "ok": true,
+        "source": "streams",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "reanime:blocked:reanime sedang diistirahatkan (blocked), dicoba lagi ±180 dtk.",
+          "anizone:blocked:anizone sedang diistirahatkan (blocked), dicoba lagi ±180 dtk."
+        ],
+        "servers": [],
+        "status": {
+          "reanime": "blocked",
+          "anizone": "blocked"
+        }
+      }
+    },
+    {
+      "name": "stream servers tanpa anilist (judul)",
+      "path": "/api/stream/servers?ep=1&title=Frieren%3A%20Beyond%20Journey's%20End&title=Sousou%20no%20Frieren&year=2023",
+      "status": 200,
+      "ms": 2,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=60",
+      "summary": {
+        "ok": true,
+        "source": "streams",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "reanime:blocked:reanime sedang diistirahatkan (blocked), dicoba lagi ±180 dtk.",
+          "anizone:blocked:anizone sedang diistirahatkan (blocked), dicoba lagi ±180 dtk."
+        ],
+        "servers": [],
+        "status": {
+          "reanime": "blocked",
+          "anizone": "blocked"
+        }
+      }
+    },
+    {
+      "name": "health (akhir)",
+      "path": "/api/health",
+      "status": 200,
+      "ms": 1,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": true,
+        "source": "kazanime-backend",
+        "errors": [],
+        "sources": [
+          "animexin:ok/open(blocked)",
+          "samehadaku:ok/open(blocked)",
+          "anichin:ok/open(blocked)",
+          "otakudesu:blocked/open(blocked)",
+          "hianime:ok/closed"
+        ],
+        "streams": [
+          {
+            "id": "reanime",
+            "name": "ReAnime",
+            "baseUrl": "https://reanime.to",
+            "circuit": "open",
+            "reason": "blocked"
+          },
+          {
+            "id": "anizone",
+            "name": "AniZone",
+            "baseUrl": "https://anizone.to",
+            "circuit": "open",
+            "reason": "blocked"
+          }
+        ]
+      }
+    }
+  ],
+  "finishedAt": "2026-10-22T09:25:59.504Z"
+}
