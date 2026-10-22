@@ -1,0 +1,538 @@
+[
+  {
+    "name": "anizone-episode2.html",
+    "url": "https://anizone.to/anime/a1vkn86p/3",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://anizone.to/anime/a1vkn86p/3",
+    "size": 5481,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-pHyogSavAC0hmZBgttsQMs' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment...",
+    "saved": ".live-check/raw2/anizone-episode2.html"
+  },
+  {
+    "name": "anizone-search.bot.0",
+    "url": "https://anizone.to/anime?search=sword",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anizone.to/anime?search=sword",
+    "size": 89028,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "server": "cloudflare",
+      "cache-control": "max-age=0, must-revalidate, no-cache, no-store, private",
+      "x-ratelimit-limit": "60"
+    },
+    "head": "<!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-8\"> <meta name=\"viewport\" content=\"width=",
+    "title": "Anime Index â AniZone",
+    "saved": ".live-check/raw2/anizone-search.bot.0"
+  },
+  {
+    "name": "anizone-search.browser.0",
+    "url": "https://anizone.to/anime?search=sword",
+    "ua": "browser",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://anizone.to/anime?search=sword",
+    "size": 5715,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-9oNTKuTuWQGBgcv3AEEo2L' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment..."
+  },
+  {
+    "name": "anizone-search.bot.1",
+    "url": "https://anizone.to/anime?search=sword",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anizone.to/anime?search=sword",
+    "size": 89028,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "server": "cloudflare",
+      "cache-control": "max-age=0, must-revalidate, no-cache, no-store, private",
+      "x-ratelimit-limit": "60"
+    },
+    "head": "<!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-8\"> <meta name=\"viewport\" content=\"width=",
+    "title": "Anime Index â AniZone"
+  },
+  {
+    "name": "anizone-search.browser.1",
+    "url": "https://anizone.to/anime?search=sword",
+    "ua": "browser",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://anizone.to/anime?search=sword",
+    "size": 5715,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-S9fw5wG0HfaseD6gbHP9wY' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment..."
+  },
+  {
+    "name": "anizone-list.html",
+    "url": "https://anizone.to/anime",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://anizone.to/anime",
+    "size": 5426,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-n7rpLYvs3RiLCyPzyZ41Rc' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment...",
+    "saved": ".live-check/raw2/anizone-list.html"
+  },
+  {
+    "name": "anizone-sitemap.xml",
+    "url": "https://anizone.to/sitemap.xml",
+    "ua": "bot",
+    "sent": {},
+    "status": 404,
+    "finalUrl": "https://anizone.to/sitemap.xml",
+    "size": 7597,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "server": "cloudflare",
+      "cache-control": "no-cache, private"
+    },
+    "head": "<!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-8\"> <meta name=\"viewport\" content=\"width=",
+    "title": "Not Found",
+    "saved": ".live-check/raw2/anizone-sitemap.xml"
+  },
+  {
+    "name": "anizone-anime-other.html",
+    "url": "https://anizone.to/anime/siuvpqmq",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anizone.to/anime/siuvpqmq",
+    "size": 52716,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "server": "cloudflare",
+      "cache-control": "max-age=0, must-revalidate, no-cache, no-store, private",
+      "x-ratelimit-limit": "60"
+    },
+    "head": "<!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-8\"> <meta name=\"viewport\" content=\"width=",
+    "title": "Cyberpunk: Edgerunners II â AniZone",
+    "saved": ".live-check/raw2/anizone-anime-other.html"
+  },
+  {
+    "name": "reanime-flix-159042.bot.0",
+    "url": "https://reanime.to/api/flix/159042/1",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://reanime.to/api/flix/159042/1",
+    "size": 5484,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-Z5ynmEIswUdp1ssWirUkeA' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment...",
+    "saved": ".live-check/raw2/reanime-flix-159042.bot.0"
+  },
+  {
+    "name": "reanime-flix-21.bot.0",
+    "url": "https://reanime.to/api/flix/21/1",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://reanime.to/api/flix/21/1",
+    "size": 644,
+    "headers": {
+      "content-type": "application/json",
+      "content-security-policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+      "server": "cloudflare",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    },
+    "head": "{\"success\":true,\"servers\":[{\"$id\":\"hd1-rtt4nppua1i6-sub\",\"serverName\":\"HD-1\",\"dataLink\":\"https://flixcloud.cc/e/rtt4nppu",
+    "saved": ".live-check/raw2/reanime-flix-21.bot.0"
+  },
+  {
+    "name": "reanime-flix-159042.browser.0",
+    "url": "https://reanime.to/api/flix/159042/1",
+    "ua": "browser",
+    "sent": {
+      "Accept": "application/json"
+    },
+    "status": 403,
+    "finalUrl": "https://reanime.to/api/flix/159042/1",
+    "size": 5654,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-cuoW2dGmCyPUG918kMdM8I' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment..."
+  },
+  {
+    "name": "reanime-flix-159042.bot.1",
+    "url": "https://reanime.to/api/flix/159042/1",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://reanime.to/api/flix/159042/1",
+    "size": 644,
+    "headers": {
+      "content-type": "application/json",
+      "content-security-policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+      "server": "cloudflare",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    },
+    "head": "{\"success\":true,\"servers\":[{\"$id\":\"hd1-lmumbaiq7x0v-sub\",\"serverName\":\"HD-1\",\"dataLink\":\"https://flixcloud.cc/e/lmumbaiq"
+  },
+  {
+    "name": "reanime-flix-21.bot.1",
+    "url": "https://reanime.to/api/flix/21/1",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://reanime.to/api/flix/21/1",
+    "size": 644,
+    "headers": {
+      "content-type": "application/json",
+      "content-security-policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+      "server": "cloudflare",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    },
+    "head": "{\"success\":true,\"servers\":[{\"$id\":\"hd1-rtt4nppua1i6-sub\",\"serverName\":\"HD-1\",\"dataLink\":\"https://flixcloud.cc/e/rtt4nppu"
+  },
+  {
+    "name": "reanime-flix-159042.browser.1",
+    "url": "https://reanime.to/api/flix/159042/1",
+    "ua": "browser",
+    "sent": {
+      "Accept": "application/json"
+    },
+    "status": 403,
+    "finalUrl": "https://reanime.to/api/flix/159042/1",
+    "size": 5654,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-TPo4DaGroWrSvrfvVG3nPL' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment..."
+  },
+  {
+    "name": "reanime-flix-159042.bot.2",
+    "url": "https://reanime.to/api/flix/159042/1",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://reanime.to/api/flix/159042/1",
+    "size": 644,
+    "headers": {
+      "content-type": "application/json",
+      "content-security-policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+      "server": "cloudflare",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    },
+    "head": "{\"success\":true,\"servers\":[{\"$id\":\"hd1-lmumbaiq7x0v-sub\",\"serverName\":\"HD-1\",\"dataLink\":\"https://flixcloud.cc/e/lmumbaiq"
+  },
+  {
+    "name": "reanime-flix-21.bot.2",
+    "url": "https://reanime.to/api/flix/21/1",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://reanime.to/api/flix/21/1",
+    "size": 644,
+    "headers": {
+      "content-type": "application/json",
+      "content-security-policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+      "server": "cloudflare",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    },
+    "head": "{\"success\":true,\"servers\":[{\"$id\":\"hd1-rtt4nppua1i6-sub\",\"serverName\":\"HD-1\",\"dataLink\":\"https://flixcloud.cc/e/rtt4nppu"
+  },
+  {
+    "name": "reanime-flix-159042.browser.2",
+    "url": "https://reanime.to/api/flix/159042/1",
+    "ua": "browser",
+    "sent": {
+      "Accept": "application/json"
+    },
+    "status": 403,
+    "finalUrl": "https://reanime.to/api/flix/159042/1",
+    "size": 5654,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-g56QwP60Ub6i1p43xlVfoO' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment..."
+  },
+  {
+    "name": "reanime-search2.json",
+    "url": "https://reanime.to/api/v1/search?q=one%20piece&limit=3",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://reanime.to/api/v1/search?q=one%20piece&limit=3",
+    "size": 2417,
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "810",
+      "server": "cloudflare",
+      "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    },
+    "head": "{\"limit\":3,\"offset\":0,\"processing_ms\":0,\"query\":\"one piece\",\"results\":[{\"anime_id\":\"one-piece-xamk74\",\"anilist_id\":21,\"t",
+    "saved": ".live-check/raw2/reanime-search2.json"
+  },
+  {
+    "name": "flixcloud-embed.bot",
+    "url": "https://flixcloud.cc/e/lmumbaiq7x0v?v=2",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://flixcloud.cc/e/lmumbaiq7x0v?v=2",
+    "size": 5525,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-B4FkkatlAcSa5SfemwkzIM' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment..."
+  },
+  {
+    "name": "otakudesu-search2.html",
+    "url": "https://otakudesu.blog/?s=kusuriya&post_type=anime",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://otakudesu.blog/?s=kusuriya&post_type=anime",
+    "size": 15269,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "server": "cloudflare"
+    },
+    "head": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd",
+    "title": "You searched for kusuriya | Otaku Desu",
+    "saved": ".live-check/raw2/otakudesu-search2.html"
+  },
+  {
+    "name": "otakudesu-anime.bot.html",
+    "url": "https://otakudesu.blog/anime/kusuriya-hitorigoto-s3-sub-indo/",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://otakudesu.blog/anime/kusuriya-hitorigoto-s3-sub-indo/",
+    "size": 4551,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare",
+      "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0"
+    },
+    "head": "<!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 7]> <html class",
+    "title": "Attention Required! | Cloudflare",
+    "saved": ".live-check/raw2/otakudesu-anime.bot.html"
+  },
+  {
+    "name": "otakudesu-anime.browser.html",
+    "url": "https://otakudesu.blog/anime/kusuriya-hitorigoto-s3-sub-indo/",
+    "ua": "browser",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://otakudesu.blog/anime/kusuriya-hitorigoto-s3-sub-indo/",
+    "size": 4551,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare",
+      "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0"
+    },
+    "head": "<!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 7]> <html class",
+    "title": "Attention Required! | Cloudflare",
+    "saved": ".live-check/raw2/otakudesu-anime.browser.html"
+  },
+  {
+    "name": "otakudesu-feed.xml",
+    "url": "https://otakudesu.blog/feed/",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://otakudesu.blog/feed/",
+    "size": 4551,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare",
+      "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0"
+    },
+    "head": "<!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 7]> <html class",
+    "title": "Attention Required! | Cloudflare",
+    "saved": ".live-check/raw2/otakudesu-feed.xml"
+  },
+  {
+    "name": "otakudesu-wpjson.json",
+    "url": "https://otakudesu.blog/wp-json/wp/v2/posts?per_page=2",
+    "ua": "bot",
+    "sent": {},
+    "status": 401,
+    "finalUrl": "https://otakudesu.blog/wp-json/wp/v2/posts?per_page=2",
+    "size": 108,
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "access-control-expose-headers": "X-WP-Total, X-WP-TotalPages, Link",
+      "server": "cloudflare"
+    },
+    "head": "{\"code\":\"rest_login_required\",\"message\":\"REST API restricted to authenticated users.\",\"data\":{\"status\":401}}",
+    "saved": ".live-check/raw2/otakudesu-wpjson.json"
+  },
+  {
+    "name": "anichin-episode.html",
+    "url": "https://anichin.moe/renegade-immortal-episode-163-subtitle-indonesia/",
+    "ua": "bot",
+    "sent": {},
+    "status": 403,
+    "finalUrl": "https://anichin.moe/renegade-immortal-episode-163-subtitle-indonesia/",
+    "size": 5644,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy": "default-src 'none'; script-src 'nonce-21qArwZh2mZgtcNrKZEaVf' 'unsafe-eval' https://challenges.cloudflare.com; script-src-attr 'none'; style-src 'unsafe-inline'; img-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenge",
+      "cross-origin-resource-policy": "same-origin",
+      "server": "cloudflare",
+      "cf-mitigated": "challenge"
+    },
+    "head": "<!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/htm",
+    "title": "Just a moment...",
+    "saved": ".live-check/raw2/anichin-episode.html"
+  },
+  {
+    "name": "anichin-list2.html",
+    "url": "https://anichin.moe/anime/?status=&type=&order=update",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anichin.moe/anime/?status=&type=&order=update",
+    "size": 215552,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare"
+    },
+    "head": "<!DOCTYPE html><html xmlns=\"https://www.w3.org/1999/xhtml\" lang=\"en-US\" prefix=\"og: https://ogp.me/ns#\"><head profile=\"h",
+    "title": "Series Archive - Anichin"
+  },
+  {
+    "name": "anichin-home.again",
+    "url": "https://anichin.moe/",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anichin.moe/",
+    "size": 206443,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare",
+      "cache-control": "max-age=60"
+    },
+    "head": "<!DOCTYPE html><html xmlns=\"https://www.w3.org/1999/xhtml\" lang=\"en-US\" prefix=\"og: https://ogp.me/ns#\"><head profile=\"h",
+    "title": "Anichin - Nonton Donghua Sub Indo Terbaru"
+  },
+  {
+    "name": "anichin-page2",
+    "url": "https://anichin.moe/page/2/",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anichin.moe/page/2/",
+    "size": 206018,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare"
+    },
+    "head": "<!DOCTYPE html><html xmlns=\"https://www.w3.org/1999/xhtml\" lang=\"en-US\" prefix=\"og: https://ogp.me/ns#\"><head profile=\"h",
+    "title": "Anichin - Nonton Donghua Sub Indo Terbaru"
+  },
+  {
+    "name": "anichin-ongoing.html",
+    "url": "https://anichin.moe/ongoing/",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://anichin.moe/ongoing/",
+    "size": 172011,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN",
+      "server": "cloudflare"
+    },
+    "head": "<!DOCTYPE html><html xmlns=\"https://www.w3.org/1999/xhtml\" lang=\"en-US\" prefix=\"og: https://ogp.me/ns#\"><head profile=\"h",
+    "title": "Ongoing - Anichin"
+  },
+  {
+    "name": "hianime-otakuthemes.json",
+    "url": "https://hianime.ro/wp-json/v1/otakuthemes",
+    "ua": "bot",
+    "sent": {},
+    "status": 200,
+    "finalUrl": "https://hianime.ro/wp-json/v1/otakuthemes",
+    "size": 8127,
+    "headers": {
+      "content-type": "application/json; charset=UTF-8",
+      "content-length": "735",
+      "access-control-expose-headers": "X-WP-Total, X-WP-TotalPages, Link",
+      "server": "cloudflare"
+    },
+    "head": "{\"namespace\":\"v1\\/otakuthemes\",\"routes\":{\"\\/v1\\/otakuthemes\":{\"namespace\":\"v1\\/otakuthemes\",\"methods\":[\"GET\"],\"endpoints",
+    "saved": ".live-check/raw2/hianime-otakuthemes.json"
+  }
+]

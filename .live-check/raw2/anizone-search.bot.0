@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="6FYTXgXVy4t8XbKXINy3JNMzm68QvwpNqqxY2Llx">
+
+        <title>Anime Index — AniZone</title>
+
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="manifest" href="/site.webmanifest">
+
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+        <!-- Scripts -->
+        <link rel="preload" as="style" href="https://anizone.to/build/assets/app-DKzcyrgm.css" /><link rel="preload" as="style" href="https://anizone.to/build/assets/app-BTMyseaN.css" /><link rel="preload" as="style" href="https://anizone.to/build/assets/vidstack-_etrU88d.css" /><link rel="modulepreload" as="script" href="https://anizone.to/build/assets/app-D7l3y0y9.js" /><link rel="modulepreload" as="script" href="https://anizone.to/build/assets/vidstack-B8aDH4fE.js" /><link rel="modulepreload" as="script" href="https://anizone.to/build/assets/vidstack-BGSTndAW-DRhAKVwu.js" /><link rel="stylesheet" href="https://anizone.to/build/assets/app-DKzcyrgm.css" data-navigate-track="reload" /><link rel="stylesheet" href="https://anizone.to/build/assets/app-BTMyseaN.css" data-navigate-track="reload" /><link rel="stylesheet" href="https://anizone.to/build/assets/vidstack-_etrU88d.css" data-navigate-track="reload" /><script type="module" src="https://anizone.to/build/assets/app-D7l3y0y9.js" data-navigate-track="reload"></script><script type="module" src="https://anizone.to/build/assets/vidstack-B8aDH4fE.js" data-navigate-track="reload"></script>            <!-- Livewire Styles --><style >[wire\:loading][wire\:loading], [wire\:loading\.delay][wire\:loading\.delay], [wire\:loading\.inline-block][wire\:loading\.inline-block], [wire\:loading\.inline][wire\:loading\.inline], [wire\:loading\.block][wire\:loading\.block], [wire\:loading\.flex][wire\:loading\.flex], [wire\:loading\.table][wire\:loading\.table], [wire\:loading\.grid][wire\:loading\.grid], [wire\:loading\.inline-flex][wire\:loading\.inline-flex] {display: none;}[wire\:loading\.delay\.none][wire\:loading\.delay\.none], [wire\:loading\.delay\.shortest][wire\:loading\.delay\.shortest], [wire\:loading\.delay\.shorter][wire\:loading\.delay\.shorter], [wire\:loading\.delay\.short][wire\:loading\.delay\.short], [wire\:loading\.delay\.default][wire\:loading\.delay\.default], [wire\:loading\.delay\.long][wire\:loading\.delay\.long], [wire\:loading\.delay\.longer][wire\:loading\.delay\.longer], [wire\:loading\.delay\.longest][wire\:loading\.delay\.longest] {display: none;}[wire\:offline][wire\:offline] {display: none;}[wire\:dirty]:not(textarea):not(input):not(select) {display: none;}:root {--livewire-progress-bar-color: #2299dd;}[x-cloak] {display: none !important;}[wire\:cloak] {display: none !important;}dialog#livewire-error::backdrop {background-color: rgba(0, 0, 0, .6);}</style>
+</head>
+
+    <body class="min-h-screen font-sans antialiased text-slate-300 bg-slate-800">
+                    <nav wire:snapshot="{&quot;data&quot;:{&quot;search&quot;:null},&quot;memo&quot;:{&quot;id&quot;:&quot;hmjl2gvxRypubwn6iYju&quot;,&quot;name&quot;:&quot;layout.navbar&quot;,&quot;path&quot;:&quot;anime&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;en&quot;},&quot;checksum&quot;:&quot;d6b8c7cb69bc53a44d66fd79ea2bf7e85a439da292bca41260ca7eacc919d3ce&quot;}" wire:effects="[]" wire:id="hmjl2gvxRypubwn6iYju" class="md:sticky top-0 z-40 w-full bg-gray-800/50 backdrop-blur-2xl border-gray-700/40 border-b transition-colors duration-300 ease-in-out">
+
+    <div x-data="{ isOpen: false }" class="mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-0">
+        <div class="flex justify-between items-center gap-3 md:grow">
+
+            <div class="flex items-center gap-2">
+                <a href="https://anizone.to" class="p-2.5 rounded-lg hocus:text-white hocus:bg-gray-700/90 focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Home" wire:navigate>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" class="block h-5 w-auto fill-current">
+    <path d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1V472c0 22.1-17.9 40-40 40H456c-1.1 0-2.2 0-3.3-.1c-1.4 .1-2.8 .1-4.2 .1H416 392c-22.1 0-40-17.9-40-40V448 384c0-17.7-14.3-32-32-32H256c-17.7 0-32 14.3-32 32v64 24c0 22.1-17.9 40-40 40H160 128.1c-1.5 0-3-.1-4.5-.2c-1.2 .1-2.4 .2-3.6 .2H104c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9 .1-2.8V287.6H32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7L564.8 231.5c8 7 12 15 11 24z"/>
+</svg>                </a>
+
+                <div class="hidden md:flex gap-2">
+                    <a href="https://anizone.to/anime" class="px-4 py-2 rounded-lg hocus:text-white hocus:bg-gray-700/90 focus:outline-none transition-colors duration-300 ease-in-out text-white bg-rose-500/90" aria-label="Anime Index" wire:navigate>Anime</a>
+
+                    <a href="https://anizone.to/episode" class="px-4 py-2 rounded-lg hocus:text-white hocus:bg-gray-700/90 focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Episode Index" wire:navigate>Episode</a>
+
+                    <a href="https://anizone.to/tag" class="px-4 py-2 rounded-lg hocus:text-white hocus:bg-gray-700/90 focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Tag Index" wire:navigate>Tags</a>
+
+                    <button
+                        type="button"
+                        class="px-4 py-2 rounded-lg hocus:text-white hocus:bg-gray-700/90 focus:outline-none transition-colors duration-300 ease-in-out"
+                        aria-label="Random Anime"
+                        wire:click="randomAnime"
+                    >Random</button>
+                </div>
+            </div>
+
+            <div class="flex flex-row gap-3 grow md:grow-0">
+            <form wire:submit="simpleSearch" class="grow md:grow-0">
+                <input wire:model="search" class="w-full border border-gray-700/40 rounded-full bg-slate-900/30 hocus:bg-slate-900/50 focus:ring-0 transition-colors duration-300 ease-in-out" />
+            </form>
+
+            <a href="https://anizone.to/settings" class="p-2.5 rounded-lg hocus:text-white hocus:bg-gray-700/90 focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Settings" wire:navigate>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="h-5 fill-current">
+    <path d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/>
+</svg>            </a>
+            </div>
+        </div>
+    </div>
+
+</nav>            <div wire:snapshot="{&quot;data&quot;:[],&quot;memo&quot;:{&quot;id&quot;:&quot;ejC8OR4IPbFL8uqDjjSo&quot;,&quot;name&quot;:&quot;layout.navbar-mobile&quot;,&quot;path&quot;:&quot;anime&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;en&quot;},&quot;checksum&quot;:&quot;7ed67ecea0fd84d9f62d17b2da9d404800f861597968be09648313df1bf6f588&quot;}" wire:effects="[]" wire:id="ejC8OR4IPbFL8uqDjjSo" class="w-full bg-gray-800 border-gray-700 border-t bottom-0 fixed z-40 md:hidden">
+    <div class="flex text-center text-sm">
+        <a href="https://anizone.to" class="flex flex-col flex-1 justify-center py-2 gap-1
+            focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Anime Index" wire:navigate>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" class="h-5 fill-current">
+    <path d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1V472c0 22.1-17.9 40-40 40H456c-1.1 0-2.2 0-3.3-.1c-1.4 .1-2.8 .1-4.2 .1H416 392c-22.1 0-40-17.9-40-40V448 384c0-17.7-14.3-32-32-32H256c-17.7 0-32 14.3-32 32v64 24c0 22.1-17.9 40-40 40H160 128.1c-1.5 0-3-.1-4.5-.2c-1.2 .1-2.4 .2-3.6 .2H104c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9 .1-2.8V287.6H32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7L564.8 231.5c8 7 12 15 11 24z"/>
+</svg>            <span>Home</span>
+        </a>
+        <a href="https://anizone.to/anime" class="flex flex-col flex-1 justify-center py-2 gap-1
+            focus:outline-none transition-colors duration-300 ease-in-out text-sky-500/90" aria-label="Anime Index" wire:navigate>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" class="h-5 fill-current">
+    <path d="M64 64V352H576V64H64zM0 64C0 28.7 28.7 0 64 0H576c35.3 0 64 28.7 64 64V352c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64zM128 448H512c17.7 0 32 14.3 32 32s-14.3 32-32 32H128c-17.7 0-32-14.3-32-32s14.3-32 32-32z"/>
+</svg>            <span>Anime</span>
+        </a>
+
+        <a href="https://anizone.to/episode" class="flex flex-col flex-1 justify-center py-2 gap-1
+            focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Episode Index" wire:navigate>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="h-5 fill-current">
+    <path d="M0 96C0 60.7 28.7 32 64 32H448c35.3 0 64 28.7 64 64V416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96zM48 368v32c0 8.8 7.2 16 16 16H96c8.8 0 16-7.2 16-16V368c0-8.8-7.2-16-16-16H64c-8.8 0-16 7.2-16 16zm368-16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16V368c0-8.8-7.2-16-16-16H416zM48 240v32c0 8.8 7.2 16 16 16H96c8.8 0 16-7.2 16-16V240c0-8.8-7.2-16-16-16H64c-8.8 0-16 7.2-16 16zm368-16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16V240c0-8.8-7.2-16-16-16H416zM48 112v32c0 8.8 7.2 16 16 16H96c8.8 0 16-7.2 16-16V112c0-8.8-7.2-16-16-16H64c-8.8 0-16 7.2-16 16zM416 96c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16V112c0-8.8-7.2-16-16-16H416zM160 128v64c0 17.7 14.3 32 32 32H320c17.7 0 32-14.3 32-32V128c0-17.7-14.3-32-32-32H192c-17.7 0-32 14.3-32 32zm32 160c-17.7 0-32 14.3-32 32v64c0 17.7 14.3 32 32 32H320c17.7 0 32-14.3 32-32V320c0-17.7-14.3-32-32-32H192z"/>
+</svg>            <span>Episode</span>
+        </a>
+
+        <a href="https://anizone.to/tag" class="flex flex-col flex-1 justify-center py-2 gap-1
+            focus:outline-none transition-colors duration-300 ease-in-out " aria-label="Tag Index" wire:navigate>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" class="h-5 fill-current">
+    <path d="M74.6 373.2c41.7 36.1 108 82.5 166.1 73.7c6.1-.9 12.1-2.5 18-4.5c-9.2-12.3-17.3-24.4-24.2-35.4c-21.9-35-28.8-75.2-25.9-113.6c-20.6 4.1-39.2 13-54.7 25.4c-6.5 5.2-16.3 1.3-14.8-7c6.4-33.5 33-60.9 68.2-66.3c2.6-.4 5.3-.7 7.9-.8l19.4-131.3c2-13.8 8-32.7 25-45.9C278.2 53.2 310.5 37 363.2 32.2c-.8-.7-1.6-1.4-2.4-2.1C340.6 14.5 288.4-11.5 175.7 5.6S20.5 63 5.7 83.9C0 91.9-.8 102 .6 111.8L24.8 276.1c5.5 37.3 21.5 72.6 49.8 97.2zm87.7-219.6c4.4-3.1 10.8-2 11.8 3.3c.1 .5 .2 1.1 .3 1.6c3.2 21.8-11.6 42-33.1 45.3s-41.5-11.8-44.7-33.5c-.1-.5-.1-1.1-.2-1.6c-.6-5.4 5.2-8.4 10.3-6.7c9 3 18.8 3.9 28.7 2.4s19.1-5.3 26.8-10.8zM261.6 390c29.4 46.9 79.5 110.9 137.6 119.7s124.5-37.5 166.1-73.7c28.3-24.5 44.3-59.8 49.8-97.2l24.2-164.3c1.4-9.8 .6-19.9-5.1-27.9c-14.8-20.9-57.3-61.2-170-78.3S299.4 77.2 279.2 92.8c-7.8 6-11.5 15.4-12.9 25.2L242.1 282.3c-5.5 37.3-.4 75.8 19.6 107.7zM404.5 235.3c-7.7-5.5-16.8-9.3-26.8-10.8s-19.8-.6-28.7 2.4c-5.1 1.7-10.9-1.3-10.3-6.7c.1-.5 .1-1.1 .2-1.6c3.2-21.8 23.2-36.8 44.7-33.5s36.3 23.5 33.1 45.3c-.1 .5-.2 1.1-.3 1.6c-1 5.3-7.4 6.4-11.8 3.3zm136.2 15.5c-1 5.3-7.4 6.4-11.8 3.3c-7.7-5.5-16.8-9.3-26.8-10.8s-19.8-.6-28.7 2.4c-5.1 1.7-10.9-1.3-10.3-6.7c.1-.5 .1-1.1 .2-1.6c3.2-21.8 23.2-36.8 44.7-33.5s36.3 23.5 33.1 45.3c-.1 .5-.2 1.1-.3 1.6zM530 350.2c-19.6 44.7-66.8 72.5-116.8 64.9s-87.1-48.2-93-96.7c-1-8.3 8.9-12.1 15.2-6.7c23.9 20.8 53.6 35.3 87 40.3s66.1 .1 94.9-12.8c7.6-3.4 16 3.2 12.6 10.9z"/>
+</svg>            <span>Tags</span>
+        </a>
+
+        <button
+            type="button"
+            class="items-center flex flex-col flex-1 justify-center py-2 gap-1 focus:outline-none transition-colors duration-300 ease-in-out"
+            aria-label="Random Anime"
+            wire:click="randomAnime"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="h-5 fill-current">
+    <path d="M403.8 34.4c12-5 25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6V160H352c-10.1 0-19.6 4.7-25.6 12.8L284 229.3 244 176l31.2-41.6C293.3 110.2 321.8 96 352 96h32V64c0-12.9 7.8-24.6 19.8-29.6zM164 282.7L204 336l-31.2 41.6C154.7 401.8 126.2 416 96 416H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H96c10.1 0 19.6-4.7 25.6-12.8L164 282.7zm274.6 188c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6V416H352c-30.2 0-58.7-14.2-76.8-38.4L121.6 172.8c-6-8.1-15.5-12.8-25.6-12.8H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H96c30.2 0 58.7 14.2 76.8 38.4L326.4 339.2c6 8.1 15.5 12.8 25.6 12.8h32V320c0-12.9 7.8-24.6 19.8-29.6s25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64z"/>
+</svg>            <span>Random</span>
+        </button>
+    </div>
+</div>        
+        <main class="flex flex-col items-center">
+                            <div class="w-full px-4 mt-8">
+                    <div class="w-full flex justify-center select-none overflow-hidden" 
+     x-data="{ 
+        blocked: false,
+        checkAd() {
+            setTimeout(() => {
+                const slot = this.$refs.slot;
+                if (!slot) return;
+
+                const hasNoChildren = slot.children.length === 0;
+                let elementsHidden = false;
+
+                if (!hasNoChildren) {
+                    elementsHidden = Array.from(slot.children).every(child => {
+                        const style = window.getComputedStyle(child);
+                        return style.display === 'none' || 
+                               style.visibility === 'hidden' || 
+                               child.offsetHeight < 10;
+                    });
+                }
+
+                if (hasNoChildren || elementsHidden) {
+                    this.blocked = true;
+                }
+            }, 2500);
+        }
+     }" 
+     x-init="checkAd()">
+    
+    <div class="relative max-w-[728px] min-h-[90px] w-full">
+        <div x-show="blocked" 
+            x-transition.opacity.duration.500ms
+            x-cloak
+            class="absolute inset-0 flex items-center justify-center bg-gray-700 text-center text-balance text-gray-500 font-semibold border-4 border-dashed border-gray-600 rounded-xl overflow-hidden">
+            <p class="px-4 xs:text-lg sm:text-xl md:text-2xl">
+                We don't use intrusive ads and hope you disable your adblock.
+            </p>
+        </div>
+
+        <div x-ref="slot" class="w-full h-full flex justify-center">
+            <div id="frame" style="width: 728px;margin: auto;z-index: 99998;height: auto">
+          <iframe data-aa='2419912' src='//ad.a-ads.com/2419912/?size=728x90'
+                            style='border:0; padding:0; width:728px; height:90px; overflow:hidden;display: block;margin: auto'></iframe>
+        </div>
+        </div>
+    </div>
+</div>
+                </div>
+            
+            <div wire:snapshot="{&quot;data&quot;:{&quot;title&quot;:&quot;Anime Index&quot;,&quot;search&quot;:&quot;sword&quot;,&quot;sort&quot;:&quot;title-asc&quot;,&quot;type&quot;:&quot;0&quot;,&quot;sortOptions&quot;:[{&quot;title-asc&quot;:&quot;A-Z&quot;,&quot;title-desc&quot;:&quot;Z-A&quot;,&quot;release-asc&quot;:&quot;Earliest Release&quot;,&quot;release-desc&quot;:&quot;Latest Release&quot;,&quot;added-asc&quot;:&quot;First Added&quot;,&quot;added-desc&quot;:&quot;Last Added&quot;},{&quot;s&quot;:&quot;arr&quot;}],&quot;typeOptions&quot;:[[&quot;All&quot;,&quot;Unknown&quot;,&quot;TV Series&quot;,&quot;OVA&quot;,&quot;Movie&quot;,&quot;Other&quot;,&quot;Web&quot;,&quot;TV Special&quot;,&quot;Music Video&quot;],{&quot;s&quot;:&quot;arr&quot;}]},&quot;memo&quot;:{&quot;id&quot;:&quot;vrI7TheFZRrIHgknDNUM&quot;,&quot;name&quot;:&quot;pages.anime-index&quot;,&quot;path&quot;:&quot;anime&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;en&quot;},&quot;checksum&quot;:&quot;d3e3f4188f6832a4461c930318f9337fbc140880eaf24505910223c40db6566b&quot;}" wire:effects="{&quot;url&quot;:{&quot;search&quot;:{&quot;as&quot;:null,&quot;use&quot;:&quot;replace&quot;,&quot;alwaysShow&quot;:false,&quot;except&quot;:&quot;&quot;}}}" wire:id="vrI7TheFZRrIHgknDNUM" 
+    x-data="{
+        items: JSON.parse('[{\u0022slug\u0022:\u002283fwsai2\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/83fwsai2\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/dcdef4b7-cb20-46fa-864a-3c6b5ce6c92d.jpg\u0022,\u0022main_title\u0022:\u0022\\u0022Omae Gotoki ga Maou ni Kateru to Omou na\\u0022 to Yuusha Party o Tsuihou Sareta node, Outo de Kimama ni Kurashitai\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022\\u0022Omae Gotoki ga Maou ni Kateru to Omou na\\u0022 to Yuusha Party o Tsuihou Sareta node, Outo de Kimama ni Kurashitai\u0022,\u00228\u0022:\u0022\\u300c\\u304a\\u524d\\u3054\\u3068\\u304d\\u304c\\u9b54\\u738b\\u306b\\u52dd\\u3066\\u308b\\u3068\\u601d\\u3046\\u306a\\u300d\\u3068\\u52c7\\u8005\\u30d1\\u30fc\\u30c6\\u30a3\\u3092\\u8ffd\\u653e\\u3055\\u308c\\u305f\\u306e\\u3067, \\u738b\\u90fd\\u3067\\u6c17\\u307e\\u307e\\u306b\\u66ae\\u3089\\u3057\\u305f\\u3044\u0022,\u00221\u0022:\u0022Roll Over and Die\u0022,\u002238\u0022:\u0022\\u300c\\u6191\\u59b3\\u4e5f\\u60f3\\u8a0e\\u4f10\\u9b54\\u738b\\uff1f\\u300d\\u88ab\\u52c7\\u8005\\u5c0f\\u968a\\u9010\\u51fa\\u968a\\u4f0d\\uff0c\\u53ea\\u597d\\u5728\\u738b\\u90fd\\u81ea\\u5728\\u904e\\u6d3b\u0022,\u00229\u0022:\u0022\\u300c\\u51ed\\u4f60\\u4e5f\\u60f3\\u8ba8\\u4f10\\u9b54\\u738b\\uff1f\\u300d\\u88ab\\u52c7\\u8005\\u5c0f\\u961f\\u9010\\u51fa\\u961f\\u4f0d\\uff0c\\u53ea\\u597d\\u5728\\u738b\\u90fd\\u81ea\\u5728\\u8fc7\\u6d3b\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2026,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u0022wnvwepjm\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/wnvwepjm\u0022,\u0022name\u0022:\u0022Post-apocalyptic\u0022}]},{\u0022slug\u0022:\u0022vwmtlukn\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/vwmtlukn\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/03c51cb5-44c0-4570-83d6-127cd768dec6.jpg\u0022,\u0022main_title\u0022:\u0022Eien no Aseria\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Eien no Aseria\u0022,\u00228\u0022:\u0022\\u6c38\\u9060\\u306e\\u30a2\\u30bb\\u30ea\\u30a2\u0022,\u00221\u0022:\u0022The Eternal Aseria\u0022,\u00222\u0022:\u0022Aseria l`\\u00e9ternelle\u0022,\u002234\u0022:\u0022\\u0412\\u0435\\u0447\\u043d\\u0430\\u0442\\u0430 \\u0410\\u0441\\u0435\\u0440\\u0438\\u044f\u0022},\u0022type\u0022:\u0022OVA\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2005,\u0022episode_count\u0022:2,\u0022tags\u0022:[{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022nsaugxuc\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/nsaugxuc\u0022,\u0022name\u0022:\u0022Game\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u00225xachdam\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/5xachdam\u0022,\u0022name\u0022:\u0022RPG\u0022},{\u0022slug\u0022:\u0022avffkkpv\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/avffkkpv\u0022,\u0022name\u0022:\u0022Visual Novel\u0022},{\u0022slug\u0022:\u0022ytqg2tya\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/ytqg2tya\u0022,\u0022name\u0022:\u0022Erotic Game\u0022}]},{\u0022slug\u0022:\u0022xlwnrkei\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/xlwnrkei\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/08f60e1b-695e-4d45-9239-5b5d2b6a1bd2.jpg\u0022,\u0022main_title\u0022:\u0022Eiga Black Clover: Mahoutei no Ken\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Eiga Black Clover: Mahoutei no Ken\u0022,\u00228\u0022:\u0022\\u6620\\u753b \\u30d6\\u30e9\\u30c3\\u30af\\u30af\\u30ed\\u30fc\\u30d0\\u30fc \\u9b54\\u6cd5\\u5e1d\\u306e\\u5263\u0022,\u00221\u0022:\u0022Black Clover: Sword of the Wizard King\u0022,\u00222\u0022:\u0022Black Clover : L`\\u00e9p\\u00e9e de l`empereur-mage\u0022,\u002211\u0022:\u0022Black Clover: la spada dell`Imperatore magico\u0022,\u002213\u0022:\u0022Black Clover: La espada del rey mago\u0022,\u00226\u0022:\u0022\\u0427\\u0435\\u0440\\u043d\\u044b\\u0439 \\u043a\\u043b\\u0435\\u0432\\u0435\\u0440: \\u043c\\u0435\\u0447 \\u043a\\u043e\\u0440\\u043e\\u043b\\u044f \\u043c\\u0430\\u0433\\u043e\\u0432\u0022,\u00227\u0022:\u0022\\ube14\\ub799 \\ud074\\ub85c\\ubc84: \\ub9c8\\ubc95\\uc81c\\uc758 \\uac80\u0022,\u00223\u0022:\u0022Black Clover: Sword of the Wizard King\u0022,\u002236\u0022:\u0022\\u0628\\u0644\\u0627\\u0643 \\u0643\\u0644\\u0648\\u0641\\u0631: \\u0633\\u064a\\u0641 \\u0627\\u0644\\u0645\\u0644\\u0643 \\u0627\\u0644\\u0633\\u0627\\u062d\\u0631\u0022,\u002214\u0022:\u0022Black Clover: A Espada do Rei Feiticeiro\u0022,\u002221\u0022:\u0022Black Clover: A Espada do Rei Mago\u0022,\u00224\u0022:\u0022Black Clover: Me\\u010d Kr\\u00e1le \\u010darod\\u011bj\\u016f\u0022,\u002230\u0022:\u0022Black Clover: \\u03a4\\u03bf \\u03a3\\u03c0\\u03b1\\u03b8\\u03af \\u03c4\\u03bf\\u03c5 \\u0392\\u03b1\\u03c3\\u03b9\\u03bb\\u03b9\\u03ac \\u039c\\u03ac\\u03b3\\u03bf\\u03c5\u0022,\u002235\u0022:\u0022\\u05ea\\u05dc\\u05ea\\u05df \\u05e9\\u05d7\\u05d5\\u05e8: \\u05d7\\u05e8\\u05d1\\u05d5 \\u05e9\\u05dc \\u05d4\\u05de\\u05dc\\u05da \\u05d4\\u05de\\u05db\\u05e9\\u05e3\u0022,\u002217\u0022:\u0022Black Clover: A var\\u00e1zsl\\u00f3kir\\u00e1ly kardja\u0022,\u002240\u0022:\u0022\\u0e41\\u0e1a\\u0e25\\u0e47\\u0e04\\u0e42\\u0e04\\u0e25\\u0e40\\u0e27\\u0e2d\\u0e23\\u0e4c: \\u0e14\\u0e32\\u0e1a\\u0e41\\u0e2b\\u0e48\\u0e07\\u0e08\\u0e31\\u0e01\\u0e23\\u0e1e\\u0e23\\u0e23\\u0e14\\u0e34\\u0e40\\u0e27\\u0e17\\u0e21\\u0e19\\u0e15\\u0e23\\u0e4c\u0022,\u002228\u0022:\u0022Black Clover: Sabia Regelui Vr\\u0103jitor\u0022,\u002218\u0022:\u0022Black Clover: Thanh ki\\u1ebfm c\\u1ee7a Ma ph\\u00e1p V\\u01b0\\u01a1ng\u0022,\u002233\u0022:\u0022\\u0427\\u043e\\u0440\\u043d\\u0430 \\u043a\\u043e\\u043d\\u044e\\u0448\\u0438\\u043d\\u0430: \\u041c\\u0435\\u0447 \\u043a\\u043e\\u0440\\u043e\\u043b\\u044f \\u043c\\u0430\\u0433\\u0456\\u0432\u0022,\u002238\u0022:\u0022\\u9ed1\\u8272\\u4e94\\u8449\\u8349\\uff1a\\u9b54\\u6cd5\\u5e1d\\u4e4b\\u528d\u0022,\u00229\u0022:\u0022\\u7535\\u5f71 \\u9ed1\\u8272\\u4e94\\u53f6\\u8349 \\u9b54\\u6cd5\\u5e1d\\u4e4b\\u5251\u0022,\u002241\u0022:\u0022Black Clover: La espada del rey mago\u0022,\u002258\u0022:\u0022Black Clover: \\u091c\\u093e\\u0926\\u0942\\u0917\\u0930 \\u0930\\u093e\\u091c\\u093e \\u0915\\u0940 \\u0924\\u0932\\u0935\\u093e\\u0930\u0022},\u0022type\u0022:\u0022Movie\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2023,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u0022hmi0gccz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/hmi0gccz\u0022,\u0022name\u0022:\u0022Manga\u0022},{\u0022slug\u0022:\u0022fxndqllf\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fxndqllf\u0022,\u0022name\u0022:\u0022Shounen\u0022}]},{\u0022slug\u0022:\u0022my7twpun\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/my7twpun\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/c1660479-5f75-4b15-9112-600c90a23b15.jpg\u0022,\u0022main_title\u0022:\u0022Fight!!\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Fight!!\u0022,\u00228\u0022:\u0022FIGHT!!\u0022,\u00221\u0022:\u0022Fight!! Spirit of the Sword\u0022},\u0022type\u0022:\u0022OVA\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:1993,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u0022hmi0gccz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/hmi0gccz\u0022,\u0022name\u0022:\u0022Manga\u0022},{\u0022slug\u0022:\u0022mve1ktzp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mve1ktzp\u0022,\u0022name\u0022:\u0022Shoujo\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022clb0qvcw\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/clb0qvcw\u0022,\u0022name\u0022:\u0022Contemporary Fantasy\u0022},{\u0022slug\u0022:\u00225fsavmk0\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/5fsavmk0\u0022,\u0022name\u0022:\u0022Bishounen\u0022}]},{\u0022slug\u0022:\u0022ffhbcurl\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/ffhbcurl\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/7c4fc11d-d2ed-4ed3-bb56-bb9b23f7d96e.jpg\u0022,\u0022main_title\u0022:\u0022Gekijouban Sword Art Online: Ordinal Scale\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Gekijouban Sword Art Online: Ordinal Scale\u0022,\u00228\u0022:\u0022\\u5287\\u5834\\u7248 \\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 -\\u30aa\\u30fc\\u30c7\\u30a3\\u30ca\\u30eb\\u30fb\\u30b9\\u30b1\\u30fc\\u30eb-\u0022,\u002239\u0022:\u0022\\u5200\\u528d\\u795e\\u57df\\u5287\\u5834\\u7248\\uff1a\\u5e8f\\u5217\\u722d\\u6230\u0022,\u00221\u0022:\u0022Sword Art Online the Movie: Ordinal Scale\u0022,\u002210\u0022:\u0022Sword Art Online the Movie: Ordinal Scale\u0022,\u00222\u0022:\u0022SWORD ART ONLINE THE MOVIE: Ordinal Scale\u0022,\u002211\u0022:\u0022Sword Art Online the Movie: Ordinal Scale\u0022,\u002235\u0022:\u0022\\u05d0\\u05d5\\u05de\\u05e0\\u05d5\\u05ea \\u05d4\\u05d7\\u05e8\\u05d1 \\u05d0\\u05d5\\u05e0\\u05dc\\u05d9\\u05d9\\u05df \\u05d4\\u05e1\\u05e8\\u05d8: \\u05e1\\u05d5\\u05dc\\u05dd \\u05e1\\u05d9\\u05d3\\u05d5\\u05e8\\u05d9\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df\\u5287\\u5834\\u7248\\uff1a\\u5e8f\\u5217\\u722d\\u6230\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df \\u5e8f\\u5217\\u4e4b\\u4e89\u0022},\u0022type\u0022:\u0022Movie\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2017,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022}]},{\u0022slug\u0022:\u0022rs3tgyqc\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/rs3tgyqc\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/fe93a45a-be70-44bb-8f27-749f306544af.jpg\u0022,\u0022main_title\u0022:\u0022Gekijouban Sword Art Online: Progressive - Hoshinaki Yoru no Aria\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Gekijouban Sword Art Online: Progressive - Hoshinaki Yoru no Aria\u0022,\u00228\u0022:\u0022\\u5287\\u5834\\u7248 \\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 -\\u30d7\\u30ed\\u30b0\\u30ec\\u30c3\\u30b7\\u30d6- \\u661f\\u306a\\u304d\\u591c\\u306e\\u30a2\\u30ea\\u30a2\u0022,\u00221\u0022:\u0022Sword Art Online the Movie: Progressive - Aria of a Starless Night\u0022,\u00229\u0022:\u0022\\u5267\\u573a\\u7248 \\u5200\\u5251\\u795e\\u57df \\u8fdb\\u51fb\\u7bc7 \\u65e0\\u661f\\u4e4b\\u591c\\u7684\\u548f\\u53f9\\u8c03\u0022},\u0022type\u0022:\u0022Movie\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2021,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00228euvyf6d\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/8euvyf6d\u0022,\u0022name\u0022:\u0022Isekai\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022}]},{\u0022slug\u0022:\u0022c7acej8h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/c7acej8h\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/1305e928-7c5b-443e-8aea-a56874f6245a.jpg\u0022,\u0022main_title\u0022:\u0022Gekijouban Sword Art Online: Progressive - Kuraki Yuuyami no Scherzo\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Gekijouban Sword Art Online: Progressive - Kuraki Yuuyami no Scherzo\u0022,\u00228\u0022:\u0022\\u5287\\u5834\\u7248 \\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 -\\u30d7\\u30ed\\u30b0\\u30ec\\u30c3\\u30b7\\u30d6- \\u51a5\\u304d\\u5915\\u95c7\\u306e\\u30b9\\u30b1\\u30eb\\u30c4\\u30a9\u0022,\u00221\u0022:\u0022Sword Art Online the Movie: Progressive - Scherzo of Deep Night\u0022,\u00229\u0022:\u0022\\u5267\\u573a\\u7248 \\u5200\\u5251\\u795e\\u57df \\u8fdb\\u51fb\\u7bc7 \\u9634\\u6c89\\u8584\\u66ae\\u7684\\u8bd9\\u8c10\\u66f2\u0022},\u0022type\u0022:\u0022Movie\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2022,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00228euvyf6d\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/8euvyf6d\u0022,\u0022name\u0022:\u0022Isekai\u0022}]},{\u0022slug\u0022:\u0022knu06ynm\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/knu06ynm\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/8aad667f-3f44-43cc-a5ae-687f4606410e.jpg\u0022,\u0022main_title\u0022:\u0022Kaitouranma The Animation\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Kaitouranma The Animation\u0022,\u00228\u0022:\u0022\\u5feb\\u5200\\u4e71\\u9ebb THE ANIMATION\u0022,\u00221\u0022:\u0022Samurai: Hunt for the Sword\u0022},\u0022type\u0022:\u0022OVA\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:1999,\u0022episode_count\u0022:2,\u0022tags\u0022:[{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022nsaugxuc\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/nsaugxuc\u0022,\u0022name\u0022:\u0022Game\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022qkbhbxwd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/qkbhbxwd\u0022,\u0022name\u0022:\u0022Martial Arts\u0022},{\u0022slug\u0022:\u0022yccspywy\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yccspywy\u0022,\u0022name\u0022:\u0022Samurai\u0022}]},{\u0022slug\u0022:\u00223ib5szlj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/3ib5szlj\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/c171925b-230b-45b3-8b14-a1c2de97db36.jpg\u0022,\u0022main_title\u0022:\u0022Katainaka no Ossan, Kensei ni Naru\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Katainaka no Ossan, Kensei ni Naru\u0022,\u00228\u0022:\u0022\\u7247\\u7530\\u820e\\u306e\\u304a\\u3063\\u3055\\u3093, \\u5263\\u8056\\u306b\\u306a\\u308b\u0022,\u00221\u0022:\u0022From Old Country Bumpkin to Master Swordsman\u0022,\u002238\u0022:\u0022\\u9109\\u4e0b\\u5927\\u53d4\\u6210\\u70ba\\u528d\\u8056\u0022,\u00229\u0022:\u0022\\u4e61\\u4e0b\\u5927\\u53d4\\u6210\\u4e3a\\u5251\\u5723\u0022,\u002210\u0022:\u0022Vom Landei zum Schwertheiligen\u0022,\u00222\u0022:\u0022Beryl: de paysan \\u00e0 ma\\u00eetre d`armes\u0022,\u002211\u0022:\u0022Da campagnolo stagionato a gran maestro di spada\u0022,\u002213\u0022:\u0022De camp esino cuarent\\u00f3n a espadach\\u00edn legendario\u0022,\u00223\u0022:\u0022Wie\\u015bniak mistrzem miecza\u0022,\u002214\u0022:\u0022De Caipira a Mestre Espadachim\u0022,\u002221\u0022:\u0022De Caipira a Mestre Espadachim\u0022,\u002219\u0022:\u0022S\\u0131radan Bir K\\u00f6yl\\u00fc H\\u00fcnerli Bir K\\u0131l\\u0131\\u00e7 Ustas\\u0131 Oluyor\u0022,\u00227\u0022:\u0022\\ucd0c\\uad6c\\uc11d \\uc544\\uc800\\uc528, \\uac80\\uc131\\uc774 \\ub418\\ub2e4\\u202c\u0022,\u002236\u0022:\u0022\\u0645\\u0646 \\u0631\\u064a\\u0641\\u064a \\u0639\\u062c\\u0648\\u0632 \\u0625\\u0644\\u0649 \\u0645\\u0628\\u0627\\u0631\\u0632 \\u0628\\u0627\\u0631\\u0639\\u202c\u0022,\u002240\u0022:\u0022\\u0e1b\\u0e23\\u0e21\\u0e32\\u0e08\\u0e32\\u0e23\\u0e22\\u0e4c\\u0e14\\u0e32\\u0e1a\\u0e0a\\u0e31\\u0e49\\u0e19\\u0e40\\u0e0b\\u0e35\\u0e22\\u0e19\\u0e21\\u0e32\\u0e15\\u0e1a\\u0e40\\u0e01\\u0e23\\u0e35\\u0e22\\u0e19\\u0e16\\u0e36\\u0e07\\u0e40\\u0e21\\u0e37\\u0e2d\\u0e07\\u0e01\\u0e23\\u0e38\\u0e07\\u202c\u0022,\u002245\u0022:\u0022Daripada Orang Kampung Biasa kepada Mahaguru Pedang\\u202c\u0022,\u002246\u0022:\u0022Pria Tua Pedesaan Menjadi Pendekar Pedang Elite\\u202c\u0022,\u002241\u0022:\u0022De viejo pueblerino a gran maestro espadach\\u00edn\u0022,\u002258\u0022:\u0022\\u0938\\u093e\\u092e\\u093e\\u0928\\u094d\\u092f \\u0917\\u094d\\u0930\\u093e\\u092e\\u0935\\u093e\\u0938\\u0940 \\u0938\\u0947 \\u0905\\u095b\\u0940\\u092e \\u0924\\u0932\\u0935\\u093e\\u0930\\u092c\\u093e\\u095b \\u0924\\u0915\\u202c\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2025,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022ikc7cwm5\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/ikc7cwm5\u0022,\u0022name\u0022:\u0022Harem\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022}]},{\u0022slug\u0022:\u0022g47pxv3n\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/g47pxv3n\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/1ce67c4a-4bf4-4606-8f34-a0e78b6c97d0.jpg\u0022,\u0022main_title\u0022:\u0022Katainaka no Ossan, Kensei ni Naru II\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Katainaka no Ossan, Kensei ni Naru II\u0022,\u00228\u0022:\u0022\\u7247\\u7530\\u820e\\u306e\\u304a\\u3063\\u3055\\u3093, \\u5263\\u8056\\u306b\\u306a\\u308bII\u0022,\u002210\u0022:\u0022Vom Landei zum Schwertheiligen II\u0022,\u002213\u0022:\u0022De campesino cuarent\\u00f3n a espadach\\u00edn legendario II\u0022,\u00221\u0022:\u0022From Old Country Bumpkin to Master Swordsman II\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2026,\u0022episode_count\u0022:12,\u0022tags\u0022:[]},{\u0022slug\u0022:\u0022ojcozwm9\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/ojcozwm9\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/de660610-63e9-4363-ba54-ac6df385fdd4.jpg\u0022,\u0022main_title\u0022:\u0022Katanagatari\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Katanagatari\u0022,\u00228\u0022:\u0022\\u5200\\u8a9e\u0022,\u00221\u0022:\u0022Katanagatari\u0022,\u00222\u0022:\u0022Katanagatari\u0022,\u00229\u0022:\u0022\\u5200\\u8bed\u0022,\u00226\u0022:\u0022\\u041a\\u0430\\u0442\\u0430\\u043d\\u0430\\u0441\\u043a\\u0430\\u0437\\u044b\u0022,\u002236\u0022:\u0022\\u0642\\u0635\\u0635 \\u0627\\u0644\\u0633\\u064a\\u0648\\u0641\u0022,\u002234\u0022:\u0022\\u041a\\u0430\\u0442\\u0430\\u043d\\u0430\\u0433\\u0430\\u0442\\u0430\\u0440\\u0438\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2010,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022fqe1dvxj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fqe1dvxj\u0022,\u0022name\u0022:\u0022Romance\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022stbqhivp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/stbqhivp\u0022,\u0022name\u0022:\u0022Adventure\u0022},{\u0022slug\u0022:\u0022eef8ztp5\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/eef8ztp5\u0022,\u0022name\u0022:\u0022NoitaminA\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u0022qkbhbxwd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/qkbhbxwd\u0022,\u0022name\u0022:\u0022Martial Arts\u0022},{\u0022slug\u0022:\u0022dnjyvkk6\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/dnjyvkk6\u0022,\u0022name\u0022:\u0022Tragedy\u0022},{\u0022slug\u0022:\u00224hjo1fp3\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/4hjo1fp3\u0022,\u0022name\u0022:\u0022Angst\u0022}]},{\u0022slug\u0022:\u0022oyeq97ze\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/oyeq97ze\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/98afe040-4131-476b-9986-ebe0b9c74cb1.jpg\u0022,\u0022main_title\u0022:\u0022Ken`yuu Densetsu Yaiba\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Ken`yuu Densetsu Yaiba\u0022,\u00228\u0022:\u0022\\u5263\\u52c7\\u4f1d\\u8aacYAIBA\u0022,\u002239\u0022:\u0022\\u5251\\u52c7\\u4f20\\u8bf4 \\u94c1\\u5203\u0022,\u00223\u0022:\u0022Yaiba - legendarny samuraj\u0022,\u002214\u0022:\u0022Yaiba - O Pequeno Samurai\u0022,\u00221\u0022:\u0022Legendary Brave Swordsman Yaiba\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:1993,\u0022episode_count\u0022:52,\u0022tags\u0022:[{\u0022slug\u0022:\u0022hmi0gccz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/hmi0gccz\u0022,\u0022name\u0022:\u0022Manga\u0022},{\u0022slug\u0022:\u0022bio3ygrp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/bio3ygrp\u0022,\u0022name\u0022:\u0022Comedy\u0022},{\u0022slug\u0022:\u0022v1odvezb\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/v1odvezb\u0022,\u0022name\u0022:\u0022Magic\u0022},{\u0022slug\u0022:\u0022mwma8dlr\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mwma8dlr\u0022,\u0022name\u0022:\u0022Demon\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022stbqhivp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/stbqhivp\u0022,\u0022name\u0022:\u0022Adventure\u0022},{\u0022slug\u0022:\u0022qkbhbxwd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/qkbhbxwd\u0022,\u0022name\u0022:\u0022Martial Arts\u0022}]},{\u0022slug\u0022:\u0022ebmea5qb\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/ebmea5qb\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/ef53ef9c-dbe9-4856-8370-727c4746e244.jpg\u0022,\u0022main_title\u0022:\u0022Kidou Senshi Gundam SEED Destiny: Sorezore no Tsurugi\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Kidou Senshi Gundam SEED Destiny: Sorezore no Tsurugi\u0022,\u00228\u0022:\u0022\\u6a5f\\u52d5\\u6226\\u58eb\\u30ac\\u30f3\\u30c0\\u30e0SEED DESTINY \\u305d\\u308c\\u305e\\u308c\\u306e\\u5263\u0022,\u00221\u0022:\u0022Mobile Suit Gundam SEED DESTINY Special Edition II: Respective Swords\u0022},\u0022type\u0022:\u0022TV Special\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2006,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u0022omoppzuo\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/omoppzuo\u0022,\u0022name\u0022:\u0022New\u0022},{\u0022slug\u0022:\u0022fxndqllf\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fxndqllf\u0022,\u0022name\u0022:\u0022Shounen\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022a3uudun7\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/a3uudun7\u0022,\u0022name\u0022:\u0022Mecha\u0022},{\u0022slug\u0022:\u0022exgu1dbv\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/exgu1dbv\u0022,\u0022name\u0022:\u0022Piloted Robot\u0022},{\u0022slug\u0022:\u0022pvr2yhh2\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/pvr2yhh2\u0022,\u0022name\u0022:\u0022Genetic Modification\u0022}]},{\u0022slug\u0022:\u0022md4zcibj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/md4zcibj\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/82e30676-8f26-40cc-b3ae-5f990a0bf934.jpg\u0022,\u0022main_title\u0022:\u0022Kijin Gentou Shou\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Kijin Gentou Shou\u0022,\u00228\u0022:\u0022\\u9b3c\\u4eba\\u5e7b\\u71c8\\u6284\u0022,\u00221\u0022:\u0022Sword of the Demon Hunter\u0022,\u002210\u0022:\u0022Sword of the Demon Hunter\u0022,\u002238\u0022:\u0022\\u9b3c\\u4eba\\u5e7b\\u71c8\\u6284\u0022,\u00229\u0022:\u0022\\u9b3c\\u4eba \\u5e7b\\u706f\\u6284\u0022,\u002234\u0022:\u0022\\u041c\\u0435\\u0447\\u044a\\u0442 \\u043d\\u0430 \\u041b\\u043e\\u0432\\u0435\\u0446\\u0430 \\u043d\\u0430 \\u0434\\u0435\\u043c\\u043e\\u043d\\u0438\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2025,\u0022episode_count\u0022:24,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022mwma8dlr\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mwma8dlr\u0022,\u0022name\u0022:\u0022Demon\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u0022lcizyh5p\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/lcizyh5p\u0022,\u0022name\u0022:\u0022Super Power\u0022},{\u0022slug\u0022:\u0022yccspywy\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yccspywy\u0022,\u0022name\u0022:\u0022Samurai\u0022}]},{\u0022slug\u0022:\u00229r3gecfz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/9r3gecfz\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/c6adcc4c-0ce0-4934-a73e-58e054e6d946.jpg\u0022,\u0022main_title\u0022:\u0022Kimetsu no Yaiba: Katanakaji no Sato Hen\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Kimetsu no Yaiba: Katanakaji no Sato Hen\u0022,\u00228\u0022:\u0022\\u9b3c\\u6ec5\\u306e\\u5203 \\u5200\\u935b\\u51b6\\u306e\\u91cc\\u7de8\u0022,\u00221\u0022:\u0022Demon Slayer: Swordsmith Village Arc\u0022,\u002210\u0022:\u0022Demon Slayer: Swordsmith Village Arc\u0022,\u00222\u0022:\u0022Demon Slayer: Kimetsu no Yaiba - Le village des forgerons\u0022,\u002213\u0022:\u0022Guardianes de la Noche: Kimetsu no Yaiba -Rumbo a la Aldea de los Herreros-\u0022,\u00226\u0022:\u0022\\u0418\\u0441\\u0442\\u0440\\u0435\\u0431\\u0438\\u0442\\u0435\\u043b\\u044c \\u0434\\u0435\\u043c\\u043e\\u043d\\u043e\\u0432: Kimetsu no Yaiba. \\u0414\\u0435\\u0440\\u0435\\u0432\\u043d\\u044f \\u043a\\u0443\\u0437\\u043d\\u0435\\u0446\\u043e\\u0432\u0022,\u00227\u0022:\u0022\\uadc0\\uba78\\uc758 \\uce7c\\ub0a0: \\ub3c4\\uacf5 \\ub9c8\\uc744\\ud3b8\u0022,\u002240\u0022:\u0022\\u0e14\\u0e32\\u0e1a\\u0e1e\\u0e34\\u0e06\\u0e32\\u0e15\\u0e2d\\u0e2a\\u0e39\\u0e23 \\u0e20\\u0e32\\u0e04\\u0e2b\\u0e21\\u0e39\\u0e48\\u0e1a\\u0e49\\u0e32\\u0e19\\u0e0a\\u0e48\\u0e32\\u0e07\\u0e15\\u0e35\\u0e14\\u0e32\\u0e1a\u0022,\u002218\u0022:\u0022Thanh G\\u01b0\\u01a1m Di\\u1ec7t Qu\\u1ef7: L\\u00e0ng Th\\u1ee3 R\\u00e8n\u0022,\u002238\u0022:\u0022\\u9b3c\\u6ec5\\u4e4b\\u5203 \\u5200\\u5320\\u6751\\u7bc7\u0022,\u00229\u0022:\u0022\\u9b3c\\u706d\\u4e4b\\u5203 \\u5200\\u5320\\u6751\\u7bc7\u0022,\u002241\u0022:\u0022Demon Slayer: Kimetsu no Yaiba Arco de la Aldea de los Herreros\u0022,\u002214\u0022:\u0022Demon Slayer: Kimetsu no Yaiba - Saga da Aldeia dos Ferreiros\u0022,\u002221\u0022:\u0022Demon Slayer: Kimetsu no Yaiba - Arco da Vila dos Ferreiros\u0022,\u002236\u0022:\u0022\\u0642\\u0627\\u062a\\u0644 \\u0627\\u0644\\u0634\\u064a\\u0627\\u0637\\u064a\\u0646: \\u0642\\u0648\\u0633 \\u0642\\u0631\\u064a\\u0629 \\u0627\\u0644\\u062d\\u062f\\u0627\\u062f\\u064a\\u0646\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2023,\u0022episode_count\u0022:11,\u0022tags\u0022:[{\u0022slug\u0022:\u0022hmi0gccz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/hmi0gccz\u0022,\u0022name\u0022:\u0022Manga\u0022},{\u0022slug\u0022:\u0022fxndqllf\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fxndqllf\u0022,\u0022name\u0022:\u0022Shounen\u0022},{\u0022slug\u0022:\u0022mwma8dlr\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mwma8dlr\u0022,\u0022name\u0022:\u0022Demon\u0022},{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u0022mndjjbhv\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mndjjbhv\u0022,\u0022name\u0022:\u0022Historical\u0022},{\u0022slug\u0022:\u0022ctomuegt\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/ctomuegt\u0022,\u0022name\u0022:\u0022Dark Fantasy\u0022}]},{\u0022slug\u0022:\u0022iyulqlud\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/iyulqlud\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/7b6d49fe-d709-49ff-9321-083820d81e43.jpg\u0022,\u0022main_title\u0022:\u0022Seiken Tsukai no World Break\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Seiken Tsukai no World Break\u0022,\u00228\u0022:\u0022\\u8056\\u5263\\u4f7f\\u3044\\u306e\\u7981\\u546a\\u8a60\\u5531\u0022,\u00221\u0022:\u0022World Break: Aria of Curse for a Holy Swordsman\u0022,\u00229\u0022:\u0022\\u5723\\u5251\\u4f7f\\u7684\\u7981\\u5492\\u548f\\u5531\u0022,\u00227\u0022:\u0022\\uc131\\uac80\\uc0ac\\uc758 \\uae08\\uc8fc\\uc601\\ucc3d\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:true,\u0022start_year\u0022:2015,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022v1odvezb\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/v1odvezb\u0022,\u0022name\u0022:\u0022Magic\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022ikc7cwm5\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/ikc7cwm5\u0022,\u0022name\u0022:\u0022Harem\u0022},{\u0022slug\u0022:\u0022n6ta6ma6\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/n6ta6ma6\u0022,\u0022name\u0022:\u0022School Life\u0022},{\u0022slug\u0022:\u0022mkjkmcfb\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mkjkmcfb\u0022,\u0022name\u0022:\u0022Ecchi\u0022},{\u0022slug\u0022:\u0022clb0qvcw\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/clb0qvcw\u0022,\u0022name\u0022:\u0022Contemporary Fantasy\u0022}]},{\u0022slug\u0022:\u00229psusmju\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/9psusmju\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/97974c8a-d4ee-4138-a769-d0bfe8e3c42e.jpg\u0022,\u0022main_title\u0022:\u0022Shuranosuke Zanmaken: Shikamamon no Otoko\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Shuranosuke Zanmaken: Shikamamon no Otoko\u0022,\u00228\u0022:\u0022\\u4fee\\u7f85\\u4e4b\\u4ecb\\u65ac\\u9b54\\u528d \\u6b7b\\u938c\\u7d0b\\u306e\\u7537\u0022,\u00221\u0022:\u0022Sword for Truth\u0022,\u00222\u0022:\u0022L`\\u00e9p\\u00e9e de v\\u00e9rit\\u00e9\u0022,\u00226\u0022:\u0022\\u041c\\u0435\\u0447 \\u043f\\u0440\\u0430\\u0432\\u0434\\u044b\u0022},\u0022type\u0022:\u0022OVA\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:true,\u0022start_year\u0022:1990,\u0022episode_count\u0022:1,\u0022tags\u0022:[{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u0022mndjjbhv\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/mndjjbhv\u0022,\u0022name\u0022:\u0022Historical\u0022},{\u0022slug\u0022:\u0022bmgyz0el\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/bmgyz0el\u0022,\u0022name\u0022:\u0022Thriller\u0022},{\u0022slug\u0022:\u00223ai0uvyz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/3ai0uvyz\u0022,\u0022name\u0022:\u0022Nudity\u0022},{\u0022slug\u0022:\u0022yccspywy\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yccspywy\u0022,\u0022name\u0022:\u0022Samurai\u0022}]},{\u0022slug\u0022:\u0022nloc0nnq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/nloc0nnq\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/fd539374-0d94-448e-ae82-df21bb7a1003.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3\u0022,\u002239\u0022:\u0022\\u5200\\u5251\\u795e\\u57df\u0022,\u00221\u0022:\u0022Sword Art Online\u0022,\u002210\u0022:\u0022Sword Art Online\u0022,\u00222\u0022:\u0022Sword Art Online\u0022,\u00226\u0022:\u0022\\u041c\\u0430\\u0441\\u0442\\u0435\\u0440 \\u043c\\u0435\\u0447\\u0430 \\u043e\\u043d\\u043b\\u0430\\u0439\\u043d\u0022,\u00227\u0022:\u0022\\uc18c\\ub4dc \\uc544\\ud2b8 \\uc628\\ub77c\\uc778\u0022,\u002236\u0022:\u0022\\u0633\\u064a\\u0641 \\u0627\\u0644\\u0646\\u062c\\u0627\\u0629\u0022,\u002235\u0022:\u0022\\u05d0\\u05d5\\u05de\\u05e0\\u05d5\\u05ea \\u05d4\\u05d7\\u05e8\\u05d1 \\u05d0\\u05d5\\u05e0\\u05dc\\u05d9\\u05d9\\u05df\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df\u0022,\u002237\u0022:\u0022\\u0647\\u0646\\u0631 \\u0634\\u0645\\u0634\\u06cc\\u0631 \\u0632\\u0646\\u06cc \\u0622\\u0646\\u0644\\u0627\\u06cc\\u0646\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2012,\u0022episode_count\u0022:25,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00228euvyf6d\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/8euvyf6d\u0022,\u0022name\u0022:\u0022Isekai\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022fqe1dvxj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fqe1dvxj\u0022,\u0022name\u0022:\u0022Romance\u0022},{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022stbqhivp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/stbqhivp\u0022,\u0022name\u0022:\u0022Adventure\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u00224hjo1fp3\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/4hjo1fp3\u0022,\u0022name\u0022:\u0022Angst\u0022},{\u0022slug\u0022:\u0022bmgyz0el\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/bmgyz0el\u0022,\u0022name\u0022:\u0022Thriller\u0022},{\u0022slug\u0022:\u0022yenntr1c\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yenntr1c\u0022,\u0022name\u0022:\u0022High Fantasy\u0022},{\u0022slug\u0022:\u0022pg1utx7b\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/pg1utx7b\u0022,\u0022name\u0022:\u0022Love Polygon\u0022}]},{\u0022slug\u0022:\u0022p74h9nrq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/p74h9nrq\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/f8efa112-dc0e-4b96-b47d-8308acea8af1.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online Alternative: Gun Gale Online\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online Alternative: Gun Gale Online\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 \\u30aa\\u30eb\\u30bf\\u30ca\\u30c6\\u30a3\\u30d6 \\u30ac\\u30f3\\u30b2\\u30a4\\u30eb\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3\u0022,\u00221\u0022:\u0022Sword Art Online Alternative: Gun Gale Online\u0022,\u00227\u0022:\u0022\\uc18c\\ub4dc \\uc544\\ud2b8 \\uc628\\ub77c\\uc778 \\uc5bc\\ud130\\ub108\\ud2f0\\ube0c: \\uac74 \\uac8c\\uc77c \\uc628\\ub77c\\uc778\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df\\u5916\\u50b3 Gun Gale Online\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df\\u5916\\u4f20 Gun Gale Online\u0022,\u002210\u0022:\u0022Sword Art Online: Alternative - Gun Gale Online\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2018,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022nsaugxuc\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/nsaugxuc\u0022,\u0022name\u0022:\u0022Game\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022stbqhivp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/stbqhivp\u0022,\u0022name\u0022:\u0022Adventure\u0022},{\u0022slug\u0022:\u0022cjzmn2v2\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/cjzmn2v2\u0022,\u0022name\u0022:\u0022Gunfights\u0022},{\u0022slug\u0022:\u00222yzevdad\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2yzevdad\u0022,\u0022name\u0022:\u0022Military\u0022},{\u0022slug\u0022:\u0022avxxyb3l\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/avxxyb3l\u0022,\u0022name\u0022:\u0022Action Game\u0022}]},{\u0022slug\u0022:\u0022atijetad\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/atijetad\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/ef0f6be7-2726-4c3d-8e3d-0c751d485347.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online Alternative: Gun Gale Online II\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online Alternative: Gun Gale Online II\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 \\u30aa\\u30eb\\u30bf\\u30ca\\u30c6\\u30a3\\u30d6 \\u30ac\\u30f3\\u30b2\\u30a4\\u30eb\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3II\u0022,\u00221\u0022:\u0022Sword Art Online Alternative: Gun Gale Online II\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df\\u5916\\u50b3 Gun Gale Online II\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df\\u5916\\u4f20 Gun Gale Online \\u7b2c\\u4e8c\\u5b63\u0022,\u002250\u0022:\u0022ggo2\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2024,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022cjzmn2v2\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/cjzmn2v2\u0022,\u0022name\u0022:\u0022Gunfights\u0022},{\u0022slug\u0022:\u00222yzevdad\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2yzevdad\u0022,\u0022name\u0022:\u0022Military\u0022}]},{\u0022slug\u0022:\u0022qjjkugyj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/qjjkugyj\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/438a917c-cbe0-40b1-ae5e-4533378d9b51.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online II\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online II\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3II\u0022,\u00221\u0022:\u0022Sword Art Online II\u0022,\u002210\u0022:\u0022Sword Art Online II\u0022,\u00222\u0022:\u0022Sword Art Online 2: Phantom Bullet\u0022,\u00227\u0022:\u0022\\uc18c\\ub4dc \\uc544\\ud2b8 \\uc628\\ub77c\\uc778 II\u0022,\u002243\u0022:\u0022Sword Art Online II\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df II\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df II\u0022,\u002250\u0022:\u0022\\u05d0\\u05d5\\u05de\\u05e0\\u05d5\\u05ea \\u05d4\\u05d7\\u05e8\\u05d1 \\u05d0\\u05d5\\u05e0\\u05dc\\u05d9\\u05d9\\u05df 2\u0022,\u00226\u0022:\u0022\\u041c\\u0430\\u0441\\u0442\\u0435\\u0440\\u0430 \\u043c\\u0435\\u0447\\u0430 \\u043e\\u043d\\u043b\\u0430\\u0439\\u043d 2\u0022,\u002237\u0022:\u0022\\u0647\\u0646\\u0631 \\u0634\\u0645\\u0634\\u06cc\\u0631 \\u0632\\u0646\\u06cc \\u0622\\u0646\\u0644\\u0627\\u06cc\\u0646 2 : \\u06af\\u0644\\u0648\\u0644\\u0647 \\u0641\\u0627\\u0646\\u062a\\u0648\\u0645\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2014,\u0022episode_count\u0022:24,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022fqe1dvxj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fqe1dvxj\u0022,\u0022name\u0022:\u0022Romance\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022ikc7cwm5\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/ikc7cwm5\u0022,\u0022name\u0022:\u0022Harem\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u0022bez684xg\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/bez684xg\u0022,\u0022name\u0022:\u0022Cyberpunk\u0022}]},{\u0022slug\u0022:\u0022mt0psvcj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/mt0psvcj\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/dfe72366-2381-43a5-8e2e-cfbe11b5d1d5.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online: Alicization\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online: Alicization\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 \\u30a2\\u30ea\\u30b7\\u30bc\\u30fc\\u30b7\\u30e7\\u30f3\u0022,\u00221\u0022:\u0022Sword Art Online Alicization\u0022,\u002210\u0022:\u0022Sword Art Online Alicization\u0022,\u00227\u0022:\u0022\\uc18c\\ub4dc \\uc544\\ud2b8 \\uc628\\ub77c\\uc778: \\uc568\\ub9ac\\uc2dc\\uc81c\\uc774\\uc158\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df Alicization\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df Alicization\\u7bc7\u0022,\u002250\u0022:\u0022Sword Art Online III\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:true,\u0022start_year\u0022:2018,\u0022episode_count\u0022:24,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00228euvyf6d\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/8euvyf6d\u0022,\u0022name\u0022:\u0022Isekai\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022stbqhivp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/stbqhivp\u0022,\u0022name\u0022:\u0022Adventure\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u00224hjo1fp3\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/4hjo1fp3\u0022,\u0022name\u0022:\u0022Angst\u0022},{\u0022slug\u0022:\u0022clb0qvcw\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/clb0qvcw\u0022,\u0022name\u0022:\u0022Contemporary Fantasy\u0022},{\u0022slug\u0022:\u00223ai0uvyz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/3ai0uvyz\u0022,\u0022name\u0022:\u0022Nudity\u0022}]},{\u0022slug\u0022:\u0022hjl7rwog\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/hjl7rwog\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/abde109d-aa74-4754-9059-a5fffabab794.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online: Alicization - War of Underworld\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online: Alicization - War of Underworld\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 \\u30a2\\u30ea\\u30b7\\u30bc\\u30fc\\u30b7\\u30e7\\u30f3 War of Underworld\u0022,\u00221\u0022:\u0022Sword Art Online: Alicization - War of Underworld\u0022,\u00227\u0022:\u0022\\uc18c\\ub4dc \\uc544\\ud2b8 \\uc628\\ub77c\\uc778: \\uc568\\ub9ac\\uc2dc\\uc81c\\uc774\\uc158 - War of Underworld\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df Alicization War of Underworld\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df Alicization\\u7bc7 War of Underworld\u0022,\u002236\u0022:\u0022\\u0641\\u0646 \\u0627\\u0644\\u0633\\u064a\\u0641 \\u0639\\u0644\\u0649 \\u0627\\u0644\\u0625\\u0646\\u062a\\u0631\\u0646\\u062a: \\u0627\\u0644\\u062a\\u0623\\u0644\\u064a\\u0633 - \\u062d\\u0631\\u0628 \\u0627\\u0644\\u0639\\u0627\\u0644\\u0645 \\u0627\\u0644\\u0633\\u0641\\u0644\\u064a\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:true,\u0022start_year\u0022:2019,\u0022episode_count\u0022:12,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00228euvyf6d\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/8euvyf6d\u0022,\u0022name\u0022:\u0022Isekai\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022fqe1dvxj\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/fqe1dvxj\u0022,\u0022name\u0022:\u0022Romance\u0022},{\u0022slug\u0022:\u00227kov4siq\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/7kov4siq\u0022,\u0022name\u0022:\u0022Violence\u0022},{\u0022slug\u0022:\u0022s1ssghb1\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/s1ssghb1\u0022,\u0022name\u0022:\u0022Fantasy\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022xottt75h\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xottt75h\u0022,\u0022name\u0022:\u0022Action\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022stbqhivp\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/stbqhivp\u0022,\u0022name\u0022:\u0022Adventure\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022},{\u0022slug\u0022:\u00224hjo1fp3\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/4hjo1fp3\u0022,\u0022name\u0022:\u0022Angst\u0022},{\u0022slug\u0022:\u0022edjopyrm\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/edjopyrm\u0022,\u0022name\u0022:\u0022Conspiracy\u0022},{\u0022slug\u0022:\u0022clb0qvcw\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/clb0qvcw\u0022,\u0022name\u0022:\u0022Contemporary Fantasy\u0022},{\u0022slug\u0022:\u00223ai0uvyz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/3ai0uvyz\u0022,\u0022name\u0022:\u0022Nudity\u0022},{\u0022slug\u0022:\u0022pg1utx7b\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/pg1utx7b\u0022,\u0022name\u0022:\u0022Love Polygon\u0022}]},{\u0022slug\u0022:\u002291ytc3g6\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/anime\\\/91ytc3g6\u0022,\u0022cover\u0022:\u0022https:\\\/\\\/anizone.to\\\/images\\\/anime\\\/e14edd54-7610-4b9a-bde4-16b3526b75a0.jpg\u0022,\u0022main_title\u0022:\u0022Sword Art Online: Alicization - War of Underworld (2020)\u0022,\u0022title_list\u0022:{\u00225\u0022:\u0022Sword Art Online: Alicization - War of Underworld (2020)\u0022,\u00228\u0022:\u0022\\u30bd\\u30fc\\u30c9\\u30a2\\u30fc\\u30c8\\u30fb\\u30aa\\u30f3\\u30e9\\u30a4\\u30f3 \\u30a2\\u30ea\\u30b7\\u30bc\\u30fc\\u30b7\\u30e7\\u30f3 War of Underworld (2020)\u0022,\u00221\u0022:\u0022Sword Art Online: Alicization - War of Underworld (2020)\u0022,\u00227\u0022:\u0022\\uc18c\\ub4dc \\uc544\\ud2b8 \\uc628\\ub77c\\uc778: \\uc568\\ub9ac\\uc2dc\\uc81c\\uc774\\uc158 - War of Underworld (2020)\u0022,\u002238\u0022:\u0022\\u5200\\u528d\\u795e\\u57df Alicization War of Underworld -THE LAST SEASON-\u0022,\u00229\u0022:\u0022\\u5200\\u5251\\u795e\\u57df Alicization War of Underworld \\u540e\\u534a\\u90e8\u0022,\u002250\u0022:\u0022Sword Art Online: Alicization - War of Underworld - The Last Season\u0022,\u002236\u0022:\u0022\\u0641\\u0646 \\u0627\\u0644\\u0633\\u064a\\u0641 \\u0639\\u0644\\u0649 \\u0627\\u0644\\u0625\\u0646\\u062a\\u0631\\u0646\\u062a: \\u0627\\u0644\\u062a\\u0623\\u0644\\u064a\\u0633 - \\u062d\\u0631\\u0628 \\u0627\\u0644\\u0639\\u0627\\u0644\\u0645 \\u0627\\u0644\\u0633\\u0641\\u0644\\u064a (2020)\u0022},\u0022type\u0022:\u0022TV Series\u0022,\u0022is_ongoing\u0022:false,\u0022is_unsafe\u0022:false,\u0022start_year\u0022:2020,\u0022episode_count\u0022:11,\u0022tags\u0022:[{\u0022slug\u0022:\u00222ch5lzak\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/2ch5lzak\u0022,\u0022name\u0022:\u0022Novel\u0022},{\u0022slug\u0022:\u00228euvyf6d\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/8euvyf6d\u0022,\u0022name\u0022:\u0022Isekai\u0022},{\u0022slug\u0022:\u0022xerwtqaz\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/xerwtqaz\u0022,\u0022name\u0022:\u0022Science Fiction\u0022},{\u0022slug\u0022:\u0022tzgxn5ic\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/tzgxn5ic\u0022,\u0022name\u0022:\u0022Seinen\u0022},{\u0022slug\u0022:\u0022yxpb0efa\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/yxpb0efa\u0022,\u0022name\u0022:\u0022Virtual World\u0022},{\u0022slug\u0022:\u0022acttdztd\u0022,\u0022url\u0022:\u0022http:\\\/\\\/anizone.to\\\/tag\\\/acttdztd\u0022,\u0022name\u0022:\u0022Swordplay\u0022}]}]'),
+        nextCursor: 'eyJtYWluX3RpdGxlIjoiU3dvcmQgQXJ0IE9ubGluZTogQWxpY2l6YXRpb24gLSBXYXIgb2YgVW5kZXJ3b3JsZCAoMjAyMCkiLCJhbmltZS5zbHVnIjoiOTF5dGMzZzYiLCJfcG9pbnRzVG9OZXh0SXRlbXMiOnRydWV9',
+        hasMore: true,
+        loading: false,
+        view: 'list',
+
+        get activeGridItems() {
+            return this.view === 'grid' ? this.items : [];
+        },
+
+        get activeListItems() {
+            return this.view === 'list' ? this.items : [];
+        },
+
+        init() {
+            const match = document.cookie.match(/(?:^|; )anime-view=([^;]*)/);
+            if (match) {
+                this.view = decodeURIComponent(match[1]);
+            }
+        },
+
+        setView(newView) {
+            this.view = newView;
+            document.cookie = `anime-view=${newView}; path=/; max-age=31536000; SameSite=Lax`;
+        },
+
+        getTitle(anime) {
+            return window.getTitle(anime.title_list, anime.main_title);
+        },
+
+        isBlurred(anime) {
+            return anime.is_unsafe && (window.getUnsafeState?.().blur ?? false);
+        },
+
+        loadMore() {
+            if (this.loading || !this.hasMore || !this.nextCursor) return;
+            this.loading = true;
+            $wire.loadPage(this.nextCursor);
+        }
+    }"
+    @items-loaded.window="
+        if ($event.detail.items && $event.detail.items.length) {
+            items.push(...$event.detail.items);
+        }
+        nextCursor = $event.detail.nextCursor;
+        hasMore = $event.detail.hasMore;
+        loading = false;
+    "
+    @filters-reset.window="
+        items.splice(0, items.length, ...$event.detail.items);
+        nextCursor = $event.detail.nextCursor;
+        hasMore = $event.detail.hasMore;
+        loading = false;
+    "
+    class="w-full lg:container pb-[109px] md:pb-12 pt-12 px-4 space-y-12"
+>
+    <div class="space-y-4">
+        <h1 class="text-xl xs:text-2xl md:text-3xl text-center lg:text-start text-slate-100">Anime Index</h1>
+
+        <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between mb-4 gap-3">
+
+    
+    <div class="w-full lg:w-96 flex flex-col gap-1">
+        <input
+            wire:model.live.debounce.500="search"
+            class="w-full rounded-lg bg-slate-900 border border-slate-700 placeholder:text-slate-200/50 focus:outline-none focus:ring-0 px-4 py-2.5"
+            placeholder="Search Title"
+        />
+        <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->    </div>
+
+    
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4" role="group">
+
+        
+        <div class="grid grid-cols-2 sm:flex items-center gap-2 sm:gap-4 grow sm:grow-0">
+            <!--[if BLOCK]><![endif]-->                <div class="w-full">
+                    <select wire:model.live="type" class="w-full sm:w-auto rounded-lg bg-slate-900 border border-slate-700 focus:outline-none focus:ring-0 pl-4 pr-9 py-2.5">
+<!--[if BLOCK]><![endif]-->    <option value="0">All</option>
+    <option value="1">Unknown</option>
+    <option value="2">TV Series</option>
+    <option value="3">OVA</option>
+    <option value="4">Movie</option>
+    <option value="5">Other</option>
+    <option value="6">Web</option>
+    <option value="7">TV Special</option>
+    <option value="8">Music Video</option>
+<!--[if ENDBLOCK]><![endif]-->
+</select>
+                </div>
+            <!--[if ENDBLOCK]><![endif]-->
+            <!--[if BLOCK]><![endif]-->                <div class="w-full">
+                    <select wire:model.live="sort" class="w-full sm:w-auto rounded-lg bg-slate-900 border border-slate-700 focus:outline-none focus:ring-0 pl-4 pr-9 py-2.5">
+<!--[if BLOCK]><![endif]-->    <option value="title-asc">A-Z</option>
+    <option value="title-desc">Z-A</option>
+    <option value="release-asc">Earliest Release</option>
+    <option value="release-desc">Latest Release</option>
+    <option value="added-asc">First Added</option>
+    <option value="added-desc">Last Added</option>
+<!--[if ENDBLOCK]><![endif]-->
+</select>
+                </div>
+            <!--[if ENDBLOCK]><![endif]-->        </div>
+
+        
+        <div wire:ignore class="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-700 shrink-0 ml-auto lg:ml-0">
+            <button 
+                type="button"
+                @click="setView('list')"
+                :class="view === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'"
+                class="p-2 rounded-md transition-colors"
+                aria-label="List View"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-5 h-5" fill="currentColor">
+    <path d="M40 48C26.7 48 16 58.7 16 72v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V72c0-13.3-10.7-24-24-24H40zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zM16 232v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V232c0-13.3-10.7-24-24-24H40c-13.3 0-24 10.7-24 24zM40 368c-13.3 0-24 10.7-24 24v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V392c0-13.3-10.7-24-24-24H40z"/>
+</svg>            </button>
+
+            <button 
+                type="button"
+                @click="setView('grid')"
+                :class="view === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'"
+                class="p-2 rounded-md transition-colors"
+                aria-label="Grid View"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor">
+    <path fill-rule="evenodd" d="M3 6a3 3 0 0 1 3-3h2.25a3 3 0 0 1 3 3v2.25a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm9.75 0a3 3 0 0 1 3-3H18a3 3 0 0 1 3 3v2.25a3 3 0 0 1-3 3h-2.25a3 3 0 0 1-3-3V6ZM3 15.75a3 3 0 0 1 3-3h2.25a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-2.25Zm9.75 0a3 3 0 0 1 3-3H18a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3h-2.25a3 3 0 0 1-3-3v-2.25Z" clip-rule="evenodd" />
+</svg>
+              </button>
+        </div>
+
+    </div>
+
+</div>
+        <div 
+            x-show="window.getUnsafeState?.()?.blur"
+            x-cloak
+            class="max-w-xl flex justify-center mx-auto"
+        >
+            <div class="w-full text-white text-center bg-rose-600/90 p-4 py-3 border border-rose-500/90 rounded-md">
+                Safesearch filter is active. You can disable it in the 
+                <a href="https://anizone.to/settings" wire:navigate class="text-white font-bold underline">Settings</a> page.
+            </div>
+        </div>
+
+        
+        <div wire:ignore>
+            
+            <div x-show="view === 'grid'">
+                <ul x-show="items.length > 0" class="grid grid-cols-2 xs:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-8 list-none">
+                    <template x-for="anime in activeGridItems" :key="'grid-' + anime.slug">
+                        <li 
+    x-data="{ inView: false, loaded: false }"
+    class="space-y-3 pb-6"
+>
+    
+    <div class="relative block aspect-[5/7] overflow-hidden drop-shadow-lg rounded-lg bg-gray-700">
+        <a
+            wire:navigate
+            :href="anime.url"
+            x-intersect.margin.200px.once="inView = true"
+            class="block w-full h-full"
+        >
+            <template x-if="inView">
+                <img
+                    :src="anime.cover"
+                    :alt="getTitle(anime)"
+                    @load="loaded = true"
+                    :class="{ 
+                        'blur-md': isBlurred(anime),
+                        'opacity-0': !loaded,
+                        'opacity-100': loaded 
+                    }"
+                    class="absolute object-cover h-full w-full transition-opacity duration-300 ease-in-out"
+                />
+            </template>
+        </a>
+    </div>
+
+    
+    <div class="space-y-3">
+        <div class="line-clamp-2">
+            <a
+                wire:navigate
+                :href="anime.url"
+                :title="getTitle(anime)"
+                class="text-white hocus:text-amber-300 focus:outline-none focus:ring-0 transition-colors duration-300 ease-in-out"
+            >
+                <span x-text="getTitle(anime)"></span>
+            </a>
+        </div>
+
+        <div class="flex flex-row text-xs pb-6 text-center">
+            <span class="inline-block not-first:before:mx-1 not-first:before:content-['•']" x-text="anime.type"></span>
+            <span class="inline-block not-first:before:mx-1 not-first:before:content-['•']" x-text="anime.is_ongoing ? 'Ongoing' : 'Completed'"></span>
+        </div>
+    </div>
+</li>                    </template>
+                </ul>
+            </div>
+
+            
+            <div x-show="view === 'list'">
+                <ul x-show="items.length > 0" class="grid grid-cols-1 2xl:grid-cols-2 gap-4 list-none">
+                    <template x-for="anime in activeListItems" :key="'list-' + anime.slug">
+                        <li 
+    x-data="{ inView: false, loaded: false }"
+    class="relative overflow-hidden h-26 rounded-lg px-4 py-3 bg-slate-900 drop-shadow-lg"
+>
+    
+    <template x-if="!isBlurred(anime)">
+        <div 
+            x-intersect.margin.200px.once="inView = true"
+            class="absolute -inset-y-0 -right-0 w-80"
+        >
+            <template x-if="inView">
+                <img
+                    :src="anime.cover"
+                    :alt="getTitle(anime)"
+                    @load="loaded = true"
+                    :class="loaded ? 'opacity-25' : 'opacity-0'"
+                    class="absolute w-full h-full object-cover bg-slate-700 transition-opacity duration-300 ease-in-out"
+                />
+            </template>
+            <div class="absolute right-0 w-full h-full bg-gradient-to-l from-transparent to-slate-900"></div>
+        </div>
+    </template>
+
+    
+    <div class="relative flex flex-col gap-2">
+        <div class="h-6 inline truncate">
+            <a
+                wire:navigate
+                :href="anime.url"
+                :title="getTitle(anime)"
+                class="text-white inline hocus:text-amber-300 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-0"
+            >
+                <span x-text="getTitle(anime)"></span>
+            </a>
+        </div>
+
+        <div class="inline text-xs h-4 line-clamp-1">
+            <span class="not-last:after:mx-1 not-last:after:content-['•']" x-text="anime.type"></span>
+
+            <template x-if="anime.start_year">
+                <span class="not-last:after:mx-1 not-last:after:content-['•']" x-text="anime.start_year"></span>
+            </template>
+
+            <template x-if="anime.episode_count">
+                <span class="not-last:after:mx-1 not-last:after:content-['•']" x-text="`${anime.episode_count} Eps`"></span>
+            </template>
+
+            <span class="not-last:after:mx-1 not-last:after:content-['•']" x-text="anime.is_ongoing ? 'Ongoing' : 'Completed'"></span>
+        </div>
+
+        <template x-if="anime.tags && anime.tags.length">
+            <div class="flex flex-wrap gap-2 line-clamp-1 h-6">
+                <template x-for="tag in anime.tags" :key="tag.slug">
+                    <a
+                        wire:navigate
+                        :href="tag.url"
+                        :title="tag.name"
+                        x-text="tag.name"
+                        class="px-2 py-1 rounded-full text-xs text-white bg-gray-600 hocus:bg-emerald-600 focus:outline-none transition-colors duration-300 ease-in-out"
+                    ></a>
+                </template>
+            </div>
+        </template>
+    </div>
+</li>                    </template>
+                </ul>
+            </div>
+        </div>
+
+        
+        <div x-show="items.length === 0" x-cloak class="max-w-xl flex justify-center mx-auto">
+            <div class="w-full text-center bg-sky-600 p-4 py-3 border border-sky-500 rounded-md">Nothing found.</div>
+        </div>
+    </div>
+
+    <div x-show="loading" class="w-full">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="fill-current h-12 w-12 mx-auto animate-spin">
+    <path d="M304 48a48 48 0 1 0 -96 0 48 48 0 1 0 96 0zm0 416a48 48 0 1 0 -96 0 48 48 0 1 0 96 0zM48 304a48 48 0 1 0 0-96 48 48 0 1 0 0 96zm464-48a48 48 0 1 0 -96 0 48 48 0 1 0 96 0zM142.9 437A48 48 0 1 0 75 369.1 48 48 0 1 0 142.9 437zm0-294.2A48 48 0 1 0 75 75a48 48 0 1 0 67.9 67.9zM369.1 437A48 48 0 1 0 437 369.1 48 48 0 1 0 369.1 437z"/>
+</svg>    </div>
+
+    <div
+        x-show="hasMore && !loading"
+        class="h-12"
+        x-intersect="loadMore()"
+    ></div>
+</div>
+        </div>
+    <script src="/livewire/livewire.min.js?id=42cd7fd5"   data-csrf="6FYTXgXVy4t8XbKXINy3JNMzm68QvwpNqqxY2Llx" data-update-uri="/livewire/update" data-navigate-once="true"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4e745849c098bef',t:'MTc5MjY1OTIwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
