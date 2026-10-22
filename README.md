@@ -446,14 +446,14 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 |---|---|
 | robots.txt | RFC 9309: grup `KazanimeBot` (atau `*`), kecocokan terpanjang, `*` & `$`, `Crawl-delay`. 4xx = boleh, 5xx/jaringan = dilarang sementara, halaman blokir Cloudflare = **blocked**. Di-cache 6 jam |
 | ToS | Hasil peninjauan per sumber di `POLICY.tos` adapter (`allowed` / `unknown` / `forbidden`). `forbidden` → adapter tidak pernah dipanggil. `unknown` → hanya diakses bila robots.txt **terbaca dan mengizinkan** |
-| User-Agent | `KazanimeBot/1.0 (+https://<domain>/api/bot; <BOT_CONTACT>)`. Sejak 22 Okt 2026 menyamar *diizinkan* pemilik proyek (opsi `headers` per sumber), tetapi tidak dipakai: diukur, UA Chrome palsu justru **lebih sering** di-challenge Cloudflare daripada UA jujur |
+| User-Agent | `KazanimeBot/1.0 (+https://<domain>/api/bot; <BOT_CONTACT>)` yang deskriptif; tidak meniru browser. Opsi `headers` hanya untuk kebutuhan protokol terdokumentasi (mis. Origin/Referer media), bukan fingerprint spoofing |
 | Rate limit keluar | maks 1 request/detik per host (Crawl-delay bisa memperbesar), antrean > 6 dtk ditolak |
 | Rate limit masuk | 60 request/menit per IP untuk `/api/anime/*` (header `RateLimit-*`) |
 | Cache | memori per instance: latest 10 mnt, search/detail/episode 15 mnt, dedupe request identik, stale-if-error 1 jam; CDN Vercel `s-maxage` |
 | Timeout & retry | 6 dtk per request; retry 1× hanya untuk error jaringan & 5xx (bukan 4xx/timeout); batas total 10 dtk per request API |
-| Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; diblokir → 30 mnt (5 mnt untuk sumber yang challenge-nya terbukti acak: AnimeXin, Samehadaku, Anichin, hianime.ro; 3 mnt untuk ReAnime/AniZone); 429 → sesuai `Retry-After` |
+| Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; AniZone & Samehadaku: challenge halaman konten → tanpa retry, cooldown 30 mnt; sumber lain mengikuti konfigurasi retry/cooldown masing-masing; 429 → sesuai `Retry-After` |
 | Anti-SSRF | hanya host milik sumber (+ sufiks CDN media AniZone `xin-cdn.xyz`); redirect ke host lain tidak diikuti; respons > 3 MB ditolak (segmen video maks 40 MB) |
-| Proteksi bot | **22 Okt 2026 — keputusan pemilik proyek: larangan spoof header & proxy dicabut.** Yang dipakai: proxy HLS AniZone (CDN-nya tidak memeriksa Referer — diukur — tetapi CORS dikunci ke anizone.to) dan pengulangan maks 2× untuk challenge yang terbukti acak. Tetap **tanpa** solver CAPTCHA/challenge & tanpa dekripsi player (embed ReAnime/flixcloud dipasang apa adanya) |
+| Proteksi bot | Tidak memakai fingerprint browser atau solver challenge. Setelah baseline GitHub Actions terbaru, halaman AniZone & Samehadaku yang mendapat challenge tidak diulang: circuit dibuka 30 menit, lalu sumber/fallback lain dipakai. Proxy media AniZone tetap dibatasi URL bertanda tangan + allowlist host |
 | Gemini (subtitle AI) | API resmi ber-key (header `x-goog-api-key`, bukan di URL); robots.txt tidak berlaku. Hanya subtitle yang ditawarkan `/servers` (URL bertanda tangan) yang bisa diterjemahkan → key tidak bisa dipakai pihak lain sebagai penerjemah gratis. Rate limit 20/menit/IP untuk request yang lolos cache CDN |
 | Proxy stream | `/api/stream/hls` hanya meneruskan URL yang ditandatangani server ini (HMAC, `STREAM_SECRET`) dan host media di allowlist → bukan open proxy. Rate limit terpisah 900/menit/IP. **Memakai bandwidth Vercel** (±300–700 MB per episode 720p di Chrome/Firefox; Safari/iOS memutar langsung dari CDN) |
 | Gambar | poster animexin dilindungi hotlink (403 + `Cross-Origin-Resource-Policy: same-origin`) → diganti poster **Kitsu** → **Bangumi** (judul Mandarin) → **MangaBaka**, hanya bila judul cocok persis (maks 2,5 dtk; sisanya dicari di belakang & respons diberi cache CDN 60 dtk). Poster Samehadaku boleh ditampilkan langsung. Tidak ada proxy gambar |
@@ -465,10 +465,10 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Sumber | Status | Catatan |
 |---|---|---|
 | **AnimeXin** | ✅ aktif, diverifikasi live | robots.txt mengizinkan semua; tidak ada ToS (DMCA & Privacy Policy tanpa larangan bot). Latest = beranda + `/anime/?order=update` (2 request, slug asli digabung lewat ID seri). 16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, Mega, …) + link download Sub Indo/English |
-| **Samehadaku** | ✅ aktif, diverifikasi live | Pengganti Kuramanime. robots.txt hanya melarang `/wp-admin/`; tidak ada ToS/DMCA tertaut → `unknown` (diakses hanya selama robots.txt terbaca & mengizinkan). Anime terbaru, pencarian, detail (judul Inggris, skor, musim, studio, daftar episode), 4 server Sub Indo per episode, link download, jadwal rilis WIB |
+| **Samehadaku** | 🟡 adapter & fixture teruji; baseline terbaru homepage di-challenge | robots.txt hanya melarang `/wp-admin/`; ToS tidak tertaut → `unknown` (konten hanya diakses bila robots.txt terbaca & mengizinkan). Adapter menyediakan anime terbaru, pencarian, detail, server Sub Indo, unduhan, dan jadwal; bila challenge, cooldown 30 mnt dan fallback dipakai |
 | **Anichin** | 🟡 aktif, parser diverifikasi dgn HTML asli | (22 Okt 2026) robots.txt mengizinkan (kecuali /wp-admin/); tema AnimeStream (parser AnimeXin). Dari IP pusat data: request kadang lolos, kadang challenge Cloudflare (beranda & halaman episode paling sering) |
 | **hianime.ro** | ✅ aktif, diverifikasi live | (22 Okt 2026) robots.txt hanya melarang /wp-admin/; tanpa Cloudflare challenge. Recently Updated, pencarian, detail, daftar episode & server lewat REST `wp-json/v1/otakuthemes` — server "Fast" & "mega" (Sub English) |
-| **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data (UA jujur maupun UA browser); hanya pencarian yang lolos. Sumber ditandai *blocked*, tanpa data palsu. Bisa bekerja bila deployment memakai proxy keluar (lihat env `NODE_USE_ENV_PROXY`) |
+| **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Sumber ditandai *blocked*, tanpa data palsu; gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
 | **ReAnime** (penyedia stream) | 🟡 parser diverifikasi dgn JSON asli | (22 Okt 2026) robots.txt mengizinkan semua; `/api/flix/<id AniList>/<ep>` publik. Dari IP pusat data sering di-challenge Cloudflare |
 | **AniZone** (penyedia stream) | 🟡 parser & proxy diverifikasi dgn data asli | (22 Okt 2026) robots.txt mengizinkan semua. Halaman episode → HLS + 17 subtitle (termasuk Indonesia). CDN video 200/206 tanpa Referer; halaman & berkas subtitle sering di-challenge dari IP pusat data |
 | ~~Kuramanime~~ | ❌ dihapus | Semua URL termasuk `robots.txt` → Cloudflare 403 untuk bot ini (dicek ulang 22 Okt 2026) + player bertoken anti-bot → adapter dihapus (bisa diambil dari `kazanime-tahap-d.zip` bila suatu saat situsnya mengizinkan bot) |
@@ -487,8 +487,9 @@ Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RAT
 `ANIZONE_MEDIA_HOSTS`, `REANIME_EMBED_HOSTS`. Subtitle AI (Tahap F): **`GEMINI_API_KEY`** (kosong = fitur mati),
 `GEMINI_MODEL` (default `gemini-3.6-flash`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`; `none` = tanpa
 cadangan), `AI_SUBTITLES=0` (matikan walau key ada), `AI_SUBTITLE_PART_LINES` / `AI_SUBTITLE_PART_CHARS` /
-`AI_SUBTITLE_TIMEOUT_MS` / `AI_SUBTITLE_RATE_LIMIT_PER_MIN`. Proxy keluar (mis. untuk Otakudesu): Node ≥ 22.21 mendukung
-`NODE_USE_ENV_PROXY=1` + `HTTPS_PROXY=http://user:pass@host:port`. Lokal: `node --env-file=.env server/index.js`.
+`AI_SUBTITLE_TIMEOUT_MS` / `AI_SUBTITLE_RATE_LIMIT_PER_MIN`. Proxy keluar hanya untuk jalur egress yang diizinkan operator
+sumber/infrastruktur (bukan untuk menghindari challenge); Node ≥ 22.21 mendukung `NODE_USE_ENV_PROXY=1` +
+`HTTPS_PROXY=http://user:pass@host:port`. Lokal: `node --env-file=.env server/index.js`.
 
 ### Menambah / mengganti sumber
 1. Buat `server/sources/<nama>.js` → factory `create<Nama>({ network, createClient, baseUrl })` yang
@@ -500,7 +501,7 @@ cadangan), `AI_SUBTITLES=0` (matikan walau key ada), `AI_SUBTITLE_PART_LINES` / 
 
 ### Tes
 ```bash
-npm test                          # 167 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
+npm test                          # 174 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
                                   # acak, stream biner), parser animexin/samehadaku/anichin/hianime/otakudesu (fixture asli;
                                   # Otakudesu anime/episode = rekonstruksi struktur), ReAnime & AniZone (JSON/HTML asli),
                                   # proxy HLS (playlist asli, Range, tanda tangan), ASS/SRT → VTT, jadwal, metadata, routes,
@@ -513,11 +514,21 @@ npm run check:sources -- --live   # uji langsung ke situs sumber (±5 request pe
 Diukur dari runner GitHub Actions (IP pusat data, mirip Vercel): **hianime.ro** selalu lolos, tetapi **Anichin, AniZone,
 ReAnime, AnimeXin, Samehadaku** di-challenge Cloudflare *kadang-kadang* — request yang sama beberapa detik kemudian
 sering lolos, dan pada run lain semuanya diblokir selama beberapa menit. **Otakudesu** memblokir permanen untuk IP pusat data.
-- Backend mengulang challenge maks 2×, lalu menandai sumber *blocked* sementara (3–30 mnt) dan memakai cache lama
-  (maks 1 jam) atau fallback. Halaman tidak pernah menampilkan data palsu: tombol server penyedia tampil
-  "tidak tersedia", daftar episode/server tetap dari sumber lain.
-- Hasil di produksi bergantung pada reputasi IP Vercel; jika sering diblokir, pilihan: region Vercel lain, atau
-  proxy keluar (`NODE_USE_ENV_PROXY` + `HTTPS_PROXY`). Solver CAPTCHA/challenge tidak dipakai.
+
+Pemeriksaan baseline non-evasif tersedia lewat `npm run check:reachability` dan workflow GitHub Actions
+`Upstream reachability baseline`. Runner mengirim User-Agent KazanimeBot yang transparan: satu GET `robots.txt`, lalu
+satu GET `/` hanya jika robots.txt terbaca dan mengizinkan (termasuk `Crawl-delay`). Redirect tidak diikuti; tidak ada
+fingerprint browser, cookie, proxy, retry, atau solver challenge. Hasilnya hanya menunjukkan akses biasa saat pemeriksaan,
+bukan izin penggunaan konten atau cara untuk melewati proteksi.
+
+Baseline terbaru (22 Okt 2026, 12:16 UTC; suffix `cf-ray` SJC): kedua `robots.txt` membalas 200, tetapi homepage AniZone
+dan Samehadaku membalas 403 Cloudflare challenge. Cek ini hanya meminta `/`; endpoint katalog/episode tidak diuji.
+
+- Sumber lain yang secara khusus dikonfigurasi untuk challenge acak masih memiliki retry terbatas. AniZone dan Samehadaku
+  kini gagal-cepat saat halaman konten di-challenge, membuka cooldown 30 menit, lalu memakai cache lama (maks 1 jam) atau
+  fallback. Halaman tidak menampilkan data palsu: tombol provider yang blocked ditandai tidak tersedia dan server lain tetap dipakai.
+- Bila deployment mendapat challenge, gunakan cache/fallback yang tersedia atau minta akses/allowlist resmi dari pemilik sumber.
+  Jangan mencoba menghindari challenge dengan fingerprint, proxy rotasi, cookie, atau solver.
 
 ---
 
@@ -605,9 +616,9 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
    ReAnime/AniZone diatur di `STREAMING_SERVERS`; `ui/player.js` hanya menerima daftar server jadi dari `js/api/streams.js`.
 10. **Backend: satu pintu keluar.** Hanya `server/lib/fetcher.js` yang melakukan request ke situs lain
     (robots, throttle, UA, timeout, retry, allowlist host). Adapter di `server/sources/` hanya mengurai
-    HTML/JSON dan WAJIB mengembalikan `makeAnime()` / `makeEpisode()`. Sejak 22 Okt 2026 spoof header & proxy
-    diizinkan pemilik proyek (lewat opsi fetcher, bukan di adapter); solver CAPTCHA/challenge tetap tidak dipakai.
-    Proxy stream hanya untuk URL bertanda tangan + host media di allowlist.
+    HTML/JSON dan WAJIB mengembalikan `makeAnime()` / `makeEpisode()`. Header opsional hanya untuk kebutuhan protokol
+    terdokumentasi; tidak ada fingerprint browser atau solver challenge. Proxy stream hanya untuk URL bertanda tangan
+    + host media di allowlist.
 11. **Ikon, bukan emoji, untuk UI.** Pakai `icon('nama')` dari `js/ui/icons.js` (template JS) atau
     `<span class="ic-slot" data-icon="nama"></span>` (HTML statis). Emoji hanya untuk konten pilihan pengguna
     (tema, avatar). Font lewat `var(--font-body)` / `var(--font-display)` — jangan hardcode nama font.

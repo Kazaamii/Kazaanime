@@ -153,7 +153,10 @@ test('anizone provider: cari slug lewat judul → halaman episode → server HLS
         'https://anizone.to/anime?search=Tensei+Shitara+Ken+Deshita+2nd+Season': fixture('anizone-search.html'),
         'https://anizone.to/anime/ivt095hh/3': fixture('anizone-episode.html'),
     });
-    const z = createAnizone({ network: {}, createClient });
+    let clientOpts;
+    const z = createAnizone({ network: {}, createClient: (net, opts) => { clientOpts = opts; return createClient(net, opts); } });
+    assert.equal(clientOpts.challengeRetries, 0, 'challenge konten tidak diulang');
+    assert.equal(clientOpts.blockedMs, 30 * 60 * 1000, 'AniZone diistirahatkan 30 menit setelah challenge');
     const r = await z.servers({ ep: 3, titles: ['Tensei Shitara Ken Deshita 2nd Season'], year: 2026 });
     assert.equal(r.slug, 'ivt095hh');
     assert.equal(r.servers[0].kind, 'hls');

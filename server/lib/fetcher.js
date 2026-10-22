@@ -8,14 +8,12 @@
  *   5. User-Agent jujur, timeout, batas ukuran respons
  *   6. retry terbatas (hanya error jaringan & HTTP 5xx), backoff + jitter
  *   7. halaman blokir/challenge Cloudflare dikenali → "blocked" → sumber diistirahatkan.
- *      Tanpa solver CAPTCHA/challenge. Sumber yang challenge-nya terbukti ACAK per request
- *      (diukur 22 Okt 2026: AniZone, ReAnime, Anichin — request yang sama berikutnya lolos)
- *      boleh mengulang maks `challengeRetries` kali dengan jeda, lalu diistirahatkan `blockedMs`.
+ *      Tanpa solver challenge. Retry challenge hanya aktif pada adapter yang secara eksplisit
+ *      memilihnya; default 0. AniZone & Samehadaku kini gagal-cepat dan cooldown 30 menit.
  *
- * Sejak 22 Okt 2026 (instruksi pemilik proyek) larangan spoof header & proxy dicabut. Header
- * khusus per sumber bisa diberikan lewat opsi `headers`. Catatan pengukuran: UA browser palsu
- * justru LEBIH sering di-challenge Cloudflare daripada UA bot jujur, jadi default tetap UA jujur.
- * `stream()` dipakai proxy HLS (server/routes/stream.js) untuk meneruskan segmen video biner.
+ * User-Agent tetap deskriptif. Opsi `headers` hanya untuk kebutuhan protokol yang terdokumentasi
+ * (mis. Origin/Referer media), bukan untuk meniru fingerprint browser. `stream()` dipakai proxy HLS
+ * (server/routes/stream.js) untuk meneruskan segmen video biner.
  */
 import { load } from 'cheerio';
 import { BOT, SCRAPER } from '../config.js';

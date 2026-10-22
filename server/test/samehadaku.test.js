@@ -125,7 +125,9 @@ test('samehadaku: adapter — latest/search/detail/episode/schedule lewat client
         [`${BASE}/anime/${KIKANSHA}/`]: fixture('samehadaku-anime.html'),
         [`${BASE}/${KIKANSHA}-episode-3/`]: fixture('samehadaku-episode.html'),
     });
+    let adapterClientOpts;
     const clientFactory = (net, opts) => {
+        adapterClientOpts = opts;
         const c = createClient(net, opts);
         // schedule() memakai request() (HTML mentah) — tiru dari fixture
         c.request = async (url) => {
@@ -136,6 +138,8 @@ test('samehadaku: adapter — latest/search/detail/episode/schedule lewat client
         return c;
     };
     const a = createSamehadaku({ network: {}, createClient: clientFactory, baseUrl: `${BASE}/` });
+    assert.equal(adapterClientOpts.challengeRetries, 0, 'challenge konten tidak diulang');
+    assert.equal(adapterClientOpts.blockedMs, 30 * 60 * 1000, 'Samehadaku diistirahatkan 30 menit setelah challenge');
     assert.equal(a.id, 'samehadaku');
     assert.deepEqual(a.parseRef([KIKANSHA]), { slug: KIKANSHA });
     assert.equal(a.parseRef(['../etc']), null);
