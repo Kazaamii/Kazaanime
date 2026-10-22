@@ -1,139 +1,101 @@
 /**
- * Uji UI SEMENTARA di runner GitHub Actions (Playwright + Chromium). Bukan bagian aplikasi.
- * Hasil: .live-check/ui/*.jpg + .live-check/ui/result.json
+ * Uji UI SEMENTARA (runner GitHub Actions) — tahap 2: pemutaran server AniZone (HLS) & ReAnime (embed).
+ * Halaman AniZone/ReAnime diblokir Cloudflare dari IP runner, jadi respons /api/stream/servers DICEGAT
+ * dan diisi data asli dari fixture (URL master AniZone & embed flixcloud yang ditangkap 22 Okt 2026),
+ * ditandatangani dengan secret server yang sama. Yang diuji: player.js (video + hls.js), proxy
+ * /api/stream/hls + /sub milik server asli, CDN AniZone asli, konversi ASS → VTT, iframe embed ReAnime.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
-import { chromium, devices } from 'playwright';
+import { chromium } from 'playwright';
+import { STREAMS } from '../../server/config.js';
+import { createSigner, encodeTarget } from '../../server/lib/stream-proxy.js';
 
 const BASE = process.env.UI_BASE || 'http://127.0.0.1:3000';
-const OUT = '.live-check/ui';
-const result = { console: [], api: [], pages: {} };
+const OUT = '.live-check/ui2';
 await mkdir(OUT, { recursive: true });
+const signer = createSigner(STREAMS.secret);
+const hls = (u) => `/api/stream/hls?u=${encodeTarget(u)}&s=${signer.sign(u)}`;
+const sub = (u, f) => `/api/stream/sub?u=${encodeTarget(u)}&f=${f}&s=${signer.sign(`${u}|${f}`)}`;
+const ROOT = 'https://suzaku.xin-cdn.xyz/77511fce-546a-42ed-b5ea-d454a5f07a23';
+const FAKE = {
+    ok: true, source: 'streams', fallback: false, stale: false, generatedAt: new Date().toISOString(),
+    data: {
+        episode: 3,
+        status: { reanime: 'ok', anizone: 'ok' },
+        servers: [
+            { provider: 'reanime', kind: 'embed', name: 'ReAnime HD-2', label: 'HD-2', lang: 'en', url: 'https://flixcloud.cc/e/lmumbaiq7x0v?v=2' },
+            { provider: 'reanime', kind: 'embed', name: 'ReAnime HD-1', label: 'HD-1', lang: 'en', url: 'https://flixcloud.cc/e/lmumbaiq7x0v?v=1' },
+            {
+                provider: 'anizone', kind: 'hls', name: 'AniZone', lang: 'multi', url: hls(`${ROOT}/master.m3u8`), direct: `${ROOT}/master.m3u8`,
+                poster: `${ROOT}/snapshot.webp`,
+                subtitles: [
+                    { label: 'Indonesia', lang: 'id', default: true, url: sub(`${ROOT}/subtitles/8_id.ass`, 'ass') },
+                    { label: 'English', lang: 'en', default: false, url: sub(`${ROOT}/subtitles/1_en.ass`, 'ass') },
+                    { label: 'English (SDH)', lang: 'en', default: false, url: sub(`${ROOT}/subtitles/2_en.srt`, 'srt') },
+                ],
+            },
+        ],
+    },
+};
+
+const result = { console: [], api: [], steps: {} };
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') result.console.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
+page.on('pageerror', (e) => result.console.push(`pageerror: ${String(e).slice(0, 300)}`));
+page.on('response', (r) => {
+    const u = r.url();
+    if (u.includes('/api/stream/')) result.api.push(`${r.status()} ${r.headers()['content-type'] || ''} ${u.replace(BASE, '').slice(0, 90)}`);
+});
+await page.route('**/api/stream/servers**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE) }));
 
-async function open(name, url, { mobile = false } = {}) {
-    const ctx = await browser.newContext(mobile ? { ...devices['iPhone 13'] } : { viewport: { width: 1440, height: 900 } });
-    const page = await ctx.newPage();
-    page.on('console', (m) => {
-        if (m.type() === 'error' || m.type() === 'warning') result.console.push({ page: name, type: m.type(), text: m.text().slice(0, 400) });
-    });
-    page.on('pageerror', (e) => result.console.push({ page: name, type: 'pageerror', text: String(e?.stack || e).slice(0, 600) }));
-    page.on('response', (r) => {
-        const u = r.url();
-        if (u.includes('/api/') && !u.includes('/api/stream/hls')) result.api.push({ page: name, status: r.status(), url: u.replace(BASE, '').slice(0, 200) });
-        if (u.includes('/api/stream/hls') && r.status() >= 400) result.api.push({ page: name, status: r.status(), url: u.replace(BASE, '').slice(0, 120) });
-    });
-    page.on('requestfailed', (r) => {
-        const u = r.url();
-        if (u.startsWith(BASE)) result.console.push({ page: name, type: 'requestfailed', text: `${u.replace(BASE, '')} ${r.failure()?.errorText}` });
-    });
-    await page.goto(BASE + url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    return { ctx, page };
-}
-const shot = (page, name, opts = {}) => page.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 72, ...opts });
+await page.goto(`${BASE}/watch.html?anilist=159042&ep=3&title=Reincarnated%20as%20a%20Sword%20Season%202`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(15000);
+result.steps.servers = await page.evaluate(() => [...document.querySelectorAll('.server-btn')].map((b) => `${b.dataset.server}: ${b.textContent.replace(/\s+/g, ' ').trim()} [${b.className}]`));
 
-/* ---------------- Beranda ---------------- */
-for (const mobile of [false, true]) {
-    const name = mobile ? 'home-mobile' : 'home-desktop';
-    const { ctx, page } = await open(name, '/', { mobile });
-    await page.waitForTimeout(14000);
-    await shot(page, `${name}-top`);
-    await shot(page, `${name}-full`, { fullPage: true });
-    result.pages[name] = await page.evaluate(() => ({
-        order: [...document.querySelectorAll('main > section')].map((s) => s.id),
-        iconsHydrated: document.querySelectorAll('.ic-slot').length === 0,
-        svgIcons: document.querySelectorAll('svg.ic').length,
-        bodyFont: getComputedStyle(document.body).fontFamily,
-        titleFont: getComputedStyle(document.querySelector('.section-title')).fontFamily,
-        fontsLoaded: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => `${f.family} ${f.weight}`).slice(0, 12),
-        cards: document.querySelectorAll('.anime-card').length,
-        bookmarkBtn: (() => {
-            const b = document.querySelector('.anime-card .card-bookmark-btn');
-            if (!b) return null;
-            const r = b.getBoundingClientRect();
-            const img = b.closest('.anime-card-img').getBoundingClientRect();
-            return { top: Math.round(r.top - img.top), right: Math.round(img.right - r.right), opacity: getComputedStyle(b).opacity, w: Math.round(r.width) };
-        })(),
-        schedule: document.querySelectorAll('.schedule-item').length,
-        scheduleNote: document.querySelector('#scheduleNote')?.textContent?.slice(0, 200),
-        emojiLeft: (document.querySelector('main').innerText.match(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu) || []).slice(0, 20),
-    }));
-    if (!mobile) {
-        // klik genre → hasil langsung di bawah tombol
-        await page.click('.genre-tag[data-genre="Action"]');
-        await page.waitForTimeout(7000);
-        const genre = await page.$('#genre');
-        await genre.screenshot({ path: `${OUT}/home-genre-results.jpg`, type: 'jpeg', quality: 72 });
-        result.pages['genre-click'] = await page.evaluate(() => ({
-            visible: !document.querySelector('#genreResults').hidden,
-            title: document.querySelector('#genreResultsTitle').textContent,
-            cards: document.querySelectorAll('#genreGrid .anime-card').length,
-            popularTitle: document.querySelector('#popular .section-title')?.textContent?.trim(),
-        }));
-        await page.click('#genreClose');
-        await page.waitForTimeout(500);
-        result.pages['genre-close'] = await page.evaluate(() => ({ hidden: document.querySelector('#genreResults').hidden }));
-    }
-    await ctx.close();
-}
-
-/* ---------------- Halaman nonton ---------------- */
-async function watch(name, url, { mobile = false, anizone = false } = {}) {
-    const { ctx, page } = await open(name, url, { mobile });
-    await page.waitForTimeout(26000);
-    await shot(page, `${name}-top`);
-    const info = await page.evaluate(() => ({
-        title: document.querySelector('#watchTitle')?.textContent,
+// ---- AniZone Multi Sub (HLS) ----
+await page.click('.server-btn[data-server="anizone"]');
+await page.waitForTimeout(22000);
+result.steps.anizone = await page.evaluate(async () => {
+    const v = document.querySelector('video.player-video');
+    if (!v) return { video: false, status: document.querySelector('#playerStatusText')?.textContent, stage: document.querySelector('#playerStage')?.innerText?.slice(0, 200) };
+    v.muted = true;
+    let played;
+    try { await v.play(); played = true; } catch (e) { played = String(e); }
+    const t0 = v.currentTime;
+    await new Promise((r) => setTimeout(r, 10000));
+    const tracks = [...v.textTracks].map((t) => ({ label: t.label, lang: t.language, mode: t.mode, cues: t.cues ? t.cues.length : null }));
+    return {
+        video: true, mode: v.dataset.mode, readyState: v.readyState, played, t0, t1: v.currentTime, duration: v.duration,
+        size: `${v.videoWidth}x${v.videoHeight}`, error: v.error ? `${v.error.code} ${v.error.message}` : null, tracks,
+        audioTracks: v.audioTracks ? v.audioTracks.length : 'n/a',
         status: document.querySelector('#playerStatusText')?.textContent,
-        servers: [...document.querySelectorAll('.server-btn')].map((b) => `${b.textContent.replace(/\s+/g, ' ').trim()} [${b.className.replace('server-btn', '').trim()}] (${b.getAttribute('title') || ''})`),
-        iframe: document.querySelector('.player-frame')?.getAttribute('src')?.slice(0, 120) || null,
-        meta: document.querySelector('#watchMeta')?.innerText?.replace(/\s+/g, ' ').slice(0, 200),
-        downloads: document.querySelectorAll('.download-item').length,
-    }));
-    result.pages[name] = info;
-    if (anizone) {
-        const btn = await page.$('.server-btn[data-server="anizone"]');
-        if (btn && !(await btn.getAttribute('aria-disabled')).includes('true')) {
-            await btn.click();
-            await page.waitForTimeout(20000);
-            const state = await page.evaluate(async () => {
-                const v = document.querySelector('video.player-video');
-                if (!v) return { video: false, status: document.querySelector('#playerStatusText')?.textContent };
-                v.muted = true;
-                let played = null;
-                try { await v.play(); played = true; } catch (e) { played = String(e); }
-                await new Promise((r) => setTimeout(r, 9000));
-                return {
-                    video: true, mode: v.dataset.mode, readyState: v.readyState, currentTime: v.currentTime, duration: v.duration,
-                    played, error: v.error ? `${v.error.code} ${v.error.message}` : null, videoWidth: v.videoWidth, videoHeight: v.videoHeight,
-                    tracks: [...v.textTracks].map((t) => `${t.label}:${t.mode}:${t.cues ? t.cues.length : 'null'}`),
-                    status: document.querySelector('#playerStatusText')?.textContent,
-                };
-            });
-            result.pages[`${name}-anizone`] = state;
-            await shot(page, `${name}-anizone`);
-        } else {
-            result.pages[`${name}-anizone`] = { button: btn ? await btn.getAttribute('title') : 'tidak ada tombol' };
-        }
-    }
-    await ctx.close();
-}
-await watch('watch-desktop', '/watch.html?anilist=159042&ep=3&title=Reincarnated%20as%20a%20Sword%20Season%202&alt=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season', { anizone: true });
-await watch('watch-mobile', '/watch.html?anilist=21&ep=1&title=One%20Piece', { mobile: true });
+    };
+});
+await page.screenshot({ path: `${OUT}/anizone-playing.jpg`, type: 'jpeg', quality: 75 });
+// subtitle: tampilkan cue aktif pertama agar terlihat di screenshot
+result.steps.firstCues = await page.evaluate(() => {
+    const v = document.querySelector('video.player-video');
+    const t = v && [...v.textTracks].find((x) => x.mode === 'showing');
+    return t && t.cues ? [...t.cues].slice(0, 3).map((c) => `${c.startTime.toFixed(1)}–${c.endTime.toFixed(1)} ${c.text.replace(/\n/g, ' / ').slice(0, 80)}`) : null;
+});
 
-/* ---------------- Pencarian ---------------- */
-{
-    const { ctx, page } = await open('search', '/search.html?q=frieren');
-    await page.waitForTimeout(12000);
-    await shot(page, 'search-desktop');
-    result.pages.search = await page.evaluate(() => ({
-        tabs: [...document.querySelectorAll('.search-source-tab')].map((t) => t.textContent.replace(/\s+/g, ' ').trim()),
-        cards: document.querySelectorAll('.anime-card').length,
-    }));
-    await ctx.close();
+// ---- ReAnime (embed flixcloud) ----
+await page.click('.server-btn[data-server="reanime"]');
+await page.waitForTimeout(15000);
+result.steps.reanime = await page.evaluate(() => ({
+    iframe: document.querySelector('iframe.player-frame')?.src || null,
+    status: document.querySelector('#playerStatusText')?.textContent,
+}));
+await page.screenshot({ path: `${OUT}/reanime-embed.jpg`, type: 'jpeg', quality: 75 });
+const frame = page.frames().find((f) => f.url().includes('flixcloud.cc'));
+if (frame) {
+    try {
+        result.steps.reanimeFrame = await frame.evaluate(() => ({ title: document.title, text: document.body.innerText.slice(0, 200) }));
+    } catch (e) { result.steps.reanimeFrame = String(e).slice(0, 200); }
 }
 
 await browser.close();
 await writeFile(`${OUT}/result.json`, JSON.stringify(result, null, 2));
-console.log(JSON.stringify(result.pages, null, 1).slice(0, 4000));
-console.log('console errors:', result.console.length);
+console.log(JSON.stringify(result, null, 1).slice(0, 5000));

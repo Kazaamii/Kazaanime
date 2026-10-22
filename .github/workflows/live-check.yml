@@ -20,10 +20,10 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
-      - name: Uji end-to-end (server asli → situs live)
+      - name: Server lokal
         run: |
           LOG_REQUESTS=1 node server/index.js > .live-check-server.log 2>&1 &
-          node tools/live-check/e2e.mjs
+          sleep 3
       - name: Uji UI (Playwright Chromium)
         run: |
           npm i --no-save --no-audit --no-fund playwright@1
