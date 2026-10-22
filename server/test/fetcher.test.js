@@ -61,6 +61,38 @@ test('fetcher: User-Agent jujur, robots.txt dicek sekali, halaman yang dilarang 
     }
 });
 
+test('fetcher: POST form mengirim method/body dan tetap harus lolos robots gate', async () => {
+    let received = null;
+    const t = setup({
+        '/robots.txt': send(200, 'User-agent: KazanimeBot\\nDisallow: /wp-admin/\\nAllow: /wp-admin/admin-ajax.php', { 'content-type': 'text/plain' }),
+        '/wp-admin/admin-ajax.php': (req, res) => {
+            const chunks = [];
+            req.on('data', (chunk) => chunks.push(chunk));
+            req.on('end', () => {
+                received = { method: req.method, body: Buffer.concat(chunks).toString(), contentType: req.headers['content-type'] };
+                res.writeHead(200, { 'content-type': 'application/json' });
+                res.end(JSON.stringify(received));
+            });
+        },
+    }, { requireExplicitRobots: true, clientOpts: { retries: 0 } });
+    const { client, hits, base } = await t.ready;
+    try {
+        const body = new URLSearchParams({ action: 'player_ajax', post: 'fixture-post', nume: '1', type: 'movie' }).toString();
+        const result = await client.request(`${base}/wp-admin/admin-ajax.php`, {
+            method: 'POST', body, accept: 'application/json',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        });
+        assert.deepEqual(JSON.parse(result.text), {
+            method: 'POST', body,
+            contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+        });
+        assert.equal(received.method, 'POST');
+        assert.deepEqual(hits.map((hit) => hit.url), ['/robots.txt', '/wp-admin/admin-ajax.php']);
+    } finally {
+        await t.close();
+    }
+});
+
 test('fetcher: 5xx di-retry sekali lalu berhasil; 404 → not_found tanpa retry', async () => {
     let n = 0;
     const t = setup({
@@ -113,6 +145,22 @@ test('fetcher: ToS belum ditinjau + robots.txt 404 → tidak diakses (policy)', 
     try {
         await assert.rejects(client.request(`${base}/x`), (e) => e.kind === 'policy');
         assert.equal(hits.filter((h) => h.url === '/x').length, 0);
+    } finally {
+        await t.close();
+    }
+});
+
+test('fetcher: media AnimeOnsen hanya diminta jika robots.txt eksplisit mengizinkan host dan path', async () => {
+    const t = setup({
+        '/robots.txt': send(200, 'User-agent: KazanimeBot\nDisallow: /media/\nAllow: /media/episode.m3u8', { 'content-type': 'text/plain' }),
+        '/media/episode.m3u8': send(200, '#EXTM3U'),
+        '/media/blocked.m3u8': send(200, 'JANGAN'),
+    }, { requireExplicitRobots: true, clientOpts: { retries: 0 } });
+    const { client, hits, base } = await t.ready;
+    try {
+        assert.equal((await client.request(`${base}/media/episode.m3u8`)).text, '#EXTM3U');
+        await assert.rejects(client.request(`${base}/media/blocked.m3u8`), (error) => error.kind === 'robots');
+        assert.deepEqual(hits.map((hit) => hit.url), ['/robots.txt', '/media/episode.m3u8'], 'path terlarang tidak diminta');
     } finally {
         await t.close();
     }

@@ -29,7 +29,7 @@
  * @property {string}   lang         bahasa subtitle: 'id' | 'en' | 'multi' | '' (tidak diketahui)
  * @property {'hard'|'soft'} [subtitleType] jenis subtitle bila dicantumkan eksplisit oleh sumber
  * @property {string[]} origins      origin yang boleh mengirim postMessage untuk server ini
- * @property {'embed'|'hls'} [kind]  'hls' = player video bawaan (AniZone), selain itu iframe
+ * @property {'embed'|'hls'|'video'} [kind]  'hls'/'video' = player video bawaan (AniZone/AnimeOnsen), selain itu iframe
  * @property {string[]|null} [mirrors] URL cadangan penyedia yang sama (dicoba berurutan sebelum pindah server)
  * @property {string} [direct]       (hls) URL CDN untuk HLS native Safari/iOS
  * @property {{label:string, lang:string, url:string, default:boolean}[]} [subtitles] (hls) track WebVTT

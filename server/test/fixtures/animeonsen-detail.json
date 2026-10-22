@@ -1,0 +1,15 @@
+{
+  "content_id": "fixture-anime-01",
+  "content_title": "Kumo no Monogatari",
+  "content_title_en": "Cloud Story",
+  "content_title_jp": "雲の物語",
+  "mal_id": 123456,
+  "mal_data": {
+    "genres": [{ "name": "Adventure" }, { "name": "Drama" }],
+    "status": "finished_airing",
+    "studios": [{ "name": "Studio Example" }],
+    "synopsis": "A test-only synopsis.",
+    "mean_score": 7.84,
+    "rating": "pg_13"
+  }
+}

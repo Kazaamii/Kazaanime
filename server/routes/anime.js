@@ -12,7 +12,8 @@
  *   gagal  : { ok: false, error, code, details? }   (dibuat oleh error handler di app.js)
  */
 import { Router } from 'express';
-import { CACHE } from '../config.js';
+import { CACHE, SOURCES } from '../config.js';
+import { encodeTarget } from '../lib/stream-proxy.js';
 import { badRequest } from '../lib/errors.js';
 
 /** Validasi ?q= : string 1–100 karakter, tanpa karakter kontrol. */
@@ -44,20 +45,71 @@ function setCacheHeaders(res, result, cdn) {
     res.set('Cache-Control', `public, max-age=${result.fallback || result.stale ? 0 : 60}, s-maxage=${sMax}, stale-while-revalidate=${cdn.cdnStale}`);
 }
 
+function isAllowedAnimeOnsenMediaUrl(value, hosts) {
+    try {
+        const url = new URL(String(value || ''));
+        const host = url.hostname.toLowerCase();
+        return url.protocol === 'https:' && !url.port && !url.username && !url.password
+            && hosts.map((entry) => String(entry).toLowerCase()).includes(host);
+    } catch {
+        return false;
+    }
+}
+
+/** Convert AnimeOnsen's upstream media URLs to signed same-origin proxy paths; never cache them at the CDN. */
+function proxyAnimeOnsenEpisode(result, signer, mediaHosts) {
+    if (result?.source !== 'animeonsen' || !result.data || !Array.isArray(result.data.servers)) return result;
+    const data = { ...result.data };
+    if (typeof signer?.sign !== 'function') {
+        data.servers = [];
+        return { ...result, data };
+    }
+    data.servers = data.servers.map((server) => {
+        const kind = server?.kind;
+        const target = String(server?.url || '');
+        if (!['hls', 'video'].includes(kind) || !isAllowedAnimeOnsenMediaUrl(target, mediaHosts)) return null;
+        const proxy = (url, format = '') => {
+            const encoded = encodeTarget(url);
+            const signature = format
+                ? signer.sign(`${url}|${format}|animeonsen`)
+                : signer.sign(`${url}|animeonsen`);
+            return format
+                ? `/api/stream/sub?u=${encoded}&f=${format}&p=animeonsen&s=${signature}`
+                : `/api/stream/hls?u=${encoded}&p=animeonsen&s=${signature}`;
+        };
+        const subtitles = (Array.isArray(server.subtitles) ? server.subtitles : [])
+            .filter((track) => track && ['ass', 'ssa', 'srt', 'vtt'].includes(String(track.format || '').toLowerCase())
+                && isAllowedAnimeOnsenMediaUrl(track.url, mediaHosts))
+            .slice(0, 16)
+            .map((track) => ({
+                label: String(track.label || 'Subtitle').slice(0, 40),
+                lang: String(track.lang || 'und').slice(0, 12).toLowerCase(),
+                default: Boolean(track.default),
+                url: proxy(track.url, String(track.format).toLowerCase()),
+            }));
+        return { ...server, url: proxy(target), subtitles };
+    }).filter(Boolean);
+    return { ...result, data };
+}
+
 /**
  * @param {ReturnType<import('../sources/index.js').createRegistry>} registry
- * @param {{budgetMs: number, cdn?: typeof CACHE}} opts
+ * @param {{budgetMs: number, cdn?: typeof CACHE, signer?: {sign:Function}, animeOnsenMediaHosts?:string[]}} opts
  */
-export function animeRouter(registry, { budgetMs, cdn = CACHE }) {
+export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, animeOnsenMediaHosts = SOURCES.animeonsen.mediaHosts } = {}) {
     const router = Router();
 
     /** Bungkus handler: siapkan ctx (batas waktu total) lalu kirim JSON seragam. */
     const handle = (fn) => async (req, res) => {
         const started = Date.now();
         const ctx = { deadline: started + budgetMs };
-        const result = await fn(req, ctx);
+        const rawResult = await fn(req, ctx);
+        const result = req.params?.ep
+            ? proxyAnimeOnsenEpisode(rawResult, signer, animeOnsenMediaHosts)
+            : rawResult;
         res.locals.result = result;
         setCacheHeaders(res, result, cdn);
+        if (req.params?.ep && result.source === 'animeonsen') res.set('Cache-Control', 'private, no-store');
         res.json({
             ok: true,
             source: result.source,

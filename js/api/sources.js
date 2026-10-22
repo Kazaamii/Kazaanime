@@ -134,8 +134,22 @@ function toEpisodeMedia(json) {
     const site = clip(json.source || d.source, 40, 'backend').replace(/^backend:/, '');
     const servers = (Array.isArray(d.servers) ? d.servers : [])
         .map((x, i) => {
-            const url = toHttpUrl(x?.url);
+            const kind = ['hls', 'video'].includes(x?.kind) ? x.kind : '';
+            const rawUrl = String(x?.url || '');
+            const url = kind
+                ? (OWN_STREAM_RE.test(rawUrl) ? rawUrl : '')
+                : toHttpUrl(rawUrl);
             if (!url) return null;
+            const subtitles = kind && Array.isArray(x.subtitles)
+                ? x.subtitles.filter((track) => OWN_STREAM_RE.test(String(track?.url || '')))
+                    .slice(0, 16)
+                    .map((track) => ({
+                        label: clip(track.label, 40, 'Subtitle'),
+                        lang: clip(track.lang, 12, 'und').toLowerCase(),
+                        url: track.url,
+                        default: Boolean(track.default),
+                    }))
+                : [];
             return {
                 id: `backend-${site}-${i}`,
                 name: clip(x.name, 40, `Server ${i + 1}`),
@@ -148,6 +162,8 @@ function toEpisodeMedia(json) {
                 source: `backend:${site}`,
                 lang: ['id', 'en', 'multi'].includes(x.lang) ? x.lang : '',
                 ...(x.subtitleType === 'hard' || x.subtitleType === 'soft' ? { subtitleType: x.subtitleType } : {}),
+                ...(kind ? { kind } : {}),
+                ...(subtitles.length ? { subtitles } : {}),
                 origins: [originOf(url)].filter(Boolean),
             };
         })

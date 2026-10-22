@@ -29,10 +29,10 @@
  *    izin camera/microphone/display-capture yang tidak diperlukan.
  *
  * 22 Okt 2026:
- *  - Server `kind: 'hls'` (AniZone "Multi Sub") diputar di <video> bawaan: Safari/iOS memakai HLS
- *    native langsung dari CDN (`direct`, tanpa proxy); browser lain memakai hls.js (dimuat malas dari
- *    PLAYER.hlsScript) dengan playlist lewat proxy backend. Subtitle = <track> WebVTT (pilih lewat
- *    menu CC player); Indonesia dipilih otomatis bila ada.
+ *  - Server `kind: 'hls'` (AniZone/AnimeOnsen) dan `kind: 'video'` (AnimeOnsen MP4/WebM) diputar di <video>
+ *    bawaan. AniZone HLS: Safari/iOS dapat memakai URL direct; browser lain memakai hls.js lewat proxy.
+ *    AnimeOnsen HLS/native video memakai proxy backend bertanda tangan. Soft subtitle = <track> WebVTT;
+ *    Indonesia dipilih otomatis bila ada.
  *  - Server dengan `mirrors` (ReAnime HD-2/HD-1) mencoba mirror berikutnya sebelum pindah server.
  *  - Slot penyedia yang belum selesai dicari (`pending`) tampil "mencari…".
  *  - "Subtitle Indonesia (AI)": bila server HLS tidak punya subtitle Indonesia dan backend menawarkannya
@@ -390,7 +390,7 @@ export function createPlayer({
 
         const overlay = messageEl({ spinner: true, text: `Memuat streaming Episode ${ep}...`, sub: `Server: ${server.flag ? `${server.flag} ` : ''}${server.name}` });
         overlay.classList.add('player-overlay');
-        if (server.kind === 'hls') {
+        if (server.kind === 'hls' || server.kind === 'video') {
             playVideo(server, my, overlay);
             return;
         }
@@ -429,7 +429,7 @@ export function createPlayer({
     }
 
     /**
-     * Server HLS di player video bawaan (AniZone "Multi Sub").
+     * Server HLS (AniZone/AnimeOnsen) atau video langsung (AnimeOnsen) di player video bawaan.
      * @param {StreamServer} server
      * @param {number} my token pemutaran
      * @param {HTMLElement} overlay
@@ -522,11 +522,12 @@ export function createPlayer({
         //  - Browser lain: hls.js (MSE) lewat proxy. HLS native Chromium (Chrome ≥141) TIDAK dipakai untuk
         //    URL CDN langsung: diuji 22 Okt 2026, request-nya diblokir (CORS/CORP CDN dikunci ke anizone.to).
         //  - Tanpa MSE tetapi bisa HLS native → native lewat proxy.
-        const canNative = Boolean(v.canPlayType(HLS_MIME));
+        const isHls = server.kind === 'hls';
+        const canNative = isHls && Boolean(v.canPlayType(HLS_MIME));
         const appleWebKit = /Apple/.test(navigator.vendor || '') && canNative;
         const hasMse = Boolean(window.MediaSource || window.ManagedMediaSource);
         const native = appleWebKit || (canNative && !hasMse);
-        let usingDirect = appleWebKit && Boolean(server.direct);
+        let usingDirect = isHls && appleWebKit && Boolean(server.direct);
         v.addEventListener('error', () => {
             if (my !== token) return;
             if (usingDirect) {
@@ -551,6 +552,11 @@ export function createPlayer({
             else fail(server, 'timeout');
         }, PLAYER.loadTimeout + 5000); // manifest + key + segmen pertama lewat proxy → beri waktu lebih
 
+        if (!isHls) {
+            v.dataset.mode = 'native-video';
+            v.src = server.url;
+            return;
+        }
         v.dataset.mode = native ? (usingDirect ? 'native-direct' : 'native-proxy') : 'hlsjs'; // diagnosa (devtools)
         if (native) {
             v.src = usingDirect ? server.direct : server.url;

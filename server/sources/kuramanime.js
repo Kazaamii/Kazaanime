@@ -1,13 +1,15 @@
 /**
  * Kazanime backend — sources/kuramanime.js
- * Adapter Kuramanime (https://v20.kuramanime.ing — domain sering berganti, atur lewat KURAMANIME_BASE_URL).
+ * Adapter Kuramanime (default https://v20.kuramanime.ing; pilih domain per deployment lewat KURAMANIME_BASE_URL).
  * Server streaming berlabel Indonesia diklasifikasikan Hardsub; label Hardsub/Softsub pada unduhan
  * tetap dibaca per grup, karena sumber dapat menawarkan kedua format unduhan.
  *
- * STATUS 2026-10-21, dicek ulang 2026-10-22: TIDAK BISA DIVERIFIKASI LANGSUNG.
- *   Semua URL (termasuk /robots.txt, beranda, pencarian) membalas Cloudflare 403
- *   ("Sorry, you have been blocked" / "Attention Required!") untuk bot ini — juga saat diuji
- *   dengan User-Agent browser (blokir berbasis IP/WAF). Domain aktif masih v20.kuramanime.ing.
+ * STATUS 2026-10-21/22: baseline v20 TIDAK BISA DIVERIFIKASI LANGSUNG.
+ *   Pada baseline lama, URL termasuk /robots.txt membalas Cloudflare 403 untuk bot ini
+ *   ("Sorry, you have been blocked" / "Attention Required!"); status mencerminkan blokir IP/WAF.
+ *   Pengguna memberi v9.kuramanime.blog dan v9.kuramanime.work sebagai kandidat domain baru,
+ *   tetapi keduanya belum dicek live. Pilih tepat satu lewat KURAMANIME_BASE_URL; tidak ada
+ *   failover/rotasi domain dan blokir tetap dihormati.
  *   Scraper open-source lain mencatat situs ini memeriksa header Sec-Fetch-*, fingerprint TLS,
  *   dan memakai token anti-bot berlapis untuk player. Semua itu adalah proteksi akses →
  *   adapter ini TIDAK mencoba melewatinya. Hasilnya: robots.txt tidak terbaca → sumber

@@ -78,17 +78,37 @@ const SUBTITLE_TYPE_ORDER = { hard: 0, soft: 1 };
 
 /**
  * Payload endpoint episode (kontrak dengan js/api/sources.js → toEpisodeMedia):
- *   { episode, title, released, url, servers: [{name, url, lang, subtitleType?}], downloads: [{quality, size, format, subtitle, links: [{provider, url}]}] }
+ *   { episode, title, released, url,
+ *     servers: [{name, url, lang, subtitleType?, kind?: 'hls'|'video', subtitles?: [{label,lang,format,url,default}]}],
+ *     downloads: [{quality, size, format, subtitle, links: [{provider, url}]}] }
  */
 export function makeEpisode({ episode, title = '', released = '', url = '', servers = [], downloads = [], notice = '' } = {}) {
     const seen = new Set();
     const srv = servers
-        .map((s) => ({
-            name: clip(s.name, 40) || 'Server',
-            url: absoluteUrl(s.url),
-            lang: s.lang || null,
-            ...(s.subtitleType === 'hard' || s.subtitleType === 'soft' ? { subtitleType: s.subtitleType } : {}),
-        }))
+        .map((s) => {
+            const kind = s.kind === 'hls' || s.kind === 'video' ? s.kind : '';
+            const subtitles = kind && Array.isArray(s.subtitles)
+                ? s.subtitles.map((track) => {
+                    const lang = String(track?.lang || 'und').toLowerCase();
+                    const format = String(track?.format || '').toLowerCase();
+                    return {
+                        label: clip(track?.label, 40) || 'Subtitle',
+                        lang: /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/.test(lang) ? lang : 'und',
+                        format,
+                        url: absoluteUrl(track?.url),
+                        default: Boolean(track?.default),
+                    };
+                }).filter((track) => track.url && ['ass', 'ssa', 'srt', 'vtt'].includes(track.format)).slice(0, 16)
+                : [];
+            return {
+                name: clip(s.name, 40) || 'Server',
+                url: absoluteUrl(s.url),
+                lang: s.lang || null,
+                ...(s.subtitleType === 'hard' || s.subtitleType === 'soft' ? { subtitleType: s.subtitleType } : {}),
+                ...(kind ? { kind } : {}),
+                ...(subtitles.length ? { subtitles } : {}),
+            };
+        })
         .filter((s) => s.url && !seen.has(s.url) && seen.add(s.url))
         // Sub Indo didahulukan, lalu hardsub eksplisit sebelum softsub; urutan sumber tetap stabil.
         .map((s, i) => ({ s, i }))

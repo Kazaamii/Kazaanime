@@ -65,6 +65,16 @@ test('latest: semua sumber paralel; satu gagal → hasil sebagian + daftar error
     assert.deepEqual(r.errors.map((e) => [e.source, e.kind]), [['kuramanime', 'blocked']]);
 });
 
+test('latest: adapter yang mendeklarasikan supportsLatest=false dilewati', async () => {
+    const O = stub('animeonsen', { latest: async () => { throw new Error('must not call'); } });
+    O.supportsLatest = false;
+    const A = stub('animexin', { latest: async () => [anime('animexin', 'x', 'X')] });
+    const result = await reg([O, A], metaStub()).latest();
+    assert.equal(result.source, 'animexin');
+    assert.equal(O.calls.length, 0);
+    assert.deepEqual(A.calls, ['latest']);
+});
+
 test('latest: semua scraper gagal → fallback API metadata (fallback: true)', async () => {
     const A = stub('animexin', { latest: async () => { throw fail('timeout', 'animexin'); } });
     const r = await reg([A], metaStub()).latest();

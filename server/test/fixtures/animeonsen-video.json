@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "subtitles": {
+      "en-US": "English",
+      "id-ID": "Indonesian",
+      "fr-FR": "French"
+    }
+  },
+  "uri": {
+    "stream": "https://media.example.test/fixture/episode/master.m3u8",
+    "subtitles": {
+      "en-US": "https://media.example.test/fixture/subtitles/en-US.vtt",
+      "id-ID": "https://media.example.test/fixture/subtitles/id-ID.srt",
+      "fr-FR": "https://unlisted.example.test/fixture/subtitles/fr-FR.vtt",
+      "de-DE": "https://media.example.test/fixture/subtitles/de-DE.bin"
+    }
+  }
+}

@@ -84,6 +84,16 @@ test('animexin: halaman episode → 16 server (base64 → iframe), download tanp
     assert.ok(!JSON.stringify(r.downloads).includes('ko-fi'), 'grup Membership VIP (ko-fi) dibuang');
 });
 
+test('animexin: parser upstream mirror menerima direct URL, data-em, iframe/source, dan meta embedUrl', () => {
+    const episode = parseEpisodePage(fixture$('animexin-mirror-variants.html'), BASE);
+    assert.deepEqual(episode.servers.map((server) => [server.name, server.lang, server.subtitleType, server.url]), [
+        ['Direct (Sub Indo)', 'id', 'hard', 'https://direct.example.test/embed/one'],
+        ['Mirror (Sub English)', 'en', 'soft', 'https://meta.example.test/embed/mirror'],
+        ['Iframe Mirror', null, undefined, 'https://iframe.example.test/embed/mirror'],
+        ['Source Mirror', null, undefined, 'https://source.example.test/video.mp4'],
+    ]);
+});
+
 test('animexin: nama server rapi dan jenis sub hanya dicatat jika eksplisit', () => {
     assert.deepEqual(describeServer('Hardsub Indonesia Dailymotion AX', 'https://geo.dailymotion.com/player/x.html?video=1'), { name: 'Dailymotion (Sub Indo)', lang: 'id', subtitleType: 'hard' });
     assert.deepEqual(describeServer('Soft-sub Indonesia Dailymotion AX', 'https://geo.dailymotion.com/player/x.html?video=1'), { name: 'Dailymotion (Sub Indo)', lang: 'id', subtitleType: 'soft' });

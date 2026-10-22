@@ -11,8 +11,9 @@
  *   3. Tambahkan nama ke SCRAPER_SOURCES (env) bila ingin diaktifkan.
  *
  * Alur & fallback:
- *   latest / search : semua scraper paralel → digabung (selang-seling) & dedupe judul.
- *                     latest: dedupe lintas sumber (kartu donghua AnimeXin & Anichin tidak dobel);
+ *   latest / search : scraper yang mendukung method dipanggil paralel → digabung (selang-seling) & dedupe judul.
+ *                     latest: adapter `supportsLatest: false` (mis. AnimeOnsen: popular, bukan latest) dilewati;
+ *                     dedupe lintas sumber (kartu donghua AnimeXin & Anichin tidak dobel);
  *                     search: dedupe PER SUMBER (22 Okt 2026) — judul yang sama dari Samehadaku &
  *                     Otakudesu tetap dikirim agar halaman nonton bisa menggabungkan server keduanya.
  *                     Semua gagal → API metadata publik (fallback: true).
@@ -31,6 +32,7 @@ import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
 import { createAnoboy } from './anoboy.js';
+import { createAnimeOnsen } from './animeonsen.js';
 import { createAnimexin } from './animexin.js';
 import { createHianime } from './hianime.js';
 import { createKuramanime } from './kuramanime.js';
@@ -43,6 +45,7 @@ import { createSakunime } from './sakunime.js';
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
     samehadaku: createSamehadaku,
+    animeonsen: createAnimeOnsen,
     anoboy: createAnoboy,
     sakunime: createSakunime,
     anichin: createAnichin,
@@ -194,8 +197,8 @@ export function createRegistry({
     }
 
     /** Jalankan fungsi di semua scraper aktif secara paralel. */
-    async function fanOut(keyOf, ttlMs, run) {
-        const active = usable();
+    async function fanOut(keyOf, ttlMs, run, candidates = usable()) {
+        const active = candidates;
         const settled = await Promise.allSettled(active.map((a) => wrap(keyOf(a), ttlMs, () => run(a))));
         const groups = [];
         const used = [];
@@ -225,7 +228,8 @@ export function createRegistry({
         network,
 
         async latest(ctx = {}) {
-            const r = await fanOut((a) => `latest:${a.id}`, ttl.latestTtlMs, (a) => a.latest(ctx));
+            const candidates = usable().filter((a) => a.supportsLatest !== false && typeof a.latest === 'function');
+            const r = await fanOut((a) => `latest:${a.id}`, ttl.latestTtlMs, (a) => a.latest(ctx), candidates);
             const items = mergeLists(r.groups);
             if (items.length) {
                 const data = await withSafeImages(items);
