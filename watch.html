@@ -49,6 +49,11 @@
                 <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled aria-label="Episode sebelumnya"><span class="ic-slot" data-icon="chevron-left"></span><span class="ctrl-long">Episode </span>Sebelumnya</button>
                 <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled title="Coba server streaming berikutnya"><span class="ic-slot" data-icon="refresh-cw"></span>Server Lain</button>
                 <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled aria-label="Episode berikutnya"><span class="ctrl-long">Episode </span>Berikutnya<span class="ic-slot" data-icon="chevron-right"></span></button>
+                <div class="player-local-subtitle-tools" id="localSubtitleTools" hidden>
+                    <button type="button" class="player-ctrl-btn" id="btnLocalSubtitle" title="Pilih berkas subtitle lokal .srt atau .vtt">Sub Lokal</button>
+                    <button type="button" class="player-ctrl-btn player-ctrl-btn--clear-subtitle" id="btnClearLocalSubtitle" aria-label="Hapus subtitle lokal" title="Hapus subtitle lokal" hidden>×</button>
+                    <input id="localSubtitleInput" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" hidden>
+                </div>
             </div>
         </div>
 
@@ -125,7 +130,7 @@
                 </div>
                 <div class="server-selector">
                     <h4><span class="ic-slot" data-icon="server"></span>Server Streaming</h4>
-                    <p class="server-hint">Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Server <strong>Multi Sub</strong>: pilih bahasa subtitle lewat tombol CC di player.</p>
+                    <p class="server-hint">Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Server <strong>Multi Sub</strong>: pilih bahasa lewat tombol CC; pemutar HLS bawaan juga menerima subtitle lokal <strong>.srt/.vtt</strong> (berkas tetap di perangkat, tidak diunggah).</p>
                     <div class="server-buttons" id="serverButtons"></div>
                 </div>
             </aside>

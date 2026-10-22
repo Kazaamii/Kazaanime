@@ -215,6 +215,10 @@ const player = createPlayer({
     statusText: $('#playerStatusText'),
     getTitle: () => anime.title,
     fetchAiSubtitle: getAiSubtitlePart, // "Subtitle Indonesia (AI)" (hanya bila backend menawarkannya)
+    localSubtitleTools: $('#localSubtitleTools'),
+    localSubtitleButton: $('#btnLocalSubtitle'),
+    clearLocalSubtitleButton: $('#btnClearLocalSubtitle'),
+    localSubtitleInput: $('#localSubtitleInput'),
 });
 
 const episodes = createEpisodeList({

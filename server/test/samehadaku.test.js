@@ -101,6 +101,18 @@ test('samehadaku: halaman episode → server embed publik (VIP berbayar dilewati
     assert.ok(ep.downloads.some((g) => g.format === 'MP4'));
 });
 
+test('samehadaku: halaman FX Senshi snapshot → server publik eksplisit; token/ID fixture disamarkan', () => {
+    const ep = parseEpisodePage(fixture$('samehadaku-fx-senshi-episode.html'), BASE);
+    assert.equal(ep.title, 'FX Senshi Kurumi-chan Episode 4');
+    assert.equal(ep.animeUrl, `${BASE}/anime/fx-senshi-kurumi-chan/`);
+    assert.deepEqual(ep.servers.map((server) => server.name), ['Blogspot', 'Mega 480p', 'Mega 720p', 'Mega 1080p']);
+    assert.ok(ep.servers.every((server) => server.lang === 'id' && server.subtitleType === 'hard'));
+    assert.deepEqual(ep.servers.map((server) => new URL(server.url).hostname), [
+        'www.blogger.com', 'mega.nz', 'mega.nz', 'mega.nz',
+    ]);
+    assert.equal(ep.downloads.length, 0, 'bagian download tidak disalin ke fixture minimal');
+});
+
 test('samehadaku: jadwal rilis per hari (0 = Minggu) + jam WIB', () => {
     const days = parseSchedulePage(fixture('samehadaku-schedule.html'), BASE);
     assert.deepEqual(Object.keys(days).sort(), ['0', '1', '2', '3', '4', '5', '6']);

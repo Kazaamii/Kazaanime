@@ -15,7 +15,7 @@ import { RequestManager } from '../lib/request-manager.js';
 import { HostThrottle } from '../lib/rate-limit.js';
 import { TtlCache } from '../lib/cache.js';
 import { SCRAPER_RUNTIME, SOURCES } from '../config.js';
-import { createRegistry } from '../sources/index.js';
+import { FACTORIES, createRegistry } from '../sources/index.js';
 
 function listen(server) {
     return new Promise((resolve, reject) => {
@@ -89,13 +89,19 @@ function cookieHeaders() {
     return headers;
 }
 
-test('config runtime: sumber target terpisah; Kuramanime opt-in dan rendering JS tidak aktif default', () => {
+test('config runtime: Anoboy/Sakunime aktif untuk Sub Indo; Kuramanime tetap opt-in', () => {
     assert.ok(SOURCES.enabled.includes('samehadaku'));
     assert.ok(SOURCES.enabled.includes('otakudesu'));
+    assert.ok(FACTORIES.anoboy);
+    assert.ok(FACTORIES.sakunime);
+    assert.ok(SOURCES.enabled.includes('anoboy'));
+    assert.ok(SOURCES.enabled.includes('sakunime'));
     assert.ok(!SOURCES.enabled.includes('kuramanime'));
     assert.equal(SOURCES.samehadaku.renderJavaScript, false);
     assert.equal(SOURCES.otakudesu.renderJavaScript, false);
     assert.equal(SOURCES.kuramanime.renderJavaScript, false);
+    assert.equal(SOURCES.anoboy.baseUrl, 'https://anoboy.be');
+    assert.equal(SOURCES.sakunime.baseUrl, 'https://sakunime.com');
     assert.ok(Object.isFrozen(SCRAPER_RUNTIME.proxy.urls));
     assert.ok(SCRAPER_RUNTIME.request.maxConcurrencyPerHost >= 1);
 });

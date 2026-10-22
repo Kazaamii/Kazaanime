@@ -49,6 +49,9 @@
 .player-ctrl-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:6px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit;transition:all .3s;white-space:nowrap}
 .player-ctrl-btn:hover:not(:disabled){background:rgba(var(--primary-rgb),.12);border-color:var(--primary);color:var(--primary)}
 .player-ctrl-btn:disabled{opacity:.4;cursor:not-allowed}
+.player-ctrl-btn[hidden],.player-local-subtitle-tools[hidden]{display:none}
+.player-local-subtitle-tools{display:inline-flex;align-items:center;gap:6px}
+.player-ctrl-btn--clear-subtitle{min-width:32px;padding:6px 9px;font-size:17px;line-height:1}
 
 /* ==========================================================================
    DETAIL (kolom utama + sidebar)
@@ -222,7 +225,10 @@ a.ep-btn{display:block;text-decoration:none}
 }
 @media(max-width:480px){
     .player-controls{width:100%}
-    .player-ctrl-btn{flex:1;text-align:center;padding:6px 8px}
+    .player-controls>.player-ctrl-btn{flex:1;min-width:0;text-align:center;padding:6px 6px}
+    .player-local-subtitle-tools{flex:1.35;min-width:0;gap:4px}
+    .player-local-subtitle-tools .player-ctrl-btn:first-child{flex:1;min-width:0;padding:6px 4px}
+    .player-local-subtitle-tools .player-ctrl-btn--clear-subtitle{flex:0 0 28px;min-width:28px;padding:6px 4px}
     .ctrl-long{display:none}
     .watch-info{grid-template-columns:1fr}
     .watch-info-poster{display:none}

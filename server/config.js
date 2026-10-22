@@ -144,14 +144,16 @@ export const CACHE = Object.freeze({
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // Kuramanime didaftarkan namun tidak aktif secara default: akses/robots diblokir, tidak dicoba dilewati.
-    enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku', 'anichin', 'otakudesu', 'hianime']).map((s) => s.toLowerCase()),
+    // Anoboy/Sakunime aktif untuk menambah Sub Indo, tetapi ToS unknown dan fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime tetap opt-in (akses diblokir, tidak di-bypass).
+    enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime']).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
     samehadaku: Object.freeze({
         baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, ''),
         renderJavaScript: bool('SAMEHADAKU_RENDER_JAVASCRIPT', false),
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('SAMEHADAKU_COOKIES', true),
     }),
+    anoboy: Object.freeze({ baseUrl: (env.ANOBOY_BASE_URL || 'https://anoboy.be').replace(/\/+$/, '') }),
+    sakunime: Object.freeze({ baseUrl: (env.SAKUNIME_BASE_URL || 'https://sakunime.com').replace(/\/+$/, '') }),
     anichin: Object.freeze({ baseUrl: (env.ANICHIN_BASE_URL || 'https://anichin.moe').replace(/\/+$/, '') }),
     otakudesu: Object.freeze({
         baseUrl: (env.OTAKUDESU_BASE_URL || 'https://otakudesu.blog').replace(/\/+$/, ''),

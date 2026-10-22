@@ -13,14 +13,15 @@ beradapter.
 | **D** | Backend Express + adapter `animexin` / `kuramanime` + fallback metadata (satu project Vercel) | ✅ Selesai |
 | **D+** | Perbaikan 22 Okt 2026: player memutar server **hasil scraping lebih dulu** untuk semua anime; MegaPlay (`megaplay.buzz`) jadi cadangan; perkiraan jumlah episode saat AniList mati | ✅ Selesai |
 | **D++** | Perbaikan 22 Okt 2026 (2): **Samehadaku** (anime Jepang, Sub Indo) menggantikan Kuramanime; tombol **Server 1, 2, …**; **Jadwal Rilis** dari Samehadaku + AnimeXin (`/api/anime/schedule`); poster donghua Kitsu → **Bangumi** → **MangaBaka**; donghua cadangan via Kitsu & bergambar; cadangan Vidnest/TryEmbed | ✅ Selesai |
-| **E** | Perbaikan 22 Okt 2026 (3): **Genre & Jadwal di atas** beranda (hasil genre langsung di bawah tombol); server cadangan #2 → **ReAnime**, + tombol **AniZone "Multi Sub"** (player HLS bawaan + proxy); **tombol bookmark kartu** di pojok poster; **ikon** pengganti emoji; font **Figtree + Bricolage Grotesque**; donghua + **Anichin**; Sub Indo + **Otakudesu** & **hianime.ro**; **Jikan dihapus** | ✅ Selesai — lihat [Batasan Cloudflare](#-batasan-cloudflare-dicek-22-okt-2026) |
+| **E** | Perbaikan 22 Okt 2026 (3): **Genre & Jadwal di atas** beranda (hasil genre langsung di bawah tombol); server cadangan #2 → **ReAnime**, + tombol **AniZone "Multi Sub"** (player HLS bawaan + proxy); **tombol bookmark kartu** di pojok poster; **ikon** pengganti emoji; font **Figtree + Bricolage Grotesque**; donghua + **Anichin**; Sub Indo + **Otakudesu**, **Anoboy** & **Sakunime** (robots.txt fail-closed) + **hianime.ro**; **Jikan dihapus** | ✅ Selesai — lihat [Batasan Cloudflare](#-batasan-cloudflare-dicek-22-okt-2026) |
+| **F+** | Subtitle lokal untuk pemutar HLS: pilih `.srt` / `.vtt` di browser, konversi SRT→WebVTT, ganti/hapus track; tidak diunggah | ✅ Selesai |
 
 ---
 
 ## 📁 Struktur folder (final)
 
 Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diubah di Tahap D · 🅔 baru/diubah di Tahap E (22 Okt 2026) ·
-🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) (22 Okt 2026)
+🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) · 🅖 subtitle lokal browser (22 Okt 2026)
 
 ```
 kazanime/
@@ -78,8 +79,9 @@ kazanime/
 │   │   ├── notice.js          ✅ keterangan "data cadangan" + tombol Coba lagi
 │   │   ├── search-dropdown.js ✅🅔 autocomplete AniList + Kitsu (bertahap, bisa dibatalkan, keyboard, ARIA)
 │   │   ├── api-status.js      ✅ widget status sumber data
-│   │   ├── player.js          🅒🅔🅕 SATU player: iframe ATAU video HLS (hls.js / HLS native), mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI
+│   │   ├── player.js          🅒🅔🅕🅖 SATU player: iframe ATAU video HLS (hls.js / HLS native), mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI & lokal
 │   │   ├── ai-subtitle.js     🅕 "Subtitle Indonesia (AI)": track AI (TextTrack/VTTCue) per bagian, subtitle bawaan disembunyikan, pilihan pengguna dihormati
+│   │   ├── local-subtitle.js  🅖 pilih .srt/.vtt lokal, konversi SRT→WebVTT, track browser + cleanup object URL; tanpa upload
 │   │   ├── icons.js           🅔 ikon garis Lucide (ISC) pengganti emoji: icon() + hydrateIcons() untuk HTML statis
 │   │   ├── episode-list.js    🅒 tombol episode (link asli), tab rentang >100 ep, input manual, penanda ditonton
 │   │   └── download-list.js   🅒🅓 daftar link download per kualitas (+ format & bahasa subtitle dari backend)
@@ -117,6 +119,8 @@ kazanime/
     │   ├── index.js           registry + aggregator + fallback (menambah sumber = 1 file + 1 baris)
     │   ├── animexin.js        adapter AnimeXin — donghua (diverifikasi live) + jadwal rilis
     │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Hardsub Indonesia (diverifikasi live) + jadwal rilis
+    │   ├── anoboy.js          adapter Anoboy — anime Jepang, server Sub Indo dari `data-url`; aktif default dengan robots gate
+    │   ├── sakunime.js        adapter Sakunime — anime Jepang, `data-default` eksplisit Sub Indo; `serverId` opaque diabaikan; robots gate
     │   ├── anichin.js         🅔 adapter Anichin — donghua Sub Indo (tema AnimeStream, parser bersama AnimeXin) + jadwal berjam
     │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Hardsub Indonesia (diblokir Cloudflare untuk IP pusat data, lihat batasan)
     │   ├── kuramanime.js      adapter Kuramanime (Hardsub Indonesia) opt-in; nonaktif default, robots wajib eksplisit, token player tidak di-bypass
@@ -170,7 +174,7 @@ Yang bisa dicoba (Tahap D):
 - `/api/anime/latest` · `/api/anime/search?q=soul%20land` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan/episode/175`
 - `/api/health` (status sumber, robots, circuit, cache) · `/api/bot` (info bot untuk admin situs sumber)
 - `npm run check:sources -- --live` → laporan robots.txt/ToS + uji ambil data tiap sumber
-- `npm test` → 88 unit test backend (tanpa internet)
+- `npm test` → 206 unit test backend + subtitle UI helper (tanpa internet)
 
 Yang bisa dicoba (Tahap C):
 - klik kartu mana pun → `watch.html`: player, daftar episode asli, info + sinopsis, rekomendasi
@@ -237,7 +241,8 @@ Satu implementasi player (`ui/player.js`) menggantikan **dua** salinan di file a
 
 ```
 watch.html?title=...&ep=3&anilist=...&mal=...[&alt=judul romaji]
-   │  1. cari episode di SEMUA situs backend (Samehadaku, Otakudesu, AnimeXin, Anichin, hianime.ro) lewat judul,
+   │  1. cari episode di situs backend aktif lewat judul (default: Samehadaku, Anoboy, Sakunime, Otakudesu,
+   │     AnimeXin, Anichin, hianime.ro; Anoboy/Sakunime hanya berjalan jika robots.txt eksplisit mengizinkan),
    │     judul alternatif & judul tanpa season → server Sub Indo diputar DULU
    │  2. paralel: GET /api/stream/servers → ReAnime (embed) + AniZone (HLS "Multi Sub") untuk episode itu
    │  3. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan sesuai urutan config
@@ -345,6 +350,14 @@ Object.freeze({
 ```
 
 ---
+
+### 📄 Subtitle lokal (.srt / .vtt)
+
+Pada server yang diputar di video bawaan Kazanime (HLS/native), tombol **Sub Lokal** membuka pemilih berkas di perangkat. Berkas `.srt` dikonversi ke WebVTT di browser; header `.vtt` diperiksa, lalu track dipilih otomatis dan tetap bisa diganti lewat menu CC. Tombol **×** melepas track dan menghapus subtitle lokal dari memori player.
+
+- Batas ukuran **10 MB**. File hanya dibaca browser dan dipasang sebagai Blob URL lokal — **tidak diunggah atau dikirim ke backend**.
+- Subtitle dipertahankan di memori saat berganti server pada episode yang sama, tetapi dibersihkan saat pindah episode, menghapusnya, atau menutup player. Object URL/track dilepas saat sumber video berubah.
+- Embed iframe pihak ketiga (lintas-domain) tidak dapat diberi track lokal; kontrol hanya muncul untuk player HLS/native milik Kazanime. File tidak disimpan setelah halaman dimuat ulang.
 
 ### 🤖 Subtitle Indonesia (AI) — Tahap F (22 Okt 2026)
 
@@ -473,6 +486,8 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 |---|---|---|
 | **AnimeXin** | ✅ aktif, diverifikasi live | robots.txt mengizinkan semua; tidak ada ToS (DMCA & Privacy Policy tanpa larangan bot). Latest = beranda + `/anime/?order=update` (2 request, slug asli digabung lewat ID seri). 16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, Mega, …) + link download Sub Indo/English |
 | **Samehadaku** | 🟡 adapter & fixture teruji; baseline terbaru homepage di-challenge | robots.txt hanya melarang `/wp-admin/`; ToS tidak tertaut → `unknown` (konten hanya diakses bila robots.txt terbaca & mengizinkan). Adapter menyediakan anime terbaru, pencarian, detail, server Hardsub Indonesia, unduhan, dan jadwal; bila challenge, cooldown 30 mnt dan fallback dipakai |
+| **Anoboy** | 🟡 default-enabled, robots fail-closed | Adapter dan fixture offline dari snapshot pengguna (22 Okt 2026). ToS/robots belum diverifikasi → `unknown`; request konten hanya jika robots.txt terbaca & mengizinkan. Server diambil dari `.aspd-server[data-url]`, dilabeli Sub Indo; belum live-tested |
+| **Sakunime** | 🟡 default-enabled, robots fail-closed | Adapter dan fixture offline dari snapshot pengguna (22 Okt 2026). ToS/robots belum diverifikasi → `unknown`; request konten hanya jika robots.txt terbaca & mengizinkan. Hanya `#playerShell[data-default]` eksplisit (Sub Indo); `serverId` opaque tidak di-resolve; belum live-tested |
 | **Anichin** | 🟡 aktif, parser diverifikasi dgn HTML asli | (22 Okt 2026) robots.txt mengizinkan (kecuali /wp-admin/); tema AnimeStream (parser AnimeXin). Dari IP pusat data: request kadang lolos, kadang challenge Cloudflare (beranda & halaman episode paling sering) |
 | **hianime.ro** | ✅ aktif, diverifikasi live | (22 Okt 2026) robots.txt hanya melarang /wp-admin/; tanpa Cloudflare challenge. Recently Updated, pencarian, detail, daftar episode & server lewat REST `wp-json/v1/otakuthemes` — server "Fast" & "mega" (Sub English) |
 | **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Adapter mengklasifikasikan server Sub Indo sebagai Hardsub sesuai konfirmasi pemilik proyek; sumber tetap ditandai *blocked*, tanpa data palsu. Gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
@@ -486,8 +501,8 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 
 ### Environment variable (semua opsional)
 Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di User-Agent),
-`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anichin,otakudesu,hianime`; `kuramanime` opt-in),
-`SAMEHADAKU_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti),
+`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anoboy,sakunime,anichin,otakudesu,hianime`; `kuramanime` opt-in),
+`SAMEHADAKU_BASE_URL` / `ANOBOY_BASE_URL` / `SAKUNIME_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti),
 `CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
 Penyedia stream: `STREAM_PROVIDERS` (default `reanime,anizone`), **`STREAM_SECRET`** (≥ 16 karakter acak — isi di
 Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RATE_LIMIT_PER_MIN`,
