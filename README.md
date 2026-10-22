@@ -513,6 +513,13 @@ npm run check:sources -- --live   # uji langsung ke situs sumber (±5 request pe
 Diukur dari runner GitHub Actions (IP pusat data, mirip Vercel): **hianime.ro** selalu lolos, tetapi **Anichin, AniZone,
 ReAnime, AnimeXin, Samehadaku** di-challenge Cloudflare *kadang-kadang* — request yang sama beberapa detik kemudian
 sering lolos, dan pada run lain semuanya diblokir selama beberapa menit. **Otakudesu** memblokir permanen untuk IP pusat data.
+
+Pemeriksaan baseline non-evasif tersedia lewat `npm run check:reachability` dan workflow GitHub Actions
+`Upstream reachability baseline`. Runner mengirim User-Agent KazanimeBot yang transparan: satu GET `robots.txt`, lalu
+satu GET `/` hanya jika robots.txt terbaca dan mengizinkan (termasuk `Crawl-delay`). Redirect tidak diikuti; tidak ada
+fingerprint browser, cookie, proxy, retry, atau solver challenge. Hasilnya hanya menunjukkan akses biasa saat pemeriksaan,
+bukan izin penggunaan konten atau cara untuk melewati proteksi.
+
 - Backend mengulang challenge maks 2×, lalu menandai sumber *blocked* sementara (3–30 mnt) dan memakai cache lama
   (maks 1 jam) atau fallback. Halaman tidak pernah menampilkan data palsu: tombol server penyedia tampil
   "tidak tersedia", daftar episode/server tetap dari sumber lain.

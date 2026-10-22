@@ -1,0 +1,37 @@
+name: Upstream reachability baseline
+
+on:
+  push:
+    branches:
+      - arena/8e2bb76b-kazaanime
+    paths:
+      - '.github/workflows/source-reachability.yml'
+      - 'server/scripts/check-source-reachability.js'
+      - 'server/test/reachability.test.js'
+      - 'server/lib/fetcher.js'
+      - 'server/lib/robots.js'
+      - 'server/config.js'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Transparent GET baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.3'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Check ordinary upstream reachability
+        run: npm run check:reachability
