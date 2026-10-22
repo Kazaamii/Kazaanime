@@ -35,6 +35,10 @@
  *    menu CC player); Indonesia dipilih otomatis bila ada.
  *  - Server dengan `mirrors` (ReAnime HD-2/HD-1) mencoba mirror berikutnya sebelum pindah server.
  *  - Slot penyedia yang belum selesai dicari (`pending`) tampil "mencari…".
+ *  - "Subtitle Indonesia (AI)": bila server HLS tidak punya subtitle Indonesia dan backend menawarkannya
+ *    (`server.ai`), subtitle Inggris diterjemahkan Gemini saat video mulai diputar (ui/ai-subtitle.js).
+ *    Track AI tampil otomatis & subtitle bawaan disembunyikan; subtitle asli tetap bisa dipilih di menu subtitle
+ *    player (ikon CC di Firefox/Safari, menu titik tiga → Captions di Chrome).
  *
  * Tidak ada fetch di sini. Daftar server (StreamServer[]) datang dari js/api.
  */
@@ -42,6 +46,7 @@ import { PLAYER, LEGAL_PLATFORMS } from '../config.js';
 import { html, delegate } from './dom.js';
 import { showToast } from './toast.js';
 import { icon, hasIcon } from './icons.js';
+import { createAiSubtitle, aiErrorText } from './ai-subtitle.js';
 
 /** @typedef {import('../api/streams.js').StreamServer} StreamServer */
 
@@ -95,15 +100,49 @@ function percentOf(data) {
 }
 
 /**
+ * Keterangan subtitle di status bar selama/sesudah terjemahan AI.
+ * @param {{phase: string, done: number, total: number, label: string}} s
+ * @param {{label: string}|undefined} def subtitle bawaan yang dipilih
+ */
+function aiNote(s, def) {
+    const orig = def?.label || 'subtitle asli';
+    switch (s.phase) {
+        case 'translating':
+            return s.done ? `${s.label} · menerjemahkan ${s.done}/${s.total}` : `${orig} · menerjemahkan ke ${s.label}…`;
+        case 'ready': return s.label;
+        case 'partial': return `${s.label}, sebagian ${orig}`;
+        case 'kept': return `${s.showing || 'Subtitle mati'} · ${s.label} siap di menu subtitle`;
+        default: return orig;
+    }
+}
+
+/**
+ * Toast sekali per kejadian penting.
+ * @returns {{key: string, text: string, type: 'success'|'error'|'info', duration?: number}|null}
+ */
+function aiToast(s, def) {
+    const orig = def?.label || 'asli';
+    if (s.phase === 'translating' && s.first) {
+        return { key: 'on', type: 'success', duration: 6000, text: `Subtitle ${s.label} aktif — terjemahan mesin, bisa kurang tepat. Subtitle ${orig} tetap bisa dipilih di menu subtitle player (ikon CC atau menu titik tiga).` };
+    }
+    if (s.phase === 'kept' && s.first) return { key: 'kept', type: 'info', text: `Subtitle ${s.label} siap — pilih lewat menu subtitle player (ikon CC atau menu titik tiga).` };
+    if (s.phase === 'partial') return { key: 'partial', type: 'info', duration: 8000, text: `Sebagian subtitle belum bisa diterjemahkan AI — bagian itu memakai subtitle ${orig}. ${aiErrorText(s.error)}` };
+    if (s.phase === 'failed') return { key: 'failed', type: 'info', duration: 8000, text: `Subtitle ${s.label} tidak tersedia. ${aiErrorText(s.error)} Subtitle ${orig} tetap dipakai.` };
+    return null;
+}
+
+/**
  * @param {{
  *   stage: HTMLElement,          isi area player (#playerStage)
  *   serverBox: HTMLElement,      wadah tombol server (#serverButtons)
  *   status: HTMLElement,         status bar (#playerStatus) — kelas is-ok / is-error
  *   statusText: HTMLElement,     teks status (#playerStatusText)
  *   getTitle?: () => string,     judul anime (untuk title iframe & tautan platform legal)
+ *   fetchAiSubtitle?: ((url: string, part: number, o: {signal?: AbortSignal}) => Promise<any>)|null,
+ *                                bagian "Subtitle Indonesia (AI)" (js/api getAiSubtitlePart); null = fitur mati
  * }} opts
  */
-export function createPlayer({ stage, serverBox, status, statusText, getTitle = () => '' }) {
+export function createPlayer({ stage, serverBox, status, statusText, getTitle = () => '', fetchAiSubtitle = null }) {
     /** @type {Record<string, Set<Function>>} */
     const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
@@ -121,6 +160,8 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
     let video = null;
     /** Instance hls.js aktif (server HLS di browser tanpa HLS native). */
     let hls = null;
+    /** Pengendali "Subtitle Indonesia (AI)" untuk video yang sedang diputar. */
+    let aiSub = null;
     /** id server → indeks mirror yang sedang dicoba (direset per episode). */
     let mirror = new Map();
     const urlOf = (server) => server.mirrors?.[mirror.get(server.id) || 0] || server.url;
@@ -161,6 +202,10 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
         if (frame) {
             frame.remove(); // melepas iframe = video/audio benar-benar berhenti
             frame = null;
+        }
+        if (aiSub) {
+            aiSub.destroy(); // batalkan request terjemahan yang masih berjalan
+            aiSub = null;
         }
         if (hls) {
             try { hls.destroy(); } catch { /* sudah dilepas */ }
@@ -307,13 +352,46 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
             if (t === def) track.default = true;
             v.append(track);
         }
+        // "Subtitle Indonesia (AI)": hanya bila subtitle Indonesia tidak ada & backend menawarkannya.
+        let subNote = def ? def.label : '';
+        let aiShown = false;
+        let lastPct = 0;
+        const statusLine = () => (lastPct > 0
+            ? `${server.name} | EP ${ep} | ${Math.round(lastPct * 100)}%${aiShown && subNote ? ` | ${subNote}` : ''}`
+            : `${server.name} | Episode ${ep} | ${LANG_LABELS.multi}${subNote ? ` (${subNote})` : ''}`);
+        const hasIndo = subs.some((t) => t.lang.split('-')[0] === 'id');
+        if (!hasIndo && server.ai && typeof fetchAiSubtitle === 'function' && PLAYER.aiSubtitle?.enabled !== false) {
+            const ai = server.ai;
+            const toasted = new Set();
+            aiSub = createAiSubtitle({
+                video: v,
+                ai,
+                fetchPart: (part, signal) => fetchAiSubtitle(ai.url, part, { signal }),
+                retryDelays: PLAYER.aiSubtitle?.retryDelays,
+                onState: (s) => {
+                    if (my !== token) return;
+                    aiShown = true;
+                    subNote = aiNote(s, def);
+                    const msg = aiToast(s, def);
+                    if (msg && !toasted.has(msg.key)) {
+                        toasted.add(msg.key);
+                        showToast(msg.text, msg.type, msg.duration);
+                    }
+                    if (state === 'playing') setStatus(statusLine(), 'ok', { quiet: s.phase === 'translating' && !s.first });
+                },
+            });
+            // Mulai saat video BENAR-BENAR diputar (bukan saat halaman dibuka) → kuota hanya untuk penonton.
+            v.addEventListener('playing', () => {
+                if (my === token) aiSub?.start();
+            }, { once: true });
+        }
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
             clearTimeout(overlayTimer);
             state = 'playing';
             overlay.remove();
-            setStatus(`${server.name} | Episode ${ep} | ${LANG_LABELS.multi}${def ? ` (${def.label})` : ''}`, 'ok');
+            setStatus(statusLine(), 'ok');
             renderServers();
             emit('loaded', { ep, server });
             v.play().catch(() => { /* autoplay ditolak browser → pengguna menekan play */ });
@@ -325,13 +403,12 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
             completedFor = ep;
             emit('complete', { ep, server });
         });
-        let lastPct = 0;
         v.addEventListener('timeupdate', () => {
             if (my !== token || !Number.isFinite(v.duration) || v.duration <= 0) return;
             const pct = clamp01(v.currentTime / v.duration);
             if (Math.abs(pct - lastPct) < 0.02 && pct < 0.99) return;
             lastPct = pct;
-            setStatus(`${server.name} | EP ${ep} | ${Math.round(pct * 100)}%`, 'ok', { quiet: true });
+            setStatus(statusLine(), 'ok', { quiet: true });
             emit('progress', { ep, percent: pct });
         });
 

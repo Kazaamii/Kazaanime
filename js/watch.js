@@ -38,7 +38,7 @@ import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
 import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
 import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
-    friendlyError, getEpisodeExtras, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
+    friendlyError, getAiSubtitlePart, getEpisodeExtras, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
     retrySourcesNow, withProviderServers,
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
@@ -212,6 +212,7 @@ const player = createPlayer({
     status: $('#playerStatus'),
     statusText: $('#playerStatusText'),
     getTitle: () => anime.title,
+    fetchAiSubtitle: getAiSubtitlePart, // "Subtitle Indonesia (AI)" (hanya bila backend menawarkannya)
 });
 
 const episodes = createEpisodeList({

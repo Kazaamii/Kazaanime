@@ -361,4 +361,16 @@ export const PLAYER = Object.freeze({
     hlsScript: '/js/vendor/hls.min.js',
     /** Urutan subtitle yang dipilih otomatis (kode bahasa). */
     subtitlePriority: Object.freeze(['id', 'en']),
+    /**
+     * "Subtitle Indonesia (AI)" (22 Okt 2026). Bila episode di player bawaan tidak punya subtitle Indonesia DAN
+     * backend menawarkannya (`server.ai`, hanya bila GEMINI_API_KEY diisi di server), subtitle Inggris
+     * diterjemahkan Gemini per bagian saat video mulai diputar. Key tidak pernah ada di frontend.
+     */
+    aiSubtitle: Object.freeze({
+        enabled: true,
+        /** Satu bagian bisa butuh puluhan detik (batas fungsi Vercel 60 dtk). */
+        requestTimeout: 65000,
+        /** Jeda sebelum mengulang bagian yang gagal sementara (ms); Retry-After server dihormati (maks 2 menit). */
+        retryDelays: Object.freeze([5000, 20000]),
+    }),
 });

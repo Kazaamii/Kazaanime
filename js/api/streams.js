@@ -32,6 +32,9 @@
  * @property {string[]|null} [mirrors] URL cadangan penyedia yang sama (dicoba berurutan sebelum pindah server)
  * @property {string} [direct]       (hls) URL CDN untuk HLS native Safari/iOS
  * @property {{label:string, lang:string, url:string, default:boolean}[]} [subtitles] (hls) track WebVTT
+ * @property {{url:string, from:string, sourceLabel:string, label:string}|null} [ai] (hls, 22 Okt 2026) tawaran
+ *           "Subtitle Indonesia (AI)" dari backend — hanya ada bila episode TIDAK punya subtitle Indonesia
+ *           dan backend punya GEMINI_API_KEY (lihat ui/ai-subtitle.js)
  * @property {string} [provider]     slot penyedia ('reanime' | 'anizone')
  * @property {boolean} [pending]     slot penyedia yang hasilnya belum datang
  *
