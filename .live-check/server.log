@@ -1,0 +1,23 @@
+
+🌸 Kazanime berjalan di http://localhost:3000
+   API      : http://localhost:3000/api/health
+   Sumber   : animexin, samehadaku
+   UA bot   : KazanimeBot/1.0 (local development)
+
+[api] GET /api/health 200 3ms
+[api] GET /api/health 200 0ms
+[api] GET /api/anime/latest 200 2050ms source=samehadaku
+[api] GET /api/anime/search?q=Kusuriya%20no%20Hitorigoto 200 1407ms source=metadata fallback
+[api] GET /api/anime/search?q=Renegade%20Immortal 200 196ms source=metadata fallback
+[api] GET /api/anime/search?q=Cyberpunk%20Edgerunners 200 349ms source=metadata fallback
+[api] GET /api/anime/anichin~renegade-immortal 404 1ms
+[api] GET /api/anime/anichin~renegade-immortal/episode/163 404 1ms
+[api] GET /api/anime/hianime~cyberpunk-edgerunners-2 404 0ms
+[api] GET /api/anime/hianime~cyberpunk-edgerunners-2/episode/1 404 1ms
+[api] GET /api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo 404 1ms
+[api] GET /api/anime/schedule → 503 SOURCES_UNAVAILABLE Jadwal rilis tidak tersedia: semua sumber sedang bermasalah.
+[api] GET /api/anime/schedule 503 2ms
+[api] GET /api/stream/servers?ep=1&anilist=21&title=One%20Piece&year=1999 404 1ms
+[api] GET /api/stream/servers?ep=3&anilist=159042&title=Reincarnated%20as%20a%20Sword%20Season%202&title=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season&year=2026 404 1ms
+[api] GET /api/stream/servers?ep=1&title=Frieren%3A%20Beyond%20Journey%27s%20End&title=Sousou%20no%20Frieren&year=2023 404 0ms
+[api] GET /api/health 200 0ms

@@ -1,0 +1,263 @@
+{
+  "startedAt": "2026-10-22T09:20:44.919Z",
+  "steps": [
+    {
+      "name": "health",
+      "path": "/api/health",
+      "status": 200,
+      "ms": 3,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": true,
+        "source": "kazanime-backend",
+        "errors": [],
+        "sources": [
+          "animexin:unchecked/closed",
+          "samehadaku:unchecked/closed"
+        ]
+      }
+    },
+    {
+      "name": "latest (semua adapter)",
+      "path": "/api/anime/latest",
+      "status": 200,
+      "ms": 2052,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "samehadaku",
+        "fallback": false,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin memblokir akses bot (Cloudflare) — tidak dipaksa."
+        ],
+        "count": 14,
+        "bySource": {
+          "samehadaku": 14
+        },
+        "sample": [
+          "samehadaku~kikansha-no-mahou-wa-tokubetsu-desu-season-2 | Kikansha no Mahou wa Tokubetsu desu Season 2 | ep3 | img:y",
+          "samehadaku~shin-tennis-no-oujisama-u-17-world-cup-kesshou-member-ketteisen | Shin Tennis no Oujisama: U-17 World Cup – Kesshou Member Ketteisen | ep4 | img:y",
+          "samehadaku~tensei-shitara-ken-deshita-s2 | Tensei shitara Ken deshita S2 | ep4 | img:y"
+        ]
+      }
+    },
+    {
+      "name": "search kusuriya",
+      "path": "/api/anime/search?q=Kusuriya%20no%20Hitorigoto",
+      "status": 200,
+      "ms": 1408,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=120, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "metadata",
+        "fallback": true,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±1800 dtk.",
+          "samehadaku:blocked:samehadaku memblokir akses bot (Cloudflare) — tidak dipaksa."
+        ],
+        "count": 7,
+        "bySource": {
+          "kitsu": 7
+        },
+        "sample": [
+          "null | The Apothecary Diaries | ep- | img:y",
+          "null | The Apothecary Diaries Season 2 | ep- | img:y",
+          "null | The Apothecary Diaries Season 3 | ep- | img:y"
+        ]
+      }
+    },
+    {
+      "name": "search renegade",
+      "path": "/api/anime/search?q=Renegade%20Immortal",
+      "status": 200,
+      "ms": 197,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=120, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "metadata",
+        "fallback": true,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±1799 dtk.",
+          "samehadaku:blocked:samehadaku sedang diistirahatkan (blocked), dicoba lagi ±1799 dtk."
+        ],
+        "count": 2,
+        "bySource": {
+          "kitsu": 2
+        },
+        "sample": [
+          "null | Renegade Immortal | ep- | img:y",
+          "null | Renegade Immortal: Battle of Gods | ep- | img:y"
+        ]
+      }
+    },
+    {
+      "name": "search cyberpunk",
+      "path": "/api/anime/search?q=Cyberpunk%20Edgerunners",
+      "status": 200,
+      "ms": 350,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=0, s-maxage=120, stale-while-revalidate=1800",
+      "summary": {
+        "ok": true,
+        "source": "metadata",
+        "fallback": true,
+        "stale": false,
+        "errors": [
+          "animexin:blocked:animexin sedang diistirahatkan (blocked), dicoba lagi ±1799 dtk.",
+          "samehadaku:blocked:samehadaku sedang diistirahatkan (blocked), dicoba lagi ±1799 dtk."
+        ],
+        "count": 3,
+        "bySource": {
+          "kitsu": 3
+        },
+        "sample": [
+          "null | CYBERPUNK: EDGERUNNERS | ep- | img:y",
+          "null | CYBERPUNK: EDGERUNNERS II | ep- | img:y",
+          "null | Let You Down | ep- | img:y"
+        ]
+      }
+    },
+    {
+      "name": "detail anichin",
+      "path": "/api/anime/anichin~renegade-immortal",
+      "status": 404,
+      "ms": 2,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=300",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Sumber \"anichin\" tidak dikenal atau sedang dimatikan."
+      }
+    },
+    {
+      "name": "episode anichin 163",
+      "path": "/api/anime/anichin~renegade-immortal/episode/163",
+      "status": 404,
+      "ms": 2,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=300",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Sumber \"anichin\" tidak dikenal atau sedang dimatikan."
+      }
+    },
+    {
+      "name": "detail hianime",
+      "path": "/api/anime/hianime~cyberpunk-edgerunners-2",
+      "status": 404,
+      "ms": 2,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=300",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Sumber \"hianime\" tidak dikenal atau sedang dimatikan."
+      }
+    },
+    {
+      "name": "episode hianime 1",
+      "path": "/api/anime/hianime~cyberpunk-edgerunners-2/episode/1",
+      "status": 404,
+      "ms": 1,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=300",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Sumber \"hianime\" tidak dikenal atau sedang dimatikan."
+      }
+    },
+    {
+      "name": "detail otakudesu",
+      "path": "/api/anime/otakudesu~kusuriya-hitorigoto-s3-sub-indo",
+      "status": 404,
+      "ms": 3,
+      "type": "application/json; charset=utf-8",
+      "cache": "public, max-age=60, s-maxage=300",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Sumber \"otakudesu\" tidak dikenal atau sedang dimatikan."
+      }
+    },
+    {
+      "name": "schedule",
+      "path": "/api/anime/schedule",
+      "status": 503,
+      "ms": 2,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "SOURCES_UNAVAILABLE: Jadwal rilis tidak tersedia: semua sumber sedang bermasalah."
+      }
+    },
+    {
+      "name": "stream servers One Piece ep1",
+      "path": "/api/stream/servers?ep=1&anilist=21&title=One%20Piece&year=1999",
+      "status": 404,
+      "ms": 1,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Endpoint tidak ditemukan."
+      }
+    },
+    {
+      "name": "stream servers Ken Deshita S2 ep3",
+      "path": "/api/stream/servers?ep=3&anilist=159042&title=Reincarnated%20as%20a%20Sword%20Season%202&title=Tensei%20Shitara%20Ken%20Deshita%202nd%20Season&year=2026",
+      "status": 404,
+      "ms": 1,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Endpoint tidak ditemukan."
+      }
+    },
+    {
+      "name": "stream servers tanpa anilist (judul)",
+      "path": "/api/stream/servers?ep=1&title=Frieren%3A%20Beyond%20Journey's%20End&title=Sousou%20no%20Frieren&year=2023",
+      "status": 404,
+      "ms": 1,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": false,
+        "errors": [],
+        "error": "NOT_FOUND: Endpoint tidak ditemukan."
+      }
+    },
+    {
+      "name": "health (akhir)",
+      "path": "/api/health",
+      "status": 200,
+      "ms": 1,
+      "type": "application/json; charset=utf-8",
+      "cache": "no-store",
+      "summary": {
+        "ok": true,
+        "source": "kazanime-backend",
+        "errors": [],
+        "sources": [
+          "animexin:ok/open(blocked)",
+          "samehadaku:ok/open(blocked)"
+        ]
+      }
+    }
+  ],
+  "finishedAt": "2026-10-22T09:20:49.545Z"
+}
