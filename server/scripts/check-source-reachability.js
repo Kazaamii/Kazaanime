@@ -206,6 +206,13 @@ export async function main(targets = DEFAULT_TARGETS) {
 
     const summary = markdownSummary(results);
     console.log(summary);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+        for (const result of results) {
+            const message = `site=${result.id}; robots=${checkLabel(result.robots)}; homepage=${checkLabel(result.homepage)}`
+                .replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+            console.log(`::notice::${message}`);
+        }
+    }
     if (process.env.GITHUB_STEP_SUMMARY) {
         await appendFile(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`, 'utf8');
     }
