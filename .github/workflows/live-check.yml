@@ -19,8 +19,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Probe
-        run: node tools/live-check/probe.mjs
+      - run: npm ci --no-audit --no-fund
+      - name: Uji end-to-end (server asli → situs live)
+        run: |
+          LOG_REQUESTS=1 node server/index.js > .live-check-server.log 2>&1 &
+          node tools/live-check/e2e.mjs
+          mkdir -p .live-check && tail -n 80 .live-check-server.log > .live-check/server.log || true
       - name: Commit hasil
         run: |
           git config user.name "live-check[bot]"
