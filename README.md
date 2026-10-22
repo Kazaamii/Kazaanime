@@ -118,7 +118,7 @@ kazanime/
     │   └── match.js           pencocokan judul (2nd Season = Season 2 = II)
     ├── scripts/
     │   └── check-sources.js   `npm run check:sources [-- --live]`: laporan robots/ToS/kesehatan sumber
-    └── test/                  `npm test` (node:test, 143 test) + fixtures/ (HTML/JSON asli dipangkas; Otakudesu anime/episode = rekonstruksi struktur)
+    └── test/                  `npm test` (node:test, 145 test) + fixtures/ (HTML/JSON asli dipangkas; Otakudesu anime/episode = rekonstruksi struktur)
 ```
 
 ---
@@ -264,7 +264,7 @@ Urutan sejak 22 Okt 2026 (bagian 3) — `servers()` di `js/watch.js`, slot cadan
 | 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Indonesia (AnimeXin juga Inggris) |
 | 2 | **MegaPlay** `megaplay.buzz` (cadangan #1, via id AniList) | hampir semua anime Jepang | Inggris |
 | 3 | **ReAnime** (cadangan #2 — **menggantikan MegaPlay-MAL**) | embed `flixcloud.cc` dari API publik `reanime.to/api/flix/<id AniList>/<ep>`; mirror HD-2 → HD-1 dicoba otomatis | Inggris |
-| 4 | **AniZone — Multi Sub** (tombol baru) | HLS di player bawaan + 10–16 pilihan subtitle (Indonesia dipilih otomatis bila ada); audio Jepang/Inggris | Banyak bahasa |
+| 4 | **AniZone — Multi Sub** (tombol baru) | HLS di player bawaan + 10–16 pilihan subtitle (Indonesia dipilih otomatis bila ada); audio Jepang/Inggris. Chrome/Firefox/Edge/Android: hls.js lewat proxy `/api/stream/hls` (CDN mengunci CORS & key AES ke anizone.to); Safari/iOS: HLS native langsung dari CDN | Banyak bahasa |
 | 5 | **Vidnest** · **TryEmbed** (cadangan, via id AniList) | pustaka HiAnime yang sama | Inggris |
 | 6 | **hianime.ro** (backend) | server "Fast" (player blogger hianime.ro) & "mega" (megaplay.su) — embed berbasis id yang sudah ada di atas tidak diulang | Inggris |
 
@@ -454,7 +454,7 @@ Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RAT
 
 ### Tes
 ```bash
-npm test                          # 143 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
+npm test                          # 145 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
                                   # acak, stream biner), parser animexin/samehadaku/anichin/hianime/otakudesu (fixture asli;
                                   # Otakudesu anime/episode = rekonstruksi struktur), ReAnime & AniZone (JSON/HTML asli),
                                   # proxy HLS (playlist asli, Range, tanda tangan), ASS/SRT → VTT, jadwal, metadata, routes

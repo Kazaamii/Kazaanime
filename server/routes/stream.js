@@ -97,12 +97,19 @@ export function streamRouter({ providers, mediaClient, signer, budgetMs, subRetr
         // Pengguna menutup koneksi sebelum respons selesai → batalkan fetch ke CDN.
         // (BUKAN req.on('close'): sejak Node 16 event itu terpicu begitu request GET selesai dibaca.)
         res.on('close', () => { if (!res.writableFinished) ac.abort(); });
-        const up = await mediaClient.stream(target, {
+        const fetchUp = () => mediaClient.stream(target, {
             signal: ac.signal,
             headers: range ? { Range: range } : {},
             timeoutMs: STREAMS.proxyTimeoutMs,
             maxBytes: STREAMS.maxSegmentBytes,
         });
+        let up = await fetchUp();
+        // Challenge Cloudflare acak di CDN (terukur 22 Okt 2026: key AES sesekali 403 lalu lolos) → ulangi SEKALI.
+        if ((up.status === 403 || up.status === 503) && /text\/html/i.test(up.headers.get('content-type') || '')) {
+            await up.body?.cancel().catch(() => {});
+            await sleep(subRetryDelayMs / 2, ac.signal);
+            up = await fetchUp();
+        }
         if (up.status >= 400) {
             await up.body?.cancel().catch(() => {});
             throw new AppError(`Server video membalas HTTP ${up.status}.`, { status: up.status === 404 ? 404 : 502, code: 'UPSTREAM' });

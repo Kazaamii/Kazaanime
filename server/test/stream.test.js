@@ -348,3 +348,18 @@ test('GET /api/stream/hls dengan fetcher SUNGGUHAN + upstream lambat: tidak diba
         await upstream.close();
     }
 });
+
+test('GET /api/stream/hls: CDN membalas challenge HTML sekali → diulang otomatis, key tetap terkirim', async () => {
+    const KEY = 'https://suzaku.xin-cdn.xyz/77/keys/abc.key';
+    const media = fakeMedia({
+        [KEY]: (n) => (n === 1
+            ? { status: 403, headers: { 'content-type': 'text/html; charset=UTF-8', server: 'cloudflare' }, body: '<title>Just a moment...</title>' }
+            : { headers: { 'content-type': 'application/octet-stream' }, body: new Uint8Array(16).fill(9) }),
+    });
+    await withStreamApp({ streams: fakeStreams([]), media }, async (base, signer) => {
+        const r = await fetch(`${base}/api/stream/hls?u=${encodeTarget(KEY)}&s=${signer.sign(KEY)}`);
+        assert.equal(r.status, 200);
+        assert.equal((await r.arrayBuffer()).byteLength, 16);
+        assert.equal(media.calls.filter((c) => c.url === KEY).length, 2);
+    });
+});
