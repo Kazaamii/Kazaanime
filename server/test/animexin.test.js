@@ -75,18 +75,21 @@ test('animexin: halaman episode → 16 server (base64 → iframe), download tanp
     assert.equal(r.seriesUrl, 'https://animexin.dev/tales-of-demons-and-gods-season-10/');
     assert.equal(r.servers.length, 16);
     assert.ok(r.servers.every((s) => s.url.startsWith('https://')), 'protocol-relative //ok.ru → https');
-    assert.ok(r.servers.some((s) => s.url === 'https://ok.ru/videoembed/16132622453300?nochat=1' && s.name === 'OK.ru (Sub Indo)' && s.lang === 'id'));
+    assert.ok(r.servers.some((s) => s.url === 'https://ok.ru/videoembed/16132622453300?nochat=1' && s.name === 'OK.ru (Sub Indo)' && s.lang === 'id' && s.subtitleType === 'hard'));
     assert.equal(r.servers.filter((s) => s.lang === 'id').length, 6);
+    assert.equal(r.servers.filter((s) => s.subtitleType === 'hard').length, 10, 'label hardsub per server dipertahankan');
     assert.ok(!r.servers.some((s) => /follow-up/.test(s.name)), 'select komentar diabaikan');
     assert.equal(r.downloads.length, 2);
     assert.deepEqual(r.downloads.map((d) => [d.quality, d.subtitle, d.format, d.links.length]), [['1080p', 'Sub Indo', 'MP4', 3], ['1080p', 'Sub English', 'MP4', 3]]);
     assert.ok(!JSON.stringify(r.downloads).includes('ko-fi'), 'grup Membership VIP (ko-fi) dibuang');
 });
 
-test('animexin: nama server rapi', () => {
-    assert.deepEqual(describeServer('Hardsub Indonesia Dailymotion AX', 'https://geo.dailymotion.com/player/x.html?video=1'), { name: 'Dailymotion (Sub Indo)', lang: 'id' });
+test('animexin: nama server rapi dan jenis sub hanya dicatat jika eksplisit', () => {
+    assert.deepEqual(describeServer('Hardsub Indonesia Dailymotion AX', 'https://geo.dailymotion.com/player/x.html?video=1'), { name: 'Dailymotion (Sub Indo)', lang: 'id', subtitleType: 'hard' });
+    assert.deepEqual(describeServer('Soft-sub Indonesia Dailymotion AX', 'https://geo.dailymotion.com/player/x.html?video=1'), { name: 'Dailymotion (Sub Indo)', lang: 'id', subtitleType: 'soft' });
+    assert.deepEqual(describeServer('Dtube Indo AX', 'https://play.d.tube?v=1'), { name: 'DTube (Sub Indo)', lang: 'id' });
     assert.deepEqual(describeServer('All Sub Streamwish AX', 'https://animexinfansub.seekplayer.vip/#1'), { name: 'Streamwish (Multi Sub)', lang: 'multi' });
-    assert.deepEqual(describeServer('Hardsub English Ok.ru AX', 'https://ok.ru/videoembed/1'), { name: 'OK.ru (Sub English)', lang: 'en' });
+    assert.deepEqual(describeServer('Hardsub English Ok.ru AX', 'https://ok.ru/videoembed/1'), { name: 'OK.ru (Sub English)', lang: 'en', subtitleType: 'hard' });
     assert.deepEqual(describeServer('', 'https://rumble.com/embed/v1/'), { name: 'Rumble', lang: null });
 });
 
@@ -142,6 +145,7 @@ test('animexin adapter: search, getAnime, getEpisode', async () => {
     const ep = await a.getEpisode(ref, 34, { anime });
     assert.equal(ep.episode, 34);
     assert.equal(ep.servers[0].lang, 'id', 'Sub Indo didahulukan');
+    assert.equal(ep.servers[0].subtitleType, 'hard', 'label Hardsub bertahan hingga payload endpoint');
     assert.equal(ep.servers.length, 16);
     assert.equal(ep.downloads[0].subtitle, 'Sub Indo');
     assert.equal(ep.url, epUrl);

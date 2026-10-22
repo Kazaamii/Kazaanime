@@ -272,7 +272,7 @@ Urutan sejak 22 Okt 2026 (bagian 3) — `servers()` di `js/watch.js`, slot cadan
 | Urutan | Sumber | Isi | Subtitle |
 |---|---|---|---|
 | 1 | **Samehadaku** · **Otakudesu** (backend) | anime Jepang — server per episode + link download | Indonesia |
-| 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Indonesia (AnimeXin juga Inggris) |
+| 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Indonesia (AnimeXin juga Inggris; label Hardsub/Softsub AnimeXin ditampilkan bila dicantumkan sumber) |
 | 2 | **MegaPlay** `megaplay.buzz` (cadangan #1, via id AniList) | hampir semua anime Jepang | Inggris |
 | 3 | **ReAnime** (cadangan #2 — **menggantikan MegaPlay-MAL**) | embed `flixcloud.cc` dari API publik `reanime.to/api/flix/<id AniList>/<ep>`; mirror HD-2 → HD-1 dicoba otomatis | Inggris |
 | 4 | **AniZone — Multi Sub** (tombol baru) | HLS di player bawaan + 10–16 pilihan subtitle (Indonesia dipilih otomatis bila ada); audio Jepang/Inggris. Chrome/Firefox/Edge/Android: hls.js lewat proxy `/api/stream/hls` (CDN mengunci CORS & key AES ke anizone.to); Safari/iOS: HLS native langsung dari CDN | Banyak bahasa |

@@ -27,6 +27,7 @@
  * @property {string}   reason       alasan tidak tersedia (untuk tooltip/toast)
  * @property {string}   source       'static' | 'backend:<situs>'
  * @property {string}   lang         bahasa subtitle: 'id' | 'en' | 'multi' | '' (tidak diketahui)
+ * @property {'hard'|'soft'} [subtitleType] jenis subtitle bila dicantumkan eksplisit oleh sumber
  * @property {string[]} origins      origin yang boleh mengirim postMessage untuk server ini
  * @property {'embed'|'hls'} [kind]  'hls' = player video bawaan (AniZone), selain itu iframe
  * @property {string[]|null} [mirrors] URL cadangan penyedia yang sama (dicoba berurutan sebelum pindah server)

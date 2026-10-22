@@ -59,6 +59,7 @@ const OVERLAY_MAX_MS = 3000;
 const COMPLETE_EVENTS = new Set(['complete', 'ended', 'finish', 'finished']);
 /** Label bahasa subtitle server (StreamServer.lang) untuk status bar. */
 const LANG_LABELS = { id: 'Sub Indo', en: 'Sub English', multi: 'Multi Sub' };
+const SUBTITLE_TYPE_LABELS = { hard: 'Hardsub', soft: 'Softsub' };
 const HLS_MIME = 'application/vnd.apple.mpegurl';
 const ICON_LOCK = icon('lock');
 
@@ -83,10 +84,11 @@ const PROGRESS_EVENTS = new Set(['time', 'timeupdate', 'progress', 'watching-log
 
 const clamp01 = (n) => Math.min(1, Math.max(0, n));
 
-/** " | Sub Indo" — kosong bila bahasa tidak diketahui atau sudah tertulis di nama server. */
+/** Bahasa & jenis subtitle pada status bar — kosong bila sudah tertulis di nama server. */
 function langSuffix(server) {
-    const label = LANG_LABELS[server.lang];
-    return label && !String(server.name).includes(label) ? ` | ${label}` : '';
+    const labels = [LANG_LABELS[server.lang], SUBTITLE_TYPE_LABELS[server.subtitleType]]
+        .filter((label) => label && !String(server.name).includes(label));
+    return labels.length ? ` | ${labels.join(' · ')}` : '';
 }
 
 /** Persentase tonton dari payload player (0–1), null bila tidak ada. */

@@ -9,7 +9,7 @@
  *  1. initLayout() → navbar, footer, modal, autocomplete, status API, auth.
  *  2. Parameter URL (title, ep, anilist, mal, kitsu, slug, src) → anime sementara:
  *     judul, label episode, bookmark & platform legal tampil instan.
- *  3. Tombol server tampil "Server 1, 2, …" sesuai urutan putar + badge bahasa subtitle
+ *  3. Tombol server tampil "Server 1, 2, …" sesuai urutan putar + badge bahasa/jenis subtitle
  *     (nama penyedia/situs sumber tidak ditampilkan).
  *     Server hasil SCRAPING didahulukan (PLAYER.serverOrder = 'scrape-first'): untuk setiap
  *     episode player menunggu backend (AnimeXin / Samehadaku) dulu — anime dari AniList/MAL/
@@ -124,13 +124,15 @@ const fromBackendSource = () => Boolean(ref.slug) && isBackendEnabled();
 const scrapeFirst = () => isBackendEnabled() && (Boolean(ref.slug) || PLAYER.serverOrder !== 'static-first');
 const staticServers = () => listStreamServers(anime, ep);
 
-/** Badge & keterangan bahasa subtitle untuk tombol server. */
+/** Badge & keterangan bahasa dan jenis subtitle untuk tombol server. */
 const LANG_BADGE = { id: 'Sub Indo', en: 'Sub Eng', multi: 'Multi Sub' };
 const LANG_DESC = { id: 'Subtitle Indonesia', en: 'Subtitle Inggris', multi: 'Beberapa pilihan subtitle' };
+const SUBTITLE_TYPE_BADGE = { hard: 'Hardsub', soft: 'Softsub' };
+const SUBTITLE_TYPE_DESC = { hard: 'Jenis subtitle: hardsub', soft: 'Jenis subtitle: softsub' };
 
 /**
  * Tombol server = "Server 1, 2, …" sesuai urutan putar. Nama penyedia / situs sumber tidak
- * ditampilkan; yang terlihat hanya nomor + bahasa subtitle (badge & tooltip).
+ * ditampilkan; yang terlihat hanya nomor + bahasa dan jenis subtitle bila tersedia (badge & tooltip).
  * @param {import('./api/streams.js').StreamServer[]} list
  */
 function numbered(list) {
@@ -138,8 +140,8 @@ function numbered(list) {
         ...s,
         name: `Server ${i + 1}`,
         flag: '',
-        badge: LANG_BADGE[s.lang] || '',
-        description: [LANG_DESC[s.lang], s.source === 'static' ? 'server cadangan' : ''].filter(Boolean).join(' • ') || `Server ${i + 1}`,
+        badge: [LANG_BADGE[s.lang], SUBTITLE_TYPE_BADGE[s.subtitleType]].filter(Boolean).join(' · '),
+        description: [LANG_DESC[s.lang], SUBTITLE_TYPE_DESC[s.subtitleType], s.source === 'static' ? 'server cadangan' : ''].filter(Boolean).join(' • ') || `Server ${i + 1}`,
     }));
 }
 /**

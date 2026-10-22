@@ -117,7 +117,7 @@ test('makeAnime: bentuk seragam + sanitasi', () => {
     }
 });
 
-test('makeEpisode: server Sub Indo didahulukan, URL ganda & berbahaya dibuang', () => {
+test('makeEpisode: Sub Indo didahulukan, hardsub/softsub diurutkan, URL ganda & berbahaya dibuang', () => {
     const e = makeEpisode({
         episode: 3,
         servers: [
@@ -126,10 +126,16 @@ test('makeEpisode: server Sub Indo didahulukan, URL ganda & berbahaya dibuang', 
             { name: 'C', url: 'javascript:alert(1)' },
             { name: 'B lagi', url: 'https://b.example/1', lang: 'id' },
             { name: 'D (Multi Sub)', url: 'https://d.example/1', lang: 'multi' },
+            { name: 'E (Softsub Indo)', url: 'https://e.example/1', lang: 'id', subtitleType: 'soft' },
+            { name: 'F (Hardsub Indo)', url: 'https://f.example/1', lang: 'id', subtitleType: 'hard' },
+            { name: 'G (Hardsub Multi)', url: 'https://g.example/1', lang: 'multi', subtitleType: 'hard' },
         ],
         downloads: [{ quality: '1080p', links: [{ provider: 'X', url: 'https://x.example/f' }, { provider: 'Y', url: 'ftp://y' }] }, { quality: '720p', links: [] }],
     });
-    assert.deepEqual(e.servers.map((s) => s.name), ['B (Sub Indo)', 'D (Multi Sub)', 'A (Sub English)']);
+    assert.deepEqual(e.servers.map((s) => s.name), ['F (Hardsub Indo)', 'E (Softsub Indo)', 'B (Sub Indo)', 'G (Hardsub Multi)', 'D (Multi Sub)', 'A (Sub English)']);
+    assert.equal(e.servers[0].subtitleType, 'hard');
+    assert.equal(e.servers[1].subtitleType, 'soft');
+    assert.ok(!('subtitleType' in e.servers[2]), 'metadata yang tidak tertulis tidak ditebak');
     assert.equal(e.downloads.length, 1);
     assert.deepEqual(e.downloads[0].links, [{ provider: 'X', url: 'https://x.example/f' }]);
     assert.equal(e.episode, 3);
