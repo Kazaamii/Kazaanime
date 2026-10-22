@@ -309,3 +309,42 @@ test('GET /api/stream/sub: ASS → VTT; challenge acak diulang; gagal terus → 
         await new Promise((r) => server.close(r));
     }
 });
+
+test('GET /api/stream/hls dengan fetcher SUNGGUHAN + upstream lambat: tidak dibatalkan dini, segmen utuh', async () => {
+    const { createClient, createNetwork } = await import('../lib/fetcher.js');
+    const { startServer } = await import('./helpers.js');
+    const seg = Buffer.alloc(200_000, 7);
+    const upstream = await startServer((req, res) => {
+        setTimeout(() => {
+            if (req.url.endsWith('.m3u8')) {
+                res.writeHead(200, { 'content-type': 'application/vnd.apple.mpegurl' });
+                res.end('#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6.0,\nseg0.ts\n#EXT-X-ENDLIST\n');
+            } else {
+                res.writeHead(200, { 'content-type': 'video/mp2t', 'content-length': String(seg.length) });
+                res.write(seg.subarray(0, 100_000));
+                setTimeout(() => res.end(seg.subarray(100_000)), 150);
+            }
+        }, 300); // CDN lambat: request GET kita sudah selesai dibaca jauh sebelum respons datang
+    });
+    const net = createNetwork({ userAgent: 'KazanimeBot/1.0 (+test)' });
+    const media = createClient(net, { source: 'uji-media', allowedHosts: ['127.0.0.1'], robots: false, intervalMs: 0, retries: 0, timeoutMs: 5000 });
+    const signer = createSigner(SECRET);
+    const app = createApp({ registry: fakeRegistry(), streams: fakeStreams([]), mediaClient: media, signer, log: false, rateLimitPerMinute: 0, proxyRateLimitPerMinute: 0 });
+    const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+        const q = (u) => `${base}/api/stream/hls?u=${encodeTarget(u)}&s=${signer.sign(u)}`;
+        const pl = await fetch(q(`${upstream.url}/v/index.m3u8`));
+        assert.equal(pl.status, 200);
+        const segUri = (await pl.text()).split('\n').find((l) => l.startsWith('/api/stream/hls'));
+        assert.ok(segUri, 'URI segmen ditulis ulang');
+        const r = await fetch(new URL(segUri, base));
+        assert.equal(r.status, 200);
+        const body = Buffer.from(await r.arrayBuffer());
+        assert.equal(body.length, seg.length, 'segmen utuh (tidak terputus oleh abort dini)');
+    } finally {
+        server.closeAllConnections?.();
+        await new Promise((res) => server.close(res));
+        await upstream.close();
+    }
+});

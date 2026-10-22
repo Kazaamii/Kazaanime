@@ -73,7 +73,7 @@ export function streamRouter({ providers, mediaClient, signer, budgetMs, subRetr
                 lang: s.lang,
                 url: hlsUrl(s.src),
                 direct: s.src,
-                poster: s.poster || null,
+                poster: s.poster ? hlsUrl(s.poster) : null, // CDN mengirim CORP → lewat proxy
                 subtitles: (s.subtitles || []).map((t) => ({ label: t.label, lang: t.lang, default: Boolean(t.default), url: subUrl(t.file, t.format) })),
             }
             : { provider: s.provider, kind: 'embed', name: s.name, label: s.label || '', lang: s.lang, url: s.url }));
@@ -94,7 +94,9 @@ export function streamRouter({ providers, mediaClient, signer, budgetMs, subRetr
         const target = verified(req.query.u, req.query.s);
         const range = typeof req.headers.range === 'string' && /^bytes=\d*-\d*$/.test(req.headers.range) ? req.headers.range : null;
         const ac = new AbortController();
-        req.on('close', () => { if (!res.writableEnded) ac.abort(); });
+        // Pengguna menutup koneksi sebelum respons selesai → batalkan fetch ke CDN.
+        // (BUKAN req.on('close'): sejak Node 16 event itu terpicu begitu request GET selesai dibaca.)
+        res.on('close', () => { if (!res.writableFinished) ac.abort(); });
         const up = await mediaClient.stream(target, {
             signal: ac.signal,
             headers: range ? { Range: range } : {},

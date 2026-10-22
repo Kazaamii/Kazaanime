@@ -198,7 +198,7 @@ function toProviderServers(json) {
                 .map((t) => ({ label: clip(t.label, 40, 'Subtitle'), lang: clip(t.lang, 12).toLowerCase(), url: t.url, default: Boolean(t.default) }));
             if (!byProvider.has(provider)) {
                 byProvider.set(provider, {
-                    provider, kind: 'hls', url, direct: toHttpUrl(x.direct) || '', poster: toHttpUrl(x.poster) || '',
+                    provider, kind: 'hls', url, direct: toHttpUrl(x.direct) || '', poster: OWN_STREAM_RE.test(String(x.poster || '')) ? x.poster : '',
                     subtitles, lang: 'multi', mirrors: null,
                 });
             }

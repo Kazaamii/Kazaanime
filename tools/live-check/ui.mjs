@@ -11,7 +11,7 @@ import { STREAMS } from '../../server/config.js';
 import { createSigner, encodeTarget } from '../../server/lib/stream-proxy.js';
 
 const BASE = process.env.UI_BASE || 'http://127.0.0.1:3000';
-const OUT = '.live-check/ui2';
+const OUT = '.live-check/ui3';
 await mkdir(OUT, { recursive: true });
 const signer = createSigner(STREAMS.secret);
 const hls = (u) => `/api/stream/hls?u=${encodeTarget(u)}&s=${signer.sign(u)}`;
@@ -44,9 +44,14 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await ctx.newPage();
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') result.console.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
 page.on('pageerror', (e) => result.console.push(`pageerror: ${String(e).slice(0, 300)}`));
-page.on('response', (r) => {
+page.on('response', async (r) => {
     const u = r.url();
-    if (u.includes('/api/stream/')) result.api.push(`${r.status()} ${r.headers()['content-type'] || ''} ${u.replace(BASE, '').slice(0, 90)}`);
+    if (!u.includes('/api/stream/')) return;
+    let target = '';
+    try { target = Buffer.from(new URL(u).searchParams.get('u') || '', 'base64url').toString('utf8').replace('https://suzaku.xin-cdn.xyz/77511fce-546a-42ed-b5ea-d454a5f07a23', '…'); } catch { /* abaikan */ }
+    let body = '';
+    if (r.status() >= 400) { try { body = (await r.text()).slice(0, 200); } catch { /* abaikan */ } }
+    result.api.push(`${r.status()} ${(r.headers()['content-type'] || '').split(';')[0]} ${u.includes('/servers') ? '/servers' : target} ${body}`);
 });
 await page.route('**/api/stream/servers**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE) }));
 

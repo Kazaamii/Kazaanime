@@ -335,8 +335,17 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
             emit('progress', { ep, percent: pct });
         });
 
-        const native = Boolean(v.canPlayType(HLS_MIME));
-        let usingDirect = native && Boolean(server.direct);
+        // Jalur pemutaran:
+        //  - Safari/WebKit (macOS & iOS): HLS native langsung dari CDN — media pipeline WebKit tidak butuh CORS,
+        //    jadi tanpa proxy (hemat bandwidth); gagal → lewat proxy.
+        //  - Browser lain: hls.js (MSE) lewat proxy. HLS native Chromium (Chrome ≥141) TIDAK dipakai untuk
+        //    URL CDN langsung: diuji 22 Okt 2026, request-nya diblokir (CORS/CORP CDN dikunci ke anizone.to).
+        //  - Tanpa MSE tetapi bisa HLS native → native lewat proxy.
+        const canNative = Boolean(v.canPlayType(HLS_MIME));
+        const appleWebKit = /Apple/.test(navigator.vendor || '') && canNative;
+        const hasMse = Boolean(window.MediaSource || window.ManagedMediaSource);
+        const native = appleWebKit || (canNative && !hasMse);
+        let usingDirect = appleWebKit && Boolean(server.direct);
         v.addEventListener('error', () => {
             if (my !== token) return;
             if (usingDirect) {
