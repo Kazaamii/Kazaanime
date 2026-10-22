@@ -1,0 +1,14 @@
+name: live-check (sementara)
+on:
+  push:
+    branches: [arena/adbff310-kazaanime]
+    paths: ['.github/workflows/live-check.yml', 'tools/live-check/**']
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "probe ok"
