@@ -521,8 +521,8 @@ satu GET `/` hanya jika robots.txt terbaca dan mengizinkan (termasuk `Crawl-dela
 fingerprint browser, cookie, proxy, retry, atau solver challenge. Hasilnya hanya menunjukkan akses biasa saat pemeriksaan,
 bukan izin penggunaan konten atau cara untuk melewati proteksi.
 
-Baseline terbaru (22 Okt 2026, 12:04 UTC): kedua `robots.txt` membalas 200, tetapi homepage AniZone dan Samehadaku
-membalas 403 Cloudflare challenge. Cek ini hanya meminta `/`; endpoint katalog/episode tidak diuji.
+Baseline terbaru (22 Okt 2026, 12:16 UTC; suffix `cf-ray` SJC): kedua `robots.txt` membalas 200, tetapi homepage AniZone
+dan Samehadaku membalas 403 Cloudflare challenge. Cek ini hanya meminta `/`; endpoint katalog/episode tidak diuji.
 
 - Sumber lain yang secara khusus dikonfigurasi untuk challenge acak masih memiliki retry terbatas. AniZone dan Samehadaku
   kini gagal-cepat saat halaman konten di-challenge, membuka cooldown 30 menit, lalu memakai cache lama (maks 1 jam) atau
