@@ -27,7 +27,7 @@
  * Payload episode (/api/anime/:slug/episode/:ep) yang dipakai watch.html:
  *   data: {
  *     episode: 3,
- *     servers:   [{ name: 'Dailymotion (Sub Indo)', url: 'https://.../embed/...', lang: 'id' }],
+ *     servers:   [{ name: 'Dailymotion (Sub Indo)', url: 'https://.../embed/...', lang: 'id', subtitleType: 'hard' }],
  *     downloads: [{ quality: '1080p', size: '', format: 'MP4', subtitle: 'Sub Indo', links: [{ provider: 'Mediafire', url: 'https://...' }] }]
  *   }
  * URL yang bukan http(s) dibuang di sini (data hasil scraping tidak dipercaya).
@@ -147,6 +147,7 @@ function toEpisodeMedia(json) {
                 reason: '',
                 source: `backend:${site}`,
                 lang: ['id', 'en', 'multi'].includes(x.lang) ? x.lang : '',
+                ...(x.subtitleType === 'hard' || x.subtitleType === 'soft' ? { subtitleType: x.subtitleType } : {}),
                 origins: [originOf(url)].filter(Boolean),
             };
         })

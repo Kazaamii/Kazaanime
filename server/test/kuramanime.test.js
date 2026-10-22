@@ -63,6 +63,7 @@ test('kuramanime: player publik (iframe + mp4; m3u8 dilewati)', () => {
         ['Kuramanime', 'https://filemoon.sx/e/abc123def'],
         ['Kuramadrive 720p', 'https://kuramadrive.com/kdrive/kusuriya3-03-720.mp4'],
     ]);
+    assert.ok(p.servers.every((s) => s.lang === 'id' && s.subtitleType === 'hard'));
     assert.equal(p.protectedPlayer, false);
 });
 

@@ -39,6 +39,8 @@
  *    (`server.ai`), subtitle Inggris diterjemahkan Gemini saat video mulai diputar (ui/ai-subtitle.js).
  *    Track AI tampil otomatis & subtitle bawaan disembunyikan; subtitle asli tetap bisa dipilih di menu subtitle
  *    player (ikon CC di Firefox/Safari, menu titik tiga → Captions di Chrome).
+ *  - Subtitle lokal `.srt`/`.vtt` hanya untuk video HLS/native: dikonversi/dipasang di browser sebagai Blob URL,
+ *    tidak diunggah; track & object URL dibersihkan saat source berganti dan file dilupakan saat episode berganti.
  *
  * Tidak ada fetch di sini. Daftar server (StreamServer[]) datang dari js/api.
  */
@@ -47,6 +49,7 @@ import { html, delegate } from './dom.js';
 import { showToast } from './toast.js';
 import { icon, hasIcon } from './icons.js';
 import { createAiSubtitle, aiErrorText } from './ai-subtitle.js';
+import { attachLocalSubtitleTrack, readLocalSubtitleFile } from './local-subtitle.js';
 
 /** @typedef {import('../api/streams.js').StreamServer} StreamServer */
 
@@ -59,6 +62,7 @@ const OVERLAY_MAX_MS = 3000;
 const COMPLETE_EVENTS = new Set(['complete', 'ended', 'finish', 'finished']);
 /** Label bahasa subtitle server (StreamServer.lang) untuk status bar. */
 const LANG_LABELS = { id: 'Sub Indo', en: 'Sub English', multi: 'Multi Sub' };
+const SUBTITLE_TYPE_LABELS = { hard: 'Hardsub', soft: 'Softsub' };
 const HLS_MIME = 'application/vnd.apple.mpegurl';
 const ICON_LOCK = icon('lock');
 
@@ -83,10 +87,11 @@ const PROGRESS_EVENTS = new Set(['time', 'timeupdate', 'progress', 'watching-log
 
 const clamp01 = (n) => Math.min(1, Math.max(0, n));
 
-/** " | Sub Indo" — kosong bila bahasa tidak diketahui atau sudah tertulis di nama server. */
+/** Bahasa & jenis subtitle pada status bar — kosong bila sudah tertulis di nama server. */
 function langSuffix(server) {
-    const label = LANG_LABELS[server.lang];
-    return label && !String(server.name).includes(label) ? ` | ${label}` : '';
+    const labels = [LANG_LABELS[server.lang], SUBTITLE_TYPE_LABELS[server.subtitleType]]
+        .filter((label) => label && !String(server.name).includes(label));
+    return labels.length ? ` | ${labels.join(' · ')}` : '';
 }
 
 /** Persentase tonton dari payload player (0–1), null bila tidak ada. */
@@ -140,9 +145,22 @@ function aiToast(s, def) {
  *   getTitle?: () => string,     judul anime (untuk title iframe & tautan platform legal)
  *   fetchAiSubtitle?: ((url: string, part: number, o: {signal?: AbortSignal}) => Promise<any>)|null,
  *                                bagian "Subtitle Indonesia (AI)" (js/api getAiSubtitlePart); null = fitur mati
+ *   localSubtitleTools?: HTMLElement, localSubtitleButton?: HTMLButtonElement,
+ *   clearLocalSubtitleButton?: HTMLButtonElement, localSubtitleInput?: HTMLInputElement,
  * }} opts
  */
-export function createPlayer({ stage, serverBox, status, statusText, getTitle = () => '', fetchAiSubtitle = null }) {
+export function createPlayer({
+    stage,
+    serverBox,
+    status,
+    statusText,
+    getTitle = () => '',
+    fetchAiSubtitle = null,
+    localSubtitleTools = null,
+    localSubtitleButton = null,
+    clearLocalSubtitleButton = null,
+    localSubtitleInput = null,
+}) {
     /** @type {Record<string, Set<Function>>} */
     const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
@@ -162,6 +180,12 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
     let hls = null;
     /** Pengendali "Subtitle Indonesia (AI)" untuk video yang sedang diputar. */
     let aiSub = null;
+    /** Isi subtitle pilihan pengguna (hanya di memori browser, tidak pernah dikirim ke server). */
+    let localSubtitle = null;
+    let localSubtitleReadToken = 0;
+    /** Melepas track lokal + object URL video aktif saat source berganti. */
+    let disposeLocalSubtitleTrack = null;
+    let localSubtitleToolsVisible = false;
     /** id server → indeks mirror yang sedang dicoba (direset per episode). */
     let mirror = new Map();
     const urlOf = (server) => server.mirrors?.[mirror.get(server.id) || 0] || server.url;
@@ -193,7 +217,86 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
         status.classList.toggle('is-error', kind === 'error');
     }
 
+    function updateLocalSubtitleControls() {
+        if (localSubtitleTools) localSubtitleTools.hidden = !localSubtitleToolsVisible;
+        if (localSubtitleButton) {
+            localSubtitleButton.hidden = !localSubtitleToolsVisible;
+            localSubtitleButton.textContent = localSubtitle ? 'Ganti Sub' : 'Sub Lokal';
+            localSubtitleButton.title = localSubtitle
+                ? `Ganti subtitle lokal (${localSubtitle.label})`
+                : 'Pilih berkas subtitle lokal .srt atau .vtt';
+            localSubtitleButton.setAttribute('aria-label', localSubtitle
+                ? `Ganti subtitle lokal: ${localSubtitle.label}`
+                : 'Pilih berkas subtitle lokal');
+        }
+        if (clearLocalSubtitleButton) {
+            clearLocalSubtitleButton.hidden = !localSubtitleToolsVisible || !localSubtitle;
+        }
+    }
+
+    function setLocalSubtitleControlsVisible(visible) {
+        localSubtitleToolsVisible = Boolean(visible);
+        updateLocalSubtitleControls();
+    }
+
+    function detachLocalSubtitleTrack() {
+        if (!disposeLocalSubtitleTrack) return;
+        const dispose = disposeLocalSubtitleTrack;
+        disposeLocalSubtitleTrack = null;
+        try { dispose(); } catch (err) { console.warn('[player] subtitle lokal tidak dapat dilepas:', err); }
+    }
+
+    function forgetLocalSubtitle() {
+        localSubtitleReadToken++;
+        detachLocalSubtitleTrack();
+        localSubtitle = null;
+        if (localSubtitleInput) localSubtitleInput.value = '';
+        updateLocalSubtitleControls();
+    }
+
+    function attachRememberedLocalSubtitle(targetVideo) {
+        if (!localSubtitle) return true;
+        try {
+            disposeLocalSubtitleTrack = attachLocalSubtitleTrack(targetVideo, localSubtitle);
+            return true;
+        } catch (err) {
+            console.warn('[player] subtitle lokal tidak dapat dipasang:', err);
+            localSubtitle = null;
+            updateLocalSubtitleControls();
+            showToast('Subtitle lokal tidak dapat dipasang ke video ini.', 'error');
+            return false;
+        }
+    }
+
+    async function onLocalSubtitleChange() {
+        const file = localSubtitleInput?.files?.[0];
+        if (!file) return;
+        const readToken = ++localSubtitleReadToken;
+        const selectedEpisode = ep;
+        try {
+            const subtitle = await readLocalSubtitleFile(file);
+            if (readToken !== localSubtitleReadToken) return;
+            if (selectedEpisode !== ep) {
+                showToast('Episode sudah berganti; subtitle lokal tidak diterapkan.', 'info');
+                return;
+            }
+            detachLocalSubtitleTrack();
+            localSubtitle = subtitle;
+            if (video && !attachRememberedLocalSubtitle(video)) return;
+            updateLocalSubtitleControls();
+            showToast(video
+                ? `Subtitle lokal "${subtitle.label}" aktif. Berkas tidak diunggah.`
+                : `Subtitle lokal "${subtitle.label}" siap untuk pemutar HLS; tidak dapat dipakai di embed pihak ketiga.`, 'success');
+        } catch (err) {
+            showToast(err?.message || 'Berkas subtitle tidak dapat dimuat.', 'error');
+        } finally {
+            if (readToken === localSubtitleReadToken && localSubtitleInput) localSubtitleInput.value = '';
+        }
+    }
+
     function clearFrame() {
+        setLocalSubtitleControlsVisible(false);
+        detachLocalSubtitleTrack();
         clearTimeout(timer);
         clearTimeout(overlayTimer);
         timer = 0;
@@ -332,6 +435,7 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
      * @param {HTMLElement} overlay
      */
     function playVideo(server, my, overlay) {
+        setLocalSubtitleControlsVisible(true);
         const v = document.createElement('video');
         v.className = 'player-frame player-video';
         v.controls = true;
@@ -436,6 +540,7 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
 
         stage.replaceChildren(v, overlay);
         video = v;
+        attachRememberedLocalSubtitle(v);
         setStatus(`Memuat ${server.name} • Episode ${ep}...`);
         overlayTimer = setTimeout(() => {
             if (my === token) overlay.remove();
@@ -568,6 +673,21 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
     }
     window.addEventListener('message', onMessage);
 
+    const onLocalSubtitleButtonClick = () => {
+        if (!localSubtitleInput) return;
+        localSubtitleInput.value = '';
+        localSubtitleInput.click();
+    };
+    const onClearLocalSubtitleClick = () => {
+        if (!localSubtitle) return;
+        forgetLocalSubtitle();
+        showToast('Subtitle lokal dihapus dari pemutar.', 'info');
+    };
+    localSubtitleButton?.addEventListener('click', onLocalSubtitleButtonClick);
+    clearLocalSubtitleButton?.addEventListener('click', onClearLocalSubtitleClick);
+    localSubtitleInput?.addEventListener('change', onLocalSubtitleChange);
+    updateLocalSubtitleControls();
+
     /* ---------------------------------------------------------------- */
     /* Klik tombol server                                                */
     /* ---------------------------------------------------------------- */
@@ -601,6 +721,7 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
          * @param {StreamServer[]} list
          */
         load(episode, list) {
+            if (episode !== ep) forgetLocalSubtitle();
             ep = episode;
             servers = list;
             failed = new Set();
@@ -683,8 +804,13 @@ export function createPlayer({ stage, serverBox, status, statusText, getTitle = 
         /** Hentikan & lepaskan listener (tidak dipakai di watch.html, disediakan untuk kebersihan). */
         destroy() {
             clearFrame();
+            forgetLocalSubtitle();
             token++;
             window.removeEventListener('message', onMessage);
+            localSubtitleButton?.removeEventListener('click', onLocalSubtitleButtonClick);
+            clearLocalSubtitleButton?.removeEventListener('click', onClearLocalSubtitleClick);
+            localSubtitleInput?.removeEventListener('change', onLocalSubtitleChange);
+            if (localSubtitleInput) localSubtitleInput.value = '';
         },
     };
 }

@@ -270,18 +270,23 @@ const LANG_TAG = { id: 'Sub Indo', en: 'Sub English', multi: 'Multi Sub' };
 const squash = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
- * Label opsi mirror → nama server yang rapi + bahasa subtitle.
- * "Hardsub Indonesia Dailymotion AX" → { name: "Dailymotion (Sub Indo)", lang: "id" }
+ * Label opsi mirror → nama server yang rapi + bahasa dan jenis subtitle bila tertulis eksplisit.
+ * "Hardsub Indonesia Dailymotion AX" → { name: "Dailymotion (Sub Indo)", lang: "id", subtitleType: "hard" }
  */
 export function describeServer(label, url) {
     const lang = /indo/i.test(label) ? 'id' : /\beng(lish)?\b/i.test(label) ? 'en' : /all\s*sub|multi/i.test(label) ? 'multi' : null;
+    const subtitleType = /\bhard[\s-]*sub\b/i.test(label) ? 'hard' : /\bsoft[\s-]*sub\b/i.test(label) ? 'soft' : null;
     let host = '';
     try { host = new URL(url).hostname.replace(/^(www|geo|play)\./, ''); } catch { /* biarkan kosong */ }
     const known = HOSTS.find(([re]) => re.test(host))?.[1] || '';
-    let provider = cleanText(String(label || '').replace(/\b(hardsub|softsub|player|server|ax|indonesia|indo|english|eng|all\s*sub|sub|hd)\b/gi, ' '));
+    let provider = cleanText(String(label || '').replace(/\b(hard[\s-]*sub|soft[\s-]*sub|player|server|ax|indonesia|indo|english|eng|all[\s-]*sub|sub|hd)\b/gi, ' '));
     if (!provider || provider.length > 24) provider = known || host || 'Server';
     else if (known && squash(provider) === squash(known)) provider = known;
-    return { name: LANG_TAG[lang] ? `${provider} (${LANG_TAG[lang]})` : provider, lang };
+    return {
+        name: LANG_TAG[lang] ? `${provider} (${LANG_TAG[lang]})` : provider,
+        lang,
+        ...(subtitleType ? { subtitleType } : {}),
+    };
 }
 
 function iframeSrc(snippet) {

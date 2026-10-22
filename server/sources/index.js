@@ -30,17 +30,21 @@ import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
+import { createAnoboy } from './anoboy.js';
 import { createAnimexin } from './animexin.js';
 import { createHianime } from './hianime.js';
 import { createKuramanime } from './kuramanime.js';
 import { createMetadata, hasCjk } from './metadata.js';
 import { createOtakudesu } from './otakudesu.js';
 import { createSamehadaku } from './samehadaku.js';
+import { createSakunime } from './sakunime.js';
 
 /** id sumber → factory adapter. */
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
     samehadaku: createSamehadaku,
+    anoboy: createAnoboy,
+    sakunime: createSakunime,
     anichin: createAnichin,
     otakudesu: createOtakudesu,
     hianime: createHianime,

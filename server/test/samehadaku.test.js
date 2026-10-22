@@ -86,7 +86,7 @@ test('samehadaku: halaman episode → server embed publik (VIP berbayar dilewati
     assert.deepEqual(ep.servers.map((s) => s.name), ['Blogspot', 'Mega 480p', 'Mega 720p', 'Mega 1080p']);
     assert.ok(ep.servers[0].url.startsWith('https://www.blogger.com/video.g?token='));
     assert.ok(ep.servers.slice(1).every((s) => s.url.startsWith('https://mega.nz/embed/')));
-    assert.ok(ep.servers.every((s) => s.lang === 'id'), 'Samehadaku = subtitle Indonesia');
+    assert.ok(ep.servers.every((s) => s.lang === 'id' && s.subtitleType === 'hard'), 'Samehadaku = Hardsub Indonesia');
     assert.ok(!ep.servers.some((s) => /vip/i.test(s.name)));
     assert.equal(ep.downloads.length, 8);
     assert.deepEqual(ep.downloads[0], {
@@ -99,6 +99,18 @@ test('samehadaku: halaman episode → server embed publik (VIP berbayar dilewati
         ],
     });
     assert.ok(ep.downloads.some((g) => g.format === 'MP4'));
+});
+
+test('samehadaku: halaman FX Senshi snapshot → server publik eksplisit; token/ID fixture disamarkan', () => {
+    const ep = parseEpisodePage(fixture$('samehadaku-fx-senshi-episode.html'), BASE);
+    assert.equal(ep.title, 'FX Senshi Kurumi-chan Episode 4');
+    assert.equal(ep.animeUrl, `${BASE}/anime/fx-senshi-kurumi-chan/`);
+    assert.deepEqual(ep.servers.map((server) => server.name), ['Blogspot', 'Mega 480p', 'Mega 720p', 'Mega 1080p']);
+    assert.ok(ep.servers.every((server) => server.lang === 'id' && server.subtitleType === 'hard'));
+    assert.deepEqual(ep.servers.map((server) => new URL(server.url).hostname), [
+        'www.blogger.com', 'mega.nz', 'mega.nz', 'mega.nz',
+    ]);
+    assert.equal(ep.downloads.length, 0, 'bagian download tidak disalin ke fixture minimal');
 });
 
 test('samehadaku: jadwal rilis per hari (0 = Minggu) + jam WIB', () => {
@@ -157,6 +169,7 @@ test('samehadaku: adapter — latest/search/detail/episode/schedule lewat client
     const ep = await a.getEpisode({ slug: KIKANSHA }, 3, { anime });
     assert.equal(ep.episode, 3);
     assert.equal(ep.servers.length, 4);
+    assert.ok(ep.servers.every((s) => s.subtitleType === 'hard'));
     assert.equal(ep.released, '22 October 2026');
     await assert.rejects(() => a.getEpisode({ slug: KIKANSHA }, 9, { anime }), (err) => err.kind === 'not_found');
 

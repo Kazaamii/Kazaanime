@@ -74,19 +74,27 @@ export function makeEpisodeList(list = []) {
 }
 
 const LANG_ORDER = { id: 0, multi: 1, en: 2 };
+const SUBTITLE_TYPE_ORDER = { hard: 0, soft: 1 };
 
 /**
  * Payload endpoint episode (kontrak dengan js/api/sources.js → toEpisodeMedia):
- *   { episode, title, released, url, servers: [{name, url, lang}], downloads: [{quality, size, format, subtitle, links: [{provider, url}]}] }
+ *   { episode, title, released, url, servers: [{name, url, lang, subtitleType?}], downloads: [{quality, size, format, subtitle, links: [{provider, url}]}] }
  */
 export function makeEpisode({ episode, title = '', released = '', url = '', servers = [], downloads = [], notice = '' } = {}) {
     const seen = new Set();
     const srv = servers
-        .map((s) => ({ name: clip(s.name, 40) || 'Server', url: absoluteUrl(s.url), lang: s.lang || null }))
+        .map((s) => ({
+            name: clip(s.name, 40) || 'Server',
+            url: absoluteUrl(s.url),
+            lang: s.lang || null,
+            ...(s.subtitleType === 'hard' || s.subtitleType === 'soft' ? { subtitleType: s.subtitleType } : {}),
+        }))
         .filter((s) => s.url && !seen.has(s.url) && seen.add(s.url))
-        // Sub Indo didahulukan (stabil: urutan asli dipertahankan di dalam bahasa yang sama)
+        // Sub Indo didahulukan, lalu hardsub eksplisit sebelum softsub; urutan sumber tetap stabil.
         .map((s, i) => ({ s, i }))
-        .sort((a, b) => ((LANG_ORDER[a.s.lang] ?? 3) - (LANG_ORDER[b.s.lang] ?? 3)) || (a.i - b.i))
+        .sort((a, b) => ((LANG_ORDER[a.s.lang] ?? 3) - (LANG_ORDER[b.s.lang] ?? 3))
+            || ((SUBTITLE_TYPE_ORDER[a.s.subtitleType] ?? 2) - (SUBTITLE_TYPE_ORDER[b.s.subtitleType] ?? 2))
+            || (a.i - b.i))
         .map(({ s }) => s)
         .slice(0, 20);
 

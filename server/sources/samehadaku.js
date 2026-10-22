@@ -1,7 +1,7 @@
 /**
  * Kazanime backend — sources/samehadaku.js
  * Adapter Samehadaku (https://v2.samehadaku.how — domain sering berganti, atur lewat SAMEHADAKU_BASE_URL).
- * Pengganti Kuramanime (diblokir Cloudflare untuk bot ini): anime Jepang, subtitle INDONESIA.
+ * Pengganti Kuramanime (diblokir Cloudflare untuk bot ini): anime Jepang, Hardsub Indonesia.
  *
  * Diverifikasi langsung 2026-10-22 (fixture asli di server/test/fixtures/samehadaku-*.html):
  *   - robots.txt : "User-agent: * / Disallow: /wp-admin/ / Allow: /wp-admin/admin-ajax.php" → halaman
@@ -254,7 +254,7 @@ export function parseEpisodePage($, base) {
         const url = embedSrc(opt.attr('data-embed'), base) || absoluteUrl(opt.attr('data-url'), base);
         if (!url || seen.has(url)) return;
         seen.add(url);
-        servers.push({ name: cleanText(opt.find('span').first().text()) || `Server ${servers.length + 1}`, url, lang: 'id' });
+        servers.push({ name: cleanText(opt.find('span').first().text()) || `Server ${servers.length + 1}`, url, lang: 'id', subtitleType: 'hard' });
     });
 
     const downloads = [];
