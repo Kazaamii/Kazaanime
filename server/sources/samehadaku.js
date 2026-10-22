@@ -7,7 +7,9 @@
  *   - robots.txt : "User-agent: * / Disallow: /wp-admin/ / Allow: /wp-admin/admin-ajax.php" → halaman
  *                  yang dipakai di sini diizinkan. Tidak ada halaman ToS/DMCA yang tertaut → verdict
  *                  "unknown": diakses HANYA bila robots.txt terbaca & mengizinkan (requireExplicitRobots).
- *   - Bot ini TIDAK diblokir Cloudflare (beda dengan Kuramanime/Otakudesu yang membalas 403).
+ *   - Snapshot/fixture ini membuktikan halaman pernah berhasil diambil, bukan akses yang selalu tersedia.
+ *     README mencatat Cloudflare dapat men-challenge request dari IP pusat data secara intermiten; status live
+ *     harus dianggap belum pasti tanpa pemeriksaan baru. Backend menghentikan sumber setelah batas retry.
  *   - Server video ada di HTML publik: atribut data-embed pada .east_player_option berisi iframe
  *     siap pakai (Blogspot, Mega 480p/720p/1080p). Tidak ada AJAX/token yang perlu ditiru.
  *     Opsi "VIP" (berbayar, disabled) dilewati.
