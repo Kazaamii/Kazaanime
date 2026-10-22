@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cari Anime - Kazanime</title>
-    <meta name="description" content="Cari anime subtitle Indonesia dari MyAnimeList, Kitsu, dan AniList.">
+    <meta name="description" content="Cari anime subtitle Indonesia dari AniList dan Kitsu.">
     <meta name="robots" content="noindex, follow">
     <script src="js/theme-preload.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/search.css">
@@ -31,23 +31,22 @@
 
         <!-- Tab sumber data (hanya untuk mode pencarian) -->
         <div class="search-source-tabs" id="searchSourceTabs" role="tablist" aria-label="Sumber data">
-            <button type="button" class="search-source-tab active" role="tab" aria-selected="true" data-source="all">📚 Semua <span class="count" data-count="all">0</span></button>
-            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="mal">🔷 MyAnimeList <span class="count" data-count="mal">0</span></button>
-            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="kitsu">🟠 Kitsu <span class="count" data-count="kitsu">0</span></button>
-            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="anilist">💙 AniList <span class="count" data-count="anilist">0</span></button>
+            <button type="button" class="search-source-tab active" role="tab" aria-selected="true" data-source="all"><span class="ic-slot" data-icon="library"></span>Semua <span class="count" data-count="all">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="kitsu"><span class="src-dot src-dot--kitsu" aria-hidden="true"></span>Kitsu <span class="count" data-count="kitsu">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="anilist"><span class="src-dot src-dot--anilist" aria-hidden="true"></span>AniList <span class="count" data-count="anilist">0</span></button>
         </div>
 
         <!-- Urutan (eksklusif) + format (bisa lebih dari satu) -->
         <div class="search-filters" id="searchFilters">
-            <button type="button" class="search-filter-btn active" data-sort="relevance" aria-pressed="true">🔍 Relevansi</button>
-            <button type="button" class="search-filter-btn" data-sort="score" aria-pressed="false">⭐ Rating</button>
-            <button type="button" class="search-filter-btn" data-sort="popularity" aria-pressed="false">🔥 Populer</button>
-            <button type="button" class="search-filter-btn" data-sort="newest" aria-pressed="false">🆕 Terbaru</button>
+            <button type="button" class="search-filter-btn active" data-sort="relevance" aria-pressed="true"><span class="ic-slot" data-icon="search"></span>Relevansi</button>
+            <button type="button" class="search-filter-btn" data-sort="score" aria-pressed="false"><span class="ic-slot" data-icon="star"></span>Rating</button>
+            <button type="button" class="search-filter-btn" data-sort="popularity" aria-pressed="false"><span class="ic-slot" data-icon="flame"></span>Populer</button>
+            <button type="button" class="search-filter-btn" data-sort="newest" aria-pressed="false"><span class="ic-slot" data-icon="clock"></span>Terbaru</button>
             <span class="search-filters-divider" aria-hidden="true"></span>
-            <button type="button" class="search-filter-btn" data-format="TV" aria-pressed="false">📺 TV</button>
-            <button type="button" class="search-filter-btn" data-format="MOVIE" aria-pressed="false">🎬 Movie</button>
-            <button type="button" class="search-filter-btn" data-format="OVA" aria-pressed="false">💿 OVA</button>
-            <button type="button" class="search-filter-btn" data-format="ONA" aria-pressed="false">🌐 ONA</button>
+            <button type="button" class="search-filter-btn" data-format="TV" aria-pressed="false"><span class="ic-slot" data-icon="tv"></span>TV</button>
+            <button type="button" class="search-filter-btn" data-format="MOVIE" aria-pressed="false"><span class="ic-slot" data-icon="clapperboard"></span>Movie</button>
+            <button type="button" class="search-filter-btn" data-format="OVA" aria-pressed="false"><span class="ic-slot" data-icon="disc-3"></span>OVA</button>
+            <button type="button" class="search-filter-btn" data-format="ONA" aria-pressed="false"><span class="ic-slot" data-icon="globe"></span>ONA</button>
         </div>
 
         <div class="anime-grid" id="searchResultsGrid" aria-busy="true"></div>

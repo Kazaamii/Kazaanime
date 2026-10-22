@@ -9,8 +9,10 @@
  *  - Ada aria-live supaya terbaca screen reader.
  */
 import { UI } from '../config.js';
+import { icon } from './icons.js';
 
-const ICONS = { success: '✅', error: '❌', info: 'ℹ️' };
+/** Ikon per jenis toast (pesan tidak perlu emoji lagi). */
+const ICONS = { success: 'circle-check', error: 'circle-x', info: 'info' };
 let stack = null;
 let counter = 0;
 
@@ -27,12 +29,13 @@ function getStack() {
 
 function fill(el, message, type) {
     el.replaceChildren();
-    const icon = document.createElement('span');
-    icon.textContent = ICONS[type] || ICONS.info;
-    icon.setAttribute('aria-hidden', 'true');
+    const mark = document.createElement('span');
+    mark.className = `toast-icon toast-icon--${ICONS[type] ? type : 'info'}`;
+    mark.innerHTML = String(icon(ICONS[type] || ICONS.info)); // SVG statis dari icons.js
+    mark.setAttribute('aria-hidden', 'true');
     const text = document.createElement('span');
     text.textContent = message;
-    el.append(icon, text);
+    el.append(mark, text);
 }
 
 /**

@@ -13,6 +13,7 @@
  *    login anime tersebut langsung ditambahkan (dulu harus klik ulang).
  */
 import { installImageFallback } from './dom.js';
+import { hydrateIcons } from './icons.js';
 import { initTheme } from '../services/theme.js';
 import { renderNavbar, setNavUser, getSearchElements } from './navbar.js';
 import { renderFooter } from './footer.js';
@@ -54,7 +55,7 @@ export function toggleBookmarkWithFeedback(anime) {
         return null;
     }
     showToast(
-        res.bookmarked ? `${anime.title} ditambahkan ke bookmark! 🔖` : `${anime.title} dihapus dari bookmark`,
+        res.bookmarked ? `${anime.title} ditambahkan ke bookmark!` : `${anime.title} dihapus dari bookmark`,
         res.bookmarked ? 'success' : 'info',
     );
     return res.bookmarked;
@@ -75,7 +76,7 @@ async function handleLogin(data) {
         showToast(res.error, 'error');
         return false;
     }
-    showToast(`Selamat datang kembali, ${res.user.username}! 🌸`, 'success');
+    showToast(`Selamat datang kembali, ${res.user.username}!`, 'success');
     if (res.migrated) console.info('[auth] password akun lama dikonversi ke hash SHA-256.');
     completePendingBookmark();
     return true;
@@ -90,8 +91,8 @@ async function handleRegister(data) {
     const avatar = res.user.avatar;
     showToast(
         avatar?.custom
-            ? `Selamat datang, ${res.user.username}! 🌸 Avatar custom disimpan.`
-            : `Selamat datang, ${res.user.username}! 🌸 Avatar ${avatar?.name || ''} telah dipilih.`,
+            ? `Selamat datang, ${res.user.username}! Avatar custom disimpan.`
+            : `Selamat datang, ${res.user.username}! Avatar ${avatar?.name || ''} telah dipilih.`,
         'success',
     );
     completePendingBookmark();
@@ -104,14 +105,14 @@ function handleAvatarSave(avatar) {
         showToast(res.error, 'error');
         return false;
     }
-    showToast(res.avatar.custom ? 'Avatar custom berhasil disimpan! 📷' : `Avatar berhasil diganti ke ${res.avatar.name}! 🎭`, 'success');
+    showToast(res.avatar.custom ? 'Avatar custom berhasil disimpan!' : `Avatar berhasil diganti ke ${res.avatar.name}!`, 'success');
     return true;
 }
 
 function handleLogout() {
     pendingBookmark = null;
     auth.logout();
-    showToast('Berhasil keluar. Sampai jumpa! 👋', 'info');
+    showToast('Berhasil keluar. Sampai jumpa!', 'info');
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,6 +131,7 @@ export function initLayout() {
 
     installImageFallback();
     initTheme();
+    hydrateIcons(document); // placeholder <span class="ic-slot" data-icon="…"> di HTML statis → SVG
 
     renderNavbar(document.getElementById('app-navbar'), {
         page,

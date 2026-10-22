@@ -1,8 +1,8 @@
 /**
  * Kazanime — ui/search-dropdown.js
- * Autocomplete kotak pencarian navbar (MyAnimeList + Kitsu + AniList).
+ * Autocomplete kotak pencarian navbar (AniList + Kitsu; MyAnimeList/Jikan dihapus 22 Okt 2026).
  *
- * Tampilan & urutan grup sama seperti file asli (MAL 4, Kitsu 3, AniList 3,
+ * Tampilan grup sama seperti file asli (kini AniList 5, Kitsu 5 — kuota MAL dibagi,
  * tanpa duplikat), dengan perbaikan:
  *  - Request sebelumnya DIBATALKAN saat user mengetik lagi (dulu hasil lama
  *    bisa menimpa hasil baru karena balapan request).
@@ -18,11 +18,11 @@ import { suggestAnime, dedupeKeys } from '../api/index.js';
 import { scoreLabel } from '../api/normalize.js';
 import { html, debounce, placeholderImage } from './dom.js';
 import { watchUrl, searchUrl } from '../routes.js';
+import { icon } from './icons.js';
 
 const GROUPS = [
-    { source: 'mal', label: '🔷 MyAnimeList', badge: 'source-mal', name: 'MyAnimeList' },
-    { source: 'kitsu', label: '🟠 Kitsu', badge: 'source-kitsu', name: 'Kitsu' },
-    { source: 'anilist', label: '💙 AniList', badge: 'source-anilist', name: 'AniList' },
+    { source: 'anilist', label: 'AniList', badge: 'source-anilist', name: 'AniList' },
+    { source: 'kitsu', label: 'Kitsu', badge: 'source-kitsu', name: 'Kitsu' },
 ];
 
 /** Teks episode singkat (sama dengan dropdown asli): "24 EP" / "Ongoing" / "?". */
@@ -71,7 +71,7 @@ export function initSearchDropdown(els) {
     function renderLoading(q) {
         options = [];
         active = -1;
-        dropdown.innerHTML = String(html`<div class="search-loading">🔍 Mencari "${q}" di MyAnimeList + Kitsu + AniList...</div>`);
+        dropdown.innerHTML = String(html`<div class="search-loading">${icon('loader-circle', { cls: 'ic--spin' })} Mencari "${q}" di AniList + Kitsu...</div>`);
         show();
     }
 
@@ -105,15 +105,15 @@ export function initSearchDropdown(els) {
 
         if (!total) {
             dropdown.innerHTML = String(failed === GROUPS.length
-                ? html`<div class="search-no-results" role="presentation"><p>⚠️ Gagal memuat saran</p><small>Periksa koneksi, atau tekan Enter untuk pencarian lengkap</small></div>`
-                : html`<div class="search-no-results" role="presentation"><p>🔍 Tidak ditemukan "${q}"</p><small>Tekan Enter untuk pencarian lengkap di 3 database</small></div>`);
+                ? html`<div class="search-no-results" role="presentation"><p>${icon('triangle-alert')} Gagal memuat saran</p><small>Periksa koneksi, atau tekan Enter untuk pencarian lengkap</small></div>`
+                : html`<div class="search-no-results" role="presentation"><p>${icon('search')} Tidak ditemukan "${q}"</p><small>Tekan Enter untuk pencarian lengkap di AniList & Kitsu</small></div>`);
             show();
             return;
         }
 
         let index = 0;
         const body = groups.map((g) => html`
-            <div class="search-dropdown-header" role="presentation">${g.label} <span class="source-badge ${g.badge}">${g.items.length} hasil</span></div>
+            <div class="search-dropdown-header" data-source="${g.source}" role="presentation"><span class="src-dot" aria-hidden="true"></span>${g.label} <span class="source-badge ${g.badge}">${g.items.length} hasil</span></div>
             ${g.items.map((anime) => {
                 const i = index++;
                 const href = watchUrl(anime, 1);
@@ -123,14 +123,14 @@ export function initSearchDropdown(els) {
                     <img src="${anime.image || placeholderImage(anime.title, anime.color)}" alt="" loading="lazy" decoding="async" data-fallback data-color="${anime.color || ''}">
                     <div class="search-result-info">
                         <h4>${anime.title}</h4>
-                        <p><span class="sr-score">⭐ ${scoreLabel(anime)}</span><span>${epText(anime)}</span><span class="sr-format">${anime.format}</span></p>
+                        <p><span class="sr-score">${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}</span><span>${epText(anime)}</span><span class="sr-format">${anime.format}</span></p>
                     </div>
                 </a>`;
             })}`);
 
         dropdown.innerHTML = String(html`
             ${body}
-            ${pendingNames.length ? html`<div class="search-loading search-loading--inline" role="presentation">⏳ Memuat ${pendingNames.join(' & ')}...</div>` : ''}
+            ${pendingNames.length ? html`<div class="search-loading search-loading--inline" role="presentation">${icon('loader-circle', { cls: 'ic--spin' })} Memuat ${pendingNames.join(' & ')}...</div>` : ''}
             <div class="search-dropdown-footer" role="presentation">
                 <span>Tekan Enter untuk hasil lengkap</span>
                 <a href="${searchUrl(q)}">Lihat Semua →</a>

@@ -12,6 +12,7 @@ import { html, raw } from './dom.js';
 import { registerModal, openModal, closeModal } from './modal.js';
 import { setTheme, getActiveTheme } from '../services/theme.js';
 import { showToast } from './toast.js';
+import { icon } from './icons.js';
 
 const ICON_CLOSE = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>');
 
@@ -32,7 +33,7 @@ export function mountThemeModal() {
     <div class="theme-modal" id="themeModal">
         <div class="theme-modal-content">
             <div class="theme-modal-header">
-                <h2 id="themeModalTitle">🎨 Pilih Tema</h2>
+                <h2 id="themeModalTitle">${icon('palette')} Pilih Tema</h2>
                 <button type="button" class="modal-close" data-modal-close aria-label="Tutup">${ICON_CLOSE}</button>
             </div>
             <div class="theme-grid">

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TtlCache } from '../lib/cache.js';
 import { SourceError } from '../lib/errors.js';
-import { cjkKey, createMetadata, hasCjk, kitsuCountry, normalizeAniList, normalizeJikan, normalizeKitsu } from '../sources/metadata.js';
+import * as metadataModule from '../sources/metadata.js';
+import { cjkKey, createMetadata, hasCjk, kitsuCountry, normalizeAniList, normalizeKitsu } from '../sources/metadata.js';
 import { fixture } from './helpers.js';
 
 test('normalizeKitsu: data asli Kitsu → anime seragam + id MAL/AniList dari mappings', () => {
@@ -28,21 +29,8 @@ test('kitsuCountry: romanisasi jadi penanda (zh_cn saja tidak cukup)', () => {
     assert.equal(kitsuCountry({ en: 'Only English' }), null);
 });
 
-test('normalizeJikan & normalizeAniList (bentuk respons sesuai dokumentasi API)', () => {
-    const j = normalizeJikan({
-        mal_id: 52991, url: 'https://myanimelist.net/anime/52991', title: 'Sousou no Frieren', title_english: "Frieren: Beyond Journey's End",
-        images: { webp: { large_image_url: 'https://cdn.myanimelist.net/images/anime/1015/138006l.webp' } }, synopsis: 'Sinopsis.\n\n[Written by MAL Rewrite]',
-        episodes: 28, genres: [{ name: 'Adventure' }], score: 9.3, status: 'Finished Airing', airing: false, type: 'TV', year: 2023,
-        studios: [{ name: 'Madhouse' }], duration: '24 min per ep', season: 'fall', members: 1200000,
-    });
-    assert.equal(j.title, "Frieren: Beyond Journey's End");
-    assert.equal(j.titleAlt, 'Sousou no Frieren');
-    assert.deepEqual(j.ids, { anilist: null, mal: 52991, kitsu: null });
-    assert.equal(j.status, 'COMPLETED');
-    assert.equal(j.description, 'Sinopsis.');
-    assert.equal(j.duration, 24);
-    assert.equal(j.season, 'FALL');
-
+test('normalizeAniList (bentuk respons sesuai dokumentasi API) — Jikan sudah dihapus', () => {
+    assert.equal(metadataModule.normalizeJikan, undefined, 'normalizer Jikan tidak diekspor lagi');
     const al = normalizeAniList({
         id: 154587, idMal: 52991, siteUrl: 'https://anilist.co/anime/154587', title: { romaji: 'Sousou no Frieren', english: 'Frieren' },
         coverImage: { extraLarge: 'https://s4.anilist.co/x.jpg' }, description: 'A<br>B <i>C</i>', episodes: null, genres: ['Drama'],
@@ -80,19 +68,20 @@ const kitsuItem = (id, titles, extra = {}) => ({
     relationships: { mappings: { data: [] } },
 });
 
-test('metadata.search: Kitsu gagal → Jikan dipakai (urutan fallback)', async () => {
+test('metadata.search: Kitsu gagal → AniList dipakai (urutan fallback, tanpa Jikan)', async () => {
     const { m, calls } = metaWith({
-        jikan: async () => ({ data: [{ mal_id: 1, title: 'Naruto', type: 'TV', status: 'Finished Airing' }] }),
+        anilist: async () => ({ data: { Page: { media: [{ id: 20, idMal: 20, title: { romaji: 'Naruto' }, status: 'FINISHED', format: 'TV' }] } } }),
     });
     const r = await m.search('naruto');
-    assert.equal(r.provider, 'jikan');
-    assert.equal(r.items[0].ids.mal, 1);
-    assert.deepEqual(calls.map((c) => c.source), ['kitsu', 'jikan']);
+    assert.equal(r.provider, 'anilist');
+    assert.equal(r.items[0].ids.anilist, 20);
+    assert.deepEqual(calls.map((c) => c.source), ['kitsu', 'anilist']);
+    assert.ok(calls.every((c) => !c.url.includes('jikan')), 'Jikan tidak pernah dipanggil');
 });
 
 test('metadata.search: semua mati → error gabungan', async () => {
     const { m } = metaWith({});
-    await assert.rejects(m.search('naruto'), (e) => e.status >= 500 && e.details.length === 3);
+    await assert.rejects(m.search('naruto'), (e) => e.status >= 500 && e.details.length === 2);
 });
 
 test('metadata.latestDonghua: Kitsu ONA+TV tayang, hanya yang berasal dari Tiongkok', async () => {
@@ -107,7 +96,7 @@ test('metadata.latestDonghua: Kitsu ONA+TV tayang, hanya yang berasal dari Tiong
     const r = await m.latestDonghua();
     assert.equal(r.provider, 'kitsu');
     assert.deepEqual(r.items.map((a) => a.title), ['Renegade Immortal', 'Shrouding the Heavens']);
-    assert.ok(calls.every((c) => !c.url.includes('jikan')), 'Jikan tidak dipakai (tidak bisa filter negara)');
+    assert.ok(calls.every((c) => !c.url.includes('jikan')), 'Jikan tidak dipakai');
 });
 
 test('metadata.lookupImage: judul persis (termasuk judul dalam kurung) → poster; di-cache', async () => {
@@ -162,20 +151,21 @@ test('metadata.findByTitle: persis → dengan id; cocok tanpa season → tanpa i
     assert.equal(await m.findByTitle('sesuatu yang tidak ada'), null);
 });
 
-test('metadata.getById: kitsu / mal (Jikan) / anilist (GraphQL POST)', async () => {
+test('metadata.getById: kitsu / mal (lewat AniList idMal, tanpa Jikan) / anilist (GraphQL POST)', async () => {
     const { m, calls } = metaWith({
         kitsu: async () => ({ data: kitsuItem(46474, { en: 'Frieren', en_jp: 'Sousou no Frieren' }) }),
-        jikan: async () => ({ data: { mal_id: 52991, title: 'Sousou no Frieren', type: 'TV', status: 'Finished Airing' } }),
         anilist: async (url, o) => {
             const body = JSON.parse(o.body);
             assert.match(body.query, /Media\(id: \$id/);
-            return { data: { Media: { id: body.variables.id, title: { romaji: 'Sousou no Frieren' }, status: 'FINISHED', format: 'TV' } } };
+            const v = body.variables;
+            return { data: { Media: { id: v.id || 154587, idMal: v.idMal || 52991, title: { romaji: 'Sousou no Frieren' }, status: 'FINISHED', format: 'TV' } } };
         },
     });
     assert.equal((await m.getById('kitsu', 46474)).ids.kitsu, 46474);
     assert.equal((await m.getById('mal', 52991)).ids.mal, 52991);
     assert.equal((await m.getById('anilist', 154587)).ids.anilist, 154587);
     assert.equal(calls.find((c) => c.source === 'anilist').url, 'https://graphql.anilist.co');
+    assert.ok(calls.every((c) => c.source !== 'jikan'), 'Jikan tidak pernah dipanggil');
 });
 
 test('metadata.lookupImage: Kitsu tidak punya → Bangumi lewat judul Mandarin (cocok persis) → MangaBaka (judul persis)', async () => {

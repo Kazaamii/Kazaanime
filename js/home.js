@@ -8,7 +8,7 @@
  *  1. initLayout()  → navbar, footer, modal, autocomplete, status API, auth.
  *  2. Hero + 4 section diminta bersamaan. Di AniList semuanya berasal dari
  *     SATU query gabungan (request dipakai bersama, di-cache 15 menit).
- *     Jika AniList gagal → Jikan → Kitsu → data cadangan statis (+ keterangan
+ *     Jika AniList gagal → Kitsu → data cadangan statis (+ keterangan
  *     & tombol "Coba lagi").
  *     Donghua (Tahap D): rilis terbaru dari backend scraper (animexin) lebih dulu —
  *     kartunya langsung membuka episode terbaru — lalu AniList CN → data cadangan.
@@ -23,11 +23,12 @@ import { setSectionNote } from './ui/notice.js';
 import { showSkeleton } from './ui/skeleton.js';
 import { html, $, delegate } from './ui/dom.js';
 import { GENRES, SCHEDULE } from './config.js';
-import { browseUrl, genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
+import { genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
 import {
     getHeroSlides, getHomeSection, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
+import { icon } from './ui/icons.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -55,23 +56,18 @@ const GRIDS = {
     donghua: $('#donghuaGrid'),
 };
 
-/** State section Populer (juga dipakai filter genre). */
-const popular = { genre: '', token: 0 };
-
 async function loadSection(kind) {
     const grid = GRIDS[kind];
-    const token = kind === 'popular' ? ++popular.token : 0;
     showSkeleton(grid);
     setSectionNote(grid);
     const res = await getHomeSection(kind);
-    if (kind === 'popular' && (token !== popular.token || popular.genre)) return; // user sudah pindah ke genre
-    // "Baru Rilis" & donghua dari backend (rilis terbaru animexin): kartu langsung membuka
+    // "Baru Rilis" & donghua dari backend (rilis terbaru AnimeXin/Anichin): kartu langsung membuka
     // episode yang baru tayang (label kartu "EP 9" → episode 9)
     const toLatest = kind === 'recent' || (kind === 'donghua' && res.source === 'backend');
     renderCards(grid, res.items, { isBookmarked, episodeOf: toLatest ? latestEpisodeOf : undefined });
     if (res.fallback) {
         setSectionNote(grid, {
-            text: `⚠️ Menampilkan data cadangan. ${friendlyError(res.error)}`,
+            text: `Menampilkan data cadangan. ${friendlyError(res.error)}`,
             onRetry: () => {
                 retrySourcesNow();
                 loadSection(kind);
@@ -81,16 +77,18 @@ async function loadSection(kind) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Genre (memfilter section Populer, sama seperti file asli)           */
+/* Genre — di bagian atas beranda (22 Okt 2026). Hasil tampil LANGSUNG  */
+/* di bawah tombol genre (dulu memfilter section Populer yang kini      */
+/* letaknya jauh di bawah). Klik genre aktif / tombol tutup = sembunyi. */
 /* ------------------------------------------------------------------ */
 const genreBox = $('#genreTags');
-const popularTitle = $('#popularTitle');
-const popularSeeAll = $('#popularSeeAll');
+const genreResults = $('#genreResults');
+const genreGrid = $('#genreGrid');
+const genreTitle = $('#genreResultsTitle');
+const genreSeeAll = $('#genreSeeAll');
+const genreState = { genre: '', token: 0 };
 
-genreBox.innerHTML = String(html`
-    <button type="button" class="genre-tag active" data-genre="" aria-pressed="true">Semua</button>
-    ${GENRES.map((g) => html`<button type="button" class="genre-tag" data-genre="${g.label}" aria-pressed="false">${g.label}</button>`)}
-`);
+genreBox.innerHTML = String(html`${GENRES.map((g) => html`<button type="button" class="genre-tag" data-genre="${g.label}" aria-pressed="false" aria-controls="genreResults">${g.label}</button>`)}`);
 
 function markGenre(genre) {
     genreBox.querySelectorAll('.genre-tag').forEach((t) => {
@@ -100,49 +98,59 @@ function markGenre(genre) {
     });
 }
 
-/** Hasil genre tampil di section Populer (di atas tombol genre) → gulir ke sana bila tidak terlihat. */
-function revealPopular() {
-    const section = $('#popular');
-    if (section.getBoundingClientRect().top < 0) section.scrollIntoView({ behavior: smooth(), block: 'start' });
+function closeGenre() {
+    genreState.genre = '';
+    genreState.token++;
+    markGenre('');
+    genreResults.hidden = true;
+    genreGrid.innerHTML = '';
+}
+
+/** Hasil genre di bawah tombol: gulir sedikit bila bagian bawahnya di luar layar. */
+function revealGenreResults() {
+    const r = genreResults.getBoundingClientRect();
+    if (r.top > window.innerHeight * 0.75) genreResults.scrollIntoView({ behavior: smooth(), block: 'nearest' });
 }
 
 async function selectGenre(genre) {
-    markGenre(genre);
-    popular.genre = genre;
-    const grid = GRIDS.popular;
-    if (!genre) {
-        popularTitle.textContent = 'Anime Populer';
-        popularSeeAll.href = browseUrl('popular');
-        await loadSection('popular'); // dari cache → instan
+    if (!genre || genre === genreState.genre) {
+        closeGenre();
         return;
     }
-    const token = ++popular.token;
-    popularTitle.textContent = `Genre: ${genre}`;
-    popularSeeAll.href = genreUrl(genre);
-    showSkeleton(grid);
-    setSectionNote(grid);
-    revealPopular();
+    markGenre(genre);
+    genreState.genre = genre;
+    const token = ++genreState.token;
+    genreTitle.textContent = `Genre: ${genre}`;
+    genreSeeAll.href = genreUrl(genre);
+    genreResults.hidden = false;
+    showSkeleton(genreGrid);
+    revealGenreResults();
 
     const res = await getGenreAnime(genre);
-    if (token !== popular.token) return; // klik genre lain sebelum selesai
+    if (token !== genreState.token) return; // klik genre lain / ditutup sebelum selesai
     if (res.items.length) {
-        renderCards(grid, res.items, { isBookmarked });
+        renderCards(genreGrid, res.items, { isBookmarked });
+        if (res.fallback) setSectionNote(genreGrid, { text: `Menampilkan data cadangan. ${friendlyError(res.error)}` });
+        else setSectionNote(genreGrid);
     } else if (res.error && res.error.kind !== 'empty') {
-        gridMessage(grid, {
-            icon: '⚠️',
+        gridMessage(genreGrid, {
+            icon: 'triangle-alert',
             title: 'Gagal memuat genre',
             text: friendlyError(res.error),
-            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-genre">🔄 Coba Lagi</button>`,
+            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-genre">${icon('refresh-cw')} Coba Lagi</button>`,
         });
     } else {
-        gridMessage(grid, { icon: '📭', text: `Tidak ada anime dengan genre "${genre}"` });
+        gridMessage(genreGrid, { icon: 'inbox', text: `Tidak ada anime dengan genre "${genre}"` });
     }
 }
 
 delegate(genreBox, 'click', '.genre-tag', (_e, tag) => selectGenre(tag.dataset.genre || ''));
-delegate(GRIDS.popular, 'click', '[data-action="retry-genre"]', () => {
+$('#genreClose').addEventListener('click', closeGenre);
+delegate(genreGrid, 'click', '[data-action="retry-genre"]', () => {
     retrySourcesNow();
-    selectGenre(popular.genre);
+    const g = genreState.genre;
+    genreState.genre = '';
+    selectGenre(g);
 });
 
 /* ------------------------------------------------------------------ */
@@ -162,9 +170,9 @@ function renderBookmarkSection() {
     if (!list.length) {
         bookmarkGrid.innerHTML = String(html`
             <div class="bookmark-empty">
-                <p class="bookmark-empty-icon" aria-hidden="true">🔖</p>
+                <p class="bookmark-empty-icon" aria-hidden="true">${icon('bookmark')}</p>
                 <h3>Belum ada bookmark</h3>
-                <p>Klik ikon 🔖 di kartu anime untuk menambahkan bookmark!</p>
+                <p>Klik ikon bookmark di pojok kartu anime untuk menambahkannya ke sini.</p>
             </div>`);
         return;
     }
@@ -185,9 +193,8 @@ const scheduleGrid = $('#scheduleGrid');
 const scheduleNote = $('#scheduleNote');
 
 const SCHEDULE_NOTES = {
-    backend: `🕒 Jadwal rilis Sub Indo dalam ${SCHEDULE.label} (Samehadaku) · donghua dari AnimeXin (tanpa jam) · klik judul untuk episode terbaru.`,
-    anilist: `🕒 Jam tayang dalam ${SCHEDULE.label} (UTC+7) · ${SCHEDULE.perDay} anime terpopuler per hari · sumber: AniList · klik judul untuk menonton.`,
-    mal: `🕒 Jam tayang dalam ${SCHEDULE.label}, dikonversi dari jadwal siaran Jepang (sumber: MyAnimeList).`,
+    backend: `Jadwal rilis Sub Indo dalam ${SCHEDULE.label} (Samehadaku) · donghua dari Anichin (jam perkiraan) & AnimeXin · klik judul untuk episode terbaru.`,
+    anilist: `Jam tayang dalam ${SCHEDULE.label} (UTC+7) · ${SCHEDULE.perDay} anime terpopuler per hari · sumber: AniList · klik judul untuk menonton.`,
 };
 
 async function loadSchedule() {
@@ -209,7 +216,7 @@ async function loadSchedule() {
     renderSchedule(scheduleGrid, byDay, { today: res.today, timeLabel: SCHEDULE.label });
 
     if (res.source === 'fallback') {
-        scheduleNote.innerHTML = String(html`⚠️ Jadwal contoh (data cadangan). ${friendlyError(res.error)} <button type="button" class="schedule-retry" data-action="retry">🔄 Coba lagi</button>`);
+        scheduleNote.innerHTML = String(html`${icon('triangle-alert')} Jadwal contoh (data cadangan). ${friendlyError(res.error)} <button type="button" class="schedule-retry" data-action="retry">${icon('refresh-cw')} Coba lagi</button>`);
         scheduleNote.querySelector('[data-action="retry"]').addEventListener('click', () => {
             retrySourcesNow();
             loadSchedule();
@@ -246,4 +253,4 @@ if (window.location.hash === '#bookmarks' && !bookmarkSection.hidden) {
     requestAnimationFrame(() => bookmarkSection.scrollIntoView({ block: 'start' }));
 }
 
-console.info('%c🌸 Kazanime — Tahap D (data live: AniList → Jikan → Kitsu → cadangan; donghua dari backend scraper)', 'color:#ff6b9d;font-weight:bold');
+console.info('%cKazanime — data live: AniList → Kitsu → cadangan; donghua & jadwal dari backend scraper', 'color:#ff6b9d;font-weight:bold');

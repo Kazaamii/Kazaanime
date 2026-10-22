@@ -18,6 +18,7 @@ import { AVATARS, AVATAR_UPLOAD } from '../config.js';
 import { html, raw, $, delegate, emojiAvatar } from './dom.js';
 import { registerModal, openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
+import { icon } from './icons.js';
 
 const ICON_CLOSE = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>');
 
@@ -59,7 +60,7 @@ function uploadAreaHTML(scope, inputId, text) {
     return html`
         <label class="avatar-upload-area" for="${inputId}" data-scope="${scope}">
             <img class="avatar-upload-preview" alt="Pratinjau foto">
-            <div class="upload-icon" aria-hidden="true">📷</div>
+            <div class="upload-icon" aria-hidden="true">${icon('camera')}</div>
             <div class="upload-text">${text}</div>
             <input type="file" id="${inputId}" accept="image/*" data-scope="${scope}">
         </label>`;
@@ -92,9 +93,9 @@ function buildAuthModal() {
                 <div class="form-group"><label for="regUsername">Username</label><input type="text" id="regUsername" name="username" placeholder="Pilih username unik" autocomplete="username" minlength="3" maxlength="24" required></div>
                 <div class="form-group"><label for="regPassword">Password</label><input type="password" id="regPassword" name="password" placeholder="Minimal 6 karakter" autocomplete="new-password" minlength="6" required></div>
                 <div class="avatar-section">
-                    <label for="avatarFileInput">📷 Upload Foto Sendiri (Opsional)</label>
+                    <label for="avatarFileInput">${icon('camera')} Upload Foto Sendiri (Opsional)</label>
                     ${uploadAreaHTML('register', 'avatarFileInput', raw('Klik untuk <strong>upload foto</strong> atau gunakan avatar di bawah'))}
-                    <label>Atau Pilih Avatar Waifu/Husbando 🌸</label>
+                    <label>Atau Pilih Avatar Waifu/Husbando</label>
                     <div class="avatar-grid" id="avatarGrid">${avatarGridHTML('register')}</div>
                 </div>
                 <button type="submit" class="btn-auth">Daftar Sekarang</button>

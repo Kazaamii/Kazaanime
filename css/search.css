@@ -11,13 +11,14 @@
 
 /* ---------- Filter urutan & format ---------- */
 .search-filters{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.search-filter-btn{padding:8px 16px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:20px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s}
+.search-filter-btn .ic,.search-source-tab .ic{font-size:14px}
+.search-filter-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:20px;font-size:12px;color:var(--text-secondary);cursor:pointer;font-family:inherit;transition:all .3s}
 .search-filter-btn:hover,.search-filter-btn.active{background:rgba(var(--primary-rgb),.12);border-color:var(--primary);color:var(--primary)}
 .search-filters-divider{width:1px;align-self:stretch;background:rgba(255,255,255,.08);margin:0 4px}
 
 /* ---------- Tab sumber data ---------- */
 .search-source-tabs{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.search-source-tab{padding:10px 20px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:12px;font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:'Poppins',sans-serif;transition:all .3s;display:flex;align-items:center;gap:8px}
+.search-source-tab{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;background:var(--bg-card);border:1px solid rgba(255,255,255,.08);border-radius:12px;font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:inherit;transition:all .3s;display:flex;align-items:center;gap:8px}
 .search-source-tab:hover{border-color:rgba(var(--primary-rgb),.3)}
 .search-source-tab.active{background:rgba(var(--primary-rgb),.1);border-color:var(--primary);color:var(--primary)}
 .search-source-tab .count{background:var(--gradient-1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}

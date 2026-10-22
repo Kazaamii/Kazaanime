@@ -13,6 +13,7 @@
  *  - Tanpa toast "berhasil dimuat" di setiap ganti episode (dulu menumpuk dengan toast lain).
  */
 import { html, safeUrl } from './dom.js';
+import { icon } from './icons.js';
 
 const QUALITY = {
     '1080p': { cls: 'dq-1080', label: 'Full HD' },
@@ -48,7 +49,7 @@ export function renderDownloads(box, state = {}) {
         box.innerHTML = String(html`
             <div class="download-loading">
                 <div class="loading-shimmer" aria-hidden="true"></div>
-                <p>🔍 Mencari link download...</p>
+                <p>${icon('loader-circle', { cls: 'ic--spin' })} Mencari link download...</p>
             </div>`);
         return;
     }
@@ -74,7 +75,7 @@ export function renderDownloads(box, state = {}) {
                 </div>`;
             })}
             <div class="download-notice download-notice--ok">
-                <strong>✅ Episode ${state.ep || ''}</strong> — link dari ${state.source || 'sumber'} (dibuka di tab baru).
+                <strong>${icon('circle-check')} Episode ${state.ep || ''}</strong> — link dari ${state.source || 'sumber'} (dibuka di tab baru).
             </div>`);
         return;
     }
@@ -86,8 +87,8 @@ export function renderDownloads(box, state = {}) {
             : 'untuk episode ini. Gunakan platform streaming legal di bawah atau coba anime lain.';
     box.innerHTML = String(html`
         <div class="download-notice download-notice--warn">
-            <p><strong>⚠️ Link download belum tersedia</strong> ${text}</p>
-            ${state.onRetry && state.error ? html`<button type="button" class="download-retry" data-action="retry">🔄 Coba lagi</button>` : ''}
+            <p><strong>${icon('triangle-alert')} Link download belum tersedia</strong> ${text}</p>
+            ${state.onRetry && state.error ? html`<button type="button" class="download-retry" data-action="retry">${icon('refresh-cw')} Coba lagi</button>` : ''}
         </div>`);
     if (state.onRetry && state.error) {
         box.querySelector('[data-action="retry"]')?.addEventListener('click', state.onRetry, { once: true });

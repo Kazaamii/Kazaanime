@@ -187,7 +187,7 @@ async function runAliases({ key, names, build, variables, ttl, map }) {
         try {
             return await gql(build(names), variables, { cacheKey: key, ttl, transform: (data) => pick(data, names) });
         } catch (err) {
-            if (!isQueryRejected(err)) throw err; // jaringan/403/429 → biar facade fallback ke Jikan/Kitsu
+            if (!isQueryRejected(err)) throw err; // jaringan/403/429 → biar facade fallback ke Kitsu
             disableBatch(err);
         }
     }

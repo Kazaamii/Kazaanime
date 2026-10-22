@@ -9,7 +9,7 @@
     <script src="js/theme-preload.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/home.css">
@@ -39,47 +39,64 @@
             </div>
         </div>
         <div class="hero-navigation">
-            <button class="hero-nav-btn hero-prev" type="button" data-hero="prev" aria-label="Slide sebelumnya">❮</button>
-            <button class="hero-nav-btn hero-next" type="button" data-hero="next" aria-label="Slide berikutnya">❯</button>
+            <button class="hero-nav-btn hero-prev" type="button" data-hero="prev" aria-label="Slide sebelumnya"><span class="ic-slot" data-icon="chevron-left"></span></button>
+            <button class="hero-nav-btn hero-next" type="button" data-hero="next" aria-label="Slide berikutnya"><span class="ic-slot" data-icon="chevron-right"></span></button>
         </div>
         <div class="hero-dots" id="heroDots"></div>
+    </section>
+
+    <!-- GENRE — di atas (permintaan 22 Okt 2026). Hasil genre tampil langsung di bawah tombol. -->
+    <section class="section" id="genre">
+        <div class="section-header"><h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="tags"></span></span><span class="section-title-text">Jelajahi Genre</span></h2></div>
+        <div class="genre-tags" id="genreTags" role="toolbar" aria-label="Pilih genre"></div>
+        <div class="genre-results" id="genreResults" hidden>
+            <div class="genre-results-head">
+                <h3 class="genre-results-title" id="genreResultsTitle">Genre</h3>
+                <div class="genre-results-actions">
+                    <a href="search.html" class="see-all" id="genreSeeAll">Lihat Semua <span class="ic-slot" data-icon="chevron-right"></span></a>
+                    <button type="button" class="genre-close" id="genreClose" aria-label="Tutup hasil genre"><span class="ic-slot" data-icon="x"></span></button>
+                </div>
+            </div>
+            <div class="anime-grid" id="genreGrid" aria-live="polite" aria-busy="false"></div>
+        </div>
+    </section>
+
+    <!-- JADWAL RILIS — di atas (permintaan 22 Okt 2026) -->
+    <section class="section" id="jadwal">
+        <div class="section-header"><h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="calendar-days"></span></span><span class="section-title-text">Jadwal Rilis</span></h2></div>
+        <div class="schedule-grid" id="scheduleGrid"></div>
+        <p class="schedule-note" id="scheduleNote"></p>
     </section>
 
     <!-- ONGOING -->
     <section class="section" id="ongoing">
         <div class="section-header">
-            <h2 class="section-title">Ongoing Anime</h2>
-            <a href="search.html?browse=ongoing" class="see-all">Lihat Semua →</a>
+            <h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="radio-tower"></span></span><span class="section-title-text">Ongoing Anime</span></h2>
+            <a href="search.html?browse=ongoing" class="see-all">Lihat Semua <span class="ic-slot" data-icon="chevron-right"></span></a>
         </div>
         <div class="anime-grid" id="ongoingGrid" aria-busy="true"></div>
     </section>
 
-    <!-- POPULER (juga target filter genre) -->
+    <!-- POPULER -->
     <section class="section" id="popular">
         <div class="section-header">
-            <h2 class="section-title" id="popularTitle">Anime Populer</h2>
-            <a href="search.html?browse=popular" class="see-all" id="popularSeeAll">Lihat Semua →</a>
+            <h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="flame"></span></span><span class="section-title-text">Anime Populer</span></h2>
+            <a href="search.html?browse=popular" class="see-all" id="popularSeeAll">Lihat Semua <span class="ic-slot" data-icon="chevron-right"></span></a>
         </div>
         <div class="anime-grid" id="popularGrid" aria-busy="true"></div>
     </section>
 
     <!-- BOOKMARK (hanya tampil saat login) -->
     <section class="section" id="bookmarks" hidden>
-        <div class="section-header"><h2 class="section-title">🔖 Bookmark Saya</h2></div>
+        <div class="section-header"><h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="bookmark"></span></span><span class="section-title-text">Bookmark Saya</span></h2></div>
         <div class="anime-grid" id="bookmarkGrid"></div>
-    </section>
-
-    <!-- GENRE (tombol dirender dari js/config.js → GENRES) -->
-    <section class="section" id="genre">
-        <div class="section-header"><h2 class="section-title">Jelajahi Genre</h2></div>
-        <div class="genre-tags" id="genreTags" role="toolbar" aria-label="Filter genre"></div>
     </section>
 
     <!-- BARU RILIS -->
     <section class="section" id="baru-rilis">
         <div class="section-header">
-            <h2 class="section-title">Baru Rilis</h2>
-            <a href="search.html?browse=new" class="see-all">Lihat Semua →</a>
+            <h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="sparkles"></span></span><span class="section-title-text">Baru Rilis</span></h2>
+            <a href="search.html?browse=new" class="see-all">Lihat Semua <span class="ic-slot" data-icon="chevron-right"></span></a>
         </div>
         <div class="anime-grid" id="newReleaseGrid" aria-busy="true"></div>
     </section>
@@ -87,17 +104,10 @@
     <!-- DONGHUA -->
     <section class="section" id="donghua">
         <div class="section-header">
-            <h2 class="section-title">🐉 Donghua (Anime China)</h2>
-            <a href="search.html?browse=donghua" class="see-all">Lihat Semua →</a>
+            <h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="swords"></span></span><span class="section-title-text">Donghua (Anime China)</span></h2>
+            <a href="search.html?browse=donghua" class="see-all">Lihat Semua <span class="ic-slot" data-icon="chevron-right"></span></a>
         </div>
         <div class="anime-grid" id="donghuaGrid" aria-busy="true"></div>
-    </section>
-
-    <!-- JADWAL RILIS -->
-    <section class="section" id="jadwal">
-        <div class="section-header"><h2 class="section-title">Jadwal Rilis</h2></div>
-        <div class="schedule-grid" id="scheduleGrid"></div>
-        <p class="schedule-note" id="scheduleNote"></p>
     </section>
 
 </main>

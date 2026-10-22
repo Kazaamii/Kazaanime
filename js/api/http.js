@@ -1,13 +1,13 @@
 /**
  * Kazanime — api/http.js
  * SATU-SATUNYA tempat `fetch()` dipanggil di seluruh frontend.
- * Modul UI tidak boleh memanggil fetch; modul sumber (anilist/jikan/kitsu/sources)
+ * Modul UI tidak boleh memanggil fetch; modul sumber (anilist/kitsu/sources)
  * memanggil fetchJSON() di sini.
  *
  * Masalah di file asli yang diselesaikan di sini:
  *  - Tidak ada cache → ±12 request setiap kali halaman dibuka/login/logout.
  *  - Timeout pakai Promise.race → request lama tetap berjalan (tidak dibatalkan).
- *  - Tidak ada retry, tidak ada pembatas laju (Jikan cepat kena 429).
+ *  - Tidak ada retry, tidak ada pembatas laju (API publik cepat kena 429).
  *  - Status API dicek dengan request terpisah, bukan dari request yang benar-benar dipakai.
  *
  * Fitur:
@@ -16,14 +16,14 @@
  *  - cache 2 lapis: Map (memori) + sessionStorage (antar-halaman dalam satu tab),
  *    yang disimpan adalah hasil `transform` (data sudah dinormalisasi → kecil)
  *  - dedupe: request identik yang sedang berjalan dipakai bersama
- *  - throttle per host (Jikan: jeda minimal antar-request)
+ *  - throttle per host (opsional: jeda minimal antar-request)
  *  - registry kesehatan sumber + circuit breaker: sumber yang baru gagal
  *    dilewati sementara sehingga fallback ke sumber berikutnya instan
  *  - ApiError bertipe + friendlyError() berbahasa Indonesia untuk UI
  */
 import { API_CONFIG, STORAGE_KEYS } from '../config.js';
 
-export const API_SOURCES = Object.freeze(['anilist', 'jikan', 'kitsu', 'backend']);
+export const API_SOURCES = Object.freeze(['anilist', 'kitsu', 'backend']);
 const HEALTH_EVENT = 'kazanime:api-health';
 const CACHE_PREFIX = STORAGE_KEYS.apiCachePrefix;
 const MEMORY_MAX = 250;
@@ -349,7 +349,7 @@ function backoffDelay(attempt, retryAfter) {
  *
  * @param {string} url
  * @param {{
- *   source?: 'anilist'|'jikan'|'kitsu'|'backend',
+ *   source?: 'anilist'|'kitsu'|'backend',
  *   method?: string,
  *   headers?: Record<string,string>,
  *   body?: unknown,                 objek → JSON.stringify

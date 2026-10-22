@@ -14,6 +14,7 @@
 import { APP, NAV_LINKS, UI } from '../config.js';
 import { html, raw, $, avatarSrc } from './dom.js';
 import { homeSectionUrl, searchUrl } from '../routes.js';
+import { icon } from './icons.js';
 
 const ICON_SEARCH = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>');
 const ICON_BOOKMARK = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>');
@@ -50,12 +51,12 @@ function navbarHTML(page) {
                 <form class="search-box" id="searchBoxWrapper" role="search" action="search.html" method="get">
                     ${ICON_SEARCH}
                     <label for="searchInput" class="sr-only">Cari anime</label>
-                    <input type="text" name="q" placeholder="Cari anime... (AniList + MyAnimeList)" id="searchInput" autocomplete="off" enterkeyhint="search" aria-controls="searchDropdown" aria-expanded="false" aria-autocomplete="list">
+                    <input type="text" name="q" placeholder="Cari anime atau donghua..." id="searchInput" autocomplete="off" enterkeyhint="search" aria-controls="searchDropdown" aria-expanded="false" aria-autocomplete="list">
                     <span class="search-kbd" aria-hidden="true">Ctrl+K</span>
                     <div class="search-dropdown" id="searchDropdown" role="listbox" aria-label="Saran pencarian"></div>
                 </form>
-                <button type="button" class="nav-btn btn-theme search-toggle" id="btnSearchToggle" aria-label="Buka pencarian" aria-expanded="false">🔍</button>
-                <button type="button" class="nav-btn btn-theme" id="btnTheme" aria-label="Pilih tema">🎨 <span class="theme-label">Tema</span></button>
+                <button type="button" class="nav-btn btn-theme search-toggle" id="btnSearchToggle" aria-label="Buka pencarian" aria-expanded="false">${icon('search')}</button>
+                <button type="button" class="nav-btn btn-theme" id="btnTheme" aria-label="Pilih tema">${icon('palette')} <span class="theme-label">Tema</span></button>
                 <button type="button" class="nav-btn btn-login" id="btnShowAuth">Masuk</button>
                 <div class="profile-wrapper" id="profileWrapper" hidden>
                     <button type="button" class="profile-trigger" id="profileTrigger" aria-haspopup="menu" aria-expanded="false">

@@ -23,6 +23,11 @@
     --particle-color:var(--primary);--desktop-max:1400px;
     /* Tinggi navbar dipakai untuk offset konten & scroll-margin */
     --nav-h:70px;
+    /* Tipografi (22 Okt 2026): Figtree untuk teks/UI (font referensi AniZone), Bricolage Grotesque
+       untuk judul — menggantikan Poppins yang terasa "template". */
+    --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+    --font-display:'Bricolage Grotesque','Figtree',system-ui,sans-serif;
+    --rating:#fbbf24;
 }
 
 /* ---------- 6 tema tambahan (total 7 bersama Sakura) ---------- */
@@ -34,13 +39,23 @@
 [data-theme="forest"]{--primary:#00b894;--primary-rgb:0,184,148;--primary-dark:#00a381;--secondary:#55efc4;--secondary-rgb:85,239,196;--accent:#ffeaa7;--accent-rgb:255,234,167;--bg-dark:#0a1a0f;--bg-dark-2:#0f2514;--bg-card:#142e1a;--bg-card-hover:#1a4022;--text-secondary:#80b090;--hero-bg:linear-gradient(135deg,#142e1a,#1a4022,#0f6030)}
 
 /* ---------- Elemen global ---------- */
-body{font-family:'Poppins',sans-serif;background:var(--bg-dark);color:var(--text-primary);min-height:100vh;overflow-x:hidden;transition:background .4s}
+body{font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;background:var(--bg-dark);color:var(--text-primary);min-height:100vh;overflow-x:hidden;transition:background .4s}
+button,input,select,textarea{font-family:inherit}
+h1,h2,h3{letter-spacing:-.01em}
 /* Pengganti document.body.style.overflow='hidden' saat modal terbuka */
 body.modal-open{overflow:hidden}
 ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:var(--bg-dark)}::-webkit-scrollbar-thumb{background:var(--primary);border-radius:10px}
 
 /* Atribut [hidden] harus selalu menang atas aturan display komponen */
 [hidden]{display:none!important}
+
+/* ---------- Ikon (js/ui/icons.js, Lucide — ISC) ---------- */
+.ic{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:-.14em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic-slot{display:inline-block;width:1em;height:1em;vertical-align:-.14em;flex-shrink:0}
+.ic--rating{color:var(--rating);fill:var(--rating);stroke:var(--rating)}
+.ic--heart{color:var(--primary);fill:var(--primary)}
+.ic--spin{animation:spin 1s linear infinite}
+@media (prefers-reduced-motion: reduce){.ic--spin{animation:none}}
 
 /* ---------- Utilitas ---------- */
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

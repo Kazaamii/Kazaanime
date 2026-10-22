@@ -18,7 +18,7 @@
  *     diputar bila id anime sudah ada di URL; tanpa id → menunggu detail dulu.
  *     'static-first' = perilaku Tahap D (server statis dulu, kecuali URL membawa slug).
  *  4. getWatchData() → detail + jumlah episode tayang + rekomendasi
- *     (AniList: 1 request; cadangan Jikan → Kitsu → data dari URL).
+ *     (AniList: 1 request; cadangan Kitsu → data dari URL).
  *  5. Ganti episode tanpa reload; URL ikut diperbarui (replaceState) → bisa di-share.
  *  6. Auto-next lewat postMessage player, penanda episode yang sudah ditonton,
  *     server + link download dari backend scraper, rekomendasi.
@@ -38,11 +38,13 @@ import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
 import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
 import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
-    friendlyError, getEpisodeExtras, getRecommendations, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime, retrySourcesNow,
+    friendlyError, getEpisodeExtras, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
+    retrySourcesNow, withProviderServers,
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { getWatchedEpisodes, markWatched } from './services/history.js';
 import { storage } from './services/storage.js';
+import { icon } from './ui/icons.js';
 
 const ctx = initLayout();
 const isBookmarked = (a) => ctx.isBookmarked(a);
@@ -103,6 +105,16 @@ let scrapedTitles = '';
 let extrasBusy = false;
 /** Detail membawa judul baru saat pencarian masih berjalan → cari lagi bila hasilnya kosong. */
 let rescrapePending = false;
+/**
+ * Server dari penyedia berbasis id/judul (ReAnime, AniZone) untuk episode aktif (22 Okt 2026).
+ * null = masih dicari (slot tampil "mencari…").
+ * @type {{servers: object[], status: Record<string,string>, error?: unknown}|null}
+ */
+let providerResult = null;
+/** @type {AbortController|null} */
+let providerCtrl = null;
+/** id AniList + judul yang dipakai permintaan penyedia terakhir (diminta ulang bila detail membawa data baru). */
+let providerKey = '';
 
 const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 const urlFor = (n) => watchUrl(anime, n, { src: ref.src, slug: ref.slug });
@@ -130,9 +142,19 @@ function numbered(list) {
         description: [LANG_DESC[s.lang], s.source === 'static' ? 'server cadangan' : ''].filter(Boolean).join(' • ') || `Server ${i + 1}`,
     }));
 }
-const servers = () => numbered(scrapeFirst()
-    ? [...backendServers, ...staticServers()]
-    : [...staticServers(), ...backendServers]);
+/**
+ * Urutan putar (22 Okt 2026):
+ *   scrape-first: server Sub Indo/Multi hasil scraping → server cadangan sesuai config (MegaPlay, ReAnime,
+ *                 AniZone Multi Sub, Vidnest, TryEmbed) → server Sub Inggris hasil scraping (hianime.ro)
+ *   static-first: server cadangan dulu, lalu semua server hasil scraping
+ */
+const servers = () => {
+    const fallback = withProviderServers(staticServers(), providerResult);
+    if (!scrapeFirst()) return numbered([...fallback, ...backendServers]);
+    const english = backendServers.filter((s) => s.lang === 'en');
+    const local = backendServers.filter((s) => s.lang !== 'en');
+    return numbered([...local, ...fallback, ...english]);
+};
 /** Semua judul yang diketahui (URL + detail) untuk mencari padanan di situs sumber. */
 const scrapeTitles = () => [ref.title, ref.alt, anime.title, anime.titleAlt];
 /** Kunci himpunan judul (untuk tahu apakah detail membawa judul yang belum dicari). */
@@ -177,7 +199,7 @@ function armHoldTimer(n, ms = PLAYER.scrapeWaitMs) {
 function holdForScrape(n) {
     holdFor = n;
     scrapeDoneFor = null;
-    player.showWaiting(`🔍 Mencari server Sub Indo untuk Episode ${n}...`);
+    player.showWaiting(`Mencari server Sub Indo untuk Episode ${n}...`);
     armHoldTimer(n);
 }
 
@@ -222,15 +244,15 @@ function renderEpisodeLabel() {
 function renderMeta() {
     const a = anime;
     const parts = [];
-    if (a.score != null) parts.push(html`<span class="meta-score">⭐ ${a.score.toFixed(1)}</span>`);
+    if (a.score != null) parts.push(html`<span class="meta-score">${icon('star', { cls: 'ic--rating' })}${a.score.toFixed(1)}</span>`);
     if (detailLoaded && a.status !== 'UNKNOWN') parts.push(html`<span>${statusLabel(a)}</span>`);
     if (detailLoaded) parts.push(html`<span>${formatLabel(a)}</span>`);
     const season = seasonLabel(a);
-    if (season) parts.push(html`<span>📅 ${season}</span>`);
-    if (a.episodes) parts.push(html`<span>🎞️ ${a.episodes} Episode</span>`);
-    if (a.duration) parts.push(html`<span>⏱️ ${a.duration} mnt</span>`);
-    if (a.studios?.length) parts.push(html`<span>🎨 ${a.studios[0]}</span>`);
-    parts.push(html`<span>📺 Sub Indo</span>`, html`<span>📡 Multi-Server</span>`);
+    if (season) parts.push(html`<span>${icon('calendar')}${season}</span>`);
+    if (a.episodes) parts.push(html`<span>${icon('film')}${a.episodes} Episode</span>`);
+    if (a.duration) parts.push(html`<span>${icon('timer')}${a.duration} mnt</span>`);
+    if (a.studios?.length) parts.push(html`<span>${icon('building-2')}${a.studios[0]}</span>`);
+    parts.push(html`<span>${icon('captions')}Sub Indo</span>`, html`<span>${icon('server')}Multi-Server</span>`);
     els.meta.innerHTML = String(html`${parts}`);
 }
 
@@ -273,7 +295,7 @@ function renderPlatforms() {
     if (!t) return;
     els.platforms.innerHTML = String(html`${LEGAL_PLATFORMS.map((p) => html`
         <a class="platform-card" data-platform="${p.id}" href="${p.url(t)}" target="_blank" rel="noopener noreferrer">
-            <span class="platform-icon" aria-hidden="true">${p.icon}</span>
+            <span class="platform-icon" aria-hidden="true">${icon(p.icon)}</span>
             <div><div class="platform-name">${p.name}</div><div class="platform-desc">${p.description}</div></div>
         </a>`)}`);
 }
@@ -282,7 +304,7 @@ function renderNextAiring() {
     const n = anime.nextAiring;
     const show = Boolean(n?.airingAt) && n.airingAt * 1000 > Date.now() && anime.status !== 'COMPLETED';
     els.nextAiring.hidden = !show;
-    if (show) els.nextAiring.textContent = `⏰ ${n.episode ? `Episode ${n.episode}` : 'Episode berikutnya'} tayang ${formatWib(n.airingAt)}`;
+    if (show) els.nextAiring.innerHTML = String(html`${icon('alarm-clock')} ${n.episode ? `Episode ${n.episode}` : 'Episode berikutnya'} tayang ${formatWib(n.airingAt)}`);
 }
 
 function syncWatchBookmark() {
@@ -327,13 +349,13 @@ function revealPlayer() {
 function showUpcoming() {
     const n = anime.nextAiring;
     player.showMessage({
-        icon: '⏳',
+        icon: 'hourglass',
         title: 'Anime ini belum tayang',
         text: n?.airingAt ? `Episode ${n.episode || 1} dijadwalkan tayang ${formatWib(n.airingAt)}.` : 'Belum ada episode yang bisa diputar.',
         sub: 'Bookmark dulu agar mudah ditemukan saat sudah tayang.',
-        actions: [{ label: '▶ Coba putar', onClick: () => player.load(ep, servers()) }],
+        actions: [{ label: html`${icon('play')} Coba putar`, onClick: () => player.load(ep, servers()) }],
         legal: true,
-        statusText: '⏳ Belum tayang',
+        statusText: 'Belum tayang',
     });
 }
 
@@ -345,6 +367,7 @@ function showUpcoming() {
 function playEpisode(n, { initial = false, announce = true } = {}) {
     ep = n;
     backendServers = [];
+    providerResult = null;
     holdFor = null;
     scrapeDoneFor = null;
     rescrapePending = false;
@@ -357,7 +380,8 @@ function playEpisode(n, { initial = false, announce = true } = {}) {
     else if (scrapeFirst()) holdForScrape(n);
     else player.load(n, servers());
     loadExtras(n);
-    if (announce && !initial) showToast(`📺 Episode ${n} dimuat`, 'info');
+    if (total !== 0) loadProviders(n);
+    if (announce && !initial) showToast(`Episode ${n} dimuat`, 'info');
 }
 
 /** Pilihan user (daftar episode, tombol prev/next, input manual). */
@@ -385,7 +409,7 @@ els.nextServer.addEventListener('click', () => player.nextServer());
 els.autoNext.checked = (storage.getRaw(STORAGE_KEYS.autoNext) ?? (PLAYER.autoNextDefault ? '1' : '0')) === '1';
 els.autoNext.addEventListener('change', () => {
     storage.setRaw(STORAGE_KEYS.autoNext, els.autoNext.checked ? '1' : '0');
-    showToast(els.autoNext.checked ? '▶️ Auto-next aktif' : '⏸️ Auto-next nonaktif', 'info');
+    showToast(els.autoNext.checked ? 'Auto-next aktif' : 'Auto-next nonaktif', 'info');
 });
 
 function refreshWatched() {
@@ -404,13 +428,13 @@ player.on('complete', ({ ep: done }) => {
     const nextEp = done + 1;
     if (typeof total === 'number' && nextEp > total) {
         const n = anime.nextAiring;
-        if (anime.status === 'ONGOING' && n?.airingAt) showToast(`⏳ Episode ${nextEp} tayang ${formatWib(n.airingAt)}`, 'info');
-        else showToast('🎉 Selesai! Semua episode telah ditonton.', 'success');
+        if (anime.status === 'ONGOING' && n?.airingAt) showToast(`Episode ${nextEp} tayang ${formatWib(n.airingAt)}`, 'info');
+        else showToast('Selesai! Semua episode telah ditonton.', 'success');
         return;
     }
     if (!els.autoNext.checked) return;
     playEpisode(nextEp, { announce: false });
-    showToast(`▶️ Otomatis Episode ${nextEp}`, 'success');
+    showToast(`Otomatis Episode ${nextEp}`, 'success');
 });
 
 player.on('servers', ({ count }) => { els.nextServer.disabled = count === 0; });
@@ -471,6 +495,42 @@ function applyDetail(data) {
         if (player.state !== 'message') player.setServers(servers()); // mulai bila menunggu; buka kunci server baru tanpa memutus video
         if (rescrapeNow) loadExtras(ep);
     }
+    // Penyedia (ReAnime/AniZone) diminta ulang bila detail membawa id AniList / judul yang belum dipakai.
+    if (total !== 0 && providerKeyFor() !== providerKey && !(providerResult?.servers?.length)) loadProviders(ep);
+}
+
+const providerTitles = () => [...new Set(scrapeTitles().map((t) => String(t || '').trim()).filter(Boolean))];
+const providerKeyFor = () => `${anime.ids?.anilist || ref.anilist || ''}|${titlesKey(providerTitles())}`;
+
+/** Perbarui tombol server (atau mulai putar bila player menunggu tanpa server) — kecuali masih menahan untuk scraping. */
+function refreshServers() {
+    if (total === 0 || player.state === 'message' || holdFor === ep) return;
+    player.setServers(servers());
+}
+
+/** Server ReAnime + AniZone untuk episode n (lewat backend /api/stream/servers). */
+async function loadProviders(n) {
+    providerCtrl?.abort();
+    const ctrl = new AbortController();
+    providerCtrl = ctrl;
+    providerResult = null;
+    providerKey = providerKeyFor();
+    const anilistId = anime.ids?.anilist || ref.anilist || null;
+    const titles = providerTitles();
+    if (!isBackendEnabled() || (!anilistId && !titles.length)) {
+        providerResult = { servers: [], status: {}, error: { kind: isBackendEnabled() ? 'empty' : 'disabled' } };
+        refreshServers();
+        return;
+    }
+    try {
+        const res = await getStreamServers({ anilist: anilistId, ep: n, titles, year: anime.year || null, signal: ctrl.signal });
+        if (ctrl.signal.aborted || n !== ep) return;
+        providerResult = res;
+    } catch (err) {
+        if (err?.kind === 'abort' || ctrl.signal.aborted || n !== ep) return;
+        providerResult = { servers: [], status: {}, error: err };
+    }
+    refreshServers();
 }
 
 async function loadDetail() {
@@ -488,7 +548,7 @@ async function loadDetail() {
     loadRecommendations(data.recommendations);
     if (data.fallback) {
         setSectionNote(els.info, {
-            text: `⚠️ Info anime tidak dapat dimuat. ${friendlyError(data.error)}`,
+            text: `Info anime tidak dapat dimuat. ${friendlyError(data.error)}`,
             onRetry: () => {
                 retrySourcesNow();
                 loadDetail();
@@ -521,7 +581,7 @@ async function loadExtras(n) {
                 // Datang setelah server cadangan diputar → tambahkan tombol tanpa memutus video
                 const wasPlaying = player.state === 'loading' || player.state === 'playing';
                 player.setServers(servers());
-                if (wasPlaying && scrapeFirst()) showToast(`🌐 ${res.servers.length} server tambahan tersedia — pilih di daftar server.`, 'info');
+                if (wasPlaying && scrapeFirst()) showToast(`${res.servers.length} server tambahan tersedia — pilih di daftar server.`, 'info');
             }
         } else scrapeFinished(n);
         const realError = res.error && res.error.kind !== 'empty' ? res.error : null;
@@ -554,9 +614,9 @@ async function loadRecommendations(preloaded) {
     try {
         const res = await getRecommendations(anime.title ? anime : null, { preloaded });
         if (res.items.length) renderCards(els.recs, res.items, { isBookmarked });
-        else gridMessage(els.recs, { icon: '📭', text: 'Belum ada rekomendasi untuk anime ini.' });
+        else gridMessage(els.recs, { icon: 'inbox', text: 'Belum ada rekomendasi untuk anime ini.' });
     } catch (err) {
-        gridMessage(els.recs, { icon: '⚠️', text: friendlyError(err) });
+        gridMessage(els.recs, { icon: 'triangle-alert', text: friendlyError(err) });
     }
 }
 
@@ -584,7 +644,7 @@ function renderNotFound() {
     els.prev.disabled = true;
     els.next.disabled = true;
     player.showMessage({
-        icon: '🎬',
+        icon: 'clapperboard',
         title: 'Anime tidak ditemukan',
         text: 'Link tidak lengkap. Pilih anime dari beranda atau pencarian.',
         actions: [{ label: 'Kembali ke Beranda', href: PAGES.home, newTab: false }],
@@ -611,12 +671,12 @@ function start() {
 
     if (wantLatest) {
         // ep=latest: nomor episode terbaru baru diketahui setelah detail dimuat (applyDetail)
-        player.showWaiting('🔍 Mencari episode terbaru...');
+        player.showWaiting('Mencari episode terbaru...');
     } else if (scrapeFirst() || servers().some((s) => s.available)) {
         // scrape-first → menunggu hasil scraping dulu; id sudah ada di URL → tidak perlu menunggu detail
         playEpisode(ep, { initial: true });
     } else {
-        player.showWaiting('🔍 Mencari ID anime untuk server streaming...');
+        player.showWaiting('Mencari ID anime untuk server streaming...');
         loadExtras(ep);
     }
     loadDetail();
@@ -625,4 +685,4 @@ function start() {
 if (!ref.title && !ref.anilist && !ref.mal && !ref.kitsu && !ref.slug) renderNotFound();
 else start();
 
-console.info('%c🌸 Kazanime — Tahap D (player: server hasil scraping AnimeXin/Samehadaku dulu, server cadangan di belakang)', 'color:#ff6b9d;font-weight:bold');
+console.info('%cKazanime — player: server Sub Indo hasil scraping dulu, lalu cadangan (MegaPlay, ReAnime, AniZone Multi Sub, Vidnest, TryEmbed)', 'color:#ff6b9d;font-weight:bold');
