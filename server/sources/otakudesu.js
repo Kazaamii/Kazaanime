@@ -230,10 +230,15 @@ export function parseSchedulePage($, base) {
 /**
  * @param {{network: any, createClient: Function, baseUrl: string}} deps
  */
-export function createOtakudesu({ network, createClient, baseUrl }) {
+export function createOtakudesu({ network, createClient, baseUrl, sourceConfig = {} }) {
     const base = String(baseUrl || 'https://otakudesu.blog').replace(/\/+$/, '');
     const host = new URL(base).hostname.replace(/^www\./, '');
-    const client = createClient(network, { source: ID, allowedHosts: [host, `www.${host}`], challengeRetries: 1 });
+    const client = createClient(network, {
+        source: ID,
+        allowedHosts: [host, `www.${host}`],
+        cookies: sourceConfig.cookiesEnabled ?? true,
+        renderJavaScript: Boolean(sourceConfig.renderJavaScript),
+    });
 
     return {
         id: ID,

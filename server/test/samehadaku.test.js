@@ -138,7 +138,7 @@ test('samehadaku: adapter — latest/search/detail/episode/schedule lewat client
         return c;
     };
     const a = createSamehadaku({ network: {}, createClient: clientFactory, baseUrl: `${BASE}/` });
-    assert.equal(adapterClientOpts.challengeRetries, 0, 'challenge konten tidak diulang');
+    assert.equal(adapterClientOpts.challengeRetries, undefined, 'challenge konten tidak diulang');
     assert.equal(adapterClientOpts.blockedMs, 30 * 60 * 1000, 'Samehadaku diistirahatkan 30 menit setelah challenge');
     assert.equal(a.id, 'samehadaku');
     assert.deepEqual(a.parseRef([KIKANSHA]), { slug: KIKANSHA });

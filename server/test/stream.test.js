@@ -155,7 +155,7 @@ test('anizone provider: cari slug lewat judul → halaman episode → server HLS
     });
     let clientOpts;
     const z = createAnizone({ network: {}, createClient: (net, opts) => { clientOpts = opts; return createClient(net, opts); } });
-    assert.equal(clientOpts.challengeRetries, 0, 'challenge konten tidak diulang');
+    assert.equal(clientOpts.challengeRetries, undefined, 'challenge konten tidak diulang');
     assert.equal(clientOpts.blockedMs, 30 * 60 * 1000, 'AniZone diistirahatkan 30 menit setelah challenge');
     const r = await z.servers({ ep: 3, titles: ['Tensei Shitara Ken Deshita 2nd Season'], year: 2026 });
     assert.equal(r.slug, 'ivt095hh');
@@ -282,18 +282,17 @@ test('GET /api/stream/hls: playlist ditulis ulang; segmen diteruskan (Range/206,
     });
 });
 
-test('GET /api/stream/sub: ASS → VTT; challenge acak diulang; gagal terus → 503', async () => {
+test('GET /api/stream/sub: ASS → VTT; CAPTCHA/challenge dihentikan tanpa retry', async () => {
     const ASS = 'https://suzaku.xin-cdn.xyz/u/subtitles/8_id.ass';
     const BLOCKED = 'https://suzaku.xin-cdn.xyz/u/subtitles/9_x.ass';
     const challenge = { status: 403, headers: { server: 'cloudflare', 'cf-ray': 'x', 'content-type': 'text/html' }, body: '<title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/h/b/orchestrate"></script>' };
     const assText = '[Script Info]\nPlayResY: 1080\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,Halo\n';
     const media = fakeMedia({
-        [ASS]: (n) => (n === 1 ? challenge : { headers: { 'content-type': 'text/plain' }, body: assText }),
+        [ASS]: () => ({ headers: { 'content-type': 'text/plain' }, body: assText }),
         [BLOCKED]: () => challenge,
     });
     const signer = createSigner(SECRET);
     const app = createApp({ registry: fakeRegistry(), streams: fakeStreams([]), mediaClient: media, signer, log: false, rateLimitPerMinute: 0, proxyRateLimitPerMinute: 0 });
-    // jeda ulang dipercepat lewat router langsung tidak tersedia → cukup terima jeda default (±1,5 dtk + 3 dtk)
     const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     const base = `http://127.0.0.1:${server.address().port}`;
     try {
@@ -301,12 +300,13 @@ test('GET /api/stream/sub: ASS → VTT; challenge acak diulang; gagal terus → 
         assert.equal(ok.status, 200);
         assert.match(ok.headers.get('content-type'), /text\/vtt/);
         assert.match(await ok.text(), /^WEBVTT[\s\S]*00:00:01\.000 --> 00:00:02\.000\nHalo/);
-        assert.equal(media.calls.filter((c) => c.url === ASS).length, 2, 'challenge pertama diulang sekali');
+        assert.equal(media.calls.filter((c) => c.url === ASS).length, 1, 'subtitle normal hanya diminta sekali');
         assert.equal((await fetch(`${base}/api/stream/sub?u=${encodeTarget(ASS)}&f=ass&s=${signer.sign(ASS)}`)).status, 403, 'format ikut ditandatangani');
         assert.equal((await fetch(`${base}/api/stream/sub?u=${encodeTarget(ASS)}&f=exe&s=x`)).status, 400);
         const blocked = await fetch(`${base}/api/stream/sub?u=${encodeTarget(BLOCKED)}&f=ass&s=${signer.sign(`${BLOCKED}|ass`)}`);
         assert.equal(blocked.status, 503);
         assert.equal((await blocked.json()).code, 'UPSTREAM_BLOCKED');
+        assert.equal(media.calls.filter((c) => c.url === BLOCKED).length, 1, 'challenge tidak diulang');
     } finally {
         server.closeAllConnections?.();
         await new Promise((r) => server.close(r));
@@ -352,7 +352,7 @@ test('GET /api/stream/hls dengan fetcher SUNGGUHAN + upstream lambat: tidak diba
     }
 });
 
-test('GET /api/stream/hls: CDN membalas challenge HTML sekali → diulang otomatis, key tetap terkirim', async () => {
+test('GET /api/stream/hls: challenge HTML dihentikan tanpa retry dan body tidak diteruskan', async () => {
     const KEY = 'https://suzaku.xin-cdn.xyz/77/keys/abc.key';
     const media = fakeMedia({
         [KEY]: (n) => (n === 1
@@ -361,8 +361,8 @@ test('GET /api/stream/hls: CDN membalas challenge HTML sekali → diulang otomat
     });
     await withStreamApp({ streams: fakeStreams([]), media }, async (base, signer) => {
         const r = await fetch(`${base}/api/stream/hls?u=${encodeTarget(KEY)}&s=${signer.sign(KEY)}`);
-        assert.equal(r.status, 200);
-        assert.equal((await r.arrayBuffer()).byteLength, 16);
-        assert.equal(media.calls.filter((c) => c.url === KEY).length, 2);
+        assert.equal(r.status, 503);
+        assert.equal((await r.json()).code, 'UPSTREAM_BLOCKED');
+        assert.equal(media.calls.filter((c) => c.url === KEY).length, 1);
     });
 });

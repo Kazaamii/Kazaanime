@@ -19,7 +19,6 @@ import { Router } from 'express';
 import { AI_SUBS, STREAMS } from '../config.js';
 import { AppError, badRequest } from '../lib/errors.js';
 import { looksLikeChallenge, readBody } from '../lib/fetcher.js';
-import { sleep } from '../lib/rate-limit.js';
 import { decodeTarget, encodeTarget, isPlaylist, rewritePlaylist, toVtt } from '../lib/stream-proxy.js';
 import { createAiSubtitleService, pickAiSource } from '../lib/subtitle-ai.js';
 import { readEpisode } from './anime.js';
@@ -51,11 +50,10 @@ const SUBAI_PARAMS = new Set(['u', 'f', 'l', 'v', 's', 'p']);
  *   mediaClient: {stream: Function},
  *   signer: {sign: (v: string) => string, verify: (v: string, s: string) => boolean},
  *   budgetMs: number,
- *   subRetryDelayMs?: number,
  *   ai?: {gemini: {generate: Function, health: Function}, config: typeof AI_SUBS}|null,  null = fitur AI mati
  * }} deps
  */
-export function streamRouter({ providers, mediaClient, signer, budgetMs, subRetryDelayMs = 1500, ai = null }) {
+export function streamRouter({ providers, mediaClient, signer, budgetMs, ai = null }) {
     const router = Router();
     const hlsUrl = (u) => `/api/stream/hls?u=${encodeTarget(u)}&s=${signer.sign(u)}`;
     const subUrl = (u, f) => `/api/stream/sub?u=${encodeTarget(u)}&f=${f}&s=${signer.sign(`${u}|${f}`)}`;
@@ -64,29 +62,27 @@ export function streamRouter({ providers, mediaClient, signer, budgetMs, subRetr
     const subAiUrl = (u, f, l) => `/api/stream/subai?u=${encodeTarget(u)}&f=${f}&l=${l}&v=${aiVersion}&s=${aiSign(u, f, l, aiVersion)}`;
 
     /**
-     * Ambil berkas subtitle dari CDN AniZone. Challenge Cloudflare acak → diulang.
+     * Ambil subtitle sekali. 403/429/CAPTCHA/challenge dihentikan; tidak ada retry atau rotasi identitas.
      * @returns {Promise<string>} isi mentah (ASS/SRT/VTT)
      */
-    async function fetchSubtitle(target, { attempts = STREAMS.subtitleAttempts, timeoutMs = 10000 } = {}) {
-        let lastStatus = 0;
-        for (let attempt = 0; attempt < attempts; attempt++) {
-            if (attempt) await sleep(subRetryDelayMs * attempt);
-            const up = await mediaClient.stream(target, { timeoutMs, maxBytes: 4 * 1024 * 1024 });
-            const body = await readBody({ body: up.body }, 4 * 1024 * 1024, { source: 'anizone-media' });
-            lastStatus = up.status;
-            if (looksLikeChallenge({ status: up.status, headers: up.headers, text: body })) continue;
-            if (up.status >= 400) throw new AppError(`Subtitle tidak tersedia (HTTP ${up.status}).`, { status: up.status === 404 ? 404 : 502, code: 'UPSTREAM' });
-            return body;
+    async function fetchSubtitle(target, { timeoutMs = 10000 } = {}) {
+        const up = await mediaClient.stream(target, { timeoutMs, maxBytes: 4 * 1024 * 1024 });
+        const body = await readBody({ body: up.body }, 4 * 1024 * 1024, { source: 'anizone-media' });
+        if (up.status === 403 || up.status === 429 || looksLikeChallenge({ status: up.status, headers: up.headers, text: body })) {
+            throw new AppError('Subtitle dibatasi situs sumber; akses dihentikan tanpa percobaan ulang.', {
+                status: 503, code: 'UPSTREAM_BLOCKED', details: { status: up.status },
+            });
         }
-        throw new AppError('Subtitle sedang dibatasi situs sumber, coba lagi sebentar.', { status: 503, code: 'UPSTREAM_BLOCKED', details: { status: lastStatus } });
+        if (up.status >= 400) throw new AppError(`Subtitle tidak tersedia (HTTP ${up.status}).`, { status: up.status === 404 ? 404 : 502, code: 'UPSTREAM' });
+        return body;
     }
 
     const aiService = ai
         ? createAiSubtitleService({
             gemini: ai.gemini,
             config: ai.config,
-            // Bagian AI punya batas waktu total ±55 dtk → subtitle sumber maks. 2 percobaan × 8 dtk.
-            loadVtt: async (target, format) => toVtt(await fetchSubtitle(target, { attempts: 2, timeoutMs: 8000 }), format),
+            // Tidak mengulang request subtitle yang dibatasi; kegagalan dikembalikan ke pemanggil AI.
+            loadVtt: async (target, format) => toVtt(await fetchSubtitle(target, { timeoutMs: 8000 }), format),
         })
         : null;
 
@@ -153,12 +149,12 @@ export function streamRouter({ providers, mediaClient, signer, budgetMs, subRetr
             timeoutMs: STREAMS.proxyTimeoutMs,
             maxBytes: STREAMS.maxSegmentBytes,
         });
-        let up = await fetchUp();
-        // Challenge Cloudflare acak di CDN (terukur 22 Okt 2026: key AES sesekali 403 lalu lolos) → ulangi SEKALI.
-        if ((up.status === 403 || up.status === 503) && /text\/html/i.test(up.headers.get('content-type') || '')) {
+        const up = await fetchUp();
+        if (up.status === 403 || up.status === 429 || looksLikeChallenge({ status: up.status, headers: up.headers })) {
             await up.body?.cancel().catch(() => {});
-            await sleep(subRetryDelayMs / 2, ac.signal);
-            up = await fetchUp();
+            throw new AppError('Server video membatasi akses; request dihentikan tanpa percobaan ulang.', {
+                status: 503, code: 'UPSTREAM_BLOCKED', details: { status: up.status },
+            });
         }
         if (up.status >= 400) {
             await up.body?.cancel().catch(() => {});

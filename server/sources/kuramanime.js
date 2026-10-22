@@ -244,7 +244,7 @@ export function parseEpisodePage($, base) {
 /**
  * @param {{network: any, createClient: Function, baseUrl: string}} deps
  */
-export function createKuramanime({ network, createClient, baseUrl }) {
+export function createKuramanime({ network, createClient, baseUrl, sourceConfig = {} }) {
     const base = String(baseUrl || 'https://v20.kuramanime.ing').replace(/\/+$/, '');
     const host = new URL(base).hostname;
     const client = createClient(network, {
@@ -252,6 +252,8 @@ export function createKuramanime({ network, createClient, baseUrl }) {
         allowedHosts: [host],
         // ToS belum bisa ditinjau → robots.txt WAJIB terbaca & mengizinkan sebelum halaman apa pun diambil.
         requireExplicitRobots: POLICY.tos.verdict !== 'allowed',
+        cookies: sourceConfig.cookiesEnabled ?? true,
+        renderJavaScript: Boolean(sourceConfig.renderJavaScript),
     });
 
     const toAnime = (c) => makeAnime({

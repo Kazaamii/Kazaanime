@@ -28,9 +28,9 @@ for (const id of SOURCES.enabled) {
         console.log(`\n✗ ${id}: adapter tidak dikenal`);
         continue;
     }
-    const adapter = factory({ network, createClient, baseUrl: SOURCES[id].baseUrl });
+    const adapter = factory({ network, createClient, baseUrl: SOURCES[id].baseUrl, sourceConfig: SOURCES[id] });
     const { tos } = adapter.policy;
-    console.log(`\n== ${adapter.name} — ${adapter.baseUrl}`);
+    console.log(`\n== ${adapter.name} — ${new URL(adapter.baseUrl).origin}`);
     line('ToS', `${tos.verdict.toUpperCase()} (ditinjau ${tos.reviewedAt})${tos.url ? ` · ${tos.url}` : ''}`);
     line('', tos.note);
 
@@ -65,7 +65,7 @@ for (const id of SOURCES.enabled) {
             line('jadwal', `${all.length} anime di ${Object.values(days).filter((d) => d.length).length} hari · ${all.filter((x) => x.time).length} dengan jam rilis`);
         }
     } catch (err) {
-        line('live', `GAGAL — ${err.kind || err.code || ''}: ${err.message}`);
+        line('live', `GAGAL — ${String(err.kind || err.code || 'error').replace(/[^a-z0-9_-]/gi, '').slice(0, 40)} (detail disembunyikan)`);
     }
 }
 console.log('');

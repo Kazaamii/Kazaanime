@@ -21,7 +21,7 @@ function fakeRegistry() {
         async detail(slug) {
             seen.push(`detail:${slug}`);
             if (slug === 'animexin~tidak-ada') throw notFound('Halaman tidak ditemukan di situs sumber.', 'animexin');
-            if (slug === 'animexin~meledak') throw new Error('bug tak terduga');
+            if (slug === 'animexin~meledak') throw new Error('bug tak terduga https://log-user:log-secret@private.example/path?token=log-token');
             if (!slug.includes('~')) throw badRequest('Slug tidak valid.');
             return { source: 'animexin', data: { ...makeAnime({ title: 'Judul', slug, source: 'animexin' }), episodeList: [] }, fallback: false, stale: false, errors: [] };
         },
@@ -106,10 +106,19 @@ test('GET /api/anime/:slug & /episode/:ep: sukses, 400, 404, 500 (pesan aman), 5
         assert.deepEqual([nf.json.ok, nf.json.code], [false, 'NOT_FOUND']);
         assert.match(nf.res.headers.get('cache-control'), /s-maxage=300/);
 
-        const boom = await get(`${base}/api/anime/animexin~meledak`);
+        const loggedErrors = [];
+        const originalConsoleError = console.error;
+        let boom;
+        try {
+            console.error = (...args) => loggedErrors.push(args.join(' '));
+            boom = await get(`${base}/api/anime/animexin~meledak`);
+        } finally {
+            console.error = originalConsoleError;
+        }
         assert.equal(boom.res.status, 500);
         assert.equal(boom.json.error, 'Terjadi kesalahan di server.', 'detail error internal tidak bocor');
         assert.equal(boom.res.headers.get('cache-control'), 'no-store');
+        assert.doesNotMatch(loggedErrors.join(' '), /log-user|log-secret|log-token|private\.example|tak terduga/);
 
         const ep = await get(`${base}/api/anime/animexin~judul/episode/12`);
         assert.equal(ep.res.status, 200);

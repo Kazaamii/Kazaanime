@@ -339,9 +339,8 @@ export function parseEpisodePage($, base) {
 export function createAnimexin({ network, createClient, baseUrl }) {
     const base = String(baseUrl || 'https://animexin.dev').replace(/\/+$/, '');
     const host = new URL(base).hostname.replace(/^www\./, '');
-    // Challenge Cloudflare acak juga terukur di situs ini dari IP pusat data (22 Okt 2026) → ulangi maks 2x,
-    // lalu istirahat 5 menit (dulu langsung 30 menit).
-    const client = createClient(network, { source: ID, allowedHosts: [host, `www.${host}`], challengeRetries: 2, blockedMs: 5 * 60 * 1000 });
+    // Challenge/access restriction selalu fail-fast; cooldown memberi ruang untuk fallback tanpa melewati WAF.
+    const client = createClient(network, { source: ID, allowedHosts: [host, `www.${host}`], blockedMs: 5 * 60 * 1000 });
 
     async function loadSeries(seriesSlug, ctx) {
         const page = await client.html(`${base}/${seriesSlug}/`, ctx);

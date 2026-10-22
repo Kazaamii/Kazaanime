@@ -11,7 +11,7 @@
  *   Embed flixcloud.cc/e/… dipasang langsung sebagai iframe (header-nya tanpa X-Frame-Options /
  *   frame-ancestors). Tidak ada dekripsi apa pun — player embed bekerja sendiri di browser pengguna.
  * Subtitle ReAnime berbahasa Inggris. Hanya server "sub" yang dipakai (HD-2 lalu HD-1, urutan situsnya).
- * Cloudflare men-challenge sebagian request secara acak (bukan blokir permanen) → challengeRetries.
+ * Challenge Cloudflare dihentikan tanpa retry; circuit memberi cooldown dan provider lain tetap dicoba.
  */
 import { notFound } from '../lib/errors.js';
 import { bestTitleMatch, uniqueTitles } from './match.js';
@@ -65,7 +65,6 @@ export function createReanime({ network, createClient, baseUrl = 'https://reanim
     const client = createClient(network, {
         source: ID,
         allowedHosts: [host, `www.${host}`],
-        challengeRetries: 2,
         blockedMs: 3 * 60 * 1000,
     });
 

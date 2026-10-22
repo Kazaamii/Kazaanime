@@ -100,8 +100,8 @@ test('fetcher: robots.txt diblokir Cloudflare → seluruh sumber blocked (kasus 
     const { client, hits, base } = await t.ready;
     try {
         await assert.rejects(client.request(`${base}/anime?order_by=updated`), (e) => e.kind === 'blocked');
-        // robots.txt yang kena challenge diulang SEKALI (challenge Cloudflare bisa acak) — halaman konten tetap tidak diminta.
-        assert.deepEqual(hits.map((h) => h.url), ['/robots.txt', '/robots.txt'], 'hanya robots.txt yang sempat diminta');
+        // robots.txt yang kena challenge dihentikan langsung; halaman konten tidak pernah diminta.
+        assert.deepEqual(hits.map((h) => h.url), ['/robots.txt'], 'hanya satu request robots.txt yang sempat diminta');
     } finally {
         await t.close();
     }
@@ -118,11 +118,34 @@ test('fetcher: ToS belum ditinjau + robots.txt 404 → tidak diakses (policy)', 
     }
 });
 
+test('fetcher: cookie session disimpan per sumber, dikirim hanya pada request berikutnya; cookie challenge dibuang', async () => {
+    const t = setup({
+        '/robots.txt': send(404, ''),
+        '/set': (req, res) => { res.writeHead(200, { 'set-cookie': 'session=private-cookie; Path=/; HttpOnly' }); res.end('ok'); },
+        '/echo': (req, res) => send(200, req.headers.cookie || '')(req, res),
+        '/blocked': (req, res) => { res.writeHead(403, { 'set-cookie': 'challenge=must-not-store; Path=/' }); res.end('Forbidden'); },
+    }, { clientOpts: { cookies: true } });
+    const { client, net, base } = await t.ready;
+    try {
+        await client.request(`${base}/set`);
+        assert.equal((await client.request(`${base}/echo`)).text, 'session=private-cookie');
+        assert.equal(await net.cookieManager.getCookieHeader('uji', `${base}/`), 'session=private-cookie');
+        await assert.rejects(client.request(`${base}/blocked`), (error) => error.kind === 'blocked');
+        assert.equal(await net.cookieManager.getCookieHeader('uji', `${base}/`), 'session=private-cookie');
+        assert.equal(await net.cookieManager.getCookieHeader('other-source', `${base}/`), '');
+        assert.doesNotMatch(JSON.stringify(net.cookieManager.snapshot()), /private-cookie/);
+    } finally {
+        await t.close();
+    }
+});
+
 test('fetcher: timeout tidak di-retry; host lain & redirect ke host lain ditolak', async () => {
     const t = setup({
         '/robots.txt': send(404, ''),
         '/lambat': (req, res) => { setTimeout(() => send(200, 'telat')(req, res), 1500); },
         '/kabur': send(302, '', { location: 'http://localhost:1/luar' }),
+        '/pindah': send(302, '', { location: '/final' }),
+        '/final': send(200, 'redirect-final'),
     });
     const { client, hits, base } = await t.ready;
     try {
@@ -131,7 +154,11 @@ test('fetcher: timeout tidak di-retry; host lain & redirect ke host lain ditolak
         assert.ok(Date.now() - t0 < 1400, 'berhenti di batas timeout');
         assert.equal(hits.filter((h) => h.url === '/lambat').length, 1, 'timeout tidak diulang');
         await assert.rejects(client.request('https://evil.example/x'), (e) => e.kind === 'policy');
-        await assert.rejects(client.request(`${base}/kabur`), (e) => e.kind === 'policy' || e.kind === 'network');
+        await assert.rejects(client.request(`${base}/kabur`), (e) => e.kind === 'policy');
+        const redirected = await client.request(`${base}/pindah`);
+        assert.equal(redirected.text, 'redirect-final');
+        assert.equal(redirected.url, `${base}/final`);
+        await assert.rejects(client.request(`http://user:private-secret@127.0.0.1:${new URL(base).port}/ok`), (error) => error.kind === 'policy' && !error.message.includes('private-secret'));
     } finally {
         await t.close();
     }
@@ -186,28 +213,26 @@ test('looksLikeChallenge & retryAfterSeconds', () => {
     assert.ok(retryAfterSeconds(new Date(Date.now() + 5000).toUTCString()) >= 4);
 });
 
-test('fetcher: challenge acak → diulang (challengeRetries) lalu berhasil', async () => {
+test('fetcher: CAPTCHA/challenge dihentikan langsung tanpa retry meski retry legacy diisi', async () => {
     let n = 0;
     const t = setup({
         '/robots.txt': send(200, 'User-agent: *\nDisallow:'),
         '/acak': (req, res) => {
             n++;
-            if (n === 1) send(403, '<title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/x"></script>', { server: 'cloudflare', 'cf-ray': 'x' })(req, res);
-            else send(200, '<p>lolos</p>')(req, res);
+            send(403, '<title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/x"></script>', { server: 'cloudflare', 'cf-ray': 'x' })(req, res);
         },
     }, { clientOpts: { challengeRetries: 1 } });
     const { client, net, base } = await t.ready;
     try {
-        const r = await client.request(`${base}/acak`);
-        assert.equal(r.text, '<p>lolos</p>');
-        assert.equal(n, 2, 'diulang tepat sekali');
-        assert.equal(net.circuit.check('uji').open, false, 'sumber tidak diistirahatkan');
+        await assert.rejects(client.request(`${base}/acak`), (e) => e.kind === 'blocked' && e.status === 503);
+        assert.equal(n, 1, 'challenge hanya diminta sekali');
+        assert.equal(net.circuit.check('uji').open, true, 'challenge membuka cooldown');
     } finally {
         await t.close();
     }
 });
 
-test('fetcher: challenge terus-menerus → blocked setelah jatah ulang habis, istirahat = blockedMs', async () => {
+test('fetcher: challenge terus-menerus tetap satu request dan mengikuti blockedMs', async () => {
     let n = 0;
     const t = setup({
         '/robots.txt': send(200, 'User-agent: *\nDisallow:'),
@@ -216,7 +241,7 @@ test('fetcher: challenge terus-menerus → blocked setelah jatah ulang habis, is
     const { client, net, base } = await t.ready;
     try {
         await assert.rejects(client.request(`${base}/cf`), (e) => e.kind === 'blocked');
-        assert.equal(n, 3, '1 percobaan + 2 ulangan');
+        assert.equal(n, 1, 'tidak ada percobaan ulang');
         const c = net.circuit.check('uji');
         assert.equal(c.open, true);
         assert.ok(c.retryAfter > 0 && c.retryAfter <= 90, `retryAfter ${c.retryAfter} mengikuti blockedMs`);
@@ -245,6 +270,25 @@ test('fetcher: stream() meneruskan byte biner + Range/206, host di luar allowlis
         await assert.rejects(client.stream('https://evil.example/x.ts'), (e) => e.kind === 'policy');
         await assert.rejects(client.stream('https://xin-cdn.xyz.evil.example/x.ts'), (e) => e.kind === 'policy');
         assert.equal(hits.filter((h) => h.url === '/robots.txt').length, 0, 'media tidak memeriksa robots.txt');
+    } finally {
+        await t.close();
+    }
+});
+
+test('fetcher: stream() menghentikan halaman CAPTCHA/403/429 sebelum body diteruskan', async () => {
+    const t = setup({
+        '/captcha.ts': send(200, '<div class="captcha-container">Complete security check</div>', { 'content-type': 'text/html' }),
+        '/rate.ts': send(429, 'slow down', { 'retry-after': '120' }),
+    }, { robots: false });
+    const { client, net, hits, base } = await t.ready;
+    const rateClient = createClient(net, { source: 'media-rate', allowedHosts: ['127.0.0.1'], robots: false, intervalMs: 0, retries: 0 });
+    try {
+        await assert.rejects(client.stream(`${base}/captcha.ts`), (error) => error.kind === 'blocked' && error.status === 503);
+        assert.equal(net.circuit.check('uji').open, true);
+        await assert.rejects(client.stream(`${base}/captcha.ts`), (error) => error.kind === 'blocked');
+        await assert.rejects(rateClient.stream(`${base}/rate.ts`), (error) => error.kind === 'rate_limited' && error.retryAfter === 120);
+        assert.equal(hits.filter((hit) => hit.url === '/captcha.ts').length, 1);
+        assert.equal(hits.filter((hit) => hit.url === '/rate.ts').length, 1);
     } finally {
         await t.close();
     }

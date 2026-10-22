@@ -28,11 +28,11 @@ kazanime/
 ├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
 ├── README.md                  ✅🅓
-├── package.json               🅓🅔 "type": "module", express 5 + cheerio, skrip dev/start/test/check:sources (test: Node 20 & 22)
+├── package.json               🅓🅔 dependency backend (cheerio/Express/Undici/fetch-socks/tough-cookie; Playwright opsional), skrip dev/start/test/check:sources
 ├── package-lock.json          🅓
 ├── vercel.json                ✅🅓🅕 header keamanan + rewrite /api/* → Function + maxDuration 60 dtk (bagian subtitle AI)
 ├── .env.example               🅔🅕 semua environment variable (opsional) beserta default-nya (+ GEMINI_*, nilai kosong)
-├── .gitignore                 🅔 (node_modules, .env, .vercel)
+├── .gitignore                 🅔 (node_modules, .env, .vercel, .scraper-data)
 ├── api/
 │   └── index.js               🅓 Vercel Function: `export default createApp()`
 ├── css/
@@ -96,7 +96,13 @@ kazanime/
     │   ├── anime.js           5 endpoint + validasi + header cache CDN
     │   └── stream.js          🅔🅕 /api/stream/servers (ReAnime + AniZone) · /hls (proxy HLS bertanda tangan) · /sub (ASS/SRT → WebVTT) · /subai (Subtitle Indonesia AI)
     ├── lib/
-    │   ├── fetcher.js         SATU-SATUNYA request keluar: allowlist host (+ sufiks CDN), robots, throttle, UA, timeout, retry, deteksi & ulang challenge Cloudflare, stream() biner, passErrors (API resmi) 🅕
+    │   ├── fetcher.js         SATU-SATUNYA request keluar: allowlist+redirect aman, robots, proxy, throttle/concurrency, cookies, timeout/retry terbatas; challenge berhenti tanpa retry
+    │   ├── proxy-manager.js   proxy HTTP(S)/SOCKS4a/5/5h, health TCP, rotasi terkonfigurasi, cooldown; tanpa direct fallback bila proxy mati
+    │   ├── cookie-manager.js  jar tough-cookie per sumber/domain, persistensi AES-256-GCM opsional
+    │   ├── fingerprint-manager.js BrowserContext stabil & transparan (UA bot, tanpa stealth)
+    │   ├── browser-automation.js Playwright opsional, host allowlist; hanya rendering JS eksplisit, bukan fallback challenge
+    │   ├── request-manager.js cache TTL yang ada, backoff terbatas, throttle + semaphore per host
+    │   ├── challenge-handler.js deteksi CAPTCHA/403/429/security challenge dan cooldown tanpa solver/retry
     │   ├── stream-proxy.js    🅔 tanda tangan HMAC URL proxy, penulisan ulang playlist m3u8, konversi ASS/SRT → WebVTT
     │   ├── gemini.js          🅕 klien Gemini API (generateContent): model utama → cadangan, pendinginan kuota/key, thinking minimal
     │   ├── subtitle-ai.js     🅕 VTT → bagian (±2 per episode), prompt "nomor|teks", validasi jawaban, cache & dedupe per instance
@@ -113,6 +119,7 @@ kazanime/
     │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Sub Indo (diverifikasi live) + jadwal rilis
     │   ├── anichin.js         🅔 adapter Anichin — donghua Sub Indo (tema AnimeStream, parser bersama AnimeXin) + jadwal berjam
     │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Sub Indo (diblokir Cloudflare untuk IP pusat data, lihat batasan)
+    │   ├── kuramanime.js      adapter Kuramanime opt-in; nonaktif default, robots wajib eksplisit, token player tidak di-bypass
     │   ├── hianime.js         🅔 adapter hianime.ro — anime Jepang, subtitle Inggris (REST otakuthemes)
     │   └── metadata.js        fallback API publik Kitsu → AniList (Jikan dihapus) + poster Kitsu → Bangumi → MangaBaka
     ├── providers/             🅔 penyedia server berbasis id/judul (bukan katalog)
@@ -122,7 +129,7 @@ kazanime/
     │   └── match.js           pencocokan judul (2nd Season = Season 2 = II)
     ├── scripts/
     │   └── check-sources.js   `npm run check:sources [-- --live]`: laporan robots/ToS/kesehatan sumber
-    └── test/                  `npm test` (node:test, 167 test) + fixtures/ (HTML/JSON asli dipangkas; Otakudesu anime/episode = rekonstruksi struktur)
+    └── test/                  `npm test` (node:test) + fixtures/ (HTML/JSON asli dipangkas; Otakudesu anime/episode = rekonstruksi struktur)
 ```
 
 ---
@@ -286,8 +293,8 @@ Hitorigoto Season 3" dalam ±1 dtk → **Server 1–4 Sub Indo** (Samehadaku) la
 - **Menunggu.** Selama mencari, player menampilkan "Mencari server Sub Indo untuk Episode N..."
   (maks. `PLAYER.scrapeWaitMs`, default 8 dtk; biasanya 1–3 dtk, lalu ter-cache). Hasil yang datang setelah
   cadangan diputar tetap ditambahkan sebagai tombol server tanpa memutus video.
-- **Kuramanime diganti Samehadaku.** Kuramanime (dan Otakudesu) menolak bot ini lewat Cloudflare (403 "Attention
-  Required!" di semua URL termasuk `robots.txt`), dan player Kuramanime memakai token anti-bot — tidak di-bypass.
+- **Samehadaku menggantikan Kuramanime sebagai sumber anime Jepang default.** Adapter Kuramanime tetap tersedia sebagai opt-in,
+  tetapi baseline sebelumnya menunjukkan Cloudflare 403 termasuk `robots.txt`; player memakai token anti-bot — tidak di-bypass.
   Samehadaku (`v2.samehadaku.how`, atur lewat `SAMEHADAKU_BASE_URL`) bisa diakses bot, robots.txt hanya melarang
   `/wp-admin/`, dan server videonya ada di HTML publik (`data-embed`). Kuronime juga terjangkau tetapi player-nya
   dimuat lewat loader terenkripsi → tidak dipakai. hianime.ro terjangkau, tetapi isinya subtitle Inggris dan
@@ -388,11 +395,11 @@ server/sources/index.js  (registry + aggregator)
       │   latest/search: semua scraper paralel → gabung + dedupe  ─┐ semua gagal
       │   detail/episode: dirutekan lewat prefix slug               ├──────────────→ metadata.js
       ▼                                                             │                (Kitsu → AniList)
-animexin · samehadaku · anichin · otakudesu · hianime  ── makeAnime()/makeEpisode() → format SERAGAM
+animexin · samehadaku · anichin · otakudesu · hianime · kuramanime (opt-in) ── makeAnime()/makeEpisode() → format SERAGAM
       │
-server/lib/fetcher.js  ── allowlist host → circuit breaker → robots.txt → throttle per host
-                          → User-Agent jujur + timeout + retry terbatas → deteksi challenge Cloudflare
-                          (diulang maks 2× bila challenge-nya acak) → istirahat 3–30 mnt
+server/lib/fetcher.js  ── allowlist + validasi redirect → circuit breaker → robots.txt → throttle/concurrency
+                          → proxy operator (bila dikonfigurasi) + User-Agent bot + cookie jar sumber
+                          → timeout + retry terbatas untuk error jaringan/5xx; 403/429/CAPTCHA/challenge berhenti & cooldown
 
 Browser (watch.js) ── GET /api/stream/servers?ep=&anilist=&title=   (22 Okt 2026)
       ▼
@@ -400,7 +407,7 @@ server/providers/  reanime.js (API JSON → embed flixcloud) · anizone.js (penc
       │
 server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditandatangani HMAC, host media di allowlist,
                            playlist ditulis ulang, segmen/key diteruskan + Range; CDN cache lama)
-                       ├── /api/stream/sub  : subtitle ASS/SRT → WebVTT (diulang bila kena challenge)
+                       ├── /api/stream/sub  : subtitle ASS/SRT → WebVTT (challenge/403/429 tidak diulang)
                        └── /api/stream/subai: (Tahap F) bagian ke-p subtitle diterjemahkan Gemini → JSON cue
                                               (lib/subtitle-ai.js → lib/gemini.js → fetcher; cache CDN 30 hari)
 ```
@@ -418,7 +425,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | `GET /api/stream/hls?u=&s=` | proxy HLS AniZone (hanya URL bertanda tangan dari `/servers`): m3u8 ditulis ulang, segmen/key apa adanya |
 | `GET /api/stream/sub?u=&f=&s=` | subtitle AniZone (ASS/SRT) dikonversi ke WebVTT untuk `<track>` |
 | `GET /api/stream/subai?u=&f=&l=&v=&s=&p=` | **(Tahap F)** `{ part, parts, ranges: [[mulai, akhir]…], lang: 'id', label: 'Indonesia (AI)', model, untranslated, cues: [[mulai, akhir, teks, pengaturan]…] }` — hanya URL bertanda tangan dari `ai.url`; parameter lain ditolak. Error: `503 AI_DISABLED` / `AI_QUOTA` (+ `Retry-After`) / `AI_CONFIG`, `504 AI_TIMEOUT`, `502 AI_UPSTREAM` / `AI_BAD_OUTPUT` / `AI_BLOCKED`, `409 AI_STALE` |
-| `GET /api/health` | status backend, User-Agent, TTL cache, status robots/circuit tiap sumber & penyedia stream, `aiSubtitles` (aktif/tidak + status tiap model Gemini; key tidak pernah ditampilkan) |
+| `GET /api/health` | status backend, User-Agent, TTL/cache, robots/circuit, concurrency, status proxy (tanpa host/kredensial), ringkasan cookie (tanpa nilai), status browser & `aiSubtitles` (key tidak ditampilkan) |
 | `GET /api/bot` | penjelasan bot + cara menolak lewat robots.txt (tercantum di User-Agent) |
 
 ```jsonc
@@ -450,10 +457,10 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Rate limit keluar | maks 1 request/detik per host (Crawl-delay bisa memperbesar), antrean > 6 dtk ditolak |
 | Rate limit masuk | 60 request/menit per IP untuk `/api/anime/*` (header `RateLimit-*`) |
 | Cache | memori per instance: latest 10 mnt, search/detail/episode 15 mnt, dedupe request identik, stale-if-error 1 jam; CDN Vercel `s-maxage` |
-| Timeout & retry | 6 dtk per request; retry 1× hanya untuk error jaringan & 5xx (bukan 4xx/timeout); batas total 10 dtk per request API |
-| Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; AniZone & Samehadaku: challenge halaman konten → tanpa retry, cooldown 30 mnt; sumber lain mengikuti konfigurasi retry/cooldown masing-masing; 429 → sesuai `Retry-After` |
-| Anti-SSRF | hanya host milik sumber (+ sufiks CDN media AniZone `xin-cdn.xyz`); redirect ke host lain tidak diikuti; respons > 3 MB ditolak (segmen video maks 40 MB) |
-| Proteksi bot | Tidak memakai fingerprint browser atau solver challenge. Setelah baseline GitHub Actions terbaru, halaman AniZone & Samehadaku yang mendapat challenge tidak diulang: circuit dibuka 30 menit, lalu sumber/fallback lain dipakai. Proxy media AniZone tetap dibatasi URL bertanda tangan + allowlist host |
+| Timeout & retry | 6 dtk per request; retry exponential-backoff terbatas hanya untuk error jaringan & 5xx; timeout tidak diulang. 403/429/CAPTCHA/challenge langsung berhenti; 429 memakai `Retry-After` terbatas dan circuit/cooldown |
+| Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; semua 403/challenge membuka cooldown tanpa retry; 429 dihentikan dengan cooldown dari `Retry-After` yang dibatasi |
+| Anti-SSRF | hanya host allowlist (+ sufiks CDN media AniZone `xin-cdn.xyz`); setiap redirect divalidasi sebelum diikuti, redirect robots harus tetap satu origin, header rahasia/cookie tidak diteruskan lintas origin; respons > 3 MB ditolak (segmen maks 40 MB) |
+| Proteksi bot | Profil BrowserContext stabil/transparan dengan User-Agent bot; tidak ada stealth/solver. Cookie/proxy hanya untuk request normal sesuai konfigurasi sumber/operator. Challenge tidak memicu retry, rotasi proxy, refresh cookie, atau fallback Playwright; circuit dibuka dan fallback dipakai. Proxy media tetap bertanda tangan + allowlist host |
 | Gemini (subtitle AI) | API resmi ber-key (header `x-goog-api-key`, bukan di URL); robots.txt tidak berlaku. Hanya subtitle yang ditawarkan `/servers` (URL bertanda tangan) yang bisa diterjemahkan → key tidak bisa dipakai pihak lain sebagai penerjemah gratis. Rate limit 20/menit/IP untuk request yang lolos cache CDN |
 | Proxy stream | `/api/stream/hls` hanya meneruskan URL yang ditandatangani server ini (HMAC, `STREAM_SECRET`) dan host media di allowlist → bukan open proxy. Rate limit terpisah 900/menit/IP. **Memakai bandwidth Vercel** (±300–700 MB per episode 720p di Chrome/Firefox; Safari/iOS memutar langsung dari CDN) |
 | Gambar | poster animexin dilindungi hotlink (403 + `Cross-Origin-Resource-Policy: same-origin`) → diganti poster **Kitsu** → **Bangumi** (judul Mandarin) → **MangaBaka**, hanya bila judul cocok persis (maks 2,5 dtk; sisanya dicari di belakang & respons diberi cache CDN 60 dtk). Poster Samehadaku boleh ditampilkan langsung. Tidak ada proxy gambar |
@@ -471,7 +478,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Sumber ditandai *blocked*, tanpa data palsu; gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
 | **ReAnime** (penyedia stream) | 🟡 parser diverifikasi dgn JSON asli | (22 Okt 2026) robots.txt mengizinkan semua; `/api/flix/<id AniList>/<ep>` publik. Dari IP pusat data sering di-challenge Cloudflare |
 | **AniZone** (penyedia stream) | 🟡 parser & proxy diverifikasi dgn data asli | (22 Okt 2026) robots.txt mengizinkan semua. Halaman episode → HLS + 17 subtitle (termasuk Indonesia). CDN video 200/206 tanpa Referer; halaman & berkas subtitle sering di-challenge dari IP pusat data |
-| ~~Kuramanime~~ | ❌ dihapus | Semua URL termasuk `robots.txt` → Cloudflare 403 untuk bot ini (dicek ulang 22 Okt 2026) + player bertoken anti-bot → adapter dihapus (bisa diambil dari `kazanime-tahap-d.zip` bila suatu saat situsnya mengizinkan bot) |
+| **Kuramanime** | ⚪ opt-in, nonaktif default | Baseline sebelumnya: Cloudflare 403 termasuk `robots.txt`; adapter tersedia terpisah dengan `requireExplicitRobots`, tetapi hanya aktif bila ditambahkan ke `SCRAPER_SOURCES`. Token player tidak dipecahkan; aktifkan hanya bila akses/robots mengizinkan |
 | Bangumi · MangaBaka | ✅ poster pengganti | `api.bgm.tv` (robots hanya melarang /pic/ /img/ /js/) & `api.mangabaka.org/v1` (robots mengizinkan /v1/) |
 | Kitsu | ✅ fallback utama | bisa dijangkau server; mapping id MAL/AniList; poster pengganti |
 | AniList | ⚠️ fallback berikutnya | dari sandbox: AniList 403 "temporarily disabled" (juga dengan Referer) — di Vercel bisa berbeda; circuit breaker membuatnya cepat dilewati |
@@ -479,17 +486,25 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 
 ### Environment variable (semua opsional)
 Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di User-Agent),
-`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anichin,otakudesu,hianime`),
-`SAMEHADAKU_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti),
+`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anichin,otakudesu,hianime`; `kuramanime` opt-in),
+`SAMEHADAKU_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti),
 `CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
 Penyedia stream: `STREAM_PROVIDERS` (default `reanime,anizone`), **`STREAM_SECRET`** (≥ 16 karakter acak — isi di
 Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RATE_LIMIT_PER_MIN`,
 `ANIZONE_MEDIA_HOSTS`, `REANIME_EMBED_HOSTS`. Subtitle AI (Tahap F): **`GEMINI_API_KEY`** (kosong = fitur mati),
 `GEMINI_MODEL` (default `gemini-3.6-flash`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`; `none` = tanpa
 cadangan), `AI_SUBTITLES=0` (matikan walau key ada), `AI_SUBTITLE_PART_LINES` / `AI_SUBTITLE_PART_CHARS` /
-`AI_SUBTITLE_TIMEOUT_MS` / `AI_SUBTITLE_RATE_LIMIT_PER_MIN`. Proxy keluar hanya untuk jalur egress yang diizinkan operator
-sumber/infrastruktur (bukan untuk menghindari challenge); Node ≥ 22.21 mendukung `NODE_USE_ENV_PROXY=1` +
-`HTTPS_PROXY=http://user:pass@host:port`. Lokal: `node --env-file=.env server/index.js`.
+`AI_SUBTITLE_TIMEOUT_MS` / `AI_SUBTITLE_RATE_LIMIT_PER_MIN`.
+Runtime scraper: `SCRAPER_PROXY_URLS` / `SCRAPER_PROXY_URL` (HTTP(S), SOCKS4a/5/5h; credentials URL-encoded; bila
+kosong, satu `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY` dikenali), `SCRAPER_PROXY_ROTATION` (`round-robin`/`sticky`/
+`disabled`), timeout/health/cooldown `SCRAPER_PROXY_*`, `SCRAPER_MAX_CONCURRENCY_PER_HOST`,
+`SCRAPER_COOKIES_ENABLED`, `SCRAPER_COOKIE_STORE_KEY` (≥32 byte), `SCRAPER_COOKIE_STORE_PATH`,
+`SCRAPER_BROWSER_ENABLED`, `SCRAPER_BROWSER_SETTLE_MS`, `PLAYWRIGHT_EXECUTABLE_PATH`, serta per-sumber
+`SAMEHADAKU_RENDER_JAVASCRIPT` / `OTAKUDESU_RENDER_JAVASCRIPT` / `KURAMANIME_RENDER_JAVASCRIPT` dan `*_COOKIES`.
+Proxy hanya egress operator yang diizinkan; challenge tidak memicu rotasi atau retry. Cookie persistent dienkripsi
+AES-256-GCM di `.scraper-data/cookies.enc`; filesystem Vercel bersifat sementara/per-instance. `playwright-core`
+tidak mengunduh browser: ikuti instruksi `.env.example` hanya bila kebutuhan JS rendering sudah diverifikasi.
+Lokal: `node --env-file=.env server/index.js`.
 
 ### Menambah / mengganti sumber
 1. Buat `server/sources/<nama>.js` → factory `create<Nama>({ network, createClient, baseUrl })` yang
@@ -501,8 +516,8 @@ sumber/infrastruktur (bukan untuk menghindari challenge); Node ≥ 22.21 menduku
 
 ### Tes
 ```bash
-npm test                          # 174 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
-                                  # acak, stream biner), parser animexin/samehadaku/anichin/hianime/otakudesu (fixture asli;
+npm test                          # unit test: robots, cache, throttle/concurrency, proxy/cookies/fingerprint/browser,
+                                  # fetcher (server HTTP lokal, redirect, challenge fail-fast, stream biner), parser semua adapter (fixture;
                                   # Otakudesu anime/episode = rekonstruksi struktur), ReAnime & AniZone (JSON/HTML asli),
                                   # proxy HLS (playlist asli, Range, tanda tangan), ASS/SRT → VTT, jadwal, metadata, routes,
                                   # subtitle AI (Gemini tiruan: format respons & error resmi, kuota, fallback model, /subai,
@@ -524,11 +539,11 @@ bukan izin penggunaan konten atau cara untuk melewati proteksi.
 Baseline terbaru (22 Okt 2026, 12:16 UTC; suffix `cf-ray` SJC): kedua `robots.txt` membalas 200, tetapi homepage AniZone
 dan Samehadaku membalas 403 Cloudflare challenge. Cek ini hanya meminta `/`; endpoint katalog/episode tidak diuji.
 
-- Sumber lain yang secara khusus dikonfigurasi untuk challenge acak masih memiliki retry terbatas. AniZone dan Samehadaku
-  kini gagal-cepat saat halaman konten di-challenge, membuka cooldown 30 menit, lalu memakai cache lama (maks 1 jam) atau
-  fallback. Halaman tidak menampilkan data palsu: tombol provider yang blocked ditandai tidak tersedia dan server lain tetap dipakai.
-- Bila deployment mendapat challenge, gunakan cache/fallback yang tersedia atau minta akses/allowlist resmi dari pemilik sumber.
-  Jangan mencoba menghindari challenge dengan fingerprint, proxy rotasi, cookie, atau solver.
+- Semua adapter dan jalur media menghentikan 403/429/CAPTCHA/security challenge tanpa retry. Pengaturan retry yang masih ada
+  hanya berlaku untuk error jaringan/5xx; proxy tidak dirotasi sebagai respons challenge, cookie tidak di-refresh, dan
+  Playwright tidak dipanggil sebagai fallback WAF. Cooldown + cache/fallback yang tersedia dipakai tanpa data palsu.
+- Proxy, cookie jar, serta rendering JS adalah konfigurasi operator untuk akses normal yang diizinkan; bukan cara
+  menghindari proteksi. Jika sumber memblokir bot, minta akses/allowlist resmi atau biarkan adapter/fallback berhenti.
 
 ---
 
@@ -592,8 +607,8 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   per instance (best effort) — perlindungan utama untuk situs sumber tetap cache CDN.
 - Hobby: function invocation & bandwidth terbatas per bulan; dengan cache CDN, satu kunjungan
   homepage biasanya tidak memanggil function sama sekali.
-- IP Vercel bisa saja diblokir situs sumber (seperti Kuramanime dulu). Backend tidak mencoba
-  melewatinya: sumber ditandai "blocked" dan fallback metadata dipakai.
+- IP Vercel bisa saja diblokir situs sumber (seperti Kuramanime pada baseline lama). Backend tidak mencoba
+  melewatinya: sumber ditandai "blocked" dan cache/fallback yang tersedia dipakai.
 
 ---
 
@@ -615,9 +630,10 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
    (atau adapter/penyedia backend: `server/sources/`, `server/providers/`); urutan slot cadangan termasuk
    ReAnime/AniZone diatur di `STREAMING_SERVERS`; `ui/player.js` hanya menerima daftar server jadi dari `js/api/streams.js`.
 10. **Backend: satu pintu keluar.** Hanya `server/lib/fetcher.js` yang melakukan request ke situs lain
-    (robots, throttle, UA, timeout, retry, allowlist host). Adapter di `server/sources/` hanya mengurai
-    HTML/JSON dan WAJIB mengembalikan `makeAnime()` / `makeEpisode()`. Header opsional hanya untuk kebutuhan protokol
-    terdokumentasi; tidak ada fingerprint browser atau solver challenge. Proxy stream hanya untuk URL bertanda tangan
+    (allowlist/redirect, robots, proxy terkonfigurasi, cookies per sumber, throttle/concurrency, UA, timeout, retry terbatas).
+    Adapter di `server/sources/` hanya mengurai HTML/JSON dan WAJIB mengembalikan `makeAnime()` / `makeEpisode()`.
+    BrowserContext stabil/transparan hanya untuk rendering JS yang diminta eksplisit; tidak ada stealth atau solver.
+    Challenge tidak diulang dan tidak memicu rotasi proxy/browser. Proxy stream hanya untuk URL bertanda tangan
     + host media di allowlist.
 11. **Ikon, bukan emoji, untuk UI.** Pakai `icon('nama')` dari `js/ui/icons.js` (template JS) atau
     `<span class="ic-slot" data-icon="nama"></span>` (HTML statis). Emoji hanya untuk konten pilihan pengguna
@@ -688,7 +704,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - [x] Satu project Vercel: frontend CDN + Express sebagai Function (`api/index.js`)
 
 ### Belum / di luar cakupan
-- [ ] Kuramanime: diblokir Cloudflare untuk bot (tidak di-bypass) → diganti Samehadaku. Anime Jepang yang tidak ada di Samehadaku tetap diputar dari server cadangan (subtitle Inggris)
+- [x] Adapter Kuramanime tetap tersedia tetapi nonaktif default; `requireExplicitRobots` wajib, token player tidak di-bypass; Samehadaku tetap sumber anime Jepang default
 
 ### Perubahan perilaku kecil (Tahap C)
 - Kartu **"Baru Rilis"** (homepage & `search.html?browse=new`) membuka episode yang baru tayang (label "EP 9" → episode 9). Kartu lain tetap episode 1.

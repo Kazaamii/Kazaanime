@@ -56,16 +56,18 @@ function requestLogger(req, res, next) {
     const started = Date.now();
     res.on('finish', () => {
         // Proxy segmen video = ratusan request per episode → hanya yang gagal dicatat.
-        if (req.originalUrl.startsWith('/api/stream/hls') && res.statusCode < 400) return;
+        if (req.path.startsWith('/api/stream/hls') && res.statusCode < 400) return;
         const r = res.locals.result;
         const extra = r ? ` source=${r.source}${r.fallback ? ' fallback' : ''}${r.stale ? ' stale' : ''}` : '';
-        console.log(`[api] ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - started}ms${extra}`);
+        console.log(`[api] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - started}ms${extra}`);
     });
     next();
 }
 
 function botInfo(req, res) {
-    const hosts = SOURCES.enabled.map((id) => SOURCES[id]?.baseUrl).filter(Boolean);
+    const hosts = SOURCES.enabled.map((id) => {
+        try { return new URL(SOURCES[id]?.baseUrl).origin; } catch { return null; }
+    }).filter(Boolean);
     res.set('Cache-Control', 'public, max-age=3600');
     res.type('text/plain; charset=utf-8').send([
         `${BOT.token}/${BOT.version}`,
@@ -76,8 +78,7 @@ function botInfo(req, res) {
         '  - obeys robots.txt (RFC 9309): group "KazanimeBot", otherwise "*"; honours Crawl-delay',
         '  - at most 1 request per second per host, limited retries, 6 s timeout',
         '  - responses cached 10-15 minutes (plus CDN cache), so most visits never reach your site',
-        '  - never solves CAPTCHAs/challenges; a Cloudflare block makes the bot back off (3-30 minutes);',
-        '    a challenge on a site where challenges are random is retried at most twice',
+        '  - never solves or retries CAPTCHA/security challenges; HTTP 403/429 stops immediately and opens a cooldown;',
         '  - video segments/subtitles for the in-site player are fetched on demand per viewer (not crawling)',
         'Opt out: add these lines to your robots.txt (picked up within 6 hours):',
         '  User-agent: KazanimeBot',
@@ -87,8 +88,8 @@ function botInfo(req, res) {
         `Configured sources: ${hosts.join(', ') || '-'}`,
         '',
         '— Bahasa Indonesia —',
-        'Bot backend Kazanime: hanya membaca halaman publik, patuh robots.txt, maks 1 request/detik per host,',
-        'hasil di-cache 10–15 menit, tanpa solver CAPTCHA/challenge. Tolak bot ini lewat robots.txt di atas.',
+        'Bot backend Kazanime: hanya membaca halaman publik, patuh robots.txt dan batas request per host,',
+        'hasil di-cache 10–15 menit; tanpa solver/retry CAPTCHA/challenge. Tolak bot lewat robots.txt di atas.',
     ].join('\n'));
 }
 
@@ -117,9 +118,15 @@ function errorHandler(err, req, res, next) {
     if (status === 499) status = 503;
     if (status < 400 || status > 599) status = 500;
     if (!known || status >= 500) {
-        const line = `[api] ${req.method} ${req.originalUrl} → ${status} ${err?.code || ''} ${err?.message || err}`;
+        // Log controlled metadata only. Error messages/stacks may embed request URLs, query tokens,
+        // proxy userinfo, or upstream body text; none of those belong in operational logs.
+        const safeToken = (value) => typeof value === 'string' && /^[a-z0-9_-]{1,64}$/i.test(value) ? value : '';
+        const code = safeToken(err?.code);
+        const kind = safeToken(err?.kind);
+        const type = safeToken(err?.name) || 'Error';
+        const line = `[api] ${req.method} ${req.path} → ${status} ${code} ${kind || type}`.trim();
         if (known) console.warn(line);
-        else console.error(line, err?.stack || '');
+        else console.error(line);
     }
     if (res.headersSent) return;
     if (err?.retryAfter) res.set('Retry-After', String(Math.min(err.retryAfter, 3600)));

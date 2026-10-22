@@ -149,7 +149,6 @@ export function createAnizone({ network, createClient, baseUrl = 'https://anizon
         allowedHosts: [host, `www.${host}`],
         // Baseline GitHub Actions (2026-10-22): homepage challenged. Don't repeat content requests;
         // open the source circuit for 30 minutes and let other providers/scrapers serve as fallback.
-        challengeRetries: 0,
         blockedMs: 30 * 60 * 1000,
     });
 
