@@ -8,7 +8,7 @@
     <script src="js/theme-preload.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/watch.css">
@@ -46,9 +46,9 @@
                 <span class="player-status-text" id="playerStatusText">Menyiapkan player...</span>
             </div>
             <div class="player-controls">
-                <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled aria-label="Episode sebelumnya">◀ <span class="ctrl-long">Episode </span>Sebelumnya</button>
-                <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled title="Coba server streaming berikutnya">⟳ Server Lain</button>
-                <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled aria-label="Episode berikutnya"><span class="ctrl-long">Episode </span>Berikutnya ▶</button>
+                <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled aria-label="Episode sebelumnya"><span class="ic-slot" data-icon="chevron-left"></span><span class="ctrl-long">Episode </span>Sebelumnya</button>
+                <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled title="Coba server streaming berikutnya"><span class="ic-slot" data-icon="refresh-cw"></span>Server Lain</button>
+                <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled aria-label="Episode berikutnya"><span class="ctrl-long">Episode </span>Berikutnya<span class="ic-slot" data-icon="chevron-right"></span></button>
             </div>
         </div>
 
@@ -91,20 +91,20 @@
 
                 <!-- DOWNLOAD -->
                 <section class="download-section" id="downloadSection" aria-labelledby="downloadHeading">
-                    <h4 id="downloadHeading">📥 Download Episode</h4>
+                    <h4 id="downloadHeading"><span class="ic-slot" data-icon="download"></span>Download Episode</h4>
                     <div class="download-list" id="downloadList" aria-live="polite">
                         <div class="download-loading">
                             <div class="loading-shimmer"></div>
-                            <p>🔍 Mencari link download...</p>
+                            <p>Mencari link download...</p>
                         </div>
                     </div>
                 </section>
 
                 <!-- PLATFORM LEGAL -->
                 <section class="platforms-section" id="platformsSection" aria-labelledby="platformsHeading">
-                    <h4 id="platformsHeading">📺 Tonton di Platform Legal</h4>
+                    <h4 id="platformsHeading"><span class="ic-slot" data-icon="monitor-play"></span>Tonton di Platform Legal</h4>
                     <div class="platforms-grid" id="platformsGrid"></div>
-                    <p class="platforms-tip">💡 <strong>Tips:</strong> Platform legal menyediakan subtitle Indonesia resmi dengan kualitas terbaik dan mendukung industri anime!</p>
+                    <p class="platforms-tip"><span class="ic-slot" data-icon="lightbulb"></span> <strong>Tips:</strong> Platform legal menyediakan subtitle Indonesia resmi dengan kualitas terbaik dan mendukung industri anime!</p>
                 </section>
             </div>
 
@@ -124,8 +124,8 @@
                     </div>
                 </div>
                 <div class="server-selector">
-                    <h4>🌐 Server Streaming:</h4>
-                    <p class="server-hint">Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik ⟳ Server Lain atau pilih manual.</p>
+                    <h4><span class="ic-slot" data-icon="server"></span>Server Streaming</h4>
+                    <p class="server-hint">Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Server <strong>Multi Sub</strong>: pilih bahasa subtitle lewat tombol CC di player.</p>
                     <div class="server-buttons" id="serverButtons"></div>
                 </div>
             </aside>

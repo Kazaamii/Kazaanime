@@ -4,6 +4,7 @@
  * cadangan..." dengan tombol "Coba lagi". Dipakai homepage & search.html.
  */
 import { html } from './dom.js';
+import { icon } from './icons.js';
 
 /**
  * Pasang/ubah/hapus keterangan di bawah `anchor`.
@@ -23,6 +24,6 @@ export function setSectionNote(anchor, { text = '', onRetry } = {}) {
         note.setAttribute('role', 'status');
         anchor.after(note);
     }
-    note.innerHTML = String(html`<span>${text}</span>${onRetry ? html`<button type="button" data-action="retry">🔄 Coba lagi</button>` : ''}`);
+    note.innerHTML = String(html`<span>${text}</span>${onRetry ? html`<button type="button" data-action="retry">${icon('refresh-cw')} Coba lagi</button>` : ''}`);
     if (onRetry) note.querySelector('[data-action="retry"]').addEventListener('click', onRetry, { once: true });
 }

@@ -8,7 +8,7 @@
  *    Hanya sumber yang belum terpakai yang dicek dengan request super ringan.
  *  - Tampil otomatis sekali per sesi (dulu di setiap muat ulang), bisa dibuka
  *    lagi kapan saja lewat tombol "📡 Status API" di footer (cek ulang semua).
- *  - Menampilkan 3 sumber (AniList, Jikan, Kitsu) + Backend bila sudah aktif.
+ *  - Menampilkan sumber AniList & Kitsu + Backend bila sudah aktif (Jikan dihapus 22 Okt 2026).
  *  - Update langsung saat status berubah; klik widget untuk menutup.
  */
 import { STORAGE_KEYS, UI } from '../config.js';
@@ -16,8 +16,8 @@ import { activeApiSources, checkApiSources, getAllHealth, onHealthChange, pendin
 import { html } from './dom.js';
 import { showToast } from './toast.js';
 
-const NAMES = { anilist: 'AniList API', jikan: 'Jikan API', kitsu: 'Kitsu API', backend: 'Backend Scraper' };
-const LABEL = { online: '✅ Online', offline: '❌ Offline', loading: '⏳ Loading...' };
+const NAMES = { anilist: 'AniList API', kitsu: 'Kitsu API', backend: 'Backend Scraper' };
+const LABEL = { online: 'Online', offline: 'Offline', loading: 'Memeriksa...' };
 
 let el = null;
 let hideTimer = null;

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,7 +24,12 @@ jobs:
         run: |
           LOG_REQUESTS=1 node server/index.js > .live-check-server.log 2>&1 &
           node tools/live-check/e2e.mjs
-          mkdir -p .live-check && tail -n 80 .live-check-server.log > .live-check/server.log || true
+      - name: Uji UI (Playwright Chromium)
+        run: |
+          npm i --no-save --no-audit --no-fund playwright@1
+          npx playwright install --with-deps chromium
+          node tools/live-check/ui.mjs || true
+          mkdir -p .live-check && tail -n 120 .live-check-server.log > .live-check/server.log || true
       - name: Commit hasil
         run: |
           git config user.name "live-check[bot]"

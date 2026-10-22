@@ -27,7 +27,7 @@ export function renderSchedule(grid, byDay, { today = new Date().getDay(), timeL
         const isToday = day === today;
         return html`
         <div class="schedule-day${isToday ? ' today' : ''}"${isToday ? html` aria-current="date"` : ''}>
-            <h4>${DAY_NAMES[day]}${isToday ? ' ✨' : ''}</h4>
+            <h4>${DAY_NAMES[day]}${isToday ? html` <span class="schedule-today">Hari ini</span>` : ''}</h4>
             ${items.length
                 ? items.map((it) => {
                     const when = it.time ? `${it.time}${timeLabel ? ` ${timeLabel}` : ''}` : 'jam rilis tidak dicantumkan';
@@ -49,7 +49,7 @@ export function renderScheduleSkeleton(grid, { today = new Date().getDay() } = {
     grid.setAttribute('aria-busy', 'true');
     grid.innerHTML = String(html`${WEEK_ORDER.map((day) => html`
         <div class="schedule-day${day === today ? ' today' : ''}" aria-hidden="true">
-            <h4>${DAY_NAMES[day]}${day === today ? ' ✨' : ''}</h4>
+            <h4>${DAY_NAMES[day]}${day === today ? html` <span class="schedule-today">Hari ini</span>` : ''}</h4>
             <div class="skeleton-line schedule-skeleton loading-shimmer"></div>
             <div class="skeleton-line schedule-skeleton loading-shimmer"></div>
             <div class="skeleton-line schedule-skeleton loading-shimmer"></div>

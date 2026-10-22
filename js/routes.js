@@ -6,7 +6,7 @@
  *   watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=...][&slug=...&src=...][&alt=...]
  *     alt = judul alternatif latin (romaji) → dipakai mencari anime yang sama di situs sumber scraping
  *     ep=latest = buka episode terbaru setelah detail dimuat (tautan dari Jadwal Rilis)
- *   search.html?q=...[&sort=score][&format=TV,MOVIE][&source=mal]   → mode pencarian
+ *   search.html?q=...[&sort=score][&format=TV,MOVIE][&source=kitsu]  → mode pencarian (source=mal lama → all)
  *   search.html?browse=ongoing                                     → "Lihat Semua" (ongoing|popular|new|donghua)
  *   search.html?genre=Action                                       → "Lihat Semua" untuk genre
  */
@@ -21,7 +21,7 @@ export const PAGES = Object.freeze({
 export const BROWSE_KINDS = Object.freeze(['ongoing', 'popular', 'new', 'donghua']);
 export const SEARCH_SORTS = Object.freeze(['relevance', 'score', 'popularity', 'newest']);
 export const SEARCH_FORMATS = Object.freeze(['TV', 'MOVIE', 'OVA', 'ONA']);
-export const SEARCH_SOURCES = Object.freeze(['all', 'mal', 'kitsu', 'anilist']);
+export const SEARCH_SOURCES = Object.freeze(['all', 'kitsu', 'anilist']);
 
 const toPositiveInt = (v) => {
     const n = Number.parseInt(v, 10);

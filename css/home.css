@@ -17,12 +17,15 @@
 .hero-info{max-width:600px;color:#fff}
 .hero-badge{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(var(--primary-rgb),0.2);border:1px solid rgba(var(--primary-rgb),0.4);border-radius:20px;font-size:12px;color:var(--primary);font-weight:600;margin-bottom:20px;backdrop-filter:blur(10px)}
 .hero-badge .dot{width:8px;height:8px;background:var(--primary);border-radius:50%;animation:pulse 2s infinite}
-.hero-title{font-size:48px;font-weight:800;line-height:1.2;margin-bottom:15px;text-shadow:2px 2px 8px rgba(0,0,0,0.8)}
+.hero-title{font-family:var(--font-display);letter-spacing:-.025em;font-size:48px;font-weight:800;line-height:1.12;margin-bottom:15px;text-shadow:2px 2px 8px rgba(0,0,0,0.8)}
 .hero-description{font-size:16px;line-height:1.6;margin-bottom:25px;color:rgba(255,255,255,0.9);text-shadow:1px 1px 4px rgba(0,0,0,0.6)}
 .hero-meta{display:flex;gap:12px;margin-bottom:30px;flex-wrap:wrap}
-.hero-meta span{padding:6px 14px;background:rgba(255,255,255,0.15);border-radius:15px;font-size:13px;color:#fff;backdrop-filter:blur(10px)}
+.hero-meta span{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.1);border-radius:15px;font-size:13px;font-weight:500;color:#fff;backdrop-filter:blur(10px)}
+.hero-meta .ic{font-size:15px;opacity:.9}
+.hero-meta .ic--rating{opacity:1}
 .hero-buttons{display:flex;gap:15px;flex-wrap:wrap}
 .hero-navigation{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:10px}
+.hero-nav-btn .ic{font-size:22px}
 .hero-nav-btn{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.3);color:#fff;font-size:20px;cursor:pointer;transition:all 0.3s;backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center}
 .hero-nav-btn:hover{background:var(--primary);border-color:var(--primary);transform:scale(1.1)}
 .hero-dots{position:absolute;bottom:100px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:8px}
@@ -42,6 +45,16 @@
 .genre-tags{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
 .genre-tag{padding:8px 18px;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:20px;font-size:13px;color:var(--text-secondary);cursor:pointer;transition:all .3s;font-family:inherit}
 .genre-tag:hover,.genre-tag.active{background:rgba(var(--primary-rgb),.12);border-color:var(--primary);color:var(--primary)}
+.genre-tag{font-weight:500}
+/* 22 Okt 2026: hasil genre tampil langsung di bawah tombol (Genre kini di atas beranda) */
+.genre-results{margin-top:22px;padding:20px;border-radius:18px;background:linear-gradient(180deg,rgba(var(--primary-rgb),.06),rgba(255,255,255,.015));border:1px solid rgba(var(--primary-rgb),.14);animation:fadeUp .35s ease}
+.genre-results-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.genre-results-title{font-family:var(--font-display);font-size:18px;font-weight:700;letter-spacing:-.01em}
+.genre-results-actions{display:flex;align-items:center;gap:10px}
+.genre-close{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--text-secondary);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .2s}
+.genre-close:hover{color:var(--text-primary);border-color:var(--primary)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.genre-results{animation:none}}
 
 /* ==========================================================================
    JADWAL RILIS
@@ -50,18 +63,20 @@
 .schedule-day{background:var(--bg-card);border-radius:16px;padding:16px;border:1px solid rgba(255,255,255,.04);transition:all .3s;min-width:0}
 .schedule-day:hover{border-color:rgba(var(--primary-rgb),.25)}
 .schedule-day.today{border-color:var(--primary);background:rgba(var(--primary-rgb),.04)}
-.schedule-day h4{font-size:13px;color:var(--primary);margin-bottom:12px;text-align:center}
+.schedule-day h4{font-size:13px;color:var(--primary);margin-bottom:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+/* 22 Okt 2026: penanda hari ini (dulu emoji ✨) */
+.schedule-today{padding:2px 8px;border-radius:999px;background:var(--gradient-1);color:#fff;font-size:10px;font-weight:700;letter-spacing:.02em}
 .schedule-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);color:inherit;text-decoration:none}
 .schedule-item:last-child{border-bottom:0}
 a.schedule-item:hover .schedule-anime{color:var(--primary)}
-.schedule-time{font-size:11px;color:var(--accent);font-weight:500;min-width:40px}
+.schedule-time{font-size:11px;color:var(--accent);font-weight:600;min-width:40px;font-variant-numeric:tabular-nums}
 .schedule-anime{font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s}
 .schedule-empty{font-size:11px;color:var(--text-secondary);opacity:.6;text-align:center;padding:8px 0}
 .schedule-note{margin-top:12px;font-size:11px;color:var(--text-secondary);opacity:.8}
 /* Tahap B: nomor episode, kerangka loading & tombol coba lagi jadwal */
 .schedule-ep{margin-left:auto;padding-left:4px;font-size:10px;font-weight:600;color:var(--primary);opacity:.85;flex-shrink:0;white-space:nowrap}
 .schedule-skeleton{height:12px;margin:12px 0}
-.schedule-retry{margin-left:6px;padding:3px 10px;border:0;border-radius:8px;background:var(--gradient-1);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:'Poppins',sans-serif}
+.schedule-retry{margin-left:6px;padding:3px 10px;border:0;border-radius:8px;background:var(--gradient-1);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
 
 /* ==========================================================================
    BOOKMARK KOSONG
@@ -69,7 +84,8 @@ a.schedule-item:hover .schedule-anime{color:var(--primary)}
 .bookmark-empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-secondary)}
 /* FIX: dulu `.bookmark-empty p{font-size:48px}` ikut membesarkan teks petunjuk */
 .bookmark-empty p{font-size:14px}
-.bookmark-empty .bookmark-empty-icon{font-size:48px;margin-bottom:15px}
+.bookmark-empty .bookmark-empty-icon{font-size:48px;margin-bottom:15px;display:flex;justify-content:center;color:rgba(var(--primary-rgb),.75)}
+.bookmark-empty .bookmark-empty-icon .ic{width:44px;height:44px;stroke-width:1.6}
 .bookmark-empty h3{font-size:18px;color:var(--text-primary);margin-bottom:8px}
 
 /* ==========================================================================
@@ -80,6 +96,8 @@ a.schedule-item:hover .schedule-anime{color:var(--primary)}
     .hero h1{font-size:36px}
 }
 @media(max-width:768px){
+    .genre-results{padding:14px;margin-top:16px}
+    .genre-results-title{font-size:16px}
     /* FIX (bug di file asli): di mobile tombol Bookmark tertimpa tombol ❮ ❯ & titik slider.
        Tinggi tetap minimal 340px seperti asli, tapi boleh bertambah bila konten tidak muat;
        padding bawah menyisakan ruang untuk navigasi slider. */

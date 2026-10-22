@@ -2,7 +2,7 @@
  * Kazanime — search.js (entry point search.html)
  *
  * Tiga mode dari query string (lihat routes.js):
- *   ?q=naruto            pencarian gabungan MyAnimeList + Kitsu + AniList
+ *   ?q=naruto            pencarian gabungan AniList + Kitsu (MyAnimeList/Jikan dihapus 22 Okt 2026)
  *   ?browse=ongoing      "Lihat Semua" dari homepage (ongoing|popular|new|donghua)
  *   ?genre=Action        "Lihat Semua" untuk genre
  * + &sort= &format= &source= disimpan di URL (refresh / bagikan link tetap sama).
@@ -31,6 +31,7 @@ import {
 } from './api/index.js';
 import { sourceLabel } from './api/normalize.js';
 import { onBookmarksChange } from './services/bookmark.js';
+import { icon } from './ui/icons.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -43,8 +44,8 @@ const filtersEl = $('#searchFilters');
 const loadMoreWrap = $('#searchLoadMore');
 const loadMoreBtn = $('#searchLoadMoreBtn');
 
-const BROWSE_TITLES = { ongoing: 'Ongoing Anime', popular: 'Anime Populer', new: 'Baru Rilis', donghua: '🐉 Donghua (Anime China)' };
-const SHORT_NAMES = { mal: 'MAL', kitsu: 'Kitsu', anilist: 'AniList' };
+const BROWSE_TITLES = { ongoing: 'Ongoing Anime', popular: 'Anime Populer', new: 'Baru Rilis', donghua: 'Donghua (Anime China)' };
+const SHORT_NAMES = { kitsu: 'Kitsu', anilist: 'AniList' };
 const LOAD_MORE_TEXT = 'Muat Lebih Banyak ↓';
 
 const params = parseSearchParams();
@@ -121,7 +122,7 @@ function setupHeader() {
     if (mode !== 'search') {
         // Tanpa kata kunci, "relevansi" = urutan bawaan kategori (trending/populer)
         const relevance = $('[data-sort="relevance"]', filtersEl);
-        if (relevance) relevance.textContent = '✨ Default';
+        if (relevance) relevance.innerHTML = String(html`${icon('sparkles')} Default`);
     }
     if (mode === 'browse' && state.browse === 'new') {
         // "Baru Rilis" selalu urut episode terbaru → tombol urutan tidak relevan
@@ -143,7 +144,7 @@ function setLoading(loading, append = false) {
     }
 }
 
-const retryButton = html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry">🔄 Coba Lagi</button>`;
+const retryButton = html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry">${icon('refresh-cw')} Coba Lagi</button>`;
 
 /* ------------------------------------------------------------------ */
 /* Mode pencarian                                                      */
@@ -175,27 +176,27 @@ function renderSearchEmpty() {
     if (state.source !== 'all') {
         const err = state.errors[state.source];
         gridMessage(grid, err
-            ? { icon: '⚠️', title: `${sourceLabel(state.source)} tidak merespons`, text: friendlyError(err), actions: retryButton }
-            : { icon: '📭', text: 'Tidak ada hasil dari sumber ini' });
+            ? { icon: 'triangle-alert', title: `${sourceLabel(state.source)} tidak merespons`, text: friendlyError(err), actions: retryButton }
+            : { icon: 'inbox', text: 'Tidak ada hasil dari sumber ini' });
         return;
     }
     if (failed.length === SEARCH_SOURCE_ORDER.length) {
-        gridMessage(grid, { icon: '⚠️', title: 'Pencarian gagal', text: friendlyError(state.errors[failed[0]]), actions: retryButton });
+        gridMessage(grid, { icon: 'triangle-alert', title: 'Pencarian gagal', text: friendlyError(state.errors[failed[0]]), actions: retryButton });
         return;
     }
     const q = encodeURIComponent(state.q);
     gridMessage(grid, {
-        icon: '🔍',
+        icon: 'search',
         title: `Tidak ditemukan "${state.q}"`,
         text: 'Coba kata kunci lain atau cek ejaan judul anime',
         actions: html`
-            <a class="btn-ext btn-ext--mal" href="https://myanimelist.net/anime.php?q=${q}" target="_blank" rel="noopener noreferrer">🔷 Cari di MAL</a>
-            <a class="btn-ext btn-ext--anilist" href="https://anilist.co/search/anime?search=${q}" target="_blank" rel="noopener noreferrer">💙 Cari di AniList</a>`,
+            <a class="btn-ext btn-ext--mal" href="https://myanimelist.net/anime.php?q=${q}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Cari di MAL</a>
+            <a class="btn-ext btn-ext--anilist" href="https://anilist.co/search/anime?search=${q}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Cari di AniList</a>`,
     });
 }
 
 /**
- * @param {{append?: {all: any[], mal?: any[], kitsu?: any[], anilist?: any[]}|null}} [opts]
+ * @param {{append?: {all: any[], kitsu?: any[], anilist?: any[]}|null}} [opts]
  */
 function renderSearch({ append = null } = {}) {
     $$('[data-count]', tabsEl).forEach((el) => {
@@ -218,7 +219,7 @@ function renderSearch({ append = null } = {}) {
     }
 
     setSectionNote(grid, failed.length && list.length
-        ? { text: `⚠️ ${failed.map((s) => sourceLabel(s)).join(', ')} tidak merespons — hasil mungkin belum lengkap.`, onRetry: () => { retrySourcesNow(); runSearch(); } }
+        ? { text: `${failed.map((s) => sourceLabel(s)).join(', ')} tidak merespons — hasil mungkin belum lengkap.`, onRetry: () => { retrySourcesNow(); runSearch(); } }
         : {});
     loadMoreWrap.hidden = !searchHasMore();
 }
@@ -229,7 +230,7 @@ async function runSearch({ append = false } = {}) {
         resetSearch();
         showSkeleton(grid, 8);
         setSectionNote(grid);
-        subtitleEl.textContent = 'Mencari dari MyAnimeList + Kitsu + AniList...';
+        subtitleEl.textContent = 'Mencari dari AniList + Kitsu...';
         loadMoreWrap.hidden = true;
     }
     setLoading(true, append);
@@ -242,7 +243,7 @@ async function runSearch({ append = false } = {}) {
         if (token !== state.token) return;
         setLoading(false, append);
         if (append) showToast(`Gagal memuat lebih banyak: ${friendlyError(err)}`, 'error');
-        else gridMessage(grid, { icon: '⚠️', title: 'Pencarian gagal', text: friendlyError(err), actions: retryButton });
+        else gridMessage(grid, { icon: 'triangle-alert', title: 'Pencarian gagal', text: friendlyError(err), actions: retryButton });
         return;
     }
     if (token !== state.token) return; // filter sudah diganti → abaikan hasil lama
@@ -320,8 +321,8 @@ async function runBrowse({ append = false } = {}) {
     if (!state.items.length) {
         subtitleEl.textContent = '';
         gridMessage(grid, res.error && res.error.kind !== 'empty'
-            ? { icon: '⚠️', title: 'Gagal memuat daftar', text: friendlyError(res.error), actions: retryButton }
-            : { icon: '📭', title: 'Tidak ada anime', text: state.formats.length ? 'Coba hapus filter format.' : 'Belum ada data untuk kategori ini.' });
+            ? { icon: 'triangle-alert', title: 'Gagal memuat daftar', text: friendlyError(res.error), actions: retryButton }
+            : { icon: 'inbox', title: 'Tidak ada anime', text: state.formats.length ? 'Coba hapus filter format.' : 'Belum ada data untuk kategori ini.' });
     } else {
         // "Baru Rilis" (browse=new) & donghua dari backend: kartu membuka episode yang baru tayang
         const toLatest = mode === 'browse' && (state.browse === 'new' || (state.browse === 'donghua' && state.browseSource === 'backend'));
@@ -333,7 +334,7 @@ async function runBrowse({ append = false } = {}) {
     if (!append) {
         subtitleEl.textContent = state.items.length ? browseSubtitle(res) : '';
         setSectionNote(grid, res.fallback
-            ? { text: `⚠️ Menampilkan data cadangan. ${friendlyError(res.error)}`, onRetry: () => { retrySourcesNow(); runBrowse(); } }
+            ? { text: `Menampilkan data cadangan. ${friendlyError(res.error)}`, onRetry: () => { retrySourcesNow(); runBrowse(); } }
             : {});
     } else {
         subtitleEl.textContent = browseSubtitle();
@@ -391,9 +392,9 @@ setupHeader();
 if (mode === 'empty') {
     subtitleEl.textContent = '';
     gridMessage(grid, {
-        icon: '🔍',
+        icon: 'search',
         title: 'Ketik judul anime di kotak pencarian',
-        text: 'Minimal 2 huruf, lalu tekan Enter untuk hasil lengkap dari MyAnimeList, Kitsu & AniList.',
+        text: 'Minimal 2 huruf, lalu tekan Enter untuk hasil lengkap dari AniList & Kitsu.',
     });
     if (window.matchMedia?.('(min-width: 769px)').matches) getSearchElements()?.input.focus();
 } else {

@@ -1,6 +1,6 @@
 /**
  * Kazanime — api/normalize.js
- * KONTRAK FORMAT DATA. Semua sumber (AniList, Jikan/MAL, Kitsu, backend scraper,
+ * KONTRAK FORMAT DATA. Semua sumber (AniList, Kitsu, backend scraper,
  * data fallback) WAJIB diubah ke bentuk `Anime` di bawah lewat createAnime().
  * UI hanya mengenal bentuk ini — tidak pernah melihat respons mentah API.
  *
@@ -39,7 +39,7 @@
  * @property {'WINTER'|'SPRING'|'SUMMER'|'FALL'|null} season
  * @property {{episode:number|null, airingAt:number}|null} nextAiring  Episode berikutnya (airingAt = detik UNIX)
  * @property {number|null} firstAiredAt   Perkiraan waktu episode 1 tersedia (detik UNIX) dari tanggal mulai
- *                                        tayang (Kitsu/Jikan) — dasar perkiraan jumlah episode anime ongoing
+ *                                        tayang (Kitsu) — dasar perkiraan jumlah episode anime ongoing
  *                                        bila sumber tidak memberi jadwal episode (mis. AniList sedang mati)
  */
 
@@ -331,7 +331,7 @@ const BROADCAST_DAYS = { sundays: 0, mondays: 1, tuesdays: 2, wednesdays: 3, thu
 
 /**
  * Perkiraan waktu episode 1 tersedia (detik UNIX) dari tanggal mulai tayang di Jepang.
- * @param {string|null|undefined} date  'YYYY-MM-DD…' (tanggal JST: Kitsu startDate / Jikan aired.from)
+ * @param {string|null|undefined} date  'YYYY-MM-DD…' (tanggal JST: Kitsu startDate)
  * @param {{day?: string|null, time?: string|null, timezone?: string|null}|null} [broadcast]  jadwal siaran MAL
  * @returns {number|null}
  */
@@ -395,7 +395,6 @@ export function airedEpisodeCount(a, now = Date.now()) {
 export const SOURCE_LABELS = Object.freeze({
     anilist: 'AniList',
     mal: 'MyAnimeList',
-    jikan: 'MyAnimeList',
     kitsu: 'Kitsu',
     backend: 'Backend',
     fallback: 'data cadangan',

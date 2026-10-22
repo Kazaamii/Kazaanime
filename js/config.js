@@ -4,7 +4,7 @@
  * jangan menulis ulang string/angka ajaib di tempat lain.
  *
  * Tahap A : konstanta UI (app, storage key, tema, navigasi, genre, avatar, platform legal).
- * Tahap B : + API_CONFIG (AniList/Jikan/Kitsu/backend), timeout, TTL cache, jadwal WIB.
+ * Tahap B : + API_CONFIG (AniList/Kitsu/backend — Jikan dihapus 22 Okt 2026), timeout, TTL cache, jadwal WIB.
  * Tahap C : + STREAMING_SERVERS & PLAYER (watch.html), CACHE_TTL.detail, kunci riwayat/auto-next.
  * Tahap D : API_CONFIG.backend aktif (backend scraper Express di server/, endpoint /api/anime/*).
  * Perbaikan pasca-D (22 Okt 2026): player mendahulukan server hasil scraping backend
@@ -76,20 +76,19 @@ export const NAV_LINKS = Object.freeze([
  * Genre di homepage + pemetaan ke tiap sumber data.
  *  - anilistTag : dipakai jika di AniList berupa TAG, bukan GENRE (contoh: Isekai).
  *                 Di file asli Isekai dikirim sebagai genre → hasil selalu kosong.
- *  - mal        : ID genre MyAnimeList (filter `genres` di Jikan).
  *  - kitsu      : slug kategori Kitsu (filter[categories], sudah dicek valid).
  */
 export const GENRES = Object.freeze([
-    { label: 'Action',        mal: 1,  kitsu: 'action' },
-    { label: 'Romance',       mal: 22, kitsu: 'romance' },
-    { label: 'Comedy',        mal: 4,  kitsu: 'comedy' },
-    { label: 'Fantasy',       mal: 10, kitsu: 'fantasy' },
-    { label: 'Slice of Life', mal: 36, kitsu: 'slice-of-life' },
-    { label: 'Horror',        mal: 14, kitsu: 'horror' },
-    { label: 'Mecha',         mal: 18, kitsu: 'mecha' },
-    { label: 'Sports',        mal: 30, kitsu: 'sports' },
-    { label: 'Isekai',        mal: 62, kitsu: 'isekai', anilistTag: 'Isekai' },
-    { label: 'Mystery',       mal: 7,  kitsu: 'mystery' },
+    { label: 'Action',        kitsu: 'action' },
+    { label: 'Romance',       kitsu: 'romance' },
+    { label: 'Comedy',        kitsu: 'comedy' },
+    { label: 'Fantasy',       kitsu: 'fantasy' },
+    { label: 'Slice of Life', kitsu: 'slice-of-life' },
+    { label: 'Horror',        kitsu: 'horror' },
+    { label: 'Mecha',         kitsu: 'mecha' },
+    { label: 'Sports',        kitsu: 'sports' },
+    { label: 'Isekai',        kitsu: 'isekai', anilistTag: 'Isekai' },
+    { label: 'Mystery',       kitsu: 'mystery' },
 ]);
 
 /** Nama hari (index = Date#getDay(): 0 = Minggu). */
@@ -137,15 +136,15 @@ export const AVATAR_UPLOAD = Object.freeze({ maxBytes: 2 * 1024 * 1024, size: 20
 /** Aturan akun (sama dengan file asli: username ≥ 3, password ≥ 6). */
 export const AUTH_RULES = Object.freeze({ usernameMin: 3, usernameMax: 24, passwordMin: 6 });
 
-/** Platform streaming legal (link pencarian, tanpa scraping). */
+/** Platform streaming legal (link pencarian, tanpa scraping). `icon` = nama ikon di js/ui/icons.js. */
 export const LEGAL_PLATFORMS = Object.freeze([
-    { id: 'bstation', name: 'Bstation',       icon: '🅱️', description: 'Platform resmi Bilibili dengan sub Indo',
+    { id: 'bstation', name: 'Bstation',       icon: 'monitor-play', description: 'Platform resmi Bilibili dengan sub Indo',
       url: (t) => `https://www.bilibili.tv/search?keyword=${encodeURIComponent(t)}` },
-    { id: 'muse',     name: 'Muse Indonesia', icon: '🎬', description: 'YouTube channel resmi anime sub Indo',
+    { id: 'muse',     name: 'Muse Indonesia', icon: 'clapperboard', description: 'YouTube channel resmi anime sub Indo',
       url: (t) => `https://www.youtube.com/@MuseIndonesia/search?query=${encodeURIComponent(t)}` },
-    { id: 'anione',   name: 'Ani-One Asia',   icon: '🎭', description: 'Anime legal dengan subtitle Indonesia',
+    { id: 'anione',   name: 'Ani-One Asia',   icon: 'film', description: 'Anime legal dengan subtitle Indonesia',
       url: (t) => `https://www.youtube.com/@AniOneAsia/search?query=${encodeURIComponent(t)}` },
-    { id: 'vidio',    name: 'Vidio',          icon: '📺', description: 'Platform streaming Indonesia',
+    { id: 'vidio',    name: 'Vidio',          icon: 'tv', description: 'Platform streaming Indonesia',
       url: (t) => `https://www.vidio.com/search?q=${encodeURIComponent(t)}` },
 ]);
 
@@ -154,13 +153,13 @@ export const LEGAL_PLATFORMS = Object.freeze([
 /* ========================================================================== */
 
 /**
- * Sumber data metadata. Urutan fallback: AniList → Jikan (MAL) → Kitsu → data statis.
+ * Sumber data metadata. Urutan fallback: AniList → Kitsu → data statis.
+ * (Jikan/MyAnimeList dihapus 22 Okt 2026 atas permintaan pemilik proyek.)
  *
  * Catatan penting (hasil pengecekan, Okt 2026):
  *  - AniList menolak request TANPA header Referer (HTTP 403). Browser mengirimnya
  *    otomatis — karena itu situs WAJIB dibuka lewat http(s)://, bukan file://.
  *    Batas sementara AniList: 30 request/menit → homepage memakai SATU query gabungan.
- *  - Jikan: maks ±3 request/detik & 60/menit → diberi jeda antar-request (minInterval).
  *  - Kitsu: kitsu.app menolak preflight CORS (OPTIONS → 403), jadi request dikirim
  *    sebagai "simple GET" tanpa header kustom. `page[offset]` saat ini diabaikan
  *    server (halaman 2 = halaman 1) → Kitsu hanya dipakai untuk halaman pertama.
@@ -171,7 +170,6 @@ export const LEGAL_PLATFORMS = Object.freeze([
  */
 export const API_CONFIG = Object.freeze({
     anilist: Object.freeze({ name: 'AniList', url: 'https://graphql.anilist.co', timeout: 8000 }),
-    jikan: Object.freeze({ name: 'Jikan', url: 'https://api.jikan.moe/v4', timeout: 7000, minInterval: 400 }),
     kitsu: Object.freeze({ name: 'Kitsu', url: 'https://kitsu.app/api/edge', timeout: 7000 }),
     backend: Object.freeze({ name: 'Backend', enabled: true, baseUrl: '', timeout: 12000 }),
     /** Timeout khusus autocomplete (lebih pendek: saran yang lambat tidak berguna). */
@@ -199,8 +197,8 @@ export const SCHEDULE = Object.freeze({
     utcOffsetHours: 7,
     /** Maks. anime berjam per hari (jadwal rilis Sub Indo / jadwal tayang). */
     perDay: 8,
-    /** Maks. donghua tanpa jam per hari (AnimeXin tidak mencantumkan jam rilis). */
-    perDayDonghua: 4,
+    /** Maks. donghua per hari (AnimeXin tanpa jam; Anichin dengan jam perkiraan). */
+    perDayDonghua: 5,
 });
 
 /** Pengaturan UI umum. */
@@ -214,7 +212,7 @@ export const UI = Object.freeze({
     searchDebounce: 350,
     searchPerPage: 20,       // maks Kitsu = 20, jadi semua sumber disamakan
     suggestFetch: 6,         // item yang diminta per sumber untuk autocomplete
-    suggestLimits: Object.freeze({ mal: 4, kitsu: 3, anilist: 3 }), // sama seperti dropdown asli
+    suggestLimits: Object.freeze({ anilist: 5, kitsu: 5 }), // total 10 seperti dropdown asli (kuota MAL dibagi)
     apiStatusHideDelay: 5000,
 });
 
@@ -227,8 +225,11 @@ export const UI = Object.freeze({
  *  - name     : nama internal (log & dokumentasi). Di halaman nonton SEMUA tombol server tampil
  *               "Server 1, 2, …" sesuai urutan putar — nama penyedia tidak ditampilkan.
  *  - needs    : ID yang wajib ada ('anilist' | 'mal' | 'kitsu'). Tanpa ID itu server
- *               ditampilkan terkunci 🔒 dan dilewati otomatis.
+ *               ditampilkan terkunci dan dilewati otomatis.
  *  - url(ctx) : ctx = { anilist, mal, kitsu, ep, title } → URL embed (http/https).
+ *  - provider : (22 Okt 2026) slot yang diisi server dari backend GET /api/stream/servers
+ *               ('reanime' | 'anizone'). Tanpa url(); posisinya di daftar tetap (nomor server
+ *               tidak bergeser) — tampil "mencari…" lalu tersedia / tidak tersedia.
  *  - lang     : bahasa subtitle ('id' | 'en' | 'multi') — tampil di status player.
  *  - origins  : origin TAMBAHAN yang boleh mengirim postMessage (auto-next & progres),
  *               mis. bila player asli berada di iframe bersarang domain lain.
@@ -256,6 +257,10 @@ export const UI = Object.freeze({
  *  - Vidnest (vidnest.fun) & TryEmbed (tryembed.us.cc): embed lain berbasis id AniList yang dipakai
  *    hianime.ro untuk pustaka HiAnime yang sama (dicek: bisa di-embed, tanpa X-Frame-Options/CSP).
  *    Subtitle Inggris. Ketersediaan per episode tidak bisa dicek dari luar → pakai "⟳ Server Lain".
+ *  - 22 Okt 2026 (permintaan pemilik proyek): server cadangan #2 (MegaPlay via id MAL) diganti
+ *    ReAnime (embed flixcloud dari API publik reanime.to, subtitle Inggris), dan ditambah satu
+ *    tombol AniZone "Multi Sub" (HLS + banyak subtitle termasuk Indonesia bila tersedia, diputar
+ *    player bawaan lewat proxy /api/stream/hls — lihat server/routes/stream.js).
  * Ganti host: ubah STREAM_HOST (pola path sama) atau tambah entri baru di bawah.
  */
 const STREAM_HOST = 'https://megaplay.buzz';
@@ -272,15 +277,22 @@ export const STREAMING_SERVERS = Object.freeze([
         url: ({ anilist, ep }) => `${STREAM_HOST}/stream/ani/${anilist}/${ep}/sub`,
     }),
     Object.freeze({
-        id: 'megaplay-mal',
-        flag: '🇺🇸',
-        name: 'Server 2 (MegaPlay - MAL)',
-        description: 'Cadangan - MegaPlay via MAL ID (subtitle Inggris)',
-        needs: 'mal',
+        id: 'reanime',
+        provider: 'reanime',
+        name: 'ReAnime',
+        description: 'Cadangan - ReAnime (subtitle Inggris)',
         lang: 'en',
         enabled: true,
         origins: Object.freeze([]),
-        url: ({ mal, ep }) => `${STREAM_HOST}/stream/mal/${mal}/${ep}/sub`,
+    }),
+    Object.freeze({
+        id: 'anizone',
+        provider: 'anizone',
+        name: 'AniZone - Multi Sub',
+        description: 'AniZone - banyak pilihan subtitle (Indonesia bila tersedia)',
+        lang: 'multi',
+        enabled: true,
+        origins: Object.freeze([]),
     }),
     Object.freeze({
         id: 'vidnest-anilist',
@@ -341,4 +353,12 @@ export const PLAYER = Object.freeze({
     sandbox: '',
     /** Jumlah kartu rekomendasi. */
     recommendationCount: 12,
+    /**
+     * Player HLS bawaan (server AniZone "Multi Sub"). hls.js disimpan lokal (js/vendor/, lisensi
+     * Apache-2.0) dan baru dimuat saat server HLS diputar. Safari/iOS memakai HLS native langsung
+     * dari CDN (tanpa proxy); browser lain lewat proxy /api/stream/hls (CORS CDN dikunci ke anizone.to).
+     */
+    hlsScript: '/js/vendor/hls.min.js',
+    /** Urutan subtitle yang dipilih otomatis (kode bahasa). */
+    subtitlePriority: Object.freeze(['id', 'en']),
 });

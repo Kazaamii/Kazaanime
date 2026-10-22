@@ -13,15 +13,17 @@
 import { html, raw, delegate, placeholderImage, escapeHtml } from './dom.js';
 import { watchUrl } from '../routes.js';
 import { episodeLabel, scoreLabel, statusBadge } from '../api/normalize.js';
+import { icon, hasIcon } from './icons.js';
 
 const ICON_PLAY = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>');
 const ICON_BOOKMARK = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>');
 
+/** Badge sumber: titik warna dari CSS (.src-*), tanpa emoji. */
 const SOURCE_BADGES = {
-    anilist: { cls: 'src-anilist', label: '💙 AniList' },
-    mal: { cls: 'src-mal', label: '🔷 MAL' },
-    kitsu: { cls: 'src-kitsu', label: '🟠 Kitsu' },
+    anilist: { cls: 'src-anilist', label: 'AniList' },
+    kitsu: { cls: 'src-kitsu', label: 'Kitsu' },
 };
+const ratingHtml = (anime) => html`${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}`;
 
 /** key → Anime, supaya handler klik bisa mengambil data lengkap kartu. */
 const registry = new Map();
@@ -49,7 +51,7 @@ export function cardHTML(anime, { variant = 'default', bookmarked = false, episo
     let badgeClass = '';
     let quality = anime.quality || '1080p';
     let metaLeft = episodeText || episodeLabel(anime);
-    let metaRight = `⭐ ${scoreLabel(anime)}`;
+    let metaRight = ratingHtml(anime);
 
     if (variant === 'search') {
         const src = SOURCE_BADGES[anime.source];
@@ -57,10 +59,10 @@ export function cardHTML(anime, { variant = 'default', bookmarked = false, episo
         badgeClass = src ? src.cls : '';
         quality = anime.format || 'TV';
         metaLeft = `${anime.year ? `${anime.year} • ` : ''}${episodeLabel(anime)}`;
-        metaRight = anime.score != null ? `⭐ ${scoreLabel(anime)}` : 'N/A';
+        metaRight = anime.score != null ? ratingHtml(anime) : 'N/A';
     } else if (variant === 'bookmark') {
-        badge = '🔖';
-        metaRight = '🔖 Saved';
+        badge = icon('bookmark-check');
+        metaRight = html`${icon('bookmark-check')} Saved`;
     }
 
     const pressed = bookmarked ? 'true' : 'false';
@@ -135,11 +137,11 @@ export function bindCardActions(root, onBookmark) {
 }
 
 /** Pesan kosong/error di dalam grid. */
-export function gridMessage(grid, { icon = '📭', title = '', text = '', actions = '' } = {}) {
+export function gridMessage(grid, { icon: iconName = 'inbox', title = '', text = '', actions = '' } = {}) {
     if (!grid) return;
     grid.innerHTML = String(html`
         <div class="empty-state">
-            <p class="empty-state-icon">${icon}</p>
+            <p class="empty-state-icon" aria-hidden="true">${hasIcon(iconName) ? icon(iconName) : iconName}</p>
             ${title ? html`<h3>${title}</h3>` : ''}
             ${text ? html`<p>${text}</p>` : ''}
             ${actions ? html`<div class="empty-actions">${actions}</div>` : ''}

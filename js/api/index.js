@@ -4,9 +4,11 @@
  * UI mengimpor fungsi dari sini dan hanya menerima objek Anime yang sudah
  * dinormalisasi — tidak pernah respons mentah, tidak pernah memanggil fetch.
  *
- * Rantai fallback metadata:  AniList → Jikan (MAL) → Kitsu → data statis
- * Section Donghua (Tahap D):  backend scraper (rilis terbaru animexin) → AniList CN → Kitsu (judul pinyin) → data statis
- * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin) → AniList → MAL → data statis
+ * Rantai fallback metadata:  AniList → Kitsu → data statis
+ *   (Jikan/MyAnimeList dihapus 22 Okt 2026 atas permintaan pemilik proyek; id MAL dari AniList/Kitsu
+ *    tetap disimpan di anime.ids.mal untuk tautan lama.)
+ * Section Donghua (Tahap D):  backend scraper (rilis terbaru AnimeXin + Anichin) → AniList CN → Kitsu (judul pinyin) → data statis
+ * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin + Anichin) → AniList → data statis
  *  - Sumber yang baru gagal "diistirahatkan" sementara (circuit breaker di
  *    http.js), jadi kunjungan berikutnya langsung ke sumber yang hidup.
  *  - Hasil memberi tahu sumber yang dipakai (`source`) dan apakah data cadangan
@@ -18,7 +20,6 @@
  */
 import { API_CONFIG, GENRES, PLAYER, SCHEDULE, UI } from '../config.js';
 import * as anilist from './anilist.js';
-import * as jikan from './jikan.js';
 import * as kitsu from './kitsu.js';
 import * as backend from './sources.js';
 import { ApiError, API_SOURCES, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests, resetCircuits } from './http.js';
@@ -28,7 +29,8 @@ import {
 } from '../data/fallback.js';
 
 export { ApiError, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests };
-export { listStreamServers, getEpisodeExtras } from './streams.js';
+export { listStreamServers, getEpisodeExtras, withProviderServers } from './streams.js';
+export { getStreamServers } from './sources.js';
 /** Dipakai tombol "Coba lagi": izinkan semua sumber dicoba lagi sekarang juga. */
 export const retrySourcesNow = resetCircuits;
 export const isBackendEnabled = backend.isBackendEnabled;
@@ -76,7 +78,6 @@ function filterFormats(items, formats = []) {
     const wanted = new Set(formats);
     return items.filter((a) => wanted.has(a.format));
 }
-const withFormats = (res, formats) => (formats.length > 1 ? { ...res, items: filterFormats(res.items, formats) } : res);
 
 /** Batasi langkah ke satu sumber (agar "Muat Lebih Banyak" tetap dari sumber yang sama). */
 const onlySource = (steps, source) => (source ? steps.filter((s) => s.source === source) : steps);
@@ -124,13 +125,10 @@ export async function getHomeSection(kind) {
     const size = UI.sectionSize;
     const steps = [{ source: 'anilist', run: async () => ((await anilist.getHomeLists())[kind] || []).slice(0, size) }];
     if (kind === 'ongoing') {
-        steps.push({ source: 'mal', run: () => jikan.topAiring({ limit: size }) });
         steps.push({ source: 'kitsu', run: () => kitsu.listAnime({ status: 'current', limit: size }) });
     } else if (kind === 'popular') {
-        steps.push({ source: 'mal', run: () => jikan.mostPopular({ limit: size }) });
         steps.push({ source: 'kitsu', run: () => kitsu.listAnime({ limit: size }) });
     } else if (kind === 'recent') {
-        steps.push({ source: 'mal', run: () => jikan.seasonNow({ limit: size }) });
         steps.push({ source: 'kitsu', run: () => kitsu.listAnime({ season: true, limit: size }) });
     }
     // donghua: rilis terbaru dari backend (animexin, episode bisa langsung diputar) → AniList CN →
@@ -153,7 +151,6 @@ export async function getHomeSection(kind) {
 export async function getHeroSlides() {
     const res = await firstAvailable([
         { source: 'anilist', run: async () => (await anilist.getHomeLists()).ongoing || [] },
-        { source: 'mal', run: () => jikan.topAiring({ limit: UI.sectionSize }) }, // request yang sama dengan section ongoing → dipakai bersama
         { source: 'kitsu', run: () => kitsu.trending({ limit: 10 }) },
     ]);
     const out = finishList(res, { fallbackItems: FALLBACK_HERO });
@@ -181,7 +178,6 @@ export async function getGenreAnime(label, { page = 1, perPage = UI.sectionSize,
     const s = sort === 'relevance' ? 'popularity' : sort;
     const steps = [
         { source: 'anilist', run: () => anilist.searchMedia({ genre: g.anilistTag ? undefined : g.label, tag: g.anilistTag, sort: s, formats, page, perPage, signal }) },
-        { source: 'mal', run: () => jikan.searchAnime({ genreId: g.mal, sort: s, formats, page, limit: perPage, signal }).then((r) => withFormats(r, formats)) },
         { source: 'kitsu', run: () => kitsu.listAnime({ category: g.kitsu, sort: s, formats, page, limit: perPage, genreLabel: g.label, signal }) },
     ];
     return finishList(await firstAvailable(onlySource(steps, source)), { page });
@@ -220,7 +216,6 @@ export async function browseAnime(kind, { page = 1, sort = 'relevance', formats 
         case 'ongoing':
             steps = [
                 { source: 'anilist', run: () => anilist.searchMedia({ status: 'RELEASING', sort: pick('trending'), formats, page, perPage, signal }) },
-                { source: 'mal', run: () => jikan.searchAnime({ status: 'airing', sort: pick('popularity'), formats, page, limit: perPage, signal }).then((r) => withFormats(r, formats)) },
                 { source: 'kitsu', run: () => kitsu.listAnime({ status: 'current', sort: pick('popularity'), formats, page, limit: perPage, signal }) },
             ];
             fallbackItems = FALLBACK_ONGOING;
@@ -228,7 +223,6 @@ export async function browseAnime(kind, { page = 1, sort = 'relevance', formats 
         case 'popular':
             steps = [
                 { source: 'anilist', run: () => anilist.searchMedia({ sort: pick('popularity'), formats, page, perPage, signal }) },
-                { source: 'mal', run: () => jikan.searchAnime({ sort: pick('popularity'), formats, page, limit: perPage, signal }).then((r) => withFormats(r, formats)) },
                 { source: 'kitsu', run: () => kitsu.listAnime({ sort: pick('popularity'), formats, page, limit: perPage, signal }) },
             ];
             fallbackItems = FALLBACK_POPULAR;
@@ -236,7 +230,6 @@ export async function browseAnime(kind, { page = 1, sort = 'relevance', formats 
         case 'new':
             steps = [
                 { source: 'anilist', run: () => recentFiltered({ page, formats, signal }) },
-                { source: 'mal', run: () => jikan.seasonNow({ page, limit: perPage, formats, signal }).then((r) => withFormats(r, formats)) },
                 { source: 'kitsu', run: () => kitsu.listAnime({ season: true, sort: 'popularity', formats, page, limit: perPage, signal }) },
             ];
             fallbackItems = FALLBACK_NEW;
@@ -262,7 +255,7 @@ export async function browseAnime(kind, { page = 1, sort = 'relevance', formats 
 /* ------------------------------------------------------------------ */
 /* Pencarian                                                           */
 /* ------------------------------------------------------------------ */
-export const SEARCH_SOURCE_ORDER = Object.freeze(['mal', 'kitsu', 'anilist']);
+export const SEARCH_SOURCE_ORDER = Object.freeze(['anilist', 'kitsu']);
 
 /**
  * Cari di beberapa sumber secara paralel. Satu sumber gagal tidak
@@ -274,7 +267,6 @@ export const SEARCH_SOURCE_ORDER = Object.freeze(['mal', 'kitsu', 'anilist']);
 export async function searchAnime(q, { page = 1, sort = 'relevance', formats = [], sources = SEARCH_SOURCE_ORDER, signal } = {}) {
     const runners = {
         anilist: () => anilist.searchMedia({ q, page, sort, formats, perPage: UI.searchPerPage, signal }),
-        mal: () => jikan.searchAnime({ q, page, sort, formats, limit: UI.searchPerPage, signal }).then((r) => withFormats(r, formats)),
         kitsu: () => kitsu.searchAnime({ q, page, sort, formats, limit: UI.searchPerPage, signal }),
     };
     const list = sources.filter((s) => runners[s]);
@@ -305,14 +297,14 @@ export function dedupeKeys(anime) {
 
 /**
  * Gabungkan hasil beberapa sumber tanpa duplikat.
- *  - relevance/popularity: diselang-seling per peringkat (AniList, MAL, Kitsu)
+ *  - relevance/popularity: diselang-seling per peringkat (AniList, Kitsu)
  *  - score: skor tertinggi dulu · newest: tahun terbaru dulu
  * @param {Record<string, Anime[]>} bySource
  * @param {{sort?: string, seen?: Set<string>}} [opts] `seen` diisi & dipakai ulang untuk "Muat Lebih Banyak"
  * @returns {Anime[]}
  */
 export function mergeAnimeLists(bySource, { sort = 'relevance', seen = new Set() } = {}) {
-    const lists = ['anilist', 'mal', 'kitsu'].map((s) => bySource[s] || []);
+    const lists = ['anilist', 'kitsu'].map((s) => bySource[s] || []);
     let sequence = [];
     if (sort === 'score' || sort === 'newest') {
         const field = sort === 'score' ? 'score' : 'year';
@@ -338,13 +330,12 @@ export function mergeAnimeLists(bySource, { sort = 'relevance', seen = new Set()
  * bertahap (sumber yang lambat tidak menahan yang cepat).
  * @param {string} q
  * @param {{signal?: AbortSignal}} [opts]
- * @returns {{mal: Promise<Anime[]>, kitsu: Promise<Anime[]>, anilist: Promise<Anime[]>}}
+ * @returns {{kitsu: Promise<Anime[]>, anilist: Promise<Anime[]>}}
  */
 export function suggestAnime(q, { signal } = {}) {
     const timeout = API_CONFIG.suggestTimeout;
     const n = UI.suggestFetch;
     return {
-        mal: jikan.searchAnime({ q, page: 1, limit: n, sort: 'popularity', signal, timeout }).then((r) => r.items),
         kitsu: kitsu.searchAnime({ q, limit: n, signal, timeout }).then((r) => r.items),
         anilist: anilist.searchMedia({ q, page: 1, perPage: n, sort: 'relevance', signal, timeout }).then((r) => r.items),
     };
@@ -368,36 +359,11 @@ const wibClock = (sec) => {
     return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
 };
 
-const JIKAN_DAYS = { sundays: 0, mondays: 1, tuesdays: 2, wednesdays: 3, thursdays: 4, fridays: 5, saturdays: 6 };
-const JST_OFFSET_H = 9;
-
-/** Jadwal MAL (jam JST) → dikelompokkan per hari WIB, N terpopuler per hari. */
-function groupJikanSchedule(list) {
-    const buckets = {};
-    for (const { anime, day, time } of list) {
-        const d = JIKAN_DAYS[String(day || '').toLowerCase()];
-        const m = /^(\d{1,2}):(\d{2})/.exec(time || '');
-        if (d === undefined || !m) continue;
-        let minutes = Number(m[1]) * 60 + Number(m[2]) + (SCHEDULE.utcOffsetHours - JST_OFFSET_H) * 60;
-        let dayIdx = d;
-        if (minutes < 0) { minutes += 1440; dayIdx = (d + 6) % 7; }
-        if (minutes >= 1440) { minutes -= 1440; dayIdx = (d + 1) % 7; }
-        (buckets[dayIdx] ||= []).push({ minutes, anime });
-    }
-    const byDay = {};
-    Object.entries(buckets).forEach(([day, items]) => {
-        byDay[day] = items
-            .sort((a, b) => (b.anime.popularity || 0) - (a.anime.popularity || 0))
-            .slice(0, SCHEDULE.perDay)
-            .sort((a, b) => a.minutes - b.minutes)
-            .map(({ minutes, anime }) => ({ time: `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`, title: anime.title, episode: null, aired: false, anime }));
-    });
-    return byDay;
-}
-
 /**
- * Jadwal dari backend → per hari: anime berjam (maks SCHEDULE.perDay, urut jam) lalu donghua tanpa jam
- * (maks SCHEDULE.perDayDonghua). Tautan item = episode terbaru (latest: true).
+ * Jadwal dari backend → per hari: anime Jepang berjam (maks SCHEDULE.perDay, urut jam) lalu donghua
+ * (maks SCHEDULE.perDayDonghua; berjam dulu — Anichin punya jam perkiraan — lalu tanpa jam).
+ * Anime tanpa jam (mis. Otakudesu) hanya mengisi sisa kuota anime. Tautan item = episode terbaru.
+ * Dipisah per negara asal supaya donghua berjam tidak menggeser jatah anime Sub Indo.
  */
 async function backendSchedule() {
     if (!backend.isBackendEnabled()) return null;
@@ -405,10 +371,14 @@ async function backendSchedule() {
         const res = await backend.getSchedule();
         const byDay = {};
         let total = 0;
+        const byTime = (a, b) => (a.time ? 0 : 1) - (b.time ? 0 : 1) || String(a.time || '').localeCompare(String(b.time || ''));
         for (const [day, items] of Object.entries(res.days)) {
-            const timed = items.filter((it) => it.time).slice(0, SCHEDULE.perDay);
-            const untimed = items.filter((it) => !it.time).slice(0, SCHEDULE.perDayDonghua);
-            byDay[day] = [...timed, ...untimed].map((it) => ({ ...it, episode: null, aired: true, latest: true }));
+            const isDonghua = (it) => it.anime?.country === 'CN';
+            const anime = items.filter((it) => !isDonghua(it));
+            const timed = anime.filter((it) => it.time).slice(0, SCHEDULE.perDay);
+            const untimedAnime = anime.filter((it) => !it.time).slice(0, Math.max(0, SCHEDULE.perDay - timed.length));
+            const donghua = items.filter(isDonghua).sort(byTime).slice(0, SCHEDULE.perDayDonghua);
+            byDay[day] = [...timed, ...untimedAnime, ...donghua].map((it) => ({ ...it, episode: null, aired: true, latest: true }));
             total += byDay[day].length;
         }
         return total ? byDay : null;
@@ -420,9 +390,9 @@ async function backendSchedule() {
 
 /**
  * Jadwal 7 hari ke depan (mulai hari ini) dalam WIB.
- * Urutan: backend (jadwal rilis Sub Indo Samehadaku + donghua AnimeXin — situs yang memang
- * dipakai untuk memutar) → AniList (jam tayang Jepang) → MAL → data contoh.
- * @returns {Promise<{byDay: Record<number, Array<{time:string|null,title:string,episode:number|null,aired:boolean,latest?:boolean,anime?:Anime}>|Array<[string,string]>>, today:number, source:'backend'|'anilist'|'mal'|'fallback', error?: ApiError}>}
+ * Urutan: backend (jadwal rilis Sub Indo Samehadaku + donghua AnimeXin/Anichin — situs yang memang
+ * dipakai untuk memutar) → AniList (jam tayang Jepang) → data contoh.
+ * @returns {Promise<{byDay: Record<number, Array<{time:string|null,title:string,episode:number|null,aired:boolean,latest?:boolean,anime?:Anime}>|Array<[string,string]>>, today:number, source:'backend'|'anilist'|'fallback', error?: ApiError}>}
  */
 export async function getWeeklySchedule() {
     const today = wibWeekday();
@@ -464,13 +434,6 @@ export async function getWeeklySchedule() {
         errors.push(err);
     }
 
-    try {
-        const byDay = groupJikanSchedule(await jikan.weeklySchedule());
-        if (Object.values(byDay).some((d) => d.length)) return { byDay, today, source: 'mal' };
-    } catch (err) {
-        errors.push(err);
-    }
-
     return { byDay: FALLBACK_SCHEDULE, today, source: 'fallback', error: pickError(errors) };
 }
 
@@ -504,7 +467,8 @@ function findFallbackAnime(title) {
  */
 export function provisionalAnime(ref) {
     const known = findFallbackAnime(ref.title);
-    const source = ref.src ? `backend:${ref.src}` : ref.anilist ? 'anilist' : ref.mal ? 'mal' : ref.kitsu ? 'kitsu' : (known?.source || 'fallback');
+    // Id MAL di URL (tautan lama) dibuka lewat AniList (idMal) — sumbernya ditandai AniList.
+    const source = ref.src ? `backend:${ref.src}` : (ref.anilist || ref.mal) ? 'anilist' : ref.kitsu ? 'kitsu' : (known?.source || 'fallback');
     const anime = createAnime({
         ...(known || {}),
         id: undefined,
@@ -523,28 +487,10 @@ function titleQuery(title) {
     return String(title || '').replace(/\bS(\d{1,2})\b/g, 'Season $1').replace(/\s+/g, ' ').trim().slice(0, 100);
 }
 
-/** Hasil pencarian judul yang paling cocok (judul persis dulu, lalu peringkat teratas). */
-function bestTitleMatch(items, title) {
-    const key = titleKey(title);
-    return items.find((a) => titleKey(a.title) === key || titleKey(a.titleAlt) === key) || items[0] || null;
-}
-
 /** Hasil pencarian judul bertentangan dengan id di URL → itu anime lain, jangan dipakai. */
 function conflictsWithRef(anime, ref) {
     return Boolean((ref.anilist && anime.ids.anilist && anime.ids.anilist !== ref.anilist)
         || (ref.mal && anime.ids.mal && anime.ids.mal !== ref.mal));
-}
-
-/** Anime ongoing dari Jikan sering tanpa total episode → hitung episode yang sudah tayang. */
-async function withJikanAiredCount(anime, signal) {
-    if (anime.status !== 'ONGOING' || anime.latestEpisode || !anime.ids.mal) return anime;
-    try {
-        const aired = await jikan.airedEpisodeCount(anime.ids.mal, { signal });
-        return aired ? { ...anime, latestEpisode: aired } : anime;
-    } catch (err) {
-        if (err?.kind === 'abort') throw err;
-        return anime;
-    }
 }
 
 /**
@@ -552,12 +498,12 @@ async function withJikanAiredCount(anime, signal) {
  *
  * Rantai (berhenti di langkah pertama yang berhasil):
  *  1. AniList by id / idMal   → detail + episode berikutnya + rekomendasi (1 request)
- *  2. Kitsu by id             → mapping id MAL/AniList → kembali ke AniList (atau Jikan)
- *  3. Jikan by id MAL         (+ jumlah episode tayang untuk anime ongoing)
- *  4. Backend by slug         (Tahap D; dilewati bila backend nonaktif / tidak berjalan)
- *  5. Pencarian judul         AniList → Jikan → Kitsu (hasil yang id-nya bertentangan dengan URL dibuang)
+ *  2. Kitsu by id             → mapping id MAL/AniList → kembali ke AniList
+ *  3. Backend by slug         (Tahap D; dilewati bila backend nonaktif / tidak berjalan)
+ *  4. Pencarian judul         AniList → Kitsu (hasil yang id-nya bertentangan dengan URL dibuang)
  *     Hasil tanpa id AniList/MAL (Kitsu tanpa mapping, backend) → id dicari lewat judul.
- *  6. Data cadangan / data URL (fallback: true)
+ *  5. Data cadangan / data URL (fallback: true)
+ * (Langkah Jikan/MyAnimeList dihapus 22 Okt 2026.)
  * ID dari URL selalu dipertahankan (dilengkapi, tidak ditimpa).
  *
  * @param {AnimeRef} ref
@@ -581,10 +527,6 @@ export async function getWatchData(ref, { signal } = {}) {
         return null;
     };
     const anilistById = (id, idMal) => attempt('anilist', () => anilist.getMediaDetail({ id, idMal, recs, signal }));
-    const jikanById = (mal) => attempt('mal', async () => {
-        const anime = await jikan.getAnimeById(mal, { signal });
-        return anime ? { anime: await withJikanAiredCount(anime, signal) } : null;
-    });
 
     let res = null;
     if (ref.anilist || ref.mal) res = await anilistById(ref.anilist, ref.anilist ? null : ref.mal);
@@ -595,28 +537,21 @@ export async function getWatchData(ref, { signal } = {}) {
             const { anilist: al, mal } = k.anime.ids;
             let viaIds = null;
             if (al || mal) viaIds = await anilistById(al, al ? null : mal);
-            if (!viaIds && mal) viaIds = await jikanById(mal);
             res = viaIds ? { ...viaIds, anime: withIds(viaIds.anime, k.anime.ids) } : k;
         }
     }
-
-    if (!res && ref.mal) res = await jikanById(ref.mal);
 
     if (!res && ref.slug && backend.isBackendEnabled()) {
         res = await attempt('backend', () => backend.getBackendAnime(ref.slug, { signal }));
     }
 
-    /** Pencarian judul: AniList → Jikan (→ Kitsu bila `withKitsu`). Judul yang sama tidak dicari 2x. */
+    /** Pencarian judul: AniList (→ Kitsu bila `withKitsu`). Judul yang sama tidak dicari 2x. */
     const triedTitles = new Set();
     const byTitle = async (title, { withKitsu = true } = {}) => {
         const q = titleQuery(title);
         if (!q || triedTitles.has(q)) return null;
         triedTitles.add(q);
         return await attempt('anilist', () => anilist.getMediaDetail({ search: q, recs, signal }))
-            || await attempt('mal', async () => {
-                const hit = bestTitleMatch((await jikan.searchAnime({ q, limit: 5, sort: 'relevance', signal })).items, q);
-                return hit ? { anime: await withJikanAiredCount(hit, signal) } : null;
-            })
             || (withKitsu ? await attempt('kitsu', async () => ({ anime: await kitsu.findByTitle(q, { signal }) })) : null);
     };
 
@@ -624,7 +559,7 @@ export async function getWatchData(ref, { signal } = {}) {
     if (!res && ref.alt) res = await byTitle(ref.alt);
 
     // Hasil tanpa id AniList/MAL (mis. Kitsu tanpa mapping, atau backend) → server streaming
-    // tidak bisa dipakai. Cari id-nya lewat judul; hasil AniList/Jikan dipakai bila tidak bertentangan.
+    // tidak bisa dipakai. Cari id-nya lewat judul; hasil AniList dipakai bila tidak bertentangan.
     if (res && !res.anime.ids.anilist && !res.anime.ids.mal) {
         const found = await byTitle(ref.title || res.anime.title, { withKitsu: false });
         if (found && (found.anime.ids.anilist || found.anime.ids.mal)) {
@@ -658,7 +593,7 @@ export async function getWatchData(ref, { signal } = {}) {
 /**
  * Rekomendasi untuk halaman nonton (anime yang sedang dibuka tidak ikut).
  * Rantai: rekomendasi AniList (sudah ikut di getWatchData, 0 request tambahan)
- *       → rekomendasi MAL → anime se-genre → anime populer (cache homepage) → data cadangan.
+ *       → anime se-genre → anime populer (cache homepage) → data cadangan.
  * @param {Anime|null} anime
  * @param {{preloaded?: Anime[]|null, signal?: AbortSignal, limit?: number}} [opts]
  * @returns {Promise<{items: Anime[], source: string|null, fallback: boolean}>}
@@ -682,7 +617,6 @@ export async function getRecommendations(anime, { preloaded = null, signal, limi
     if (first.length) return { items: first, source: 'anilist', fallback: false };
 
     const steps = [];
-    if (anime?.ids?.mal) steps.push({ source: 'mal', run: () => jikan.recommendations(anime.ids.mal, { limit: limit + 4, signal }) });
     const genre = (anime?.genres || []).map(findGenre).find(Boolean);
     if (genre) steps.push({ source: 'genre', run: () => getGenreAnime(genre.label, { signal }) });
     steps.push({ source: 'popular', run: () => getHomeSection('popular') });
@@ -703,7 +637,7 @@ export async function getRecommendations(anime, { preloaded = null, signal, limi
 /* ------------------------------------------------------------------ */
 /* Status sumber                                                       */
 /* ------------------------------------------------------------------ */
-const PINGS = { anilist: anilist.ping, jikan: jikan.ping, kitsu: kitsu.ping, backend: backend.ping };
+const PINGS = { anilist: anilist.ping, kitsu: kitsu.ping, backend: backend.ping };
 
 /** Sumber yang relevan untuk ditampilkan di widget status. */
 export function activeApiSources() {

@@ -19,6 +19,7 @@ import { html, raw } from './dom.js';
 import { watchUrl } from '../routes.js';
 import { episodeLabel, scoreLabel } from '../api/normalize.js';
 import { UI } from '../config.js';
+import { icon } from './icons.js';
 
 const DEFAULT_DESC = 'Anime trending yang sedang populer saat ini. Tonton sekarang dengan subtitle Indonesia!';
 const ICON_PLAY = raw('<svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>');
@@ -83,11 +84,11 @@ export function createHeroSlider(root, { interval = UI.heroInterval, isBookmarke
             <h1 class="hero-title">${slide.title}</h1>
             <p class="hero-description">${truncate(slide.description || DEFAULT_DESC)}</p>
             <div class="hero-meta">
-                <span>⭐ ${scoreLabel(slide)}</span>
-                <span>📺 ${genres}</span>
-                ${slide.year ? html`<span>📅 ${slide.year}</span>` : ''}
-                ${episodeLabel(slide) ? html`<span>🎬 ${episodeLabel(slide)}</span>` : ''}
-                <span>🇮🇩 Sub Indo</span>
+                <span class="hero-meta-score">${icon('star', { cls: 'ic--rating' })}${scoreLabel(slide)}</span>
+                <span>${icon('tags')}${genres}</span>
+                ${slide.year ? html`<span>${icon('calendar')}${slide.year}</span>` : ''}
+                ${episodeLabel(slide) ? html`<span>${icon('film')}${episodeLabel(slide)}</span>` : ''}
+                <span>${icon('captions')}Sub Indo</span>
             </div>
             <div class="hero-buttons">
                 <a class="btn-watch" href="${watchUrl(slide, 1)}">${ICON_PLAY} Tonton Sekarang</a>

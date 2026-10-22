@@ -12,11 +12,12 @@
  *   GET /api/anime/schedule        (jadwal rilis per hari — ditambahkan 22 Okt 2026)
  *   GET /api/anime/:slug
  *   GET /api/anime/:slug/episode/:ep
+ *   GET /api/stream/servers?ep=&anilist=&title=&year=   (22 Okt 2026: ReAnime embed + AniZone HLS "Multi Sub")
  *
  * Format respons (server/routes/anime.js):
  *   { ok: true,  source: 'animexin', fallback: false, stale: false, errors?: [...], data: <payload> }
  *   { ok: false, error: 'pesan', code: 'NOT_FOUND' }
- *   - fallback: true → semua scraper gagal, data dari API metadata publik (Kitsu/Jikan/AniList)
+ *   - fallback: true → semua scraper gagal, data dari API metadata publik (Kitsu/AniList)
  *   - slug backend menyertakan nama sumber: "animexin~soul-land-2-the-peerless-tang-clan"
  * Item anime di `data` memakai field yang sama dengan Anime (title, image, episodes, genres,
  * score, status, slug, country, ...).
@@ -75,10 +76,15 @@ function unwrap(json) {
     return json;
 }
 
-function call(path, { ttl = CACHE_TTL.browse, signal, transform } = {}) {
+function call(path, opts = {}) {
+    return callApi(`/api/anime${path}`, opts);
+}
+
+/** GET <baseUrl><apiPath> lewat http.js (cache, timeout, dedupe, status backend). */
+function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform } = {}) {
     if (!isBackendEnabled()) return Promise.reject(disabledError());
     const base = String(cfg.baseUrl || '').replace(/\/+$/, '');
-    return fetchJSON(`${base}/api/anime${path}`, {
+    return fetchJSON(`${base}${apiPath}`, {
         source: 'backend',
         ttl,
         signal,
@@ -164,6 +170,80 @@ function toEpisodeMedia(json) {
  */
 export function getBackendEpisode(slug, ep, { signal } = {}) {
     return call(`/${encodeURIComponent(slug)}/episode/${encodeURIComponent(ep)}`, { ttl: CACHE_TTL.search, signal, transform: toEpisodeMedia });
+}
+
+/** URL relatif ke proxy stream milik sendiri (bukan URL luar dari data penyedia). */
+const OWN_STREAM_RE = /^\/api\/stream\/(?:hls|sub)\?[A-Za-z0-9_=&%.-]{1,4000}$/;
+
+/**
+ * Respons /api/stream/servers → server siap pakai untuk player.
+ *  - embed : iframe biasa (ReAnime/flixcloud). Beberapa mirror penyedia yang sama (HD-2, HD-1) digabung
+ *            menjadi SATU server dengan `mirrors` (dicoba berurutan bila mirror pertama gagal dimuat).
+ *  - hls   : player video bawaan (AniZone): `url` = proxy kita, `direct` = CDN (HLS native Safari/iOS),
+ *            `subtitles` = track WebVTT hasil konversi backend.
+ */
+function toProviderServers(json) {
+    const d = json?.data || {};
+    const list = Array.isArray(d.servers) ? d.servers : [];
+    const byProvider = new Map();
+    for (const x of list) {
+        const provider = clip(x?.provider, 20);
+        if (!provider) continue;
+        if (x.kind === 'hls') {
+            const url = String(x.url || '');
+            if (!OWN_STREAM_RE.test(url)) continue;
+            const subtitles = (Array.isArray(x.subtitles) ? x.subtitles : [])
+                .filter((t) => OWN_STREAM_RE.test(String(t?.url || '')))
+                .slice(0, 16)
+                .map((t) => ({ label: clip(t.label, 40, 'Subtitle'), lang: clip(t.lang, 12).toLowerCase(), url: t.url, default: Boolean(t.default) }));
+            if (!byProvider.has(provider)) {
+                byProvider.set(provider, {
+                    provider, kind: 'hls', url, direct: toHttpUrl(x.direct) || '', poster: toHttpUrl(x.poster) || '',
+                    subtitles, lang: 'multi', mirrors: null,
+                });
+            }
+            continue;
+        }
+        const url = toHttpUrl(x?.url);
+        if (!url) continue;
+        const lang = ['id', 'en', 'multi'].includes(x.lang) ? x.lang : '';
+        const prev = byProvider.get(provider);
+        if (prev) {
+            if (prev.kind === 'embed' && !prev.mirrors.includes(url)) prev.mirrors.push(url);
+        } else {
+            byProvider.set(provider, { provider, kind: 'embed', url, lang, mirrors: [url] });
+        }
+    }
+    const servers = [...byProvider.values()].map((s) => ({
+        ...s,
+        available: true,
+        reason: '',
+        origins: [originOf(s.url), ...(s.mirrors || []).map(originOf)].filter(Boolean),
+    }));
+    const status = d.status && typeof d.status === 'object' ? { ...d.status } : {};
+    return { servers, status };
+}
+
+/**
+ * Server dari penyedia berbasis id/judul (ReAnime, AniZone) untuk satu episode.
+ * @param {{anilist?: number|null, ep: number, titles?: string[], year?: number|null, signal?: AbortSignal}} q
+ * @returns {Promise<{servers: object[], status: Record<string, string>}>}
+ */
+export function getStreamServers({ anilist, ep, titles = [], year, signal } = {}) {
+    const p = new URLSearchParams();
+    p.set('ep', String(ep));
+    if (anilist) p.set('anilist', String(anilist));
+    const seen = new Set();
+    for (const t of titles) {
+        const v = String(t || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+        const k = v.toLowerCase();
+        if (v.length < 2 || seen.has(k)) continue;
+        seen.add(k);
+        p.append('title', v);
+        if (seen.size >= 4) break;
+    }
+    if (year) p.set('year', String(year));
+    return callApi(`/api/stream/servers?${p}`, { ttl: CACHE_TTL.search, signal, transform: toProviderServers });
 }
 
 const CLOCK_RE = /^([01]\d|2[0-3]):[0-5]\d$/;

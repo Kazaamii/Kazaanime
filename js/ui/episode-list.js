@@ -12,6 +12,7 @@
  * Tidak ada fetch di sini.
  */
 import { PLAYER } from '../config.js';
+import { icon } from './icons.js';
 import { html, raw, delegate } from './dom.js';
 import { showToast } from './toast.js';
 
@@ -61,7 +62,7 @@ export function createEpisodeList({ grid, tabs, hrefFor, onSelect }) {
                     <p>Jumlah episode belum diketahui. Masukkan nomor episode:</p>
                     <form novalidate>
                         <input type="number" name="ep" min="1" max="${PLAYER.maxEpisode}" value="${current}" inputmode="numeric" aria-label="Nomor episode">
-                        <button type="submit">▶ Putar</button>
+                        <button type="submit">${icon('play')} Putar</button>
                     </form>
                 </div>`);
             return;
