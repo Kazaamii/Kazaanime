@@ -13,6 +13,8 @@
  *   GET /api/anime/:slug
  *   GET /api/anime/:slug/episode/:ep
  *   GET /api/stream/servers?ep=&anilist=&title=&year=   (22 Okt 2026: ReAnime embed + AniZone HLS "Multi Sub")
+ *   GET /api/stream/subai?…&p=N    (22 Okt 2026: "Subtitle Indonesia (AI)" — bagian ke-N, terjemahan Gemini;
+ *                                  URL-nya datang dari /servers (`ai.url`, ditandatangani backend))
  *
  * Format respons (server/routes/anime.js):
  *   { ok: true,  source: 'animexin', fallback: false, stale: false, errors?: [...], data: <payload> }
@@ -34,7 +36,7 @@
  * Live Server statis yang membalas 404 non-JSON untuk /api/...) semua fungsi langsung
  * menolak dengan ApiError kind 'disabled' — halaman tetap berjalan dengan sumber lain.
  */
-import { API_CONFIG, CACHE_TTL } from '../config.js';
+import { API_CONFIG, CACHE_TTL, PLAYER } from '../config.js';
 import { fetchJSON, ApiError } from './http.js';
 import { createAnime, originOf, toHttpUrl } from './normalize.js';
 
@@ -174,6 +176,8 @@ export function getBackendEpisode(slug, ep, { signal } = {}) {
 
 /** URL relatif ke proxy stream milik sendiri (bukan URL luar dari data penyedia). */
 const OWN_STREAM_RE = /^\/api\/stream\/(?:hls|sub)\?[A-Za-z0-9_=&%.-]{1,4000}$/;
+/** URL terjemahan subtitle AI milik sendiri (ditandatangani backend). */
+const AI_SUB_RE = /^\/api\/stream\/subai\?[A-Za-z0-9_=&%.-]{1,4000}$/;
 
 /**
  * Respons /api/stream/servers → server siap pakai untuk player.
@@ -196,10 +200,14 @@ function toProviderServers(json) {
                 .filter((t) => OWN_STREAM_RE.test(String(t?.url || '')))
                 .slice(0, 16)
                 .map((t) => ({ label: clip(t.label, 40, 'Subtitle'), lang: clip(t.lang, 12).toLowerCase(), url: t.url, default: Boolean(t.default) }));
+            // Tawaran "Subtitle Indonesia (AI)" (hanya bila episode tidak punya subtitle Indonesia).
+            const ai = x.ai && AI_SUB_RE.test(String(x.ai.url || ''))
+                ? { url: x.ai.url, from: clip(x.ai.from, 12).toLowerCase(), sourceLabel: clip(x.ai.sourceLabel, 40), label: clip(x.ai.label, 40, 'Indonesia (AI)') }
+                : null;
             if (!byProvider.has(provider)) {
                 byProvider.set(provider, {
                     provider, kind: 'hls', url, direct: toHttpUrl(x.direct) || '', poster: OWN_STREAM_RE.test(String(x.poster || '')) ? x.poster : '',
-                    subtitles, lang: 'multi', mirrors: null,
+                    subtitles, ai, lang: 'multi', mirrors: null,
                 });
             }
             continue;
@@ -244,6 +252,60 @@ export function getStreamServers({ anilist, ep, titles = [], year, signal } = {}
     }
     if (year) p.set('year', String(year));
     return callApi(`/api/stream/servers?${p}`, { ttl: CACHE_TTL.search, signal, transform: toProviderServers });
+}
+
+/** Respons /api/stream/subai → bagian subtitle AI yang tervalidasi (data dari jaringan tidak dipercaya). */
+function toAiPart(json) {
+    const d = json?.data || {};
+    const parts = Number(d.parts);
+    const part = Number(d.part);
+    if (!Number.isInteger(parts) || parts < 1 || parts > 99 || !Number.isInteger(part) || part < 0 || part >= parts) {
+        throw new ApiError('Data subtitle AI tidak valid.', { kind: 'parse', source: 'ai-subtitle' });
+    }
+    const num = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : null);
+    const ranges = (Array.isArray(d.ranges) ? d.ranges : []).slice(0, parts)
+        .map((r) => (Array.isArray(r) && num(r[0]) != null && num(r[1]) != null ? [num(r[0]), num(r[1])] : null));
+    if (ranges.length !== parts || ranges.includes(null)) throw new ApiError('Data subtitle AI tidak valid.', { kind: 'parse', source: 'ai-subtitle' });
+    const cues = (Array.isArray(d.cues) ? d.cues : []).slice(0, 4000).map((c) => {
+        if (!Array.isArray(c)) return null;
+        const start = num(c[0]);
+        const end = num(c[1]);
+        const text = typeof c[2] === 'string' ? c[2].slice(0, 500) : '';
+        if (start == null || end == null || end <= start || !text) return null;
+        return { start, end, text, settings: typeof c[3] === 'string' ? c[3].slice(0, 120) : '' };
+    }).filter(Boolean);
+    return {
+        part, parts, ranges, cues,
+        label: clip(d.label, 40, 'Indonesia (AI)'),
+        model: clip(d.model, 60),
+        untranslated: Math.max(0, Number.parseInt(d.untranslated, 10) || 0),
+    };
+}
+
+/**
+ * Satu bagian "Subtitle Indonesia (AI)". Sumber kesehatan terpisah ('ai-subtitle') → kuota AI habis tidak
+ * membuat backend dianggap mati. Tanpa retry otomatis di sini (diatur ui/ai-subtitle.js sesuai Retry-After).
+ * @param {string} url `ai.url` dari /api/stream/servers
+ * @param {number} part
+ * @param {{signal?: AbortSignal}} [opts]
+ */
+export function getAiSubtitlePart(url, part, { signal } = {}) {
+    if (!isBackendEnabled()) return Promise.reject(disabledError());
+    const p = Number(part);
+    if (!AI_SUB_RE.test(String(url || '')) || !Number.isInteger(p) || p < 0 || p > 99) {
+        return Promise.reject(new ApiError('Tautan subtitle AI tidak valid.', { kind: 'parse', source: 'ai-subtitle' }));
+    }
+    const base = String(cfg.baseUrl || '').replace(/\/+$/, '');
+    return fetchJSON(`${base}${url}&p=${p}`, {
+        source: 'ai-subtitle',
+        timeout: PLAYER.aiSubtitle?.requestTimeout || 65000,
+        retries: 0,
+        ttl: 6 * 3600 * 1000,
+        persist: false, // bisa puluhan KB per bagian → cukup cache memori + cache HTTP browser
+        signal,
+        validate: unwrap,
+        transform: toAiPart,
+    });
 }
 
 const CLOCK_RE = /^([01]\d|2[0-3]):[0-5]\d$/;

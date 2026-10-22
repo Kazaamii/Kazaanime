@@ -9,12 +9,14 @@
  *   GET /api/health                     status backend + sumber (dipakai indikator "Status API" di frontend)
  *   GET /api/bot                        info bot untuk admin situs sumber (tercantum di User-Agent)
  *   GET /api/anime/latest | /search?q= | /schedule | /:slug | /:slug/episode/:ep
+ *   GET /api/stream/servers | /hls | /sub | /subai  (lihat routes/stream.js)
  */
 import path from 'node:path';
 import express from 'express';
-import { BOT, CACHE, ROOT_DIR, SERVER, SOURCES, STREAMS } from './config.js';
+import { AI_SUBS, BOT, CACHE, ROOT_DIR, SERVER, SOURCES, STREAMS } from './config.js';
 import { AppError } from './lib/errors.js';
 import { createClient, createNetwork } from './lib/fetcher.js';
+import { createGemini } from './lib/gemini.js';
 import { ipRateLimit } from './lib/rate-limit.js';
 import { createSigner } from './lib/stream-proxy.js';
 import { createDefaultStreamProviders } from './providers/index.js';
@@ -22,7 +24,7 @@ import { animeRouter } from './routes/anime.js';
 import { streamRouter } from './routes/stream.js';
 import { createDefaultRegistry } from './sources/index.js';
 
-export const VERSION = '1.5.0';
+export const VERSION = '1.6.0';
 
 /** Header keamanan yang sama dengan vercel.json (tanpa X-Frame-Options: lihat mountStatic). */
 function securityHeaders(req, res, next) {
@@ -140,9 +142,12 @@ function errorHandler(err, req, res, next) {
  *   streams?: ReturnType<typeof createDefaultStreamProviders>,
  *   mediaClient?: {stream: Function},
  *   signer?: ReturnType<typeof createSigner>,
+ *   gemini?: ReturnType<typeof createGemini>|null,   undefined = dibuat dari AI_SUBS (bila GEMINI_API_KEY ada); null = AI mati
+ *   aiConfig?: typeof AI_SUBS,
  *   serveStatic?: boolean,
  *   rateLimitPerMinute?: number,
  *   proxyRateLimitPerMinute?: number,
+ *   aiRateLimitPerMinute?: number,
  *   budgetMs?: number,
  *   log?: boolean,
  * }} [opts]
@@ -152,9 +157,12 @@ export function createApp({
     streams,
     mediaClient,
     signer = createSigner(STREAMS.secret),
+    gemini,
+    aiConfig = AI_SUBS,
     serveStatic = false,
     rateLimitPerMinute = SERVER.rateLimitPerMinute,
     proxyRateLimitPerMinute = STREAMS.proxyRateLimitPerMinute,
+    aiRateLimitPerMinute = aiConfig.rateLimitPerMinute,
     budgetMs = SERVER.requestBudgetMs,
     log = SERVER.logRequests,
 } = {}) {
@@ -172,6 +180,32 @@ export function createApp({
         // hanya diberikan untuk Referer/Origin anizone.to. Spoof header diizinkan pemilik proyek (22 Okt 2026).
         headers: { Referer: `${STREAMS.anizone.baseUrl}/`, Origin: STREAMS.anizone.baseUrl },
     });
+    // Subtitle Indonesia (AI): klien Gemini hanya dibuat bila GEMINI_API_KEY ada (key tidak pernah keluar dari server).
+    let geminiHost = '';
+    try {
+        geminiHost = aiConfig.enabled ? new URL(aiConfig.apiBase).hostname : '';
+    } catch {
+        console.warn('[ai-subtitle] GEMINI_API_BASE tidak valid — Subtitle Indonesia (AI) dimatikan.');
+    }
+    const ai = gemini === undefined
+        ? (geminiHost
+            ? createGemini({
+                client: createClient(network, {
+                    source: 'gemini',
+                    allowedHosts: [geminiHost],
+                    robots: false, // API resmi ber-key, bukan crawling
+                    intervalMs: 0,
+                    retries: 0,
+                    timeoutMs: aiConfig.timeoutMs,
+                }),
+                apiKey: aiConfig.apiKey,
+                apiBase: aiConfig.apiBase,
+                models: aiConfig.models,
+                timeoutMs: aiConfig.timeoutMs,
+            })
+            : null)
+        : gemini;
+    const streamApi = streamRouter({ providers, mediaClient: media, signer, budgetMs, ai: ai ? { gemini: ai, config: aiConfig } : null });
     if (SERVER.isVercel && !STREAMS.secretFromEnv) {
         console.warn('[streams] STREAM_SECRET belum diatur — secret proxy diturunkan dari ID deployment (lihat README).');
     }
@@ -198,6 +232,7 @@ export function createApp({
                 cacheTtlSec: { latest: CACHE.latestTtlMs / 1000, search: CACHE.searchTtlMs / 1000, detail: CACHE.detailTtlMs / 1000, episode: CACHE.episodeTtlMs / 1000 },
                 ...registry.health(),
                 streams: providers.health(),
+                aiSubtitles: streamApi.aiHealth(),
             },
         });
     });
@@ -205,10 +240,16 @@ export function createApp({
     app.use('/api/anime', ipRateLimit({ limit: rateLimitPerMinute }), animeRouter(registry, { budgetMs }));
     const serversLimit = ipRateLimit({ limit: rateLimitPerMinute });
     const proxyLimit = ipRateLimit({ limit: proxyRateLimitPerMinute });
+    // /subai yang lolos dari cache CDN memakai kuota Gemini pemilik situs → batas per IP jauh lebih ketat.
+    const aiLimit = ipRateLimit({ limit: aiRateLimitPerMinute });
     app.use(
         '/api/stream',
-        (req, res, next) => (req.path === '/servers' ? serversLimit(req, res, next) : proxyLimit(req, res, next)),
-        streamRouter({ providers, mediaClient: media, signer, budgetMs }),
+        (req, res, next) => {
+            if (req.path === '/servers') return serversLimit(req, res, next);
+            if (req.path === '/subai') return aiLimit(req, res, next);
+            return proxyLimit(req, res, next);
+        },
+        streamApi,
     );
     app.use('/api', (req, res) => {
         res.set('Cache-Control', 'no-store');

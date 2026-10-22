@@ -19,7 +19,8 @@ beradapter.
 
 ## 📁 Struktur folder (final)
 
-Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diubah di Tahap D · 🅔 baru/diubah di Tahap E (22 Okt 2026)
+Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diubah di Tahap D · 🅔 baru/diubah di Tahap E (22 Okt 2026) ·
+🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) (22 Okt 2026)
 
 ```
 kazanime/
@@ -29,8 +30,8 @@ kazanime/
 ├── README.md                  ✅🅓
 ├── package.json               🅓🅔 "type": "module", express 5 + cheerio, skrip dev/start/test/check:sources (test: Node 20 & 22)
 ├── package-lock.json          🅓
-├── vercel.json                ✅🅓 header keamanan + rewrite /api/* → Function + maxDuration
-├── .env.example               🅔 semua environment variable (opsional) beserta default-nya
+├── vercel.json                ✅🅓🅕 header keamanan + rewrite /api/* → Function + maxDuration 60 dtk (bagian subtitle AI)
+├── .env.example               🅔🅕 semua environment variable (opsional) beserta default-nya (+ GEMINI_*, nilai kosong)
 ├── .gitignore                 🅔 (node_modules, .env, .vercel)
 ├── api/
 │   └── index.js               🅓 Vercel Function: `export default createApp()`
@@ -42,7 +43,7 @@ kazanime/
 │   └── watch.css              ✅🅒 player, server, episode, info, download, platform legal (+ urutan mobile)
 ├── js/
 │   ├── theme-preload.js       ✅ script klasik di <head>: pasang tema sebelum render (anti-kedip)
-│   ├── config.js              ✅🅓🅔 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone) & PLAYER (hls)
+│   ├── config.js              ✅🅓🅔🅕 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone) & PLAYER (hls, aiSubtitle)
 │   ├── routes.js              ✅🅒 pembuat/pembaca URL watch & search (filter di URL, batas nomor episode)
 │   ├── data/
 │   │   └── fallback.js        ✅ data cadangan offline (format ternormalisasi)
@@ -51,7 +52,7 @@ kazanime/
 │   │   ├── http.js            ✅🅓 fetchJSON: timeout, retry, cache Map+sessionStorage, dedupe, throttle, circuit breaker
 │   │   ├── anilist.js         ✅🅒 GraphQL (homepage gabungan, search, jadwal) + detail+rekomendasi dalam 1 query
 │   │   ├── kitsu.js           ✅🅒 Kitsu (JSON:API, simple GET) + detail dengan mapping id MAL/AniList
-│   │   ├── sources.js         ✅🅓🅔 klien backend /api/anime/* + /api/stream/servers (aktif; mati otomatis bila /api tidak ada) + normalisasi server/download
+│   │   ├── sources.js         ✅🅓🅔🅕 klien backend /api/anime/* + /api/stream/servers + /api/stream/subai (aktif; mati otomatis bila /api tidak ada) + normalisasi server/download
 │   │   ├── streams.js         🅒🅓🅔 server streaming per episode (config + slot penyedia + SEMUA situs backend yang cocok), link download
 │   │   └── index.js           ✅🅓 FASAD untuk UI: rantai fallback (donghua: backend → AniList CN) + getWatchData
 │   ├── services/
@@ -77,7 +78,8 @@ kazanime/
 │   │   ├── notice.js          ✅ keterangan "data cadangan" + tombol Coba lagi
 │   │   ├── search-dropdown.js ✅🅔 autocomplete AniList + Kitsu (bertahap, bisa dibatalkan, keyboard, ARIA)
 │   │   ├── api-status.js      ✅ widget status sumber data
-│   │   ├── player.js          🅒🅔 SATU player: iframe ATAU video HLS (hls.js / HLS native), mirror, status, tombol server, fallback otomatis, postMessage
+│   │   ├── player.js          🅒🅔🅕 SATU player: iframe ATAU video HLS (hls.js / HLS native), mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI
+│   │   ├── ai-subtitle.js     🅕 "Subtitle Indonesia (AI)": track AI (TextTrack/VTTCue) per bagian, subtitle bawaan disembunyikan, pilihan pengguna dihormati
 │   │   ├── icons.js           🅔 ikon garis Lucide (ISC) pengganti emoji: icon() + hydrateIcons() untuk HTML statis
 │   │   ├── episode-list.js    🅒 tombol episode (link asli), tab rentang >100 ep, input manual, penanda ditonton
 │   │   └── download-list.js   🅒🅓 daftar link download per kualitas (+ format & bahasa subtitle dari backend)
@@ -85,17 +87,19 @@ kazanime/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
 │   ├── home.js                ✅🅓🅔 homepage (genre → hasil di bawah tombol; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
-│   └── watch.js               ✅🅓 halaman nonton (anime dari backend: server situs sumber didahulukan)
+│   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
-    ├── app.js                 createApp(): /api/health, /api/bot, /api/anime/*, /api/stream/*, error handler, rate limit masuk
+    ├── app.js                 createApp(): /api/health, /api/bot, /api/anime/*, /api/stream/*, error handler, rate limit masuk (+ klien Gemini bila GEMINI_API_KEY ada 🅕)
     ├── index.js               server LOKAL: API + file frontend (`npm run dev`)
-    ├── config.js              semua konstanta backend (+ override lewat env)
+    ├── config.js              semua konstanta backend (+ override lewat env; AI_SUBS 🅕)
     ├── routes/
     │   ├── anime.js           5 endpoint + validasi + header cache CDN
-    │   └── stream.js          🅔 /api/stream/servers (ReAnime + AniZone) · /hls (proxy HLS bertanda tangan) · /sub (ASS/SRT → WebVTT)
+    │   └── stream.js          🅔🅕 /api/stream/servers (ReAnime + AniZone) · /hls (proxy HLS bertanda tangan) · /sub (ASS/SRT → WebVTT) · /subai (Subtitle Indonesia AI)
     ├── lib/
-    │   ├── fetcher.js         SATU-SATUNYA request keluar: allowlist host (+ sufiks CDN), robots, throttle, UA, timeout, retry, deteksi & ulang challenge Cloudflare, stream() biner
+    │   ├── fetcher.js         SATU-SATUNYA request keluar: allowlist host (+ sufiks CDN), robots, throttle, UA, timeout, retry, deteksi & ulang challenge Cloudflare, stream() biner, passErrors (API resmi) 🅕
     │   ├── stream-proxy.js    🅔 tanda tangan HMAC URL proxy, penulisan ulang playlist m3u8, konversi ASS/SRT → WebVTT
+    │   ├── gemini.js          🅕 klien Gemini API (generateContent): model utama → cadangan, pendinginan kuota/key, thinking minimal
+    │   ├── subtitle-ai.js     🅕 VTT → bagian (±2 per episode), prompt "nomor|teks", validasi jawaban, cache & dedupe per instance
     │   ├── robots.js          parser & pencocok robots.txt (RFC 9309) + cache
     │   ├── rate-limit.js      throttle per host, circuit breaker, rate limit per IP
     │   ├── cache.js           cache TTL + LRU + dedupe + stale-if-error
@@ -118,7 +122,7 @@ kazanime/
     │   └── match.js           pencocokan judul (2nd Season = Season 2 = II)
     ├── scripts/
     │   └── check-sources.js   `npm run check:sources [-- --live]`: laporan robots/ToS/kesehatan sumber
-    └── test/                  `npm test` (node:test, 145 test) + fixtures/ (HTML/JSON asli dipangkas; Otakudesu anime/episode = rekonstruksi struktur)
+    └── test/                  `npm test` (node:test, 167 test) + fixtures/ (HTML/JSON asli dipangkas; Otakudesu anime/episode = rekonstruksi struktur)
 ```
 
 ---
@@ -335,6 +339,41 @@ Object.freeze({
 
 ---
 
+### 🤖 Subtitle Indonesia (AI) — Tahap F (22 Okt 2026)
+
+Permintaan pemilik proyek: bila subtitle Indonesia tidak ada, terjemahkan dengan Gemini Flash lalu matikan subtitle bawaan.
+
+| | |
+|---|---|
+| Berlaku untuk | Server **AniZone "Multi Sub"** saja — satu-satunya server yang memakai player video kita sendiri (subtitle berupa berkas terpisah). Server iframe (MegaPlay, ReAnime, Vidnest, TryEmbed, hianime.ro, server Sub Indo hasil scraping) **tidak bisa**: video & subtitle ada di dalam player situs lain (lintas-domain, sebagian hardsub) |
+| Kapan | Hanya bila episode **tidak** punya subtitle Indonesia **dan** `GEMINI_API_KEY` diisi di server. Terjemahan baru dimulai saat video **benar-benar diputar** (bukan saat halaman dibuka) |
+| Sumber | Inggris (non-SDH) → Inggris SDH → Melayu → bahasa lain yang tersedia |
+| Tampilan | Track **"Indonesia (AI)"** aktif otomatis, subtitle bawaan disembunyikan (mode `hidden`, tetap termuat). Subtitle asli tetap bisa dipilih di menu subtitle player (ikon CC / menu titik tiga). Bila penonton sudah memilih subtitle lain selama menunggu, pilihannya tidak ditimpa |
+| Model | `gemini-3.6-flash` (utama, thinking `minimal` → cepat) → `gemini-3.5-flash-lite` (cadangan bila kuota habis / overload / model tidak ada). Bisa diganti lewat `GEMINI_MODEL`, mis. `gemini-3.8-flash` (Flash terbaru; thinking `low`) |
+| Pembagian | Subtitle dibagi per ±220 baris unik → **±2 request per episode TV**; bagian yang sedang ditonton didahulukan (seek ikut mengubah urutan) |
+| Cache (pilihan A, tanpa layanan baru) | Respons `/subai` di-cache **CDN Vercel 30 hari** + **browser 7 hari** + memori instance; satu episode cukup diterjemahkan sekali untuk semua penonton selama cache CDN masih ada. Cache CDN bisa hilang saat deploy ulang / beda region → episode diterjemahkan ulang (memakai kuota) |
+| Gagal | Kuota harian habis / key ditolak / AI mati → subtitle asli tetap tampil + toast penjelasan. Gagal sementara → diulang (Retry-After dihormati). Baris yang tidak diterjemahkan model tetap **bahasa asli** (dihitung `untranslated`), tidak pernah diisi teks karangan |
+
+**Cara mengaktifkan (pemilik situs):**
+1. Buat API key di Google AI Studio (aistudio.google.com/apikey). **Jangan** tempel key di chat/issue/commit —
+   repo ini publik; key yang pernah terlihat publik sebaiknya dihapus dan dibuat ulang.
+2. Vercel → Project → **Settings → Environment Variables** → `GEMINI_API_KEY` = key tadi (Production + Preview) → **Redeploy**.
+3. Cek `https://<domain>/api/health` → `data.aiSubtitles.enabled: true` dan status tiap model (`ready` / `quota-day` / …).
+4. Buka episode AniZone yang tidak punya subtitle Indonesia → tekan play → track "Indonesia (AI)" muncul dalam belasan–puluhan detik.
+
+**Kuota & biaya.** Tier gratis Gemini: batasnya tidak lagi dipublikasikan sebagai angka tetap — lihat AI Studio
+(per *project*, reset tengah malam waktu Pasifik ≈ 14.00–15.00 WIB). Laporan developer per Sept 2026: ±20 request/hari
+untuk Gemini 3.x Flash, ±500/hari untuk Flash-Lite. Tanpa billing aktif, kuota habis = error 429 (tanpa biaya).
+Di tier gratis, Google boleh memakai teks yang dikirim untuk memperbaiki produknya. Secara hukum fitur ini sama
+abu-abunya dengan proxy AniZone (menerjemahkan subtitle milik pihak lain); hasilnya selalu diberi label "(AI)".
+
+**Yang sudah diuji:** 22 unit test (Gemini tiruan dengan format respons & error resmi) + uji end-to-end lokal di
+Chromium 153 headless: backend & frontend asli, hls.js memutar stream HLS H.264/AAC lewat proxy, CDN & Gemini **tiruan**
+(tidak ada akses internet ke Google dari sandbox). Terbukti: tidak ada request sebelum video diputar; track AI tampil
+& subtitle bawaan tersembunyi; posisi sign `{\an8}` terjaga; 3 bagian urut p0 → p2 → p1 saat penonton lompat ke akhir;
+pilihan "subtitle mati" penonton dihormati; kuota habis → subtitle asli + pesan; menu titik tiga Chrome menampilkan
+"Captions: Indonesia (AI)". **Belum diuji:** panggilan Gemini sungguhan (butuh key di Vercel), Safari/iOS.
+
 ## 🕷️ Backend scraper (Tahap D)
 
 ```
@@ -361,7 +400,9 @@ server/providers/  reanime.js (API JSON → embed flixcloud) · anizone.js (penc
       │
 server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditandatangani HMAC, host media di allowlist,
                            playlist ditulis ulang, segmen/key diteruskan + Range; CDN cache lama)
-                       └── /api/stream/sub  : subtitle ASS/SRT → WebVTT (diulang bila kena challenge)
+                       ├── /api/stream/sub  : subtitle ASS/SRT → WebVTT (diulang bila kena challenge)
+                       └── /api/stream/subai: (Tahap F) bagian ke-p subtitle diterjemahkan Gemini → JSON cue
+                                              (lib/subtitle-ai.js → lib/gemini.js → fetcher; cache CDN 30 hari)
 ```
 
 ### Endpoint & format respons
@@ -373,10 +414,11 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
 | `GET /api/anime/:slug` | satu anime + `episodeList: [{ number, title, released, url }]` |
 | `GET /api/anime/:slug/episode/:ep` | `{ episode, title, released, url, servers: [{ name, url, lang }], downloads: [{ quality, size, format, subtitle, links: [{ provider, url }] }] }` |
-| `GET /api/stream/servers?ep=&anilist=&title=&title=&year=` | **(baru, 22 Okt 2026)** `{ episode, servers: [{ provider, kind: 'embed', name, label, lang, url } \| { provider, kind: 'hls', name, lang: 'multi', url: '/api/stream/hls?…', direct, poster, subtitles: [{ label, lang, default, url: '/api/stream/sub?…' }] }], status: { reanime, anizone } }` — status: `ok` / `not_found` / `blocked` / `error` / `stale` |
+| `GET /api/stream/servers?ep=&anilist=&title=&title=&year=` | **(baru, 22 Okt 2026)** `{ episode, servers: [{ provider, kind: 'embed', name, label, lang, url } \| { provider, kind: 'hls', name, lang: 'multi', url: '/api/stream/hls?…', direct, poster, subtitles: [{ label, lang, default, url: '/api/stream/sub?…' }], ai: { url: '/api/stream/subai?…', from, sourceLabel, label } \| null }], status: { reanime, anizone } }` — status: `ok` / `not_found` / `blocked` / `error` / `stale`. `ai` (Tahap F) hanya ada bila episode **tidak** punya subtitle Indonesia dan `GEMINI_API_KEY` diisi |
 | `GET /api/stream/hls?u=&s=` | proxy HLS AniZone (hanya URL bertanda tangan dari `/servers`): m3u8 ditulis ulang, segmen/key apa adanya |
 | `GET /api/stream/sub?u=&f=&s=` | subtitle AniZone (ASS/SRT) dikonversi ke WebVTT untuk `<track>` |
-| `GET /api/health` | status backend, User-Agent, TTL cache, status robots/circuit tiap sumber & penyedia stream |
+| `GET /api/stream/subai?u=&f=&l=&v=&s=&p=` | **(Tahap F)** `{ part, parts, ranges: [[mulai, akhir]…], lang: 'id', label: 'Indonesia (AI)', model, untranslated, cues: [[mulai, akhir, teks, pengaturan]…] }` — hanya URL bertanda tangan dari `ai.url`; parameter lain ditolak. Error: `503 AI_DISABLED` / `AI_QUOTA` (+ `Retry-After`) / `AI_CONFIG`, `504 AI_TIMEOUT`, `502 AI_UPSTREAM` / `AI_BAD_OUTPUT` / `AI_BLOCKED`, `409 AI_STALE` |
+| `GET /api/health` | status backend, User-Agent, TTL cache, status robots/circuit tiap sumber & penyedia stream, `aiSubtitles` (aktif/tidak + status tiap model Gemini; key tidak pernah ditampilkan) |
 | `GET /api/bot` | penjelasan bot + cara menolak lewat robots.txt (tercantum di User-Agent) |
 
 ```jsonc
@@ -412,6 +454,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; diblokir → 30 mnt (5 mnt untuk sumber yang challenge-nya terbukti acak: AnimeXin, Samehadaku, Anichin, hianime.ro; 3 mnt untuk ReAnime/AniZone); 429 → sesuai `Retry-After` |
 | Anti-SSRF | hanya host milik sumber (+ sufiks CDN media AniZone `xin-cdn.xyz`); redirect ke host lain tidak diikuti; respons > 3 MB ditolak (segmen video maks 40 MB) |
 | Proteksi bot | **22 Okt 2026 — keputusan pemilik proyek: larangan spoof header & proxy dicabut.** Yang dipakai: proxy HLS AniZone (CDN-nya tidak memeriksa Referer — diukur — tetapi CORS dikunci ke anizone.to) dan pengulangan maks 2× untuk challenge yang terbukti acak. Tetap **tanpa** solver CAPTCHA/challenge & tanpa dekripsi player (embed ReAnime/flixcloud dipasang apa adanya) |
+| Gemini (subtitle AI) | API resmi ber-key (header `x-goog-api-key`, bukan di URL); robots.txt tidak berlaku. Hanya subtitle yang ditawarkan `/servers` (URL bertanda tangan) yang bisa diterjemahkan → key tidak bisa dipakai pihak lain sebagai penerjemah gratis. Rate limit 20/menit/IP untuk request yang lolos cache CDN |
 | Proxy stream | `/api/stream/hls` hanya meneruskan URL yang ditandatangani server ini (HMAC, `STREAM_SECRET`) dan host media di allowlist → bukan open proxy. Rate limit terpisah 900/menit/IP. **Memakai bandwidth Vercel** (±300–700 MB per episode 720p di Chrome/Firefox; Safari/iOS memutar langsung dari CDN) |
 | Gambar | poster animexin dilindungi hotlink (403 + `Cross-Origin-Resource-Policy: same-origin`) → diganti poster **Kitsu** → **Bangumi** (judul Mandarin) → **MangaBaka**, hanya bila judul cocok persis (maks 2,5 dtk; sisanya dicari di belakang & respons diberi cache CDN 60 dtk). Poster Samehadaku boleh ditampilkan langsung. Tidak ada proxy gambar |
 
@@ -441,7 +484,10 @@ Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di Us
 `CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
 Penyedia stream: `STREAM_PROVIDERS` (default `reanime,anizone`), **`STREAM_SECRET`** (≥ 16 karakter acak — isi di
 Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RATE_LIMIT_PER_MIN`,
-`ANIZONE_MEDIA_HOSTS`, `REANIME_EMBED_HOSTS`. Proxy keluar (mis. untuk Otakudesu): Node ≥ 22.21 mendukung
+`ANIZONE_MEDIA_HOSTS`, `REANIME_EMBED_HOSTS`. Subtitle AI (Tahap F): **`GEMINI_API_KEY`** (kosong = fitur mati),
+`GEMINI_MODEL` (default `gemini-3.6-flash`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`; `none` = tanpa
+cadangan), `AI_SUBTITLES=0` (matikan walau key ada), `AI_SUBTITLE_PART_LINES` / `AI_SUBTITLE_PART_CHARS` /
+`AI_SUBTITLE_TIMEOUT_MS` / `AI_SUBTITLE_RATE_LIMIT_PER_MIN`. Proxy keluar (mis. untuk Otakudesu): Node ≥ 22.21 mendukung
 `NODE_USE_ENV_PROXY=1` + `HTTPS_PROXY=http://user:pass@host:port`. Lokal: `node --env-file=.env server/index.js`.
 
 ### Menambah / mengganti sumber
@@ -454,10 +500,12 @@ Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RAT
 
 ### Tes
 ```bash
-npm test                          # 145 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
+npm test                          # 167 unit test: robots, cache, throttle, circuit, fetcher (server HTTP lokal, challenge
                                   # acak, stream biner), parser animexin/samehadaku/anichin/hianime/otakudesu (fixture asli;
                                   # Otakudesu anime/episode = rekonstruksi struktur), ReAnime & AniZone (JSON/HTML asli),
-                                  # proxy HLS (playlist asli, Range, tanda tangan), ASS/SRT → VTT, jadwal, metadata, routes
+                                  # proxy HLS (playlist asli, Range, tanda tangan), ASS/SRT → VTT, jadwal, metadata, routes,
+                                  # subtitle AI (Gemini tiruan: format respons & error resmi, kuota, fallback model, /subai,
+                                  # pengendali track di frontend dengan TextTrack/VTTCue tiruan)
 npm run check:sources -- --live   # uji langsung ke situs sumber (±5 request per sumber)
 ```
 
@@ -482,7 +530,7 @@ dan `.gitignore` sudah disiapkan:
 | Bagian | Cara Vercel menjalankannya |
 |---|---|
 | `index.html`, `watch.html`, `search.html`, `css/`, `js/` | file statis di CDN |
-| `/api/*` | `rewrites` → `api/index.js` (Express; `req.url` tetap path asli) — `maxDuration` 30 dtk |
+| `/api/*` | `rewrites` → `api/index.js` (Express; `req.url` tetap path asli) — `maxDuration` 60 dtk (satu bagian terjemahan subtitle AI bisa butuh puluhan detik; endpoint lain tetap selesai secepatnya) |
 | `npm install` | otomatis dari `package.json` (dependensi: `express`, `cheerio`) |
 | Node.js | `engines.node` `>=20.18.1` → Vercel memakai versi Node yang didukung |
 | `/server/*`, `/package*.json` | di-redirect ke `/` (kode backend tidak ikut disajikan sebagai file) |
@@ -514,7 +562,7 @@ vercel.com → login dengan GitHub → **Add New… → Project** → pilih repo
 | Build Command | kosongkan |
 | Output Directory | kosongkan |
 | Install Command | biarkan default (`npm install`) |
-| Environment Variables | opsional — minimal disarankan `BOT_CONTACT` (email/URL kontakmu) |
+| Environment Variables | opsional — disarankan `BOT_CONTACT` (email/URL kontakmu), `STREAM_SECRET` (≥ 16 karakter acak), dan `GEMINI_API_KEY` bila ingin Subtitle Indonesia (AI) |
 
 Klik **Deploy** → situs aktif di `https://<nama-project>.vercel.app`. Cek: buka
 `https://<nama-project>.vercel.app/api/health` → harus `{"ok":true,...}`.
@@ -676,6 +724,14 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - Donghua: + **Anichin** (Sub Indo, jadwal berjam). Anime Sub Indo: + **Otakudesu** (diblokir Cloudflare dari IP
   pusat data) & **hianime.ro** (Sub English).
 - `npm test` diperbaiki untuk Node 22 (`node --test server/test/*.test.js`; dulu argumen folder hanya jalan di Node 20).
+
+### Perubahan perilaku (Tahap F — Subtitle Indonesia AI, 22 Okt 2026)
+- Server AniZone "Multi Sub": bila episode **tidak** punya subtitle Indonesia, subtitle Inggris diterjemahkan Gemini saat
+  video mulai diputar; track **"Indonesia (AI)"** tampil otomatis dan subtitle bawaan disembunyikan (tetap bisa dipilih
+  di menu subtitle player). Episode yang sudah punya subtitle Indonesia tidak berubah. Server iframe tidak terpengaruh.
+- Status player menampilkan keadaan terjemahan ("menerjemahkan 1/2", "Indonesia (AI)", "siap di menu subtitle");
+  toast saat aktif / gagal (mis. kuota harian habis → subtitle asli tetap dipakai).
+- `vercel.json`: `maxDuration` 30 → 60 dtk. Endpoint baru `GET /api/stream/subai`; `/api/stream/servers` membawa `ai`.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
