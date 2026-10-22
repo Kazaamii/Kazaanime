@@ -1,6 +1,8 @@
 /**
  * Kazanime backend — sources/kuramanime.js
  * Adapter Kuramanime (https://v20.kuramanime.ing — domain sering berganti, atur lewat KURAMANIME_BASE_URL).
+ * Server streaming berlabel Indonesia diklasifikasikan Hardsub; label Hardsub/Softsub pada unduhan
+ * tetap dibaca per grup, karena sumber dapat menawarkan kedua format unduhan.
  *
  * STATUS 2026-10-21, dicek ulang 2026-10-22: TIDAK BISA DIVERIFIKASI LANGSUNG.
  *   Semua URL (termasuk /robots.txt, beranda, pencarian) membalas Cloudflare 403
@@ -226,12 +228,12 @@ export function parseEpisodePage($, base) {
     const servers = [];
     $('#player iframe, .player iframe, #animeVideoPlayer iframe').each((_, f) => {
         const url = absoluteUrl($(f).attr('src') || $(f).attr('data-src'), base);
-        if (url) servers.push({ name: 'Kuramanime', url, lang: 'id' });
+        if (url) servers.push({ name: 'Kuramanime', url, lang: 'id', subtitleType: 'hard' });
     });
     $('#player source, video#player source').each((_, s) => {
         const url = absoluteUrl($(s).attr('src'), base);
         const size = $(s).attr('size');
-        if (url && !/\.m3u8(\?|$)/i.test(url)) servers.push({ name: `Kuramadrive${size ? ` ${size}p` : ''}`, url, lang: 'id' });
+        if (url && !/\.m3u8(\?|$)/i.test(url)) servers.push({ name: `Kuramadrive${size ? ` ${size}p` : ''}`, url, lang: 'id', subtitleType: 'hard' });
     });
     return {
         title: cleanText($('#episodeTitle').first().text()) || cleanText($('h1').first().text()),

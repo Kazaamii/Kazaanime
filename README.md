@@ -116,10 +116,10 @@ kazanime/
     ├── sources/
     │   ├── index.js           registry + aggregator + fallback (menambah sumber = 1 file + 1 baris)
     │   ├── animexin.js        adapter AnimeXin — donghua (diverifikasi live) + jadwal rilis
-    │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Sub Indo (diverifikasi live) + jadwal rilis
+    │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Hardsub Indonesia (diverifikasi live) + jadwal rilis
     │   ├── anichin.js         🅔 adapter Anichin — donghua Sub Indo (tema AnimeStream, parser bersama AnimeXin) + jadwal berjam
-    │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Sub Indo (diblokir Cloudflare untuk IP pusat data, lihat batasan)
-    │   ├── kuramanime.js      adapter Kuramanime opt-in; nonaktif default, robots wajib eksplisit, token player tidak di-bypass
+    │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Hardsub Indonesia (diblokir Cloudflare untuk IP pusat data, lihat batasan)
+    │   ├── kuramanime.js      adapter Kuramanime (Hardsub Indonesia) opt-in; nonaktif default, robots wajib eksplisit, token player tidak di-bypass
     │   ├── hianime.js         🅔 adapter hianime.ro — anime Jepang, subtitle Inggris (REST otakuthemes)
     │   └── metadata.js        fallback API publik Kitsu → AniList (Jikan dihapus) + poster Kitsu → Bangumi → MangaBaka
     ├── providers/             🅔 penyedia server berbasis id/judul (bukan katalog)
@@ -271,7 +271,7 @@ Urutan sejak 22 Okt 2026 (bagian 3) — `servers()` di `js/watch.js`, slot cadan
 
 | Urutan | Sumber | Isi | Subtitle |
 |---|---|---|---|
-| 1 | **Samehadaku** · **Otakudesu** (backend) | anime Jepang — server per episode + link download | Indonesia |
+| 1 | **Samehadaku** · **Otakudesu** (backend) | anime Jepang — server per episode + link download | Hardsub Indonesia |
 | 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Indonesia (AnimeXin juga Inggris; label Hardsub/Softsub AnimeXin ditampilkan bila dicantumkan sumber) |
 | 2 | **MegaPlay** `megaplay.buzz` (cadangan #1, via id AniList) | hampir semua anime Jepang | Inggris |
 | 3 | **ReAnime** (cadangan #2 — **menggantikan MegaPlay-MAL**) | embed `flixcloud.cc` dari API publik `reanime.to/api/flix/<id AniList>/<ep>`; mirror HD-2 → HD-1 dicoba otomatis | Inggris |
@@ -472,13 +472,13 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Sumber | Status | Catatan |
 |---|---|---|
 | **AnimeXin** | ✅ aktif, diverifikasi live | robots.txt mengizinkan semua; tidak ada ToS (DMCA & Privacy Policy tanpa larangan bot). Latest = beranda + `/anime/?order=update` (2 request, slug asli digabung lewat ID seri). 16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, Mega, …) + link download Sub Indo/English |
-| **Samehadaku** | 🟡 adapter & fixture teruji; baseline terbaru homepage di-challenge | robots.txt hanya melarang `/wp-admin/`; ToS tidak tertaut → `unknown` (konten hanya diakses bila robots.txt terbaca & mengizinkan). Adapter menyediakan anime terbaru, pencarian, detail, server Sub Indo, unduhan, dan jadwal; bila challenge, cooldown 30 mnt dan fallback dipakai |
+| **Samehadaku** | 🟡 adapter & fixture teruji; baseline terbaru homepage di-challenge | robots.txt hanya melarang `/wp-admin/`; ToS tidak tertaut → `unknown` (konten hanya diakses bila robots.txt terbaca & mengizinkan). Adapter menyediakan anime terbaru, pencarian, detail, server Hardsub Indonesia, unduhan, dan jadwal; bila challenge, cooldown 30 mnt dan fallback dipakai |
 | **Anichin** | 🟡 aktif, parser diverifikasi dgn HTML asli | (22 Okt 2026) robots.txt mengizinkan (kecuali /wp-admin/); tema AnimeStream (parser AnimeXin). Dari IP pusat data: request kadang lolos, kadang challenge Cloudflare (beranda & halaman episode paling sering) |
 | **hianime.ro** | ✅ aktif, diverifikasi live | (22 Okt 2026) robots.txt hanya melarang /wp-admin/; tanpa Cloudflare challenge. Recently Updated, pencarian, detail, daftar episode & server lewat REST `wp-json/v1/otakuthemes` — server "Fast" & "mega" (Sub English) |
-| **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Sumber ditandai *blocked*, tanpa data palsu; gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
+| **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Adapter mengklasifikasikan server Sub Indo sebagai Hardsub sesuai konfirmasi pemilik proyek; sumber tetap ditandai *blocked*, tanpa data palsu. Gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
 | **ReAnime** (penyedia stream) | 🟡 parser diverifikasi dgn JSON asli | (22 Okt 2026) robots.txt mengizinkan semua; `/api/flix/<id AniList>/<ep>` publik. Dari IP pusat data sering di-challenge Cloudflare |
 | **AniZone** (penyedia stream) | 🟡 parser & proxy diverifikasi dgn data asli | (22 Okt 2026) robots.txt mengizinkan semua. Halaman episode → HLS + 17 subtitle (termasuk Indonesia). CDN video 200/206 tanpa Referer; halaman & berkas subtitle sering di-challenge dari IP pusat data |
-| **Kuramanime** | ⚪ opt-in, nonaktif default | Baseline sebelumnya: Cloudflare 403 termasuk `robots.txt`; adapter tersedia terpisah dengan `requireExplicitRobots`, tetapi hanya aktif bila ditambahkan ke `SCRAPER_SOURCES`. Token player tidak dipecahkan; aktifkan hanya bila akses/robots mengizinkan |
+| **Kuramanime** | ⚪ opt-in, nonaktif default | Stream player diklasifikasikan Hardsub Indonesia; grup unduhan tetap membedakan Hardsub/Softsub. Baseline sebelumnya: Cloudflare 403 termasuk `robots.txt`; adapter hanya aktif bila ditambahkan ke `SCRAPER_SOURCES` dan robots mengizinkan. Token player tidak dipecahkan |
 | Bangumi · MangaBaka | ✅ poster pengganti | `api.bgm.tv` (robots hanya melarang /pic/ /img/ /js/) & `api.mangabaka.org/v1` (robots mengizinkan /v1/) |
 | Kitsu | ✅ fallback utama | bisa dijangkau server; mapping id MAL/AniList; poster pengganti |
 | AniList | ⚠️ fallback berikutnya | dari sandbox: AniList 403 "temporarily disabled" (juga dengan Referer) — di Vercel bisa berbeda; circuit breaker membuatnya cepat dilewati |

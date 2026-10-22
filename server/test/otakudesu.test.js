@@ -52,7 +52,7 @@ test('otakudesu: halaman anime (rekonstruksi struktur) → info + HANYA blok "Ep
 test('otakudesu: halaman episode (rekonstruksi) → server bawaan Sub Indo + download tanpa link donasi', () => {
     const r = parseEpisodePage(fixture$('otakudesu-episode.html'), BASE);
     assert.equal(r.title, 'Kusuriya no Hitorigoto Season 3 Episode 3');
-    assert.deepEqual(r.servers, [{ name: 'desustream', url: 'https://desustream.info/dstream/ondesu3/v5/index.php?id=Q09OVE9I', lang: 'id' }]);
+    assert.deepEqual(r.servers, [{ name: 'desustream', url: 'https://desustream.info/dstream/ondesu3/v5/index.php?id=Q09OVE9I', lang: 'id', subtitleType: 'hard' }]);
     assert.equal(r.downloads.length, 3);
     assert.deepEqual(r.downloads.map((d) => `${d.format} ${d.quality} ${d.size}`), ['MP4 360p 45.1 MB', 'MP4 720p 97.4 MB', 'MKV 1080p 210 MB']);
     assert.ok(r.downloads[1].links.every((l) => !l.url.includes('trakteer')), 'link donasi dibuang');
@@ -81,6 +81,7 @@ test('otakudesu adapter: alur lengkap + error jelas saat Cloudflare memblokir', 
     const anime = await o.getAnime({ slug: 'kusuriya-hitorigoto-s3-sub-indo' });
     const ep = await o.getEpisode({ slug: anime.slug }, 3, { anime });
     assert.equal(ep.servers[0].lang, 'id');
+    assert.equal(ep.servers[0].subtitleType, 'hard');
     assert.equal(ep.downloads.length, 3);
     await assert.rejects(o.schedule(), (e) => e.kind === 'blocked');
     assert.deepEqual(o.parseRef(['kusuriya-hitorigoto-s3-sub-indo']), { slug: 'kusuriya-hitorigoto-s3-sub-indo' });

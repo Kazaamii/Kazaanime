@@ -1,6 +1,6 @@
 /**
  * Kazanime backend — sources/otakudesu.js
- * Adapter Otakudesu (https://otakudesu.blog — domain resmi Okt 2026) — anime Jepang, Sub Indo.
+ * Adapter Otakudesu (https://otakudesu.blog — domain resmi Okt 2026) — anime Jepang, Hardsub Indonesia.
  * Ditambahkan 22 Okt 2026 atas permintaan pemilik proyek.
  *
  * STATUS AKSES (diukur 22 Okt 2026 dari runner GitHub Actions, IP pusat data):
@@ -185,7 +185,7 @@ export function parseEpisodePage($, base) {
     if (def) {
         let host = '';
         try { host = new URL(def).hostname.replace(/^www\./, ''); } catch { /* biarkan kosong */ }
-        servers.push({ name: host.split('.')[0] || 'Otakudesu', url: def, lang: 'id' });
+        servers.push({ name: host.split('.')[0] || 'Otakudesu', url: def, lang: 'id', subtitleType: 'hard' });
     }
     const downloads = [];
     $('.download ul li').each((_, el) => {
