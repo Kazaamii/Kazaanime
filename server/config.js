@@ -151,6 +151,42 @@ export const STREAMS = Object.freeze({
     subtitleAttempts: 3,
 });
 
+/**
+ * Subtitle Indonesia (AI) — ditambahkan 22 Okt 2026 atas permintaan pemilik proyek.
+ * Bila episode di player bawaan (server HLS AniZone "Multi Sub") TIDAK punya subtitle Indonesia, subtitle
+ * Inggris diterjemahkan Gemini per bagian lewat GET /api/stream/subai (lihat lib/subtitle-ai.js).
+ *  - API key HANYA dari env GEMINI_API_KEY di server: tidak pernah dikirim ke frontend, tidak ditulis di repo.
+ *    Tanpa key → fitur mati (backend tidak menawarkan `ai`, tidak ada tombol palsu).
+ *  - Hasil di-cache CDN Vercel + browser (tanpa layanan penyimpanan baru — pilihan pemilik proyek).
+ *  - Model: Flash (utama) → Flash-Lite (cadangan bila kuota/overload/model tidak ada). Nama model dicek di
+ *    https://ai.google.dev/gemini-api/docs/models (22 Okt 2026: gemini-3.6-flash & gemini-3.5-flash-lite
+ *    stabil + punya tier gratis; gemini-3.6-flash mendukung thinking "minimal" → paling cepat untuk terjemahan).
+ */
+const GEMINI_KEY = String(env.GEMINI_API_KEY || '').trim();
+const MODEL_RE = /^[a-z0-9][a-z0-9.-]{1,60}$/i;
+const GEMINI_MODELS = [
+    env.GEMINI_MODEL || 'gemini-3.6-flash',
+    ...(String(env.GEMINI_FALLBACK_MODEL || '').trim().toLowerCase() === 'none' ? [] : list('GEMINI_FALLBACK_MODEL', ['gemini-3.5-flash-lite'])),
+].map((m) => String(m).trim()).filter((m, i, all) => MODEL_RE.test(m) && all.indexOf(m) === i);
+export const AI_SUBS = Object.freeze({
+    enabled: Boolean(GEMINI_KEY) && GEMINI_MODELS.length > 0 && bool('AI_SUBTITLES', true),
+    apiKey: GEMINI_KEY,
+    models: Object.freeze(GEMINI_MODELS),
+    /** Bisa diarahkan ke server tiruan untuk uji lokal. */
+    apiBase: (env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/+$/, ''),
+    label: 'Indonesia (AI)',
+    /** Satu bagian = maks. sekian baris unik / karakter → 1 request Gemini (±2 bagian per episode TV 24 menit). */
+    partLines: int('AI_SUBTITLE_PART_LINES', 220, { min: 30, max: 400 }),
+    partChars: int('AI_SUBTITLE_PART_CHARS', 9000, { min: 1500, max: 20000 }),
+    /** Batas satu panggilan Gemini (ms); total satu request /subai dibatasi requestBudgetMs (< maxDuration Vercel 60 dtk). */
+    timeoutMs: int('AI_SUBTITLE_TIMEOUT_MS', 40000, { min: 8000, max: 52000 }),
+    requestBudgetMs: 55000,
+    /** Rate limit per IP per menit untuk /api/stream/subai (yang lolos dari cache CDN). 0 = nonaktif. */
+    rateLimitPerMinute: int('AI_SUBTITLE_RATE_LIMIT_PER_MIN', 20, { min: 0, max: 1000 }),
+    /** Naikkan bila prompt / cara pembagian berubah → URL baru (cache lama di CDN/browser tidak tercampur). */
+    version: 1,
+});
+
 export const METADATA = Object.freeze({
     /** Fallback ke API metadata publik bila semua scraper gagal. */
     enabled: bool('METADATA_FALLBACK', true),

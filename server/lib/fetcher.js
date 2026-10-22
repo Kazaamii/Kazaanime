@@ -166,10 +166,12 @@ export function createClient(net, opts) {
 
     /**
      * @param {string} url
-     * @param {{signal?: AbortSignal, deadline?: number, accept?: string, method?: string, body?: string, headers?: Record<string,string>}} [o]
+     * @param {{signal?: AbortSignal, deadline?: number, accept?: string, method?: string, body?: string, headers?: Record<string,string>, passErrors?: boolean}} [o]
+     *   passErrors: kembalikan respons HTTP ≥ 400 apa adanya (tanpa retry/circuit per status) — untuk klien API
+     *   resmi yang membaca body error-nya sendiri (mis. Gemini: kuota harian vs per menit, key ditolak).
      * @returns {Promise<{status: number, url: string, text: string, headers: Headers}>}
      */
-    async function request(url, { signal, deadline, accept = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5', method = 'GET', body, headers } = {}) {
+    async function request(url, { signal, deadline, accept = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5', method = 'GET', body, headers, passErrors = false } = {}) {
         let u;
         try {
             u = new URL(url);
@@ -250,6 +252,10 @@ export function createClient(net, opts) {
                 }
                 net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
                 throw new SourceError(`${source} memblokir akses bot (Cloudflare) — tidak dipaksa.`, { kind: 'blocked', source, httpStatus: res.status });
+            }
+            if (passErrors) {
+                net.circuit.success(source); // server menjawab (status apa pun) → pemanggil yang menafsirkan
+                return { status: res.status, url: res.url || u.href, text, headers: res.headers };
             }
             if (res.status === 404 || res.status === 410) {
                 net.circuit.success(source); // server sehat, halamannya saja yang tidak ada
