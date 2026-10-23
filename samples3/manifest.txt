@@ -1,0 +1,7 @@
+animeku-rest-root	200	197205	https://ww2.animeku.lol/wp-json/
+animeku-rest-genre	404	114	https://ww2.animeku.lol/wp-json/wp/v2/wai_genre?per_page=100&_fields=name,link,slug
+animeku-wp-sitemap	404	35773	https://ww2.animeku.lol/wp-sitemap.xml
+animeku-wp-sitemap-tx	404	35773	https://ww2.animeku.lol/wp-sitemap-taxonomies-wai_genre-1.xml
+animeku-genre-noc	200	43512	https://ww2.animeku.lol/genre/aksi/
+oploverz-search-douluo	200	65804	https://oploverz.ch/?s=douluo+dalu
+oploverz-search-perfect	200	71831	https://oploverz.ch/?s=perfect+world
