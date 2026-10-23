@@ -25,7 +25,7 @@ import { html, $, delegate } from './ui/dom.js';
 import { GENRES, SCHEDULE } from './config.js';
 import { genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
 import {
-    getHeroSlides, getHomeSection, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
+    getHeroSlides, getHomeSection, getGenreAnime, getWeeklySchedule, getSubIndoHomeSection, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
@@ -75,6 +75,54 @@ async function loadSection(kind) {
         });
     }
 }
+
+/* ------------------------------------------------------------------ */
+/* Anime Sub Indo — section mandiri; section homepage lain tidak diubah */
+/* ------------------------------------------------------------------ */
+const subIndoGrid = $('#subIndoGrid');
+const subIndoNote = $('#subIndoNote');
+let subIndoLoadToken = 0;
+
+async function loadSubIndoSection() {
+    const token = ++subIndoLoadToken;
+    showSkeleton(subIndoGrid);
+    subIndoNote.textContent = 'Memeriksa episode terbaru untuk subtitle Indonesia...';
+
+    try {
+        const res = await getSubIndoHomeSection();
+        if (token !== subIndoLoadToken) return;
+
+        if (res.items.length) {
+            renderCards(subIndoGrid, res.items, { isBookmarked, episodeOf: latestEpisodeOf });
+            subIndoNote.textContent = 'Hanya judul dengan server Sub Indo yang terdeteksi pada episode terbaru yang ditampilkan.';
+            return;
+        }
+
+        gridMessage(subIndoGrid, {
+            icon: 'captions',
+            title: res.unavailable ? 'Sumber Sub Indo belum dapat diperiksa' : 'Belum ada anime Sub Indo terverifikasi',
+            text: res.unavailable
+                ? 'Sumber sedang tidak merespons. Daftar lain di homepage tetap bisa digunakan.'
+                : 'Belum ada episode terbaru yang berhasil dikonfirmasi memiliki subtitle Indonesia. Coba lagi nanti.',
+            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
+        });
+        subIndoNote.textContent = 'Anime lain tidak disaring atau diubah oleh bagian ini.';
+    } catch (err) {
+        if (token !== subIndoLoadToken) return;
+        gridMessage(subIndoGrid, {
+            icon: 'captions',
+            title: 'Belum bisa memeriksa Sub Indo',
+            text: 'Katalog sumber sedang bermasalah. Bagian anime lainnya tetap berjalan seperti biasa.',
+            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
+        });
+        subIndoNote.textContent = '';
+    }
+}
+
+delegate(subIndoGrid, 'click', '[data-action="retry-subindo"]', () => {
+    retrySourcesNow();
+    loadSubIndoSection();
+});
 
 /* ------------------------------------------------------------------ */
 /* Genre — di bagian atas beranda (22 Okt 2026). Hasil tampil LANGSUNG  */
@@ -244,6 +292,7 @@ function whenVisible(el, callback) {
 /* Mulai                                                               */
 /* ------------------------------------------------------------------ */
 renderBookmarkSection();
+loadSubIndoSection();
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
