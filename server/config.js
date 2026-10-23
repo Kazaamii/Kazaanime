@@ -145,7 +145,7 @@ export const CACHE = Object.freeze({
 const animeOnsenClientId = String(env.ANIMEONSEN_CLIENT_ID || '').trim();
 const animeOnsenClientSecret = String(env.ANIMEONSEN_CLIENT_SECRET || '').trim();
 const animeOnsenMediaHosts = list('ANIMEONSEN_MEDIA_HOSTS', []).map((s) => s.toLowerCase().replace(/^\.+/, ''));
-const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime'];
+const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime', 'kuramanime'];
 // AnimeOnsen is opt-in: authorized runtime credentials + an operator-confirmed media allowlist.
 if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length) defaultSources.push('animeonsen');
 
@@ -173,7 +173,7 @@ export const SOURCES = Object.freeze({
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('OTAKUDESU_COOKIES', true),
     }),
     kuramanime: Object.freeze({
-        baseUrl: (env.KURAMANIME_BASE_URL || 'https://v20.kuramanime.ing').replace(/\/+$/, ''),
+        baseUrl: (env.KURAMANIME_BASE_URL || 'https://v9.kuramanime.work').replace(/\/+$/, ''),
         renderJavaScript: bool('KURAMANIME_RENDER_JAVASCRIPT', false),
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('KURAMANIME_COOKIES', true),
     }),
