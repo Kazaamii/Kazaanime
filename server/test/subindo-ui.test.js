@@ -13,26 +13,26 @@ const componentsCss = read('css/components.css');
 const configJs = read('js/config.js');
 const cardJs = read('js/ui/card.js');
 
-test('Sub Indo homepage exposes a live summary and a dynamic feed list', () => {
+test('Sub Indo homepage exposes a live summary without an intro paragraph', () => {
     assert.match(homeHtml, /id="subIndoStatus"[^>]*role="status"[^>]*aria-live="polite"/);
-    assert.match(homeHtml, /id="subIndoFeedList"/);
-    assert.match(homeHtml, /Feed mengikuti sumber Sub Indo yang aktif di backend/);
+    // 24 Okt 2026 (permintaan pengguna): paragraf pengantar + daftar feed dihapus.
+    assert.doesNotMatch(homeHtml, /class="subindo-intro"/, 'paragraf pengantar harus dihapus');
+    assert.doesNotMatch(homeHtml, /id="subIndoFeedList"/, 'ringkasan feed ikut dihapus');
     assert.doesNotMatch(
         homeHtml,
         /Feed: Samehadaku, Sakunime, Otakudesu, dan Kuramanime/,
         'the intro must not promise providers that may be disabled in the backend',
     );
-    // 24 Okt 2026: tidak ada lagi janji verifikasi per episode di pengantar.
     assert.doesNotMatch(homeHtml, /server atau track subtitle Indonesia ditemukan/);
     assert.doesNotMatch(homeHtml, /Diverifikasi dari episode terbaru/);
-    assert.match(homeHtml, /Tampilkan lebih banyak/);
+    assert.match(homeJs, /Tampilkan lebih banyak/, 'tombol buka panel tetap dibuat di JS');
     assert.match(homeHtml, /Lihat Semua/);
 });
 
 test('homepage merender panel per situs tanpa pemeriksaan episode', () => {
     assert.match(homeJs, /renderSubIndoSummary\(/);
     assert.match(homeJs, /\$\('#subIndoStatus'\)/);
-    assert.match(homeJs, /\$\('#subIndoFeedList'\)/);
+    assert.doesNotMatch(homeJs, /subIndoFeedList/, 'tidak ada lagi penulisan ringkasan feed');
     assert.match(homeJs, /getSubIndoHomeSources\(\{ refresh \}\)/);
     assert.match(homeJs, /getSubIndoHomeSources\(\{ sourceIds: \[id\], refresh: true \}\)/);
     assert.match(homeJs, /const SUB_INDO_HOME_LIMIT = SUB_INDO\.previewLimit/);

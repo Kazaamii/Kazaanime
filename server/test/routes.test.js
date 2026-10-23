@@ -29,8 +29,9 @@ function fakeRegistry() {
                 errors: [{ source: 'kuramanime', kind: 'blocked', message: 'diblokir' }],
             };
         },
-        async browse({ source, filter = '', genre = '', page = 1, q = '' }) {
+        async browse({ source, filter = '', genre = '', page = 1, q = '', year = '', season = '' }) {
             seen.push(`browse:${source}:${filter}:${genre}:${page}:${q}`);
+            seen.push(`browse-meta:${year || ''}:${season || ''}`);
             if (source === 'kusonime') throw badRequest('Sumber Kusonime downloads tidak menyediakan halaman daftar.');
             return {
                 source,
@@ -42,6 +43,26 @@ function fakeRegistry() {
                     genres: [{ id: 'action', label: 'Action' }],
                     filter: filter || 'update',
                     genre,
+                },
+                fallback: false,
+                stale: false,
+                errors: [],
+            };
+        },
+        async genres() {
+            seen.push('genres');
+            return {
+                source: 'animeku,oploverz',
+                data: {
+                    sources: [
+                        { id: 'animeku', name: 'AnimeKu', genres: [{ id: 'aksi', label: 'Aksi' }], seasons: [] },
+                        {
+                            id: 'oploverz',
+                            name: 'Oploverz',
+                            genres: [{ id: 'action', label: 'Action' }],
+                            seasons: [{ id: 'fall-2024', label: 'Fall 2024', season: 'fall', year: 2024 }],
+                        },
+                    ],
                 },
                 fallback: false,
                 stale: false,
@@ -143,6 +164,35 @@ test('GET /api/anime/browse: parameter tidak valid → 400, sumber tanpa daftar 
         assert.equal((await get(`${base}/api/anime/browse?source=oploverz&page=0`)).res.status, 400);
         assert.equal((await get(`${base}/api/anime/browse?source=oploverz&genre=Action%20Sub`)).res.status, 400);
         assert.equal((await get(`${base}/api/anime/browse?source=kusonime`)).res.status, 400);
+    });
+});
+
+test('GET /api/anime/browse: tahun & musim divalidasi lalu diteruskan ke registry', async () => {
+    await withApp({}, async (base, registry) => {
+        const ok = await get(`${base}/api/anime/browse?source=oploverz&genre=action&year=2024&season=FALL`);
+        assert.equal(ok.res.status, 200);
+        assert.ok(registry.seen.includes('browse-meta:2024:fall'), 'musim dinormalisasi ke huruf kecil');
+
+        // Tanpa musim: tahun tetap dikirim (adapter mengisi empat musim untuk tahun itu).
+        await get(`${base}/api/anime/browse?source=oploverz&year=2020`);
+        assert.ok(registry.seen.includes('browse-meta:2020:'));
+
+        for (const q of ['year=abcd', 'year=1800', 'season=autumn']) {
+            const bad = await get(`${base}/api/anime/browse?source=oploverz&${q}`);
+            assert.equal(bad.res.status, 400, `parameter ${q} harus ditolak`);
+        }
+    });
+});
+
+test('GET /api/anime/genres: genre + musim per sumber (24 Okt 2026)', async () => {
+    await withApp({}, async (base, registry) => {
+        const { res, json } = await get(`${base}/api/anime/genres`);
+        assert.equal(res.status, 200);
+        assert.equal(json.ok, true);
+        assert.deepEqual(json.data.sources.map((source) => source.id), ['animeku', 'oploverz']);
+        assert.equal(json.data.sources[0].genres[0].label, 'Aksi');
+        assert.equal(json.data.sources[1].seasons[0].id, 'fall-2024');
+        assert.ok(registry.seen.includes('genres'));
     });
 });
 

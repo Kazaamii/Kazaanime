@@ -139,14 +139,17 @@ function currentSeason(date = new Date()) {
  * Daftar umum: status/kategori/musim + urutan.
  * @param {{status?:'current'|'finished'|'upcoming', category?:string, season?:boolean, sort?:string, formats?:string[], limit?:number, page?:number, genreLabel?:string, signal?:AbortSignal}} [opts]
  */
-export function listAnime({ status, category, season = false, sort = 'popularity', formats = [], limit = UI.sectionSize, page = 1, genreLabel, signal } = {}) {
+export function listAnime({ status, category, season = false, seasonName = '', seasonYear, sort = 'popularity', formats = [], limit = UI.sectionSize, page = 1, genreLabel, signal } = {}) {
     if (page > 1) return Promise.resolve({ items: [], hasNext: false, total: null });
     const s = season ? currentSeason() : null;
+    // Filter musim/tahun eksplisit (permintaan 24 Okt 2026: sort by Tahun & Musim).
+    const bySeason = /^(winter|spring|summer|fall)$/.test(String(seasonName || '')) ? seasonName : null;
+    const byYear = Number.isInteger(seasonYear) && seasonYear >= 1950 ? seasonYear : null;
     return kitsu('/anime', {
         'filter[status]': status,
         'filter[categories]': category,
-        'filter[season]': s?.season,
-        'filter[seasonYear]': s?.year,
+        'filter[season]': bySeason || s?.season,
+        'filter[seasonYear]': byYear || s?.year,
         'filter[subtype]': subtypeParam(formats),
         sort: SORT[sort] || SORT.popularity,
         'page[limit]': Math.min(limit, MAX_LIMIT),

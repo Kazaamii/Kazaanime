@@ -245,7 +245,7 @@ export function getHomeLists() {
 /* ------------------------------------------------------------------ */
 /* Pencarian & daftar berhalaman                                       */
 /* ------------------------------------------------------------------ */
-const PAGE_QUERY = `query($page:Int,$perPage:Int,$search:String,$sort:[MediaSort],$formats:[MediaFormat],$genres:[String],$tags:[String],$status:MediaStatus,$country:CountryCode){Page(page:$page,perPage:$perPage){pageInfo{hasNextPage total}media(type:ANIME,isAdult:false,search:$search,sort:$sort,format_in:$formats,genre_in:$genres,tag_in:$tags,status:$status,countryOfOrigin:$country){...F}}}${FRAGMENT}`;
+const PAGE_QUERY = `query($page:Int,$perPage:Int,$search:String,$sort:[MediaSort],$formats:[MediaFormat],$genres:[String],$tags:[String],$status:MediaStatus,$country:CountryCode,$season:MediaSeason,$seasonYear:Int){Page(page:$page,perPage:$perPage){pageInfo{hasNextPage total}media(type:ANIME,isAdult:false,search:$search,sort:$sort,format_in:$formats,genre_in:$genres,tag_in:$tags,status:$status,countryOfOrigin:$country,season:$season,seasonYear:$seasonYear){...F}}}${FRAGMENT}`;
 
 /**
  * Cari / jelajahi anime (satu fungsi untuk search, genre, ongoing, donghua, dst).
@@ -254,11 +254,12 @@ const PAGE_QUERY = `query($page:Int,$perPage:Int,$search:String,$sort:[MediaSort
  *   sort?: 'relevance'|'score'|'popularity'|'newest'|'trending',
  *   formats?: string[], genre?: string, tag?: string,
  *   status?: 'RELEASING'|'FINISHED'|'NOT_YET_RELEASED', country?: string,
+ *   season?: 'WINTER'|'SPRING'|'SUMMER'|'FALL', seasonYear?: number,
  *   signal?: AbortSignal, timeout?: number,
  * }} [opts]
  * @returns {Promise<{items: Anime[], hasNext: boolean, total: number|null}>}
  */
-export function searchMedia({ q = '', page = 1, perPage = UI.searchPerPage, sort = 'relevance', formats = [], genre, tag, status, country, signal, timeout } = {}) {
+export function searchMedia({ q = '', page = 1, perPage = UI.searchPerPage, sort = 'relevance', formats = [], genre, tag, status, country, season, seasonYear, signal, timeout } = {}) {
     let primary = SORT[sort] || SORT.popularity;
     if (primary === 'SEARCH_MATCH' && !q) primary = SORT.popularity;
     const sortList = primary === 'SEARCH_MATCH' ? ['SEARCH_MATCH', 'POPULARITY_DESC'] : [primary];
@@ -272,6 +273,8 @@ export function searchMedia({ q = '', page = 1, perPage = UI.searchPerPage, sort
         tags: tag ? [tag] : undefined,
         status,
         country,
+        season,
+        seasonYear,
     };
     const clean = cleanVars(variables);
     return gql(PAGE_QUERY, clean, {

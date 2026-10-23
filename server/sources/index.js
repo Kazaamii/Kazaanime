@@ -113,6 +113,19 @@ export function mergeLists(groups, limit = 60, { perSource = false } = {}) {
  *   enrichConcurrency?: number,
  * }} deps
  */
+/**
+ * Opsi filter/genre/musim dari adapter (bentuk seragam untuk respons browse).
+ * @returns {{filters: object[], genres: object[], seasons: object[]}}
+ */
+function browseOptionsOf(adapter) {
+    const raw = typeof adapter.browseOptions === 'function' ? adapter.browseOptions() : {};
+    return {
+        filters: Array.isArray(raw.filters) ? raw.filters : [],
+        genres: Array.isArray(raw.genres) ? raw.genres : [],
+        seasons: Array.isArray(raw.seasons) ? raw.seasons : [],
+    };
+}
+
 export function createRegistry({
     adapters,
     downloaders = [],
@@ -376,7 +389,7 @@ export function createRegistry({
          * per episode (aturan bukti tetap berlaku di `latestSubIndo`).
          * @param {{source: string, filter?: string, genre?: string, page?: number}} opts
          */
-        async browse({ source, filter = '', genre = '', page = 1, q = '' } = {}, ctx = {}) {
+        async browse({ source, filter = '', genre = '', page = 1, q = '', year = '', season = '' } = {}, ctx = {}) {
             const adapter = byId.get(String(source || '').toLowerCase());
             if (!adapter) throw notFound(`Sumber "${source}" tidak dikenal atau sedang dimatikan.`);
             if (adapter.policy?.tos?.verdict === 'forbidden') throw notFound(`Sumber "${source}" tidak diizinkan.`);
@@ -389,15 +402,16 @@ export function createRegistry({
                 const searchKey = `browse-search:${adapter.id}:${query.toLowerCase()}`;
                 const found = await wrap(searchKey, ttl.searchTtlMs, () => adapter.search(query, ctx));
                 const items = (Array.isArray(found.value) ? found.value : []).slice(0, 60);
-                const options = typeof adapter.browseOptions === 'function' ? adapter.browseOptions() : { filters: [], genres: [] };
+                const options = browseOptionsOf(adapter);
                 return {
                     source: adapter.id,
                     data: {
                         items,
                         page: 1,
                         hasNext: false,
-                        filters: options.filters || [],
-                        genres: options.genres || [],
+                        filters: options.filters,
+                        genres: options.genres,
+                        seasons: options.seasons,
                         filter,
                         genre,
                         query,
@@ -414,15 +428,16 @@ export function createRegistry({
                 const feed = await wrap('donghua:titles', ttl.latestTtlMs, () => metadata.latestDonghua(ctx));
                 const titles = (feed.value?.items || []).map((item) => item.title).filter(Boolean).slice(0, 8);
                 const found = await wrap(`browse:donghua:${adapter.id}`, ttl.searchTtlMs, () => adapter.browseDonghua(titles, ctx));
-                const options = typeof adapter.browseOptions === 'function' ? adapter.browseOptions() : { filters: [], genres: [] };
+                const options = browseOptionsOf(adapter);
                 return {
                     source: adapter.id,
                     data: {
                         items: Array.isArray(found.value) ? found.value : [],
                         page: 1,
                         hasNext: false,
-                        filters: options.filters || [],
-                        genres: options.genres || [],
+                        filters: options.filters,
+                        genres: options.genres,
+                        seasons: options.seasons,
                         filter: 'donghua',
                         genre: '',
                         query: '',
@@ -436,8 +451,14 @@ export function createRegistry({
                 throw badRequest(`Sumber ${adapter.name} tidak menyediakan halaman daftar.`);
             }
             const safePage = Math.max(1, Math.min(500, Number.parseInt(page, 10) || 1));
-            const key = `browse:${adapter.id}:${filter}:${genre}:${safePage}`;
-            const r = await wrap(key, ttl.searchTtlMs, () => adapter.browse({ filter, genre, page: safePage }, ctx));
+            const safeYear = /^\d{4}$/.test(String(year || '')) ? String(year) : '';
+            const safeSeason = /^(winter|spring|summer|fall)$/.test(String(season || '').toLowerCase())
+                ? String(season).toLowerCase()
+                : '';
+            const key = `browse:${adapter.id}:${filter}:${genre}:${safeYear}:${safeSeason}:${safePage}`;
+            const r = await wrap(key, ttl.searchTtlMs, () => adapter.browse({
+                filter, genre, page: safePage, year: safeYear, season: safeSeason,
+            }, ctx));
             return {
                 source: adapter.id,
                 data: r.value,
@@ -445,6 +466,43 @@ export function createRegistry({
                 stale: r.cache === 'stale',
                 errors: r.error ? [describeError(r.error)] : [],
             };
+        },
+
+        /**
+         * Katalog genre & musim per sumber (24 Okt 2026) untuk panel "Jelajahi Genre" di beranda.
+         * Hanya sumber yang menyediakan `genres()`; kegagalan satu sumber tidak menggagalkan yang lain.
+         * @returns {Promise<{source: string, data: {sources: object[]}, fallback: boolean, stale: boolean, errors: object[]}>}
+         */
+        async genres(ctx = {}) {
+            const active = usable().filter((a) => a.supportsBrowse === true && typeof a.genres === 'function');
+            if (!active.length) throw new AppError('Tidak ada sumber yang menyediakan daftar genre.', { status: 503, code: 'NO_SOURCES' });
+            const settled = await Promise.allSettled(active.map((a) => wrap(
+                `genres:${a.id}`,
+                ttl.searchTtlMs,
+                () => a.genres(ctx),
+            )));
+            const sources = [];
+            const errors = [];
+            let stale = false;
+            settled.forEach((result, i) => {
+                const adapter = active[i];
+                if (result.status === 'rejected') {
+                    if (isAbort(result.reason)) throw result.reason;
+                    errors.push(describeError(result.reason));
+                    return;
+                }
+                if (result.value.cache === 'stale') stale = true;
+                if (result.value.error) errors.push(describeError(result.value.error));
+                const value = result.value.value || {};
+                sources.push({
+                    id: adapter.id,
+                    name: adapter.name,
+                    genres: Array.isArray(value.genres) ? value.genres : [],
+                    seasons: Array.isArray(value.seasons) ? value.seasons : [],
+                });
+            });
+            if (!sources.length) throw combineErrors(errors, 'Daftar genre tidak tersedia: semua sumber sedang bermasalah.');
+            return { source: sources.map((item) => item.id).join(','), data: { sources }, fallback: false, stale, errors };
         },
 
         async search(q, ctx = {}) {

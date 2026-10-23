@@ -34,6 +34,7 @@ function stub(id, impl = {}, policy = {}) {
         ...(impl.schedule ? { schedule: track('schedule', impl.schedule) } : {}),
         ...(impl.browse ? { browse: track('browse', impl.browse), supportsBrowse: true } : {}),
         ...(impl.browseDonghua ? { browseDonghua: track('browseDonghua', impl.browseDonghua) } : {}),
+        ...(impl.genres ? { genres: track('genres', impl.genres), supportsBrowse: true } : {}),
         calls,
     };
 }
@@ -436,4 +437,76 @@ test('search: judul sama dari sumber BERBEDA tetap dikirim (halaman nonton mengg
     assert.deepEqual(s.data.map((x) => x.slug), ['samehadaku~k3', 'otakudesu~k3']);
     const l = await reg.latest();
     assert.deepEqual(l.data.map((x) => x.slug), ['samehadaku~k3'], 'latest: kartu ganda lintas sumber dibuang');
+});
+
+test('browse: filter donghua memakai metadata + browseDonghua adapter (24 Okt 2026)', async () => {
+    const seen = [];
+    const A = stub('animeku', {
+        browse: async () => { throw new Error('browse biasa tidak boleh dipakai untuk donghua'); },
+        browseDonghua: async (titles) => {
+            seen.push(...titles);
+            return [anime('animeku', 'douluo', 'Douluo Dalu')];
+        },
+    });
+    const registry = reg([A], metaStub({
+        latestDonghua: async () => ({
+            provider: 'kitsu',
+            items: [{ title: 'Douluo Dalu' }, { title: 'Perfect World' }].map((item, i) => makeAnime({ ...item, source: 'kitsu', ids: { kitsu: i + 1 } })),
+        }),
+    }));
+    const res = await registry.browse({ source: 'animeku', filter: 'donghua' });
+
+    assert.deepEqual(seen, ['Douluo Dalu', 'Perfect World'], 'judul donghua dari metadata diteruskan ke adapter');
+    assert.deepEqual(res.data.items.map((item) => item.slug), ['animeku~douluo']);
+    assert.equal(res.data.filter, 'donghua');
+    assert.equal(A.calls.includes('browse'), false, 'halaman filter situs tidak dipanggil');
+});
+
+test('browse: tahun & musim diteruskan ke adapter dan ikut kunci cache', async () => {
+    const calls = [];
+    const O = stub('oploverz', {
+        browse: async (opts) => {
+            calls.push(opts);
+            return { items: [], page: opts.page || 1, hasNext: false };
+        },
+    });
+    const registry = reg([O]);
+
+    await registry.browse({ source: 'oploverz', year: 2024, season: 'fall' });
+    await registry.browse({ source: 'oploverz', year: '2024', season: 'FALL' });
+    assert.deepEqual(calls[0], { filter: '', genre: '', page: 1, year: '2024', season: 'fall' });
+    assert.equal(calls.length, 1, 'normalisasi nilai + cache: permintaan identik tidak menembak ulang');
+
+    await registry.browse({ source: 'oploverz', year: 2024, season: 'winter' });
+    assert.equal(calls.length, 2, 'musim berbeda = kunci cache berbeda');
+
+    // Nilai tak sah diabaikan (validasi ketat ada di route), bukan diteruskan mentah.
+    await registry.browse({ source: 'oploverz', year: 'abcd', season: 'autumn' });
+    assert.deepEqual(calls[2], { filter: '', genre: '', page: 1, year: '', season: '' });
+});
+
+test('genres: genre & musim per sumber digabung; satu sumber gagal tidak menggagalkan lainnya', async () => {
+    const A = stub('animeku', {
+        genres: async () => ({ genres: [{ id: 'aksi', label: 'Aksi' }], seasons: [] }),
+    });
+    const O = stub('oploverz', {
+        genres: async () => ({
+            genres: [{ id: 'action', label: 'Action' }, { id: 'slice-of-life', label: 'Slice of Life' }],
+            seasons: [{ id: 'fall-2024', label: 'Fall 2024', season: 'fall', year: 2024 }],
+        }),
+    });
+    const B = stub('rusak', { genres: async () => { throw fail('blocked', 'rusak'); } });
+    const registry = reg([A, O, B]);
+    const res = await registry.genres();
+
+    assert.deepEqual(res.data.sources.map((source) => source.id), ['animeku', 'oploverz']);
+    assert.deepEqual(res.data.sources[1].genres.map((genre) => genre.id), ['action', 'slice-of-life']);
+    assert.deepEqual(res.data.sources[1].seasons.map((season) => season.id), ['fall-2024']);
+    assert.equal(res.errors.length, 1, 'sumber yang gagal dilaporkan, bukan disembunyikan');
+    assert.equal(res.stale, false);
+});
+
+test('genres: semua sumber gagal → error gabungan', async () => {
+    const registry = reg([stub('rusak', { genres: async () => { throw fail('blocked', 'rusak'); } })]);
+    await assert.rejects(() => registry.genres(), (err) => Boolean(err.message));
 });

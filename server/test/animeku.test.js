@@ -105,8 +105,36 @@ test('animeku: katalog memakai menu untuk menemukan path berurutan, bukan path h
     assert.deepEqual(page.filters.map((f) => f.id),
         ['baru', 'populer', 'favorit', 'selesai', 'ongoing', 'film', 'donghua'],
         'urutan bagian: Terbaru → New Anime Populer → Top Favorit → Complete (+ Ongoing/Movie/Donghua)');
-    assert.deepEqual(page.genres, [], 'AnimeKu tidak punya arsip genre');
+    // 24 Okt 2026: 23 genre slug terverifikasi (yang 404 / arsipnya kosong tidak dimasukkan).
+    assert.equal(page.genres.length, 23);
+    assert.ok(page.genres.some((genre) => genre.id === 'aksi' && genre.label === 'Aksi'));
+    assert.equal(page.genres.some((genre) => genre.id === 'sci-fi'), false, 'slug 404 tidak ditawarkan');
+    assert.deepEqual(page.seasons, [], 'AnimeKu tidak punya filter musim');
     assert.deepEqual(calls, [`${BASE}/`, `${BASE}/baru-utnwb9y/`]);
+});
+
+test('animeku: genre dibuka lewat slug arsip `/genre/<slug>/` (24 Okt 2026)', async () => {
+    const genreUrl = `${BASE}/genre/fantasi/`;
+    const genreUrlPage2 = `${BASE}/genre/fantasi/page/2/`;
+    const { createClient, calls } = fakeClientFactory({
+        [genreUrl]: fixture('animeku-baru.html'),
+        [genreUrlPage2]: fixture('animeku-baru.html'),
+    });
+    const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
+    const page = await adapter.browse({ genre: 'fantasi', page: 1 });
+
+    assert.deepEqual(calls, [genreUrl], 'slug langsung dipakai (situs mengalihkan ke arsip bertoken)');
+    assert.equal(page.genre, 'fantasi');
+    assert.equal(page.genres.length, 23);
+    assert.ok(page.items.length > 0, 'kartu arsip genre dipetakan seperti daftar biasa');
+    assert.equal(page.seasons.length, 0);
+
+    const page2 = await adapter.browse({ genre: 'fantasi', page: 2 });
+    assert.deepEqual(calls, [genreUrl, genreUrlPage2], 'halaman berikutnya memakai /page/N/');
+
+    // Genre yang tidak ada di katalog ditolak, bukan ditebak URL-nya.
+    await assert.rejects(() => adapter.browse({ genre: 'genre-karangan' }), /tidak tersedia/i);
+    await assert.rejects(() => adapter.browse({ genre: 'sci-fi' }), /tidak tersedia/i);
 });
 
 test('animeku: New Anime Populer = daftar Baru diurutkan skor tertinggi', async () => {

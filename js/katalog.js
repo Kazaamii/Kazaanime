@@ -21,7 +21,12 @@
  * Halaman ini TIDAK mengklaim Sub Indo per judul: itu hanya dinyatakan panel beranda
  * setelah halaman episode diperiksa. State URL:
  * katalog.html?source=animeku&genre=action&filter=baru
+ * katalog.html?source=oploverz&genre=slice-of-life&year=2024&season=fall
  * katalog.html?source=oploverz&q=one+piece
+ *
+ * Filter Tahun & Musim (24 Okt 2026, permintaan pengguna) dikirim ke backend; Oploverz
+ * memakainya (`season[]=fall-2024`), AnimeKu tidak punya musim sehingga kedua pilihan
+ * disembunyikan saat tab AnimeKu aktif — bukan pura-pura menyaring.
  */
 import { initLayout } from './ui/layout.js';
 import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
@@ -47,7 +52,7 @@ const SOURCES = Object.freeze([
     {
         id: 'animeku',
         label: 'AnimeKu',
-        hint: 'Cari di dalam katalog AnimeKu lewat kolom pencarian di atas. AnimeKu punya donghua Sub Indo — lihat bagian Donghua di bawah. Filter genre tidak stabil di situs ini; genre lengkap ada di tab Oploverz.',
+        hint: 'Cari di dalam katalog AnimeKu lewat kolom pencarian di atas. Genre diambil dari tautan arsip genre situs (`/genre/<slug>-<token>/`). AnimeKu punya donghua Sub Indo — lihat bagian Donghua di bawah.',
         sections: [
             { id: 'baru', label: 'Terbaru', hint: 'Rilis paling baru dari halaman Baru.' },
             { id: 'populer', label: 'New Anime Populer', hint: 'Halaman Baru diurutkan skor tertinggi — rilis baru yang paling populer.' },
@@ -62,14 +67,14 @@ const SOURCES = Object.freeze([
             {
                 id: 'donghua',
                 label: 'Donghua di AnimeKu',
-                hint: 'AnimeKu memang mengunggah donghua Sub Indo (mis. Douluo Dalu, Perfect World). Situs tidak punya kategori donghua — halaman /negara/china/ kosong dan seri donghua pun dilabeli "Japan" — jadi daftar ini disusun dari judul donghua tayang (metadata) yang dicari di AnimeKu. Donghua lama bisa belum tercakup.',
+                hint: 'AnimeKu mengunggah donghua Sub Indo (mis. Douluo Dalu, Perfect World). Situs tidak memberi kategori donghua yang bisa dipakai — arsip genre/negara memakai token acak dan seri donghua pun dilabeli "Japan" — jadi daftar ini disusun dari judul donghua tayang (metadata) yang dicari di AnimeKu. Donghua lama bisa belum tercakup.',
             },
         ],
     },
     {
         id: 'oploverz',
         label: 'Oploverz (Animeloverz)',
-        hint: 'Kolom pencarian di atas mencari langsung di Oploverz. Genre tersedia (80 genre dari form situs). Situs tidak punya kategori Donghua — donghua ada di tab Donghua.',
+        hint: 'Kolom pencarian di atas mencari langsung di Oploverz. Genre (80), tahun, dan musim tersedia dari form filter situs. Donghua ada di bagian tersendiri di bawah.',
         sections: [
             { id: 'update', label: 'Terbaru', hint: 'Update terakhir dari situs.' },
             { id: 'popular', label: 'Populer', hint: 'Urutan populer situs.' },
@@ -77,12 +82,17 @@ const SOURCES = Object.freeze([
             { id: 'ongoing', label: 'Ongoing', hint: 'Sedang berjalan.' },
             { id: 'completed', label: 'Completed', hint: 'Sudah tamat.' },
             { id: 'movie', label: 'Movie', hint: 'Hanya film.' },
+            {
+                id: 'donghua',
+                label: 'Donghua di Oploverz',
+                hint: 'Oploverz tidak punya kategori Donghua, jadi judul donghua tayang dicari di pencarian situs lalu hanya kartu yang judulnya cocok yang ditampilkan — sama seperti cara AnimeKu dibuat.',
+            },
         ],
     },
     {
         id: 'donghua',
         label: 'Donghua',
-        hint: 'Situs Oploverz tidak punya kategori Donghua (dicek 23 Okt 2026), jadi tab ini memakai feed Donghua Kazanime: AniList (negara CN) → backend AnimeXin/Anichin.',
+        hint: 'Feed donghua Kazanime: AniList (negara CN) → backend AnimeXin/Anichin. Donghua khusus per situs ada di tab AnimeKu dan Oploverz (bagian "Donghua di …").',
         sections: [
             {
                 id: 'donghua',
@@ -102,6 +112,8 @@ const searchInput = $('#katalogSearchInput');
 const searchClear = $('#katalogSearchClear');
 const genreWrap = $('#katalogGenreWrap');
 const genreSelect = $('#katalogGenre');
+const yearSelect = $('#katalogYear');
+const seasonSelect = $('#katalogSeason');
 const titleEl = $('#katalogTitle');
 const subtitleEl = $('#katalogSubtitle');
 
@@ -117,7 +129,18 @@ const readParams = () => {
     // `q` = pencarian di dalam sumber (min. 2 karakter, sama seperti validasi backend).
     const keyword = (q.get('q') || '').replace(/\s+/g, ' ').trim().slice(0, 100);
     const query = keyword.length >= 2 ? keyword : '';
-    return { source, genre: (q.get('genre') || '').toLowerCase(), filter, query };
+    const season = /^(winter|spring|summer|fall)$/.test(String(q.get('season') || '').toLowerCase())
+        ? String(q.get('season')).toLowerCase()
+        : '';
+    const year = /^\d{4}$/.test(String(q.get('year') || '')) ? String(q.get('year')) : '';
+    return {
+        source,
+        genre: (q.get('genre') || '').toLowerCase(),
+        filter,
+        query,
+        year: season ? year : '',
+        season: year ? season : '',
+    };
 };
 
 const initial = readParams();
@@ -128,7 +151,11 @@ const state = {
     filter: initial.filter,
     /** Kata kunci pencarian di dalam sumber (kosong = tampilan bagian biasa). */
     query: initial.query,
+    /** Filter tahun & musim (kosong = semua). Hanya Oploverz yang mendukungnya. */
+    year: initial.year,
+    season: initial.season,
     genres: [],
+    seasons: [],
     sections: [],
     loadToken: 0,
 };
@@ -157,6 +184,8 @@ function syncUrl() {
     if (state.query) q.set('q', state.query);
     else if (state.filter) q.set('filter', state.filter);
     if (state.genre) q.set('genre', state.genre);
+    if (state.year) q.set('year', state.year);
+    if (state.season) q.set('season', state.season);
     const next = `${window.location.pathname}?${q.toString()}`;
     if (next !== `${window.location.pathname}${window.location.search}`) {
         window.history.replaceState({ page: currentPage() }, '', next);
@@ -214,15 +243,34 @@ function renderTabs() {
 /** Pemilih genre: hanya sumber yang mengirim `genres` (Oploverz) yang menampilkannya. */
 function renderGenre() {
     if (!genreWrap || !genreSelect) return;
-    if (!state.genres.length || state.query) {
+    if ((!state.genres.length && !state.seasons.length) || state.query) {
         genreWrap.hidden = true;
         genreSelect.innerHTML = '';
+        if (yearSelect) yearSelect.hidden = true;
+        if (seasonSelect) seasonSelect.hidden = true;
         return;
     }
     genreWrap.hidden = false;
     genreSelect.innerHTML = String(html`
         <option value=""${state.genre ? '' : ' selected'}>Semua genre</option>
         ${state.genres.map((genre) => html`<option value="${genre.id}"${genre.id === state.genre ? ' selected' : ''}>${genre.label}</option>`)}`);
+    // Oploverz punya `season[]` (mis. fall-2026) → tahun dari daftar musim situs.
+    // AnimeKu tidak punya musim: kedua pilihan disembunyikan, bukan dibuat tidak berfungsi.
+    const years = [...new Set(state.seasons.map((item) => item.year).filter((year) => Number.isInteger(year)))]
+        .sort((a, b) => b - a);
+    const hasSeasons = years.length > 0;
+    if (yearSelect) {
+        yearSelect.hidden = !hasSeasons;
+        if (hasSeasons) {
+            yearSelect.innerHTML = String(html`
+                <option value=""${state.year ? '' : ' selected'}>Semua tahun</option>
+                ${years.map((year) => html`<option value="${year}"${String(year) === state.year ? ' selected' : ''}>${year}</option>`)}`);
+        }
+    }
+    if (seasonSelect) {
+        seasonSelect.hidden = !hasSeasons;
+        if (hasSeasons) seasonSelect.value = state.season;
+    }
 }
 
 /** Judul halaman; mode "Lihat Semua" menampilkan satu bagian + tautan kembali. */
@@ -388,6 +436,8 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
                 : await getSourceBrowse(state.source, {
                     filter: runtime.def.id,
                     genre: state.genre,
+                    year: state.year,
+                    season: state.season,
                     q: state.query,
                     page: runtime.page + 1,
                     // "Coba Lagi" melewati cache + circuit breaker frontend, sama seperti panel beranda.
@@ -399,9 +449,11 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
         runtime.hasNext = Boolean(res.hasNext);
         runtime.loaded = true;
         runtime.error = paged && !res.items.length && res.error ? friendlyError(res.error) : '';
-        if (!paged && res.genres.length && !state.genres.length) {
-            state.genres = res.genres;
-            renderGenre();
+        if (!paged && (res.genres.length || res.seasons.length)) {
+            const grew = (res.genres.length && !state.genres.length) || (res.seasons.length && !state.seasons.length);
+            if (res.genres.length) state.genres = res.genres;
+            if (res.seasons.length) state.seasons = res.seasons;
+            if (grew) renderGenre();
         }
         const seen = new Set(runtime.items.map(dedupeKey));
         for (const anime of res.items) {
@@ -461,7 +513,10 @@ function switchSource(id) {
     state.source = id;
     state.genre = '';
     state.filter = '';
+    state.year = '';
+    state.season = '';
     state.genres = [];
+    state.seasons = [];
     // Kata kunci dipertahankan: mengganti tab = mencari kata yang sama di sumber lain.
     state.loadToken += 1;
     renderTabs();
@@ -535,6 +590,24 @@ if (searchForm && searchInput) {
 if (genreSelect) {
     genreSelect.addEventListener('change', () => switchGenre(genreSelect.value));
 }
+
+/** Tahun/musim mengubah hasil: muat ulang semua bagian sumber yang sedang aktif. */
+function applySeasonFilters() {
+    state.loadToken += 1;
+    renderGenre();
+    syncUrl();
+    buildSections();
+}
+
+yearSelect?.addEventListener('change', () => {
+    state.year = yearSelect.value;
+    if (!state.year) state.season = '';
+    applySeasonFilters();
+});
+seasonSelect?.addEventListener('change', () => {
+    state.season = seasonSelect.value;
+    applySeasonFilters();
+});
 
 if (sectionsEl) {
     delegate(sectionsEl, 'click', '[data-expand]', (event, button) => {

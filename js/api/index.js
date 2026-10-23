@@ -212,13 +212,42 @@ export async function getUpcomingAnime({ page = 1, perPage = UI.sectionSize, sig
     return finishList(await firstAvailable(steps), { page });
 }
 
-export async function getGenreAnime(label, { page = 1, perPage = UI.sectionSize, sort = 'relevance', formats = [], source, signal } = {}) {
+export async function getGenreAnime(label, { page = 1, perPage = UI.sectionSize, sort = 'relevance', formats = [], source, signal, year = '', season = '' } = {}) {
     const g = findGenre(label);
     if (!g) return finishList({ items: [], errors: [new ApiError('Genre tidak dikenal.', { kind: 'empty' })] }, { page });
     const s = sort === 'relevance' ? 'popularity' : sort;
+    // Filter Tahun & Musim (24 Okt 2026). Nilai season: winter|spring|summer|fall.
+    const seasonName = /^(winter|spring|summer|fall)$/.test(String(season || '').toLowerCase()) ? String(season).toLowerCase() : '';
+    const seasonYear = /^\d{4}$/.test(String(year || '')) ? Number(year) : undefined;
     const steps = [
-        { source: 'anilist', run: () => anilist.searchMedia({ genre: g.anilistTag ? undefined : g.label, tag: g.anilistTag, sort: s, formats, page, perPage, signal }) },
-        { source: 'kitsu', run: () => kitsu.listAnime({ category: g.kitsu, sort: s, formats, page, limit: perPage, genreLabel: g.label, signal }) },
+        {
+            source: 'anilist',
+            run: () => anilist.searchMedia({
+                genre: g.anilistTag ? undefined : g.label,
+                tag: g.anilistTag,
+                sort: s,
+                formats,
+                page,
+                perPage,
+                signal,
+                season: seasonName ? seasonName.toUpperCase() : undefined,
+                seasonYear,
+            }),
+        },
+        {
+            source: 'kitsu',
+            run: () => kitsu.listAnime({
+                category: g.kitsu,
+                sort: s,
+                formats,
+                page,
+                limit: perPage,
+                genreLabel: g.label,
+                seasonName,
+                seasonYear,
+                signal,
+            }),
+        },
     ];
     return finishList(await firstAvailable(onlySource(steps, source)), { page });
 }
