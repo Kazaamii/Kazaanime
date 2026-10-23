@@ -31,6 +31,7 @@ import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
+import { createAnimeIndo } from './animeindo.js';
 import { createAnoboy } from './anoboy.js';
 import { createAnimeOnsen } from './animeonsen.js';
 import { createAnimexin } from './animexin.js';
