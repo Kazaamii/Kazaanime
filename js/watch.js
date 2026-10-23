@@ -39,7 +39,7 @@ import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } fr
 import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
     friendlyError, getAiSubtitlePart, getEpisodeExtras, getEpisodeSubtitles, getKusonimeDownloads, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
-    retrySourcesNow, withProviderServers,
+    retrySourcesNow, SUB_INDO_SOURCES, withProviderServers,
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { getWatchedEpisodes, markWatched } from './services/history.js';
@@ -151,19 +151,30 @@ function numbered(list) {
     }));
 }
 /**
- * Urutan putar (22 Okt 2026):
- *   scrape-first: semua server Multi Sub (scraper/AniZone) lebih dulu, lalu hasil scraping bahasa lain,
- *                 kemudian server cadangan satu bahasa dan server Sub Eng hasil scraping.
+ * Server dari AnimeKu/Oploverz = situs yang katalognya Sub Indo (24 Okt 2026).
+ * Server-server ini ditaruh paling depan supaya episode langsung diputar dengan Sub Indo
+ * yang sudah tersedia di kedua situs itu — bukan server Multi Sub/Sub Eng lebih dulu.
+ */
+const isSubIndoSource = (server) => SUB_INDO_SOURCES.includes(
+    String(server?.source || '').replace(/^backend:/, '').split('~')[0].toLowerCase(),
+);
+
+/**
+ * Urutan putar (24 Okt 2026):
+ *   scrape-first: server AnimeKu & Oploverz (Sub Indo) → server Multi Sub (scraper/AniZone)
+ *                 → hasil scraping bahasa lain → server cadangan → server Sub Eng.
  *   static-first: server cadangan dulu, lalu semua server hasil scraping
  */
 const servers = () => {
     const fallback = withProviderServers(staticServers(), providerResult);
     if (!scrapeFirst()) return numbered([...fallback, ...backendServers]);
-    const multi = [...backendServers.filter((s) => s.lang === 'multi'), ...fallback.filter((s) => s.lang === 'multi')];
-    const local = backendServers.filter((s) => s.lang !== 'en' && s.lang !== 'multi');
-    const otherFallback = fallback.filter((s) => s.lang !== 'multi');
-    const english = backendServers.filter((s) => s.lang === 'en');
-    return numbered([...multi, ...local, ...otherFallback, ...english]);
+    const subIndo = backendServers.filter(isSubIndoSource);
+    const rest = backendServers.filter((server) => !isSubIndoSource(server));
+    const multi = [...rest.filter((s) => s.lang === 'multi'), ...fallback.filter((s) => s.lang === 'multi')];
+    const local = rest.filter((s) => s.lang !== 'en' && s.lang !== 'multi');
+    const otherFallback = fallback.filter((s) => s.lang !== 'multi' && s.lang !== 'en');
+    const english = [...rest.filter((s) => s.lang === 'en'), ...fallback.filter((s) => s.lang === 'en')];
+    return numbered([...subIndo, ...multi, ...local, ...otherFallback, ...english]);
 };
 /** Semua judul yang diketahui (URL + detail) untuk mencari padanan di situs sumber. */
 const scrapeTitles = () => [ref.title, ref.alt, anime.title, anime.titleAlt];

@@ -217,10 +217,28 @@ export async function findBackendMatches(anime, { titles: extra, signal } = {}) 
         const hit = matchBackendItem(titles, list);
         if (hit) out.push({ slug: hit.slug, title: hit.title, source: site });
     }
-    return out;
+    // AnimeKu & Oploverz (Sub Indo) dicoba lebih dulu; sisanya tetap tersedia setelahnya.
+    return out.sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source));
 }
 
 const LANG_RANK = { multi: 0, id: 1, en: 2 };
+
+/**
+ * Dua situs yang katalognya memang Sub Indo (24 Okt 2026). Server dari situs ini
+ * diprioritaskan di halaman nonton — permintaan pengguna: "prioritaskan data anime
+ * streamingnya ke Sub Indo yang sudah tersedia di kedua web itu" dan "tambahkan server
+ * dari AnimeKu dan Oploverz untuk opsi stream".
+ */
+export const SUB_INDO_SOURCES = Object.freeze(['animeku', 'oploverz']);
+
+/** "backend:animeku" / "animeku~slug" → "animeku". */
+const siteOfSource = (value) => String(value || '').replace(/^backend:/, '').split('~')[0].toLowerCase();
+
+/** 0 untuk AnimeKu, 1 untuk Oploverz, 2 untuk sumber lain. */
+const subIndoRank = (source) => {
+    const index = SUB_INDO_SOURCES.indexOf(siteOfSource(source));
+    return index === -1 ? SUB_INDO_SOURCES.length : index;
+};
 
 /**
  * Server + link download dari backend scraper untuk satu episode.
@@ -263,30 +281,28 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
             }
         }
 
-        // Jika sumber asal sudah punya server yang dikenali sebagai Sub Indo, tidak perlu
-        // membanjiri sumber lain dengan pencarian tambahan.
+        // AnimeKu & Oploverz harus SELALU muncul sebagai opsi server (24 Okt 2026). Bila sumber
+        // asal sudah punya server Sub Indo, cukup tambahkan dua situs itu; bila belum, pakai
+        // semua padanan yang ditemukan.
         const hasIndonesianServer = (item) => (item?.servers || []).some((server) => server?.lang === 'id');
+        const needsAllSources = !own || !hasIndonesianServer(primary);
         let targets = [];
-        if (!own) {
+        try {
             const matches = await findBackendMatches(anime, { titles, signal });
-            if (!matches.length) {
+            const alternatives = matches.filter((match) => match.slug && match.slug !== own);
+            const picked = needsAllSources
+                ? alternatives
+                : alternatives.filter((match) => subIndoRank(match.source) < SUB_INDO_SOURCES.length);
+            targets = picked.map((match) => match.slug);
+            matchedTitle = picked[0]?.title || alternatives[0]?.title || '';
+            if (needsAllSources && !alternatives.length && !primary) {
                 return empty('Anime ini belum ditemukan di sumber streaming yang mengizinkan akses otomatis.');
             }
-            targets = matches.map((match) => match.slug);
-            matchedTitle = matches[0].title;
-        } else if (!hasIndonesianServer(primary)) {
-            // Slug sumber yang dibuka bisa berupa AnimeIndo atau sumber lain tanpa server Indo.
-            // Jangan mengulang slug sendiri; ambil padanan dari provider lain saja.
-            try {
-                const matches = await findBackendMatches(anime, { titles, signal });
-                const alternatives = matches.filter((match) => match.slug && match.slug !== own);
-                targets = alternatives.map((match) => match.slug);
-                matchedTitle = alternatives[0]?.title || '';
-            } catch (error) {
-                if (error?.kind === 'abort') throw error;
-                // Tetap pertahankan data sumber asal jika pencarian provider lain gagal.
-                targets = [];
-            }
+        } catch (error) {
+            if (error?.kind === 'abort') throw error;
+            // Pencarian padanan gagal: data sumber asal (bila ada) tetap dipakai.
+            if (!primary) throw error;
+            targets = [];
         }
 
         const settled = await Promise.allSettled(
@@ -321,12 +337,15 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
             throw errors.find((error) => !(error?.kind === 'http' && error.status === 404)) || errors[0];
         }
 
-        // Multi Sub lebih dulu; server bahasa tunggal (termasuk Sub Indo) tetap tersedia setelahnya.
+        // AnimeKu & Oploverz lebih dulu (permintaan pengguna), lalu Multi Sub, Sub Indo situs lain,
+        // dan terakhir Sub Eng.
         const seenUrl = new Set();
         const servers = ok.flatMap((item) => item.servers || [])
             .filter((server) => server.url && !seenUrl.has(server.url) && seenUrl.add(server.url))
             .map((server, index) => ({ server, index }))
-            .sort((a, b) => ((LANG_RANK[a.server.lang] ?? 3) - (LANG_RANK[b.server.lang] ?? 3)) || (a.index - b.index))
+            .sort((a, b) => (subIndoRank(a.server.source) - subIndoRank(b.server.source))
+                || ((LANG_RANK[a.server.lang] ?? 3) - (LANG_RANK[b.server.lang] ?? 3))
+                || (a.index - b.index))
             .map(({ server }) => server);
         const downloads = ok.flatMap((item) => item.downloads || [])
             .map((download, index) => ({ download, index }))

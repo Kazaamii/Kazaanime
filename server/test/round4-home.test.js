@@ -22,36 +22,34 @@ const homeCss = read('css/home.css');
 const componentsCss = read('css/components.css');
 const katalogJs = read('js/katalog.js');
 
-test('genre situs: tombol menu, bukan dinding chip di beranda', () => {
-    assert.match(homeHtml, /id="genreMenuBtn"[^>]*aria-expanded="false"[^>]*aria-controls="genreMenu"/);
-    assert.match(homeHtml, /id="genreMenu"[^>]*hidden/);
-    assert.match(homeHtml, /id="genreMenuBody"/);
-    assert.match(homeHtml, /id="genreMenuSearch"[^>]*type="search"|type="search"[^>]*id="genreMenuSearch"/);
-    assert.match(homeHtml, /id="genreMenuClose"/);
-    assert.match(homeHtml, /id="genreMenuCount"/);
-    // Chip AniList tetap langsung terlihat (18 tombol, bukan 70).
+test('genre situs: satu <select> ringkas, bukan dinding chip (24 Okt 2026)', () => {
+    // Ronde 6 mengganti tombol menu (yang masih membuat ±80 chip saat dibuka) dengan
+    // satu pilihan di kartu filter, seperti kontrol Tahun/Musim/Urutkan.
+    assert.match(homeHtml, /<label class="genre-filter genre-filter--site" for="genreSite">/);
+    assert.match(homeHtml, /<select id="genreSite"[^>]*aria-label="Genre dari AnimeKu atau Oploverz"/);
+    assert.doesNotMatch(homeHtml, /id="genreMenuBtn"/, 'tombol menu genre situs sudah tidak dipakai');
+    assert.doesNotMatch(homeHtml, /id="genreMenu"/);
+    // Chip AniList tetap langsung terlihat (bukan ±80 tombol genre situs).
     assert.match(homeHtml, /id="genreTags"[^>]*role="toolbar"/);
 
-    assert.match(homeJs, /genreMenuBody\.querySelector\('\[data-site-genres\]'\)\?\.remove\(\)/, 'pembersihan tetap memakai kunci data-site-genres');
-    assert.match(homeJs, /genreMenuBody\.insertAdjacentHTML\('beforeend', String\(html`<div class="genre-group-list" data-site-genres>/);
-    assert.match(homeJs, /function setGenreMenuOpen\(open\)/);
-    assert.match(homeJs, /genreMenu\.hidden = !open/);
-    assert.match(homeJs, /function filterGenreMenu\(term\)/);
-    assert.match(homeJs, /delegate\(genreMenuBody, 'click', '\.genre-tag'/);
-    assert.match(homeJs, /if \(event\.key !== 'Escape' \|\| !genreMenu \|\| genreMenu\.hidden\) return;/);
-    assert.doesNotMatch(homeJs, /genreBox\.insertAdjacentHTML\('beforeend', String\(html`<div class="genre-group-list" data-site-genres>/,
-        'chip situs tidak boleh lagi disisipkan ke #genreTags');
+    assert.match(homeJs, /const genreSite = \$\('#genreSite'\)/);
+    assert.match(homeJs, /function renderSiteGenreOptions\(\)/);
+    assert.match(homeJs, /<optgroup label="\$\{source\.name\}">/, 'genre dikelompokkan per situs di dalam select');
+    assert.match(homeJs, /value="\$\{source\.id\}:\$\{genre\.id\}"/, 'nilai pilihan = sumber:token');
+    assert.match(homeJs, /async function ensureSiteGenres\(\)/);
+    assert.match(homeJs, /const SITE_GENRE_CACHE_KEY = 'kz:site-genres'/);
+    // Daftar genre situs tidak diminta saat halaman dibuka (beranda ringan).
+    assert.doesNotMatch(homeJs, /^void loadSiteGenres\(\);$/m, 'tidak ada permintaan genre situs saat memuat beranda');
+    assert.match(homeJs, /genreSite\?\.addEventListener\('change', handleSiteGenreChange\)/);
 
-    assert.match(homeCss, /\.genre-menu-btn\{/);
-    assert.match(homeCss, /\.genre-menu-btn\[aria-expanded="true"\]/);
-    assert.match(homeCss, /\.genre-menu\[hidden\]\{display:none\}/);
-    assert.match(homeCss, /\.genre-menu-body\{[^}]*max-height/);
-    assert.match(homeCss, /\.genre-tag\[hidden\]\{display:none\}/);
-    assert.match(homeCss, /\.genre-menu-body \.genre-group\[hidden\]\{display:none\}/);
+    assert.match(homeCss, /\.genre-filter--site select\{/, 'select genre situs punya gaya sendiri');
+    assert.doesNotMatch(homeCss, /\.genre-menu-btn\{/, 'CSS menu lama dibuang');
 });
 
-test('genre situs: memilih genre menutup menu dan hasil memakai filter tahun/musim', () => {
-    assert.match(homeJs, /delegate\(genreMenuBody, 'click', '\.genre-tag', \(_e, tag\) => \{\s*setGenreMenuOpen\(false\);\s*handleGenreTag\(tag\);/s);
+test('genre situs: memilih genre menampilkan hasil dengan filter tahun/musim', () => {
+    assert.match(homeJs, /function handleSiteGenreChange\(\)/);
+    assert.match(homeJs, /const \[source, \.\.\.rest\] = value\.split\(':'\)/);
+    assert.match(homeJs, /selectSiteGenre\(source, id, label\)/);
     assert.match(homeJs, /katalogUrl\(\{\s*source, genre: id, year: genreState\.year, season: genreState\.season,\s*\}\)/s);
     assert.match(homeJs, /year: genreState\.year,\s*season: genreState\.season,/s, 'filter tahun & musim diteruskan ke browse');
 });
