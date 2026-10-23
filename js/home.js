@@ -30,6 +30,7 @@ import {
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
 import { evidenceSummary, isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
+import { panelSections } from './api/subindo.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -81,7 +82,9 @@ async function loadSection(kind) {
     }
 }
 
-const SUB_INDO_HOME_LIMIT = SUB_INDO.resultLimit;
+// Panel = cuplikan ringkas (6 kartu) seperti section lain; daftar lengkap ada di halaman Jelajah.
+const SUB_INDO_HOME_LIMIT = SUB_INDO.previewLimit;
+
 const subIndoStatus = $('#subIndoStatus');
 const subIndoFeedList = $('#subIndoFeedList');
 
@@ -190,7 +193,8 @@ function renderSubIndoSources(sources, result = {}) {
     subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
         const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
         const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
-        const status = sourceStatusLabel(source, items.length);
+        // Chip menghitung SEMUA judul terverifikasi (bukan hanya 6 yang tampil).
+        const status = sourceStatusLabel(source, Array.isArray(source.items) ? source.items.length : 0);
         // Tanpa judul, diagnosis tampil sekali di baris ringkas (renderSubIndoEmpty);
         // jangan ulangi kalimat yang sama di kepala panel.
         const warnings = [];
@@ -206,7 +210,7 @@ function renderSubIndoSources(sources, result = {}) {
                 <div class="subindo-source-header">
                     <h3 id="subindo-source-title-${index}">${source.name}</h3>
                     <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
-                    ${source.browse ? html`<a class="subindo-source-more" href="${katalogUrl({ source: source.id })}">Lihat semua</a>` : ''}
+                    ${source.browse ? html`<a class="see-all subindo-source-more" href="${katalogUrl({ source: source.id })}">Lihat Semua ${icon('chevron-right')}</a>` : ''}
                 </div>
                 ${meta ? html`<p class="subindo-source-meta">${meta}</p>` : ''}
                 ${warnings.length ? html`<p class="subindo-source-warning">${warnings.join(' ')}
@@ -236,9 +240,10 @@ async function loadSubIndoSection({ refresh = false } = {}) {
     try {
         const result = await getSubIndoHomeSources({ refresh });
         if (token !== subIndoLoadToken) return;
-        subIndoState = result;
-        renderSubIndoSources(result.sections, result);
-        updateSubIndoNote(result.sections);
+        const sections = panelSections(result.sections);
+        subIndoState = { ...result, sections };
+        renderSubIndoSources(sections, subIndoState);
+        updateSubIndoNote(sections);
     } catch (error) {
         if (token !== subIndoLoadToken || error?.kind === 'abort') return;
         subIndoState = null;
@@ -277,7 +282,7 @@ async function retrySubIndoSource(sourceId) {
     try {
         // refresh: katalog diambil ulang karena sumber yang gagal tidak punya item di cache lama.
         const result = await getSubIndoHomeSources({ sourceIds: [id], refresh: true });
-        const updated = result.sections.find((source) => source.id === id);
+        const updated = panelSections(result.sections).find((source) => source.id === id);
         if (!updated) {
             // Sumber tidak lagi ada di feed backend: kembalikan panel lama, jangan biarkan skeleton.
             if (subIndoState) renderSubIndoSources(subIndoState.sections, subIndoState);

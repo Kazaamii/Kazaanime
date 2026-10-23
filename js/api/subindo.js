@@ -32,6 +32,22 @@ const RESULT_LIMIT = SUB_INDO.resultLimit;
 const CONCURRENCY = SUB_INDO.concurrency;
 const LATEST_FEED_SOURCE_IDS = new Set(['animeku', 'oploverz', 'samehadaku', 'sakunime', 'otakudesu', 'kuramanime']);
 
+/**
+ * Panel yang boleh tampil di beranda (23 Okt 2026): AnimeKu & Oploverz saja.
+ * Backend sudah menentukan daftar panel lewat `SUB_INDO_LATEST_SOURCE_ORDER`; filter ini
+ * adalah jaring pengaman untuk respons lama yang masih tersimpan di cache CDN/browser
+ * (atau panel yang diminta manual) supaya Samehadaku/Sakunime/Otakudesu/Kuramanime
+ * tidak muncul lagi sebagai kotak error kosong.
+ */
+export const PANEL_SOURCE_IDS = Object.freeze(['animeku', 'oploverz']);
+const PANEL_SOURCE_SET = new Set(PANEL_SOURCE_IDS);
+
+/** Saring daftar section feed ke panel yang masih dipakai. */
+export function panelSections(sections) {
+    return (Array.isArray(sections) ? sections : [])
+        .filter((source) => PANEL_SOURCE_SET.has(String(source?.id || '').trim().toLowerCase()));
+}
+
 function limitOf(value, fallback, min = 1, max = 60) {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;

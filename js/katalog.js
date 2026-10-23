@@ -6,13 +6,16 @@
  *   Oploverz : Terbaru → Populer → Rating Tertinggi → Ongoing → Completed → Movie (+ genre)
  *   Donghua  : donghua baru upload (feed Donghua Kazanime; situs tidak punya kategori ini)
  *
- * Setiap bagian adalah baris kartu ringkas (6 judul) dengan tombol **Expand** untuk
- * menampilkan seluruh judul yang sudah dimuat dan **Muat Lagi** untuk halaman berikutnya.
+ * Setiap bagian adalah baris kartu ringkas (6 judul) dengan tautan **Lihat Semua** —
+ * sama seperti section beranda (Ongoing/Populer) — yang membuka daftar lengkap bagian itu
+ * di halaman yang sama (`?filter=<id>`, dengan **Muat Lagi** untuk halaman berikutnya).
+ * Tidak ada tombol Expand/Ringkas: satu bagian tidak mekar di dalam halaman.
  * Bagian dimuat saat mendekati layar (IntersectionObserver) supaya satu kunjungan tidak
  * menembak enam halaman situs sekaligus — fetcher tetap menghormati jeda 1 detik/host.
  *
  * Halaman ini TIDAK mengklaim Sub Indo per judul: itu hanya dinyatakan panel beranda
- * setelah halaman episode diperiksa. State URL: katalog.html?source=animeku&genre=action
+ * setelah halaman episode diperiksa. State URL:
+ * katalog.html?source=animeku&genre=action&filter=baru
  */
 import { initLayout } from './ui/layout.js';
 import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
@@ -21,12 +24,13 @@ import { browseAnime, friendlyError, getUpcomingAnime } from './api/index.js';
 import { getSourceBrowse } from './api/sources.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { html, $, delegate } from './ui/dom.js';
-import { currentPage } from './routes.js';
+import { icon } from './ui/icons.js';
+import { currentPage, katalogUrl } from './routes.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
 
-/** Judul yang tampil sebelum tombol Expand ditekan. */
+/** Kartu yang tampil per bagian; sisanya lewat tautan "Lihat Semua" (gaya beranda). */
 const PREVIEW = 6;
 
 /**
@@ -93,13 +97,18 @@ const sourceLabel = (id) => sourceDef(id).label;
 const readParams = () => {
     const q = new URLSearchParams(window.location.search);
     const source = SOURCES.some((item) => item.id === q.get('source')) ? q.get('source') : SOURCES[0].id;
-    return { source, genre: (q.get('genre') || '').toLowerCase() };
+    // `filter` = "Lihat Semua" untuk satu bagian; hanya bagian yang memang ada di sumber itu.
+    const known = new Set(sourceDef(source).sections.map((section) => section.id));
+    const filter = known.has(q.get('filter')) ? q.get('filter') : '';
+    return { source, genre: (q.get('genre') || '').toLowerCase(), filter };
 };
 
 const initial = readParams();
 const state = {
     source: initial.source,
     genre: initial.genre,
+    /** Bagian yang dibuka lewat "Lihat Semua" (kosong = semua bagian). */
+    filter: initial.filter,
     genres: [],
     sections: [],
     loadToken: 0,
@@ -114,7 +123,6 @@ function makeRuntime(def) {
         hasNext: false,
         loaded: false,
         loading: false,
-        expanded: false,
         error: '',
         token: 0,
     };
@@ -127,6 +135,7 @@ function syncUrl() {
     const q = new URLSearchParams();
     q.set('source', state.source);
     if (state.genre) q.set('genre', state.genre);
+    if (state.filter) q.set('filter', state.filter);
     const next = `${window.location.pathname}?${q.toString()}`;
     if (next !== `${window.location.pathname}${window.location.search}`) {
         window.history.replaceState({ page: currentPage() }, '', next);
@@ -181,13 +190,19 @@ function renderGenre() {
         ${state.genres.map((genre) => html`<option value="${genre.id}"${genre.id === state.genre ? ' selected' : ''}>${genre.label}</option>`)}`);
 }
 
+/** Judul halaman; mode "Lihat Semua" menampilkan satu bagian + tautan kembali. */
 function renderHeader() {
     const def = sourceDef(state.source);
-    if (titleEl) titleEl.textContent = `Jelajah ${def.label}`;
-    if (subtitleEl) {
-        subtitleEl.textContent = `Bagian tetap: ${def.sections.map((section) => section.label).join(' → ')}. `
-            + 'Kartu di sini tidak diklaim Sub Indo sampai episodenya diperiksa.';
+    const focus = state.filter ? def.sections.find((section) => section.id === state.filter) : null;
+    if (titleEl) titleEl.textContent = focus ? `${focus.label} — ${def.label}` : `Jelajah ${def.label}`;
+    if (!subtitleEl) return;
+    if (focus) {
+        subtitleEl.innerHTML = String(html`<a class="see-all katalog-back" href="${katalogUrl({ source: state.source, genre: state.genre })}">${icon('chevron-left')} Semua bagian</a>
+            <span>${focus.hint || 'Daftar lengkap bagian ini.'} Tidak ada klaim Sub Indo sampai episodenya diperiksa.</span>`);
+        return;
     }
+    subtitleEl.textContent = `Bagian tetap: ${def.sections.map((section) => section.label).join(' → ')}. `
+        + 'Kartu di sini tidak diklaim Sub Indo sampai episodenya diperiksa.';
 }
 
 /** Satu blok bagian (kepala + grid + tombol). */
@@ -202,7 +217,9 @@ function sectionHTML(runtime, index) {
                 </div>
                 <div class="katalog-block-actions">
                     <span class="katalog-block-count" data-count hidden></span>
-                    <button type="button" class="katalog-expand" data-expand aria-expanded="false" hidden>Expand</button>
+                    <a class="see-all" data-see-all href="${katalogUrl({ source: state.source, filter: def.id, genre: state.genre })}" hidden>
+                        Lihat Semua ${icon('chevron-right')}
+                    </a>
                 </div>
             </div>
             <div class="anime-grid katalog-block-grid" data-grid aria-busy="false"></div>
@@ -216,29 +233,31 @@ function sectionNode(runtime) {
     return sectionsEl?.querySelector(`[data-section="${runtime.def.id}"]`) || null;
 }
 
-/** Gambar ulang satu bagian sesuai status (ringkas/expanded/error/kosong). */
+/** Gambar ulang satu bagian sesuai status (cuplikan/daftar penuh/error/kosong). */
 function paintSection(runtime) {
     const node = sectionNode(runtime);
     if (!node) return;
     const grid = node.querySelector('[data-grid]');
-    const expandBtn = node.querySelector('[data-expand]');
+    const seeAll = node.querySelector('[data-see-all]');
     const countEl = node.querySelector('[data-count]');
     const foot = node.querySelector('[data-foot]');
     const moreBtn = node.querySelector('[data-more]');
 
-    const visible = runtime.expanded ? runtime.items : runtime.items.slice(0, PREVIEW);
-    const canExpand = runtime.items.length > PREVIEW || runtime.hasNext;
+    // "Lihat Semua" membuka halaman daftar penuh (state.filter), bukan mekar di tempat.
+    const focused = Boolean(state.filter);
+    const visible = focused ? runtime.items : runtime.items.slice(0, PREVIEW);
+    const hasMore = runtime.items.length > PREVIEW || runtime.hasNext;
 
     if (countEl) {
         countEl.hidden = !runtime.loaded;
         countEl.textContent = runtime.loaded ? `${runtime.items.length}${runtime.hasNext ? '+' : ''} judul` : '';
     }
-    if (expandBtn) {
-        expandBtn.hidden = !canExpand;
-        expandBtn.textContent = runtime.expanded ? 'Ringkas' : `Expand (${runtime.items.length}${runtime.hasNext ? '+' : ''})`;
-        expandBtn.setAttribute('aria-expanded', runtime.expanded ? 'true' : 'false');
+    if (seeAll) {
+        seeAll.hidden = focused || !runtime.loaded || !hasMore;
+        seeAll.setAttribute('aria-label', `Lihat semua ${runtime.def.label}`);
     }
-    if (foot) foot.hidden = !runtime.expanded || !runtime.hasNext;
+    // Muat Lagi hanya di daftar penuh; cuplikan beranda cukup 6 kartu.
+    if (foot) foot.hidden = !focused || !runtime.hasNext;
 
     if (!grid) return;
     if (runtime.loading && !runtime.items.length) {
@@ -282,7 +301,6 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
         runtime.hasNext = false;
         runtime.loaded = false;
         runtime.error = '';
-        runtime.expanded = false;
     }
     runtime.loading = true;
     const token = ++runtime.token;
@@ -351,7 +369,9 @@ const observer = typeof window !== 'undefined' && 'IntersectionObserver' in wind
 
 function buildSections() {
     if (!sectionsEl) return;
-    state.sections = sourceDef(state.source).sections.map(makeRuntime);
+    const defs = sourceDef(state.source).sections;
+    const focused = state.filter ? defs.filter((section) => section.id === state.filter) : defs;
+    state.sections = (focused.length ? focused : defs).map(makeRuntime);
     sectionsEl.innerHTML = String(html`${state.sections.map((runtime, index) => sectionHTML(runtime, index))}`);
     sectionsEl.setAttribute('aria-busy', 'false');
     state.sections.forEach((runtime) => {
@@ -365,6 +385,7 @@ function switchSource(id) {
     if (!id || id === state.source) return;
     state.source = id;
     state.genre = '';
+    state.filter = '';
     state.genres = [];
     state.loadToken += 1;
     renderTabs();
@@ -399,14 +420,6 @@ if (genreSelect) {
 }
 
 if (sectionsEl) {
-    delegate(sectionsEl, 'click', '[data-expand]', (event, button) => {
-        event.preventDefault();
-        const runtime = state.sections.find((item) => sectionNode(item)?.contains(button));
-        if (!runtime) return;
-        runtime.expanded = !runtime.expanded;
-        paintSection(runtime);
-        updateNote();
-    });
     delegate(sectionsEl, 'click', '[data-more]', (event, button) => {
         event.preventDefault();
         const runtime = state.sections.find((item) => sectionNode(item)?.contains(button));

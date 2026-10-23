@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getVerifiedSubIndoAnime, getVerifiedSubIndoSources, hasIndonesianSubtitle } from '../../js/api/subindo.js';
+import { getVerifiedSubIndoAnime, getVerifiedSubIndoSources, hasIndonesianSubtitle, panelSections } from '../../js/api/subindo.js';
 
 test('recognizes only explicit Indonesian server or subtitle-track metadata', () => {
     // `lang: 'id'` tanpa bukti halaman TIDAK lagi dihitung: itu asumsi "situsnya Indonesia".
@@ -459,4 +459,22 @@ test('checks each episode slug only once per source', async () => {
     assert.deepEqual(checked, ['samehadaku~judul-a#2', 'samehadaku~judul-b#3']);
     assert.equal(result.sections[0].items.length, 2);
     assert.equal(result.checked, 2);
+});
+
+test('panel beranda menyaring situs yang sudah dihapus (respons cache lama)', () => {
+    // Backend sudah hanya mengirim AnimeKu & Oploverz; filter ini menjaga cache CDN/browser
+    // lama yang masih memuat Samehadaku/Sakunime/Otakudesu/Kuramanime.
+    const sections = [
+        { id: 'samehadaku' },
+        { id: 'AnimeKu' },
+        { id: 'oploverz' },
+        { id: 'otakudesu' },
+        { id: 'kuramanime' },
+        { id: 'sakunime' },
+        {},
+        null,
+    ];
+    assert.deepEqual(panelSections(sections).map((source) => source.id), ['AnimeKu', 'oploverz']);
+    assert.deepEqual(panelSections([]), []);
+    assert.deepEqual(panelSections(null), []);
 });

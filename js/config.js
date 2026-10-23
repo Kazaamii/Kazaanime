@@ -212,8 +212,10 @@ export const SCHEDULE = Object.freeze({
  * tidak menahan panel situs lain.
  */
 export const SUB_INDO = Object.freeze({
-    /** Maks. kartu per panel sumber. 23 Okt 2026: 2 sumber saja → tampilkan lebih banyak. */
+    /** Maks. hasil terverifikasi yang disimpan per panel (dipakai status "N terverifikasi"). */
     resultLimit: 24,
+    /** Kartu yang benar-benar dirender per panel — ringkas seperti section lain, sisanya di "Lihat Semua". */
+    previewLimit: 6,
     /** Maks. total pemeriksaan episode per pemuatan homepage. */
     maxChecks: 24,
     /** Maks. kandidat per sumber per pemuatan (keadilan antar-situs). */

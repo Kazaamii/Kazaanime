@@ -28,13 +28,14 @@ test('homepage renders per-source counts, timeout state, and a per-source retry'
     assert.match(homeJs, /source\.timedOut/);
     assert.match(homeJs, /data-action="retry-subindo-source" data-source="\$\{source\.id\}"/);
     assert.match(homeJs, /getSubIndoHomeSources\(\{ sourceIds: \[id\], refresh: true \}\)/);
-    assert.match(homeJs, /const SUB_INDO_HOME_LIMIT = SUB_INDO\.resultLimit/);
+    assert.match(homeJs, /const SUB_INDO_HOME_LIMIT = SUB_INDO\.previewLimit/);
 });
 
 test('Sub Indo verification limits are centralised in config.js', () => {
     assert.match(configJs, /export const SUB_INDO = Object\.freeze\(\{/);
     for (const entry of [
         'resultLimit: 24',
+        'previewLimit: 6',
         'maxChecks: 24',
         'perSourceChecks: 12',
         'concurrency: 4',
@@ -46,10 +47,27 @@ test('Sub Indo verification limits are centralised in config.js', () => {
     }
 });
 
+test('panel beranda hanya AnimeKu & Oploverz, ringkas 6 kartu + tautan Lihat Semua', () => {
+    // Jaring pengaman untuk respons API lama (cache CDN/browser) yang masih memuat
+    // Samehadaku/Sakunime/Otakudesu/Kuramanime.
+    assert.match(homeJs, /import \{ panelSections \} from '\.\/api\/subindo\.js'/);
+    assert.match(homeJs, /const sections = panelSections\(result\.sections\);/);
+    assert.match(homeJs, /const sections = panelSections\(result\.sections\);/);
+    assert.match(homeJs, /panelSections\(result\.sections\)\.find/);
+    // Cuplikan ringkas: 6 kartu, bukan seluruh hasil verifikasi.
+    assert.match(homeJs, /source\.items\.slice\(0, SUB_INDO_HOME_LIMIT\)/);
+    assert.match(configJs, /previewLimit: 6/);
+    // Tautan seperti section lain (Ongoing/Populer).
+    assert.match(homeJs, /class="see-all subindo-source-more"/);
+    assert.match(homeJs, /Lihat Semua/);
+    assert.doesNotMatch(componentsCss, /\.subindo-source-more\{[^}]*font-size:11px/,
+        'gaya tautan mengikuti .see-all, bukan chip kecil');
+});
+
 test('panel tanpa judul terverifikasi memakai satu baris ringkas, bukan kotak kosong besar', () => {
     assert.match(homeJs, /function renderSubIndoEmpty\(grid, source\)/);
     assert.match(homeJs, /renderSubIndoEmpty\(grid, source\)/);
-    assert.match(homeJs, /const status = sourceStatusLabel\(source, items\.length\)/);
+    assert.match(homeJs, /const status = sourceStatusLabel\(source, Array\.isArray\(source\.items\) \? source\.items\.length : 0\)/);
     assert.match(homeJs, /const summary = issuesSummary\(sections\)/);
     assert.match(homeJs, /class="subindo-empty/);
     assert.match(homeJs, /const homeUrl = safeHomeUrl\(source\.homeUrl\)/);
