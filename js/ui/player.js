@@ -70,24 +70,50 @@ const ICON_LOCK = icon('lock');
 /* Proteksi pop-up (sandbox iframe)                                    */
 /* ------------------------------------------------------------------ */
 /**
- * Pengguna bisa mematikan proteksi (mis. player menolak diputar) — pilihan disimpan
- * di localStorage. Default = proteksi AKTIF (lihat PLAYER.sandbox).
+ * Proteksi pop-up lewat atribut `sandbox` iframe — 24 Okt 2026 (perbaikan putaran 3):
+ * DEFAULT MATI.
+ *
+ * Sejak sandbox dinyalakan, banyak embed menolak diputar dan menampilkan halamannya sendiri
+ * ("Opss! Sandboxed our player is not allowed. Remove sandbox to use it.") sehingga pengguna
+ * hanya melihat kotak hitam tanpa video dan tanpa subtitle. Karena itu sandbox kini hanya
+ * dipakai bila pengguna MENYALAKANNYA lewat tombol di bawah player; nilai tersimpan 'on'
+ * berarti proteksi aktif. Timpa pilihan itu bila embed tetap menolak (lihat sandboxFor()).
  */
-function popupGuardDisabled() {
+function popupGuardEnabled() {
     try {
-        return window.localStorage.getItem(STORAGE_KEYS.popupGuard) === 'off';
+        return window.localStorage.getItem(STORAGE_KEYS.popupGuard) === 'on';
     } catch {
-        return false; // mode privat / storage diblokir → tetap proteksi
+        return false; // mode privat / storage diblokir → perilaku default: tanpa sandbox
     }
 }
 
 function storePopupGuard(enabled) {
     try {
-        if (enabled) window.localStorage.removeItem(STORAGE_KEYS.popupGuard);
-        else window.localStorage.setItem(STORAGE_KEYS.popupGuard, 'off');
+        if (enabled) window.localStorage.setItem(STORAGE_KEYS.popupGuard, 'on');
+        else window.localStorage.removeItem(STORAGE_KEYS.popupGuard);
     } catch {
         // Tidak bisa menyimpan preferensi: efeknya hanya untuk sesi ini.
     }
+}
+
+/**
+ * Host yang sudah terbukti menolak sandbox pada sesi ini. Server dari host itu dimuat TANPA
+ * sandbox walau proteksi menyala, jadi pengguna tidak pernah terjebak di layar penolakan.
+ */
+const sandboxRefused = new Set();
+function hostOf(value) {
+    try {
+        return new URL(String(value || '')).hostname;
+    } catch {
+        return '';
+    }
+}
+
+/** Pasang sandbox untuk server ini? (proteksi menyala DAN host belum pernah menolak) */
+function sandboxFor(server) {
+    if (!PLAYER.sandbox || !popupGuardEnabled()) return false;
+    const host = hostOf(server?.url);
+    return !(host && sandboxRefused.has(host));
 }
 
 /** hls.js (Apache-2.0) disimpan lokal; dimuat sekali saat server HLS pertama diputar. */
@@ -424,10 +450,12 @@ export function createPlayer({
         iframe.allow = PLAYER.allow;
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
-        // Tanpa allow-popups/allow-top-navigation: iklan di dalam embed tidak bisa
-        // membuka tab baru atau mengalihkan tab Kazanime.
-        if (!popupGuardDisabled() && PLAYER.sandbox) iframe.setAttribute('sandbox', PLAYER.sandbox);
-        iframe.dataset.popupGuard = popupGuardDisabled() ? 'off' : 'on';
+        // Mode ketat (opsional): tanpa allow-popups/allow-top-navigation sehingga iklan di dalam
+        // embed tidak bisa membuka tab baru atau mengalihkan tab Kazanime. Default MATI karena
+        // banyak embed langsung menolak diputar saat di-sandbox.
+        const sandboxed = sandboxFor(server);
+        if (sandboxed) iframe.setAttribute('sandbox', PLAYER.sandbox);
+        iframe.dataset.popupGuard = sandboxed ? 'on' : 'off';
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
@@ -450,8 +478,20 @@ export function createPlayer({
         timer = setTimeout(() => {
             if (my !== token || state !== 'loading') return;
             // Fokus sudah di dalam iframe = user sedang memakai player → jangan dipindah server.
-            if (document.activeElement === iframe) loaded();
-            else fail(server, 'timeout');
+            if (document.activeElement === iframe) {
+                loaded();
+                return;
+            }
+            if (sandboxed) {
+                // Embed yang menolak sandbox sering tidak pernah menyelesaikan pemuatan.
+                // Lepas sandbox untuk host ini lalu coba server yang sama sekali lagi.
+                const host = hostOf(server.url);
+                if (host) sandboxRefused.add(host);
+                showToast('Mode blokir pop-up dimatikan untuk player ini — mencoba memuat ulang.', 'info');
+                play(server);
+                return;
+            }
+            fail(server, 'timeout');
         }, PLAYER.loadTimeout);
     }
 
@@ -480,9 +520,27 @@ export function createPlayer({
             track.label = t.label;
             track.srclang = t.lang || 'und';
             track.src = t.url;
-            if (t === def) track.default = true;
+            if (t === def) {
+                // Chrome (desktop & iPad) tidak selalu menyalakan track yang dipasang dinamis
+                // hanya dari properti `default` — atribut HTML-nya ikut ditulis dan mode-nya
+                // dinyalakan lagi saat metadata siap (lihat showDefaultSubtitle di bawah).
+                track.default = true;
+                track.setAttribute('default', '');
+            }
             v.append(track);
         }
+        /**
+         * Chrome tidak menampilkan subtitle bila track default masih ber-mode 'disabled'
+         * (umum saat <track> ditambahkan setelah elemen <video> dibuat). Aktifkan sekali
+         * setelah metadata; subtitle AI / sub lokal tetap bisa menggantikannya nanti.
+         */
+        const showDefaultSubtitle = () => {
+            if (!def) return;
+            const tracks = Array.from(v.textTracks || []);
+            const target = tracks.find((track) => track.label === def.label) || tracks[0];
+            if (target && target.mode === 'disabled') target.mode = 'showing';
+        };
+        v.addEventListener('loadedmetadata', showDefaultSubtitle);
         // "Subtitle Indonesia (AI)": hanya bila subtitle Indonesia tidak ada & backend menawarkannya.
         let subNote = def ? def.label : '';
         let aiShown = false;
@@ -546,6 +604,8 @@ export function createPlayer({
         // Jalur pemutaran:
         //  - Safari/WebKit (macOS & iOS): HLS native langsung dari CDN — media pipeline WebKit tidak butuh CORS,
         //    jadi tanpa proxy (hemat bandwidth); gagal → lewat proxy.
+        //  - Safari/WebKit + ManagedMediaSource + episode bersubtitle (iPadOS 17.1+): hls.js (MSE) lewat proxy
+        //    supaya <track> WebVTT ikut tampil — 24 Okt 2026, subtitle tidak muncul di Chrome iPad.
         //  - Browser lain: hls.js (MSE) lewat proxy. HLS native Chromium (Chrome ≥141) TIDAK dipakai untuk
         //    URL CDN langsung: diuji 22 Okt 2026, request-nya diblokir (CORS/CORP CDN dikunci ke anizone.to).
         //  - Tanpa MSE tetapi bisa HLS native → native lewat proxy.
@@ -553,8 +613,16 @@ export function createPlayer({
         const canNative = isHls && Boolean(v.canPlayType(HLS_MIME));
         const appleWebKit = /Apple/.test(navigator.vendor || '') && canNative;
         const hasMse = Boolean(window.MediaSource || window.ManagedMediaSource);
-        const native = appleWebKit || (canNative && !hasMse);
-        let usingDirect = isHls && appleWebKit && Boolean(server.direct);
+        /**
+         * iPadOS 17.1+ (Chrome/Safari — semuanya WebKit) punya ManagedMediaSource, dan HLS
+         * native WebKit TIDAK menampilkan <track> WebVTT di dalam pemutar inline. Bila episode
+         * membawa subtitle dan MMS tersedia, pakai hls.js (MSE) supaya subtitle benar-benar
+         * tampil di Chrome iPad; perangkat tanpa MMS tetap memakai HLS native.
+         */
+        const preferMseForSubtitles = appleWebKit && hasMse && subs.length > 0;
+        const native = (appleWebKit && !preferMseForSubtitles) || (canNative && !hasMse);
+        v.dataset.subtitleMode = preferMseForSubtitles ? 'mse' : native ? 'native' : 'mse';
+        let usingDirect = isHls && appleWebKit && !preferMseForSubtitles && Boolean(server.direct);
         v.addEventListener('error', () => {
             if (my !== token) return;
             if (usingDirect) {
@@ -592,6 +660,13 @@ export function createPlayer({
         loadHlsJs().then((Hls) => {
             if (my !== token) return;
             if (!Hls.isSupported()) {
+                // hls.js tidak jalan di browser ini → kembali ke HLS native bila mungkin,
+                // jangan langsung menghabiskan daftar server.
+                if (canNative) {
+                    v.dataset.mode = 'native-proxy';
+                    v.src = server.url;
+                    return;
+                }
                 fail(server, 'browser tidak mendukung HLS');
                 return;
             }
@@ -747,12 +822,12 @@ export function createPlayer({
         get episode() { return ep; },
         hasServers: () => available().length > 0,
 
-        /** Proteksi pop-up/tab baru aktif? (default true) */
-        popupGuard: () => !popupGuardDisabled(),
+        /** Mode blokir pop-up (sandbox iframe) aktif? (default false) */
+        popupGuard: () => popupGuardEnabled(),
 
         /**
-         * Nyalakan/matikan proteksi pop-up lalu muat ulang server yang sedang dipakai
-         * supaya atribut sandbox iframe ikut berubah.
+         * Nyalakan/matikan mode blokir pop-up (sandbox iframe) lalu muat ulang server yang
+         * sedang dipakai supaya atribut sandbox ikut berubah. Default mati.
          * @param {boolean} enabled
          * @returns {boolean} status baru
          */

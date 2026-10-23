@@ -11,6 +11,7 @@
  *   GET /api/anime/downloads/kusonime?title=<Romaji>
  *   GET /api/anime/:slug
  *   GET /api/anime/:slug/episode/:ep
+ *   GET /api/anime/:slug/subtitles?from=1&to=24   (Sub Indo per episode, 24 Okt 2026)
  *
  * Format respons (seragam untuk semua sumber):
  *   sukses : { ok: true, source, data, fallback, stale, errors?, generatedAt }
@@ -52,6 +53,26 @@ export function readRomajiTitles(value) {
     }
     if (!out.length) throw badRequest('Kandidat judul Romaji minimal 2 karakter dan harus memakai huruf Latin.');
     return out;
+}
+
+/**
+ * Rentang episode untuk peta subtitle: ?from= & ?to= (1–5000). `to` boleh dilewat;
+ * jumlahnya dipotong lagi oleh registry (maks 24 episode per panggilan).
+ * @returns {{from: number, to: number}}
+ */
+export function readEpisodeRange(query = {}) {
+    const pick = (value) => (Array.isArray(value) ? value[0] : value);
+    const parse = (value, name) => {
+        if (value === undefined || value === null || value === '') return null;
+        if (!/^\d{1,4}$/.test(String(value))) throw badRequest(`Parameter ${name} harus nomor episode 1–5000.`);
+        const n = Number.parseInt(String(value), 10);
+        if (!Number.isInteger(n) || n < 1 || n > 5000) throw badRequest(`Parameter ${name} harus nomor episode 1–5000.`);
+        return n;
+    };
+    const from = parse(pick(query.from), 'from') ?? 1;
+    const to = parse(pick(query.to), 'to') ?? from;
+    if (to < from) throw badRequest('Parameter to harus lebih besar atau sama dengan from.');
+    return { from, to: Math.min(to, from + 23) };
 }
 
 /** Token filter/genre: huruf kecil, angka, garis; kosong = default adapter. */
@@ -241,6 +262,12 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
     router.get('/genres', handle((req, ctx) => registry.genres(ctx)));
     router.get('/schedule', handle((req, ctx) => registry.schedule(ctx)));
     router.get('/:slug/episode/:ep', handle((req, ctx) => registry.episode(req.params.slug, readEpisode(req.params.ep), ctx)));
+    // Badge Sub Indo per episode pada daftar episode (24 Okt 2026).
+    router.get('/:slug/subtitles', handle((req, ctx) => registry.episodeSubtitles(
+        String(req.params.slug || ''),
+        readEpisodeRange(req.query),
+        ctx,
+    )));
     router.get('/:slug', handle((req, ctx) => registry.detail(req.params.slug, ctx)));
 
     return router;

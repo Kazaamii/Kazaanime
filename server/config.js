@@ -146,6 +146,11 @@ export const CACHE = Object.freeze({
     detailTtlMs: int('CACHE_DETAIL_SEC', 900, { min: 60, max: 3600 }) * 1000,   // 15 menit
     episodeTtlMs: int('CACHE_EPISODE_SEC', 900, { min: 60, max: 3600 }) * 1000, // 15 menit
     scheduleTtlMs: int('CACHE_SCHEDULE_SEC', 3600, { min: 300, max: 21600 }) * 1000, // 1 jam (jadwal jarang berubah)
+    /**
+     * Peta Sub Indo per episode (24 Okt 2026). Pemeriksaan menyentuh halaman episode satu per
+     * satu, jadi hasilnya disimpan lebih lama daripada daftar episode biasa.
+     */
+    subtitleMapTtlMs: int('CACHE_SUBTITLE_MAP_SEC', 1800, { min: 300, max: 21600 }) * 1000,
     notFoundTtlMs: 5 * 60 * 1000,
     /** Bila sumber gagal, data lama (maks 1 jam) tetap dipakai & diberi tanda stale. */
     staleMs: 60 * 60 * 1000,

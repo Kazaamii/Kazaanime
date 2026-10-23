@@ -29,6 +29,7 @@ import { TtlCache } from '../lib/cache.js';
 import { AppError, SourceError, badRequest, combineErrors, describeError, isAbort, notFound } from '../lib/errors.js';
 import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
+import { textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
 import { createAnimeku } from './animeku.js';
@@ -44,6 +45,30 @@ import { createOploverz } from './oploverz.js';
 import { createOtakudesu } from './otakudesu.js';
 import { createSamehadaku } from './samehadaku.js';
 import { createSakunime } from './sakunime.js';
+
+/**
+ * Pemeriksaan Sub Indo per episode (24 Okt 2026, putaran 3).
+ * Halaman episode disentuh satu per satu, jadi jumlahnya dibatasi dan dijalankan bertahap.
+ */
+const SUBTITLES = Object.freeze({
+    maxEpisodes: 24,
+    concurrency: 3,
+    ttlMs: CACHE.subtitleMapTtlMs,
+});
+
+/** Jalankan `run` untuk setiap item dengan batas konkurensi (tanpa dependensi). */
+async function forEachLimit(items, limit, run) {
+    const list = Array.from(items || []);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(Math.max(1, limit), list.length) }, async () => {
+        while (cursor < list.length) {
+            const index = cursor;
+            cursor += 1;
+            await run(list[index]);
+        }
+    });
+    await Promise.all(workers);
+}
 
 /** id sumber → factory adapter. */
 export const FACTORIES = Object.freeze({
@@ -619,6 +644,89 @@ export function createRegistry({
                 r = await run(d.value);
             }
             return { source: adapter.id, data: r.value, fallback: false, stale: r.cache === 'stale', errors: r.error ? [describeError(r.error)] : [] };
+        },
+
+        /**
+         * Peta Sub Indo per episode untuk daftar episode di watch.html — 24 Okt 2026 (putaran 3).
+         *
+         * Latar belakang: badge Sub Indo dulu hanya muncul untuk episode yang kebetulan sedang
+         * dibuka, sehingga pengguna melihat "hanya episode tertentu yang Sub Indo". Di sini
+         * SETIAP episode pada rentang yang diminta diperiksa:
+         *   1. baris daftar episode yang sudah membawa bukti bahasa dipakai apa adanya
+         *      (Oploverz menulis "… Episode N Subtitle Indonesia" di daftar episodenya);
+         *   2. episode lain dibuka halaman episodenya (AnimeKu) — maks 3 permintaan bersamaan,
+         *      jadi satu panggilan memeriksa maks 24 episode.
+         * Episode yang gagal diperiksa dibiarkan `sub: null` (tanpa badge) — tidak pernah
+         * diklaim Sub Indo tanpa bukti, dan kegagalan satu episode tidak menggagalkan yang lain.
+         *
+         * @param {string} slug slug backend ("animeku~…")
+         * @param {{from?: number, to?: number}} [range]
+         * @returns {Promise<{source: string, data: {slug: string, from: number, to: number, episodes: {number: number, sub: 'id'|''|null, evidence: string}[]}, fallback: boolean, stale: boolean, errors: object[]}>}
+         */
+        async episodeSubtitles(slug, { from = 1, to = 1 } = {}, ctx = {}) {
+            const start = Math.max(1, Math.trunc(Number(from) || 1));
+            const requested = Math.trunc(Number(to) || start);
+            const last = Math.min(Math.max(start, requested), start + SUBTITLES.maxEpisodes - 1);
+            const target = resolveAdapter(slug);
+            if (target.kind === 'metadata') throw notFound('API metadata tidak menyediakan daftar episode.');
+            const { adapter } = target;
+            const key = `subs:${adapter.id}:${slug}:${start}-${last}`;
+            const r = await wrap(key, SUBTITLES.ttlMs, async () => {
+                const episodes = [];
+                for (let n = start; n <= last; n++) episodes.push({ number: n, sub: null, evidence: '' });
+                const byNumber = new Map(episodes.map((item) => [item.number, item]));
+
+                // 1) Bukti dari daftar episode (tanpa permintaan tambahan).
+                let rows = [];
+                try {
+                    rows = (await this.detail(slug, ctx))?.data?.episodeList || [];
+                } catch (err) {
+                    if (isAbort(err)) throw err;
+                    // Daftar episode gagal dimuat → semua diperiksa lewat halaman episode.
+                }
+                for (const row of Array.isArray(rows) ? rows : []) {
+                    const item = byNumber.get(row?.number);
+                    if (!item || !(row.sub === 'id' || row.sub === '')) continue;
+                    item.sub = row.sub;
+                    item.evidence = row.sub === 'id' ? 'episode-list' : '';
+                }
+
+                // Episode di luar daftar (mis. belum tayang) tidak perlu diperiksa: badge hanya
+                // untuk episode yang benar-benar ada di situs.
+                const known = (Array.isArray(rows) ? rows : [])
+                    .map((row) => Number(row?.number))
+                    .filter((n) => Number.isInteger(n) && n > 0);
+                const highest = known.length ? Math.max(...known) : null;
+                const reachable = highest
+                    ? episodes.filter((item) => item.number <= highest)
+                    : episodes;
+
+                // 2) Sisanya: buka halaman episode masing-masing (dibatasi).
+                const missing = reachable.filter((item) => item.sub === null).map((item) => item.number);
+                await forEachLimit(missing, SUBTITLES.concurrency, async (n) => {
+                    try {
+                        const result = await this.episode(slug, n, ctx);
+                        const data = result?.data || {};
+                        const indo = (Array.isArray(data.servers) ? data.servers : []).some((server) => server?.lang === 'id');
+                        const item = byNumber.get(n);
+                        if (!item) return;
+                        item.sub = indo ? 'id' : (textShowsIndonesianSubtitle(data.title) ? 'id' : '');
+                        item.evidence = indo ? 'episode-server' : (item.sub === 'id' ? 'episode-title' : '');
+                    } catch (err) {
+                        if (isAbort(err)) throw err;
+                        // Episode belum tayang / halaman gagal dibuka → tetap null (tanpa badge).
+                    }
+                });
+
+                return { slug, source: adapter.id, from: start, to: last, episodes: reachable };
+            }, { stale: 0 });
+            return {
+                source: adapter.id,
+                data: r.value,
+                fallback: false,
+                stale: false,
+                errors: r.error ? [describeError(r.error)] : [],
+            };
         },
 
         /** Ringkasan untuk /api/health & skrip check-sources. */

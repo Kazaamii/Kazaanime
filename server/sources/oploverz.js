@@ -19,7 +19,7 @@
  * (lib/subtitle-evidence.js); nama situs dan bahasa antarmuka tidak dipakai.
  */
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
-import { applySubtitleEvidence } from '../lib/subtitle-evidence.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
@@ -160,6 +160,10 @@ export function parseEpisodeRows($, base) {
             title,
             released: dateLabel.replace(/^(?:episode|eps?\.?)\s*\d+\s*[-–—]?\s*/i, '').replace(/^\d+\s*[-–—]?\s*/, ''),
             url,
+            // Judul baris daftar episode memuat "Episode N Subtitle Indonesia" → bukti bahasa
+            // per episode tanpa permintaan tambahan (24 Okt 2026). Tanpa frasa itu, episode
+            // ditandai '' (sudah diperiksa, belum ada bukti) supaya badge tidak dikarang.
+            ...(title ? { sub: textShowsIndonesianSubtitle(title) ? 'id' : '' } : {}),
         });
     });
     return makeEpisodeList(rows);

@@ -254,6 +254,31 @@ export function getBackendAnime(slug, { signal } = {}) {
     });
 }
 
+/**
+ * Peta Sub Indo per episode untuk daftar episode (24 Okt 2026, putaran 3).
+ * Backend memeriksa halaman tiap episode (maks 24 per panggilan) dan mengembalikan bukti
+ * per episode; episode tanpa bukti TIDAK diklaim Sub Indo.
+ * @param {string} slug slug backend ("animeku~…")
+ * @param {{from?: number, to?: number, signal?: AbortSignal}} [opts]
+ * @returns {Promise<Map<number, 'id'|''>>} nomor episode → 'id' (ada bukti) | '' (diperiksa, tanpa bukti)
+ */
+export async function getEpisodeSubtitles(slug, { from = 1, to = from, signal } = {}) {
+    if (!slug) return new Map();
+    const json = await call(`/${encodeURIComponent(slug)}/subtitles?from=${from}&to=${to}`, {
+        signal,
+        ttl: CACHE_TTL.browse,
+    });
+    const map = new Map();
+    for (const item of Array.isArray(json.data?.episodes) ? json.data.episodes : []) {
+        const number = Number(item?.number);
+        if (!Number.isInteger(number) || number < 1) continue;
+        // null = belum diperiksa (jangan diberi badge, jangan diklaim)
+        if (item.sub === 'id') map.set(number, 'id');
+        else if (item.sub === '') map.set(number, '');
+    }
+    return map;
+}
+
 const clip = (v, max, fallback = '') => String(v ?? '').trim().slice(0, max) || fallback;
 
 /** Search Kusonime's download packs using known Latin-script title variants; no stream hosts are fetched. */
