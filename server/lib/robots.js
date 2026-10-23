@@ -193,14 +193,14 @@ export class RobotsGate {
         const entry = await this.load(u.origin, signal);
         const crawlDelayMs = entry.crawlDelay != null ? Math.round(entry.crawlDelay * 1000) : 0;
         switch (entry.state) {
-            case 'blocked': return { allowed: false, reason: 'blocked', crawlDelayMs };
-            case 'unreachable': return { allowed: false, reason: 'unreachable', crawlDelayMs };
+            case 'blocked': return { allowed: false, reason: 'blocked', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
+            case 'unreachable': return { allowed: false, reason: 'unreachable', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
             case 'unavailable': return requireExplicit
-                ? { allowed: false, reason: 'unverified', crawlDelayMs }
-                : { allowed: true, reason: 'no-robots', crawlDelayMs };
+                ? { allowed: false, reason: 'unverified', crawlDelayMs, httpStatus: entry.httpStatus || 0 }
+                : { allowed: true, reason: 'no-robots', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
             default: {
                 const ok = isAllowed(entry.rules, u.pathname + u.search);
-                return { allowed: ok, reason: ok ? 'allowed' : 'disallowed', crawlDelayMs };
+                return { allowed: ok, reason: ok ? 'allowed' : 'disallowed', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
             }
         }
     }
