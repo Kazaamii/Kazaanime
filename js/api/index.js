@@ -27,6 +27,7 @@ import { createAnime, titleKey, withIds } from './normalize.js';
 import {
     FALLBACK_HERO, FALLBACK_ONGOING, FALLBACK_POPULAR, FALLBACK_NEW, FALLBACK_DONGHUA, FALLBACK_SCHEDULE,
 } from '../data/fallback.js';
+import { getVerifiedSubIndoAnime } from './subindo.js';
 
 export { ApiError, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests };
 export { listStreamServers, getEpisodeExtras, withProviderServers } from './streams.js';
@@ -142,6 +143,19 @@ export async function getHomeSection(kind) {
     out.items = out.items.slice(0, size);
     out.hasNext = false;
     return out;
+}
+
+/**
+ * Katalog section khusus homepage: hanya mengembalikan anime dengan server
+ * subtitle Indonesia yang benar-benar ditemukan pada endpoint episode terbaru.
+ * Fungsi ini terpisah dari rantai data section homepage yang sudah ada.
+ */
+export async function getSubIndoHomeSection({ signal } = {}) {
+    return getVerifiedSubIndoAnime({
+        getLatest: (opts) => backend.getLatest(opts),
+        getEpisode: (slug, ep, opts) => backend.getBackendEpisode(slug, ep, opts),
+        signal,
+    });
 }
 
 /**
