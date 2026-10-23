@@ -128,6 +128,9 @@ test('verifies the latest episode but keeps same-titled anime separate by source
                 ? { servers: [{ lang: 'en' }] }
                 : { servers: [{ lang: 'id', available: true }] };
         },
+        // Fokus tes ini = pemisahan panel & duplikat judul. Pemeriksaan episode
+        // sebelumnya punya tes tersendiri di bawah.
+        retryPreviousEpisode: false,
     });
 
     assert.equal(result.checked, 4);
@@ -194,4 +197,262 @@ test('source verifier records failed episode checks without claiming a title is 
     assert.deepEqual(result.sections[0].items, []);
     assert.equal(result.sections[0].checked, 1);
     assert.equal(result.sections[0].failedChecks, 1);
+});
+
+test('falls back to the previous episode when the newest episode has no Indonesian proof', async () => {
+    const checked = [];
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [{
+                id: 'samehadaku', name: 'Samehadaku',
+                items: [
+                    { title: 'Anime Baru', slug: 'samehadaku~anime-baru', source: 'backend:samehadaku', latestEpisode: 9 },
+                    { title: 'Episode Satu', slug: 'samehadaku~episode-satu', source: 'backend:samehadaku', latestEpisode: 1 },
+                ],
+            }],
+        }),
+        concurrency: 1,
+        getEpisode: async (slug, episode) => {
+            checked.push(`${slug}#${episode}`);
+            if (slug === 'samehadaku~episode-satu' || episode >= 9) return { servers: [{ lang: 'en' }] };
+            return { servers: [{ lang: 'id', available: true }] };
+        },
+    });
+
+    assert.deepEqual(checked, ['samehadaku~anime-baru#9', 'samehadaku~anime-baru#8', 'samehadaku~episode-satu#1']);
+    assert.equal(result.checked, 3);
+    assert.deepEqual(result.sections[0].items.map((anime) => anime.slug), ['samehadaku~anime-baru']);
+    assert.equal(result.sections[0].items[0].latestEpisode, 8, 'card points at the episode that was actually verified');
+    assert.equal(result.sections[0].failedChecks, 0, 'absence of proof is not a failed check');
+});
+
+test('does not request the previous episode when the latest one is already verified', async () => {
+    const checked = [];
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [{
+                id: 'sakunime', name: 'Sakunime',
+                items: [{ title: 'Sudah Ada', slug: 'sakunime~sudah-ada', source: 'backend:sakunime', latestEpisode: 4 }],
+            }],
+        }),
+        getEpisode: async (slug, episode) => {
+            checked.push(`${slug}#${episode}`);
+            return { servers: [{ lang: 'id' }] };
+        },
+    });
+
+    assert.deepEqual(checked, ['sakunime~sudah-ada#4']);
+    assert.equal(result.checked, 1);
+    assert.equal(result.sections[0].items[0].latestEpisode, 4);
+});
+
+test('bounds previous-episode checks with its own budget', async () => {
+    const checked = [];
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [{
+                id: 'otakudesu', name: 'Otakudesu',
+                items: [
+                    { title: 'Satu', slug: 'otakudesu~satu', source: 'backend:otakudesu', latestEpisode: 5 },
+                    { title: 'Dua', slug: 'otakudesu~dua', source: 'backend:otakudesu', latestEpisode: 6 },
+                    { title: 'Tiga', slug: 'otakudesu~tiga', source: 'backend:otakudesu', latestEpisode: 7 },
+                ],
+            }],
+        }),
+        concurrency: 1,
+        retryPreviousEpisode: true,
+        previousEpisodeChecks: 1,
+        getEpisode: async (slug, episode) => {
+            checked.push(`${slug}#${episode}`);
+            return { servers: [{ lang: 'en' }] };
+        },
+    });
+
+    assert.deepEqual(checked, ['otakudesu~satu#5', 'otakudesu~satu#4', 'otakudesu~dua#6', 'otakudesu~tiga#7']);
+    assert.equal(result.checked, 4);
+    assert.deepEqual(result.sections[0].items, []);
+});
+
+test('returns verified titles with a timeout marker when the time budget expires', async () => {
+    const started = Date.now();
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [{
+                id: 'samehadaku', name: 'Samehadaku',
+                items: [
+                    { title: 'Cepat', slug: 'samehadaku~cepat', source: 'backend:samehadaku', latestEpisode: 2 },
+                    { title: 'Lambat', slug: 'samehadaku~lambat', source: 'backend:samehadaku', latestEpisode: 3 },
+                ],
+            }],
+        }),
+        concurrency: 2,
+        retryPreviousEpisode: false,
+        timeBudgetMs: 40,
+        getEpisode: async (slug) => {
+            if (slug === 'samehadaku~cepat') return { servers: [{ lang: 'id' }] };
+            return new Promise(() => {}); // sumber lambat yang tidak pernah selesai
+        },
+    });
+
+    assert.ok(Date.now() - started < 2000, 'feed stops waiting when the budget expires');
+    assert.equal(result.timedOut, true);
+    assert.equal(result.sections[0].timedOut, true);
+    assert.deepEqual(result.sections[0].items.map((anime) => anime.slug), ['samehadaku~cepat']);
+    assert.equal(result.checked, 2);
+});
+
+test('caps checks per source so one provider cannot consume the whole budget', async () => {
+    const checked = [];
+    const items = (prefix) => Array.from({ length: 6 }, (_, index) => ({
+        title: `${prefix} ${index}`,
+        slug: `${prefix}~${index}`,
+        source: `backend:${prefix}`,
+        latestEpisode: index + 1,
+    }));
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [
+                { id: 'samehadaku', name: 'Samehadaku', items: items('samehadaku') },
+                { id: 'otakudesu', name: 'Otakudesu', items: items('otakudesu') },
+            ],
+        }),
+        maxChecks: 6,
+        perSourceChecks: 2,
+        concurrency: 1,
+        retryPreviousEpisode: false,
+        getEpisode: async (slug) => {
+            checked.push(slug);
+            return { servers: [{ lang: 'id' }] };
+        },
+    });
+
+    assert.deepEqual(checked, ['samehadaku~0', 'otakudesu~0', 'samehadaku~1', 'otakudesu~1']);
+    assert.deepEqual(result.sections.map((source) => source.checked), [2, 2]);
+    assert.equal(result.checked, 4);
+});
+
+test('a caller abort cancels verification instead of returning partial results', async () => {
+    const controller = new AbortController();
+    const pending = getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [{
+                id: 'samehadaku', name: 'Samehadaku',
+                items: [{ title: 'Lama', slug: 'samehadaku~lama', source: 'backend:samehadaku', latestEpisode: 2 }],
+            }],
+        }),
+        getEpisode: () => new Promise(() => {}),
+        signal: controller.signal,
+        timeBudgetMs: 5000,
+    });
+
+    setTimeout(() => controller.abort(), 10);
+    await assert.rejects(pending, (error) => error?.name === 'AbortError' || error?.kind === 'abort');
+});
+
+test('per-section homeUrl is preserved so a blocked panel can be opened manually', async () => {
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [
+                {
+                    id: 'samehadaku', name: 'Samehadaku', homeUrl: 'https://samehadaku.test',
+                    items: [], error: { kind: 'blocked', source: 'samehadaku' },
+                },
+                {
+                    id: 'otakudesu', name: 'Otakudesu', homeUrl: 'https://otakudesu.test',
+                    items: [{ title: 'Dua', slug: 'otakudesu~dua', source: 'backend:otakudesu', latestEpisode: 1 }],
+                },
+            ],
+        }),
+        retryPreviousEpisode: false,
+        getEpisode: async () => ({ servers: [{ lang: 'id' }] }),
+    });
+
+    assert.deepEqual(result.sections.map((source) => source.homeUrl), ['https://samehadaku.test', 'https://otakudesu.test']);
+});
+
+test('sourceIds limits verification to one panel for per-source retry', async () => {
+    const checked = [];
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [
+                {
+                    id: 'samehadaku', name: 'Samehadaku',
+                    items: [{ title: 'Satu', slug: 'samehadaku~satu', source: 'backend:samehadaku', latestEpisode: 2 }],
+                },
+                {
+                    id: 'otakudesu', name: 'Otakudesu',
+                    items: [{ title: 'Dua', slug: 'otakudesu~dua', source: 'backend:otakudesu', latestEpisode: 3 }],
+                },
+            ],
+        }),
+        sourceIds: ['otakudesu'],
+        retryPreviousEpisode: false,
+        getEpisode: async (slug) => {
+            checked.push(slug);
+            return { servers: [{ lang: 'id' }] };
+        },
+    });
+
+    assert.deepEqual(checked, ['otakudesu~dua']);
+    assert.deepEqual(result.sections.map((source) => source.id), ['otakudesu']);
+    assert.equal(result.checked, 1);
+});
+
+test('counts the catalogue fetch against the verification time budget', async () => {
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+            return {
+                fallback: false,
+                sections: [{
+                    id: 'samehadaku', name: 'Samehadaku',
+                    items: [{ title: 'Terlambat', slug: 'samehadaku~terlambat', source: 'backend:samehadaku', latestEpisode: 2 }],
+                }],
+            };
+        },
+        getEpisode: async () => {
+            throw new Error('episode checks must not start after the budget is exhausted');
+        },
+        timeBudgetMs: 10,
+    });
+
+    assert.equal(result.timedOut, true);
+    assert.equal(result.checked, 0);
+    assert.equal(result.sections[0].timedOut, true);
+    assert.deepEqual(result.sections[0].items, []);
+});
+
+test('checks each episode slug only once per source', async () => {
+    const checked = [];
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [{
+                id: 'samehadaku', name: 'Samehadaku',
+                items: [
+                    { title: 'Judul A', slug: 'samehadaku~judul-a', source: 'backend:samehadaku', latestEpisode: 2 },
+                    { title: 'Judul A (duplikat katalog)', slug: 'samehadaku~judul-a', source: 'backend:samehadaku', latestEpisode: 2 },
+                    { title: 'Judul B', slug: 'samehadaku~judul-b', source: 'backend:samehadaku', latestEpisode: 3 },
+                ],
+            }],
+        }),
+        retryPreviousEpisode: false,
+        concurrency: 1,
+        getEpisode: async (slug, episode) => {
+            checked.push(`${slug}#${episode}`);
+            return { servers: [{ lang: 'id' }] };
+        },
+    });
+
+    assert.deepEqual(checked, ['samehadaku~judul-a#2', 'samehadaku~judul-b#3']);
+    assert.equal(result.sections[0].items.length, 2);
+    assert.equal(result.checked, 2);
 });

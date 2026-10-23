@@ -15,17 +15,19 @@ beradapter.
 | **D++** | Perbaikan 22 Okt 2026 (2): **Samehadaku** (anime Jepang, Sub Indo) menggantikan Kuramanime; tombol **Server 1, 2, …**; **Jadwal Rilis** dari Samehadaku + AnimeXin (`/api/anime/schedule`); poster donghua Kitsu → **Bangumi** → **MangaBaka**; donghua cadangan via Kitsu & bergambar; cadangan Vidnest/TryEmbed | ✅ Selesai |
 | **E** | Perbaikan 22 Okt 2026 (3): **Genre & Jadwal di atas** beranda (hasil genre langsung di bawah tombol); server cadangan #2 → **ReAnime**, + tombol **AniZone "Multi Sub"** (player HLS bawaan + proxy); **tombol bookmark kartu** di pojok poster; **ikon** pengganti emoji; font **Figtree + Bricolage Grotesque**; donghua + **Anichin**; Sub Indo + **Otakudesu**, **Anoboy** & **Sakunime** (robots.txt fail-closed) + **hianime.ro**; **Jikan dihapus** | ✅ Selesai — lihat [Batasan Cloudflare](#-batasan-cloudflare-dicek-22-okt-2026) |
 | **F+** | Subtitle lokal untuk pemutar HLS: pilih `.srt` / `.vtt` di browser, konversi SRT→WebVTT, ganti/hapus track; tidak diunggah | ✅ Selesai |
+| **G** | Penguatan feed Sub Indo 23 Okt 2026: verifikasi beranggaran waktu, batas kandidat per situs, fallback episode sebelumnya, ringkasan & tombol coba lagi per panel, panel gagal ringkas dengan diagnosis tergabung dan tautan "Buka situs" (tanpa bypass) | ✅ Selesai |
 
 ---
 
 ## 📁 Struktur folder (final)
 
 Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diubah di Tahap D · 🅔 baru/diubah di Tahap E (22 Okt 2026) ·
-🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) · 🅖 subtitle lokal browser (22 Okt 2026)
+🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) · 🅖 subtitle lokal browser (22 Okt 2026) ·
+🅗 penguatan feed Sub Indo (23 Okt 2026)
 
 ```
 kazanime/
-├── index.html                 ✅🅔 homepage: hero, GENRE (+hasil), JADWAL, ongoing, populer, bookmark, baru rilis, donghua
+├── index.html                 ✅🅔 homepage: hero, SUB INDO (per sumber), GENRE (+hasil), JADWAL, ongoing, populer, bookmark, baru rilis, donghua
 ├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
 ├── README.md                  ✅🅓
@@ -38,13 +40,13 @@ kazanime/
 │   └── index.js               🅓 Vercel Function: `export default createApp()`
 ├── css/
 │   ├── base.css               ✅🅔 reset, variabel (+ --font-body/--font-display), 7 tema, ikon .ic, keyframes, partikel tema
-│   ├── components.css         ✅ navbar, dropdown, card, skeleton, modal, toast, API status, footer, keterangan section
+│   ├── components.css         ✅ navbar, dropdown, card, skeleton, modal, toast, API status, footer, keterangan section, panel Sub Indo per sumber (+ status & retry)
 │   ├── home.css               ✅ hero, genre, jadwal
 │   ├── search.css             ✅ tab sumber, filter, muat lagi
 │   └── watch.css              ✅🅒 player, server, episode, info, download, platform legal (+ urutan mobile)
 ├── js/
 │   ├── theme-preload.js       ✅ script klasik di <head>: pasang tema sebelum render (anti-kedip)
-│   ├── config.js              ✅🅓🅔🅕 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone) & PLAYER (hls, aiSubtitle)
+│   ├── config.js              ✅🅓🅔🅕 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone), PLAYER (hls, aiSubtitle) & SUB_INDO (batas verifikasi feed)
 │   ├── routes.js              ✅🅒 pembuat/pembaca URL watch & search (filter di URL, batas nomor episode)
 │   ├── data/
 │   │   └── fallback.js        ✅ data cadangan offline (format ternormalisasi)
@@ -55,7 +57,8 @@ kazanime/
 │   │   ├── kitsu.js           ✅🅒 Kitsu (JSON:API, simple GET) + detail dengan mapping id MAL/AniList
 │   │   ├── sources.js         ✅🅓🅔🅕 klien backend /api/anime/* + /api/stream/servers + /api/stream/subai (aktif; mati otomatis bila /api tidak ada) + normalisasi server/download
 │   │   ├── streams.js         🅒🅓🅔 server streaming per episode (config + slot penyedia + SEMUA situs backend yang cocok), link download
-│   │   └── index.js           ✅🅓 FASAD untuk UI: rantai fallback (donghua: backend → AniList CN) + getWatchData
+│   │   ├── subindo.js         ✅🅗 verifikasi feed Sub Indo per sumber: batas waktu, batas kandidat per situs, episode sebelumnya (23 Okt 2026)
+│   │   └── index.js           ✅🅓 FASAD untuk UI: rantai fallback (donghua: backend → AniList CN) + getWatchData + getSubIndoHomeSources
 │   ├── services/
 │   │   ├── storage.js         ✅ localStorage aman
 │   │   ├── theme.js           ✅ 7 tema + partikel
@@ -87,7 +90,7 @@ kazanime/
 │   │   └── download-list.js   🅒🅓 daftar link download per kualitas (+ format & bahasa subtitle dari backend)
 │   ├── vendor/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
-│   ├── home.js                ✅🅓🅔 homepage (genre → hasil di bawah tombol; kartu donghua backend → episode terbaru)
+│   ├── home.js                ✅🅓🅔🅗 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
 │   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
@@ -176,7 +179,7 @@ Yang bisa dicoba (Tahap D):
 - `/api/anime/latest` · `/api/anime/search?q=soul%20land` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan/episode/175`
 - `/api/health` (status sumber, robots, circuit, cache) · `/api/bot` (info bot untuk admin situs sumber)
 - `npm run check:sources -- --live` → laporan robots.txt/ToS + uji ambil data tiap sumber
-- `npm test` → 206 unit test backend + subtitle UI helper (tanpa internet)
+- `npm test` → 276 unit test backend + helper UI frontend (tanpa internet)
 
 Yang bisa dicoba (Tahap C):
 - klik kartu mana pun → `watch.html`: player, daftar episode asli, info + sinopsis, rekomendasi
@@ -235,6 +238,34 @@ File asli: ±12 request setiap kali dibuka, login, atau logout.
 yang relevan di `js/api/index.js`. UI tidak perlu diubah.
 
 ---
+
+## 🌸 Feed Sub Indo di beranda (penguatan 23 Okt 2026)
+
+Section **Anime Jepang Sub Indo** tepat di bawah hero tetap dipisah per situs.
+`GET /api/anime/latest-subindo` hanya menyediakan katalog per sumber; browser
+memverifikasi sendiri endpoint episode situs tersebut dan hanya menampilkan judul
+yang punya server/track subtitle Indonesia eksplisit. Batasnya dipusatkan di
+`SUB_INDO` (`js/config.js`):
+
+| Aspek | Perilaku |
+|---|---|
+| Anggaran waktu | `SUB_INDO.timeBudgetMs` = 12 dtk, dihitung **sejak katalog diminta**. Pemeriksaan yang belum selesai dibatalkan; hasil yang sudah terverifikasi tetap tampil dan panel diberi label **Batas waktu** (bukan dianggap kosong/error). |
+| Batas pemeriksaan | Maks. 18 episode (`maxChecks`) dan maks. 6 kandidat per situs (`perSourceChecks`), dibagikan bergiliran supaya satu situs tidak menghabiskan jatah situs lain. |
+| Episode sebelumnya | Bila episode terbaru tidak punya bukti Sub Indo, episode sebelumnya diperiksa (maks. 6 kali per pemuatan). Kartu memakai `latestEpisode` hasil verifikasi, jadi tautan tidak menjanjikan subtitle yang belum ada. |
+| Coba lagi per panel | Tombol **Coba lagi** mengambil katalog baru (`refresh` → `force` + `noCache`, termasuk `cache: no-store`) lalu hanya memverifikasi ulang situs itu (`sourceIds`); panel lain tidak ikut dimuat ulang. |
+| Transparansi | Ringkasan "N situs · N judul terverifikasi · N episode diperiksa", status per sumber (`N episode diperiksa · N gagal · batas waktu`), dan daftar feed di intro diambil dari respons backend — bukan teks statis. |
+| Panel gagal ringkas | Situs tanpa judul terverifikasi tampil sebagai **satu baris** (ikon + diagnosis + tindakan), bukan kotak kosong besar yang mengulang kepala panel. Diagnosis hanya ditulis sekali: pesan yang sama untuk beberapa situs digabung pada keterangan global ("Penyebab: … (Samehadaku, Otakudesu)"). |
+| Label jujur | `blocked`/`policy`/`rate_limited`/`robots` diberi label **Akses dibatasi** (kita sengaja berhenti), sedangkan `parse`/`network` tetap **Sumber bermasalah**. Tidak ada kesan situsnya "rusak" saat penyebabnya kebijakan. |
+| Buka situs | Panel kosong/gagal menyertakan tautan `homeUrl` (`target="_blank"`, `rel="noopener noreferrer"`, hanya `http(s)`) agar pengguna bisa memeriksa situsnya sendiri. Ini tautan biasa — **bukan** upaya menembus Cloudflare/robots, dan tidak ada stealth, solver CAPTCHA, atau rotasi proxy. |
+| Tanpa backend | Tetap seperti sebelumnya: section menampilkan pesan yang bisa dicoba lagi; tidak ada judul metadata cadangan yang diklaim Sub Indo. |
+
+Tes offline: `server/test/subindo-home.test.js` (urutan pemeriksaan, pemisahan
+sumber, fallback episode sebelumnya, batas waktu, batas per sumber, `sourceIds`,
+`homeUrl`, abort), `server/test/subindo-ui.test.js` (ringkasan, retry per panel,
+panel ringkas, CSS, konstanta config), dan `server/test/subindo-state.test.js`
+(label status, diagnosis, penggabungan penyebab, validasi `homeUrl`).
+`server/test/frontend-media.test.js` juga menguji refresh katalog tanpa cache dan
+penerusan `sourceIds` lewat fasad.
 
 ## 🎬 Halaman nonton (Tahap C)
 

@@ -26,7 +26,26 @@ const { getSubIndoHomeSources } = await import('../../js/api/index.js');
 const { getEpisodeExtras } = await import('../../js/api/streams.js');
 const { createAnime } = await import('../../js/api/normalize.js');
 const { cardHTML } = await import('../../js/ui/card.js');
-const { clearApiCache } = await import('../../js/api/http.js');
+const { clearApiCache, friendlyError, ApiError } = await import('../../js/api/http.js');
+
+test('friendlyError explains source-policy diagnostics from the backend', () => {
+    assert.equal(
+        friendlyError(new ApiError('robots.txt tidak terbaca', { kind: 'robots', status: 500, stage: 'robots' })),
+        'robots.txt tidak dapat diverifikasi (HTTP 500); sumber dilewati sementara.',
+    );
+    assert.equal(
+        friendlyError(new ApiError('403 saat robots', { kind: 'blocked', status: 403, stage: 'robots' })),
+        'Akses dibatasi pada pemeriksaan robots.txt (HTTP 403); sumber dilewati.',
+    );
+    assert.equal(
+        friendlyError(new ApiError('challenge', { kind: 'blocked' })),
+        'Sumber mengirim challenge keamanan; permintaan dihentikan.',
+    );
+    assert.equal(
+        friendlyError(new ApiError('robots 404', { kind: 'policy', status: 404, stage: 'robots' })),
+        'robots.txt tidak tersedia dan izin sumber belum dapat diverifikasi; sumber dilewati.',
+    );
+});
 
 test('Sub Indo source cards show the provider and keep its own watch route', () => {
     const anime = createAnime({
@@ -108,6 +127,79 @@ test('homepage facade checks the latest episode and retains identical titles fro
     ]);
     assert.deepEqual(result.sections.map((source) => source.items[0].latestEpisode), [7, 8]);
     assert.equal(requested.length, 3, 'catalogue plus one latest-episode check per source');
+});
+
+test('per-source Sub Indo retry only checks the requested provider', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const requested = [];
+    globalThis.fetch = async (input) => {
+        const url = String(input);
+        requested.push(url);
+        if (url === '/api/anime/latest-subindo') {
+            return new Response(JSON.stringify({
+                ok: true,
+                source: 'samehadaku,otakudesu',
+                fallback: false,
+                data: [
+                    { id: 'samehadaku', name: 'Samehadaku', items: [{ title: 'Satu', slug: 'samehadaku~satu', source: 'samehadaku', latestEpisode: 4 }] },
+                    { id: 'otakudesu', name: 'Otakudesu', items: [{ title: 'Dua', slug: 'otakudesu~dua', source: 'otakudesu', latestEpisode: 5 }] },
+                ],
+            }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        assert.match(url, /^\/api\/anime\/otakudesu~dua\/episode\/5$/);
+        return new Response(JSON.stringify({
+            ok: true,
+            fallback: false,
+            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleType: 'hard' }], downloads: [] },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    clearApiCache();
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+        clearApiCache();
+    });
+
+    const result = await getSubIndoHomeSources({ sourceIds: ['otakudesu'] });
+    assert.deepEqual(result.sections.map((source) => source.id), ['otakudesu']);
+    assert.deepEqual(result.sections[0].items.map((anime) => anime.title), ['Dua']);
+    assert.equal(result.sections[0].items[0].latestEpisode, 5);
+    assert.equal(result.sections[0].checked, 1);
+    assert.equal(result.sections[0].failedChecks, 0);
+    assert.equal(result.sections[0].timedOut, false);
+    assert.equal(result.timedOut, false);
+    assert.equal(requested.length, 2, 'catalogue plus only the requested episode');
+});
+
+test('Sub Indo per-source refresh bypasses the cached catalogue and HTTP cache', async (t) => {
+    const originalFetch = globalThis.fetch;
+    let catalogueCalls = 0;
+    const cacheModes = [];
+    globalThis.fetch = async (url, init = {}) => {
+        assert.equal(String(url), '/api/anime/latest-subindo');
+        catalogueCalls++;
+        cacheModes.push(init.cache || '');
+        return new Response(JSON.stringify({
+            ok: true,
+            source: 'samehadaku',
+            fallback: false,
+            data: [{ id: 'samehadaku', name: 'Samehadaku', items: [{ title: 'Judul', slug: 'samehadaku~judul', source: 'samehadaku', latestEpisode: 3 }] }],
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    clearApiCache();
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+        clearApiCache();
+    });
+
+    const first = await getLatestSubIndoBySource();
+    const cached = await getLatestSubIndoBySource();
+    assert.equal(catalogueCalls, 1, 'normal navigation reuses the browser cache');
+    assert.equal(cached.sections[0].items.length, first.sections[0].items.length);
+
+    const refreshed = await getLatestSubIndoBySource({ refresh: true });
+    assert.equal(catalogueCalls, 2, 'refresh must request a fresh catalogue');
+    assert.equal(cacheModes[1], 'no-store');
+    assert.deepEqual(refreshed.sections.map((source) => source.id), ['samehadaku']);
 });
 
 test('frontend accepts only same-origin signed AnimeOnsen media proxy URLs', async (t) => {

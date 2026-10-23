@@ -289,7 +289,7 @@ async function waitTurn({ key, interval }, signal, source) {
 /* ------------------------------------------------------------------ */
 /* Request                                                             */
 /* ------------------------------------------------------------------ */
-async function attemptFetch(url, { method, headers, body, timeout, signal, source }) {
+async function attemptFetch(url, { method, headers, body, timeout, signal, source, noCache = false }) {
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -310,6 +310,7 @@ async function attemptFetch(url, { method, headers, body, timeout, signal, sourc
             signal: controller.signal,
             // AniList menolak request tanpa Referer → pastikan origin selalu terkirim.
             referrerPolicy: 'strict-origin-when-cross-origin',
+            ...(noCache ? { cache: 'no-store' } : {}),
         });
         const text = await res.text();
         let json = null;
@@ -364,6 +365,7 @@ function backoffDelay(attempt, retryAfter) {
  *   validate?: (json:any) => any,   lempar error untuk menolak respons
  *   transform?: (json:any) => any,  hasilnya yang di-cache & dikembalikan
  *   force?: boolean,                abaikan circuit breaker (cek ulang manual)
+ *   noCache?: boolean,              lewati cache memori/sessionStorage & HTTP cache (refresh manual)
  * }} [options]
  */
 export function fetchJSON(url, options = {}) {
@@ -382,12 +384,13 @@ export function fetchJSON(url, options = {}) {
         validate,
         transform,
         force = false,
+        noCache = false,
     } = options;
 
     const payload = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
     const key = cacheKey || `${source}:${hashKey(`${method} ${url} ${payload || ''}`)}`;
 
-    if (ttl > 0) {
+    if (ttl > 0 && !noCache) {
         const cached = cacheGet(key);
         if (cached !== undefined) return Promise.resolve(cached);
     }
@@ -397,7 +400,7 @@ export function fetchJSON(url, options = {}) {
     }
     // Dedupe hanya untuk request tanpa signal pemanggil (mis. section homepage yang
     // berbagi satu query gabungan). Request yang bisa dibatalkan berjalan sendiri.
-    if (!signal && inflight.has(key)) return inflight.get(key);
+    if (!signal && !noCache && inflight.has(key)) return inflight.get(key);
 
     const run = async () => {
         if (pending[source] !== undefined) pending[source]++;
@@ -405,7 +408,7 @@ export function fetchJSON(url, options = {}) {
             for (let attempt = 0; ; attempt++) {
                 try {
                     if (throttle) await waitTurn(throttle, signal, source);
-                    const json = await attemptFetch(url, { method, headers, body: payload, timeout, signal, source });
+                    const json = await attemptFetch(url, { method, headers, body: payload, timeout, signal, source, noCache });
                     const valid = validate ? validate(json) : json;
                     const value = transform ? transform(valid) : valid;
                     markHealth(source, true);

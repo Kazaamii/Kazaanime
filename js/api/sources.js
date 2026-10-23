@@ -84,7 +84,7 @@ function call(path, opts = {}) {
 }
 
 /** GET <baseUrl><apiPath> lewat http.js (cache, timeout, dedupe, status backend). */
-function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform } = {}) {
+function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform, force = false, noCache = false } = {}) {
     if (!isBackendEnabled()) return Promise.reject(disabledError());
     const base = String(cfg.baseUrl || '').replace(/\/+$/, '');
     return fetchJSON(`${base}${apiPath}`, {
@@ -94,6 +94,8 @@ function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform } = {}) {
         timeout: cfg.timeout,
         validate: unwrap,
         transform,
+        force,
+        noCache,
     }).catch((err) => {
         throw noteAbsent(err);
     });
@@ -122,16 +124,22 @@ function fromBackendError(value, fallbackSource = 'backend') {
     });
 }
 
-/** Rilis Sub Indo homepage, tiap sumber tetap menjadi grup dan kartu terpisah. */
-export function getLatestSubIndoBySource({ signal } = {}) {
+/**
+ * Rilis Sub Indo homepage, tiap sumber tetap menjadi grup dan kartu terpisah.
+ * `refresh` = ambil katalog baru tanpa cache (tombol coba lagi per panel).
+ */
+export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
     return call('/latest-subindo', {
         signal,
+        force: refresh,
+        noCache: refresh,
         transform: (json) => ({
             sections: (Array.isArray(json.data) ? json.data : []).map((entry) => {
                 const id = String(entry?.id || entry?.source || 'source').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'source';
                 return {
                     id,
                     name: String(entry?.name || id).slice(0, 60),
+                    homeUrl: String(entry?.homeUrl || ''),
                     items: (Array.isArray(entry?.items) ? entry.items : [])
                         .map((item) => fromBackend(item, id))
                         .filter(Boolean),

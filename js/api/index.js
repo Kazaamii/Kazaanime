@@ -146,12 +146,18 @@ export async function getHomeSection(kind) {
     return out;
 }
 
-/** Rilis Sub Indo yang diverifikasi per sumber melalui server/track episode terbaru. */
-export function getSubIndoHomeSources({ signal } = {}) {
+/**
+ * Rilis Sub Indo yang diverifikasi per sumber melalui server/track episode terbaru.
+ * @param {{signal?: AbortSignal, sourceIds?: string[], refresh?: boolean}} [opts]
+ *   sourceIds: batasi verifikasi ke situs tertentu (tombol "Coba lagi" per panel).
+ *   refresh: ambil katalog baru tanpa cache (perlu saat sumber sebelumnya gagal).
+ */
+export function getSubIndoHomeSources({ signal, sourceIds, refresh = false } = {}) {
     return getVerifiedSubIndoSources({
-        getSources: (opts) => backend.getLatestSubIndoBySource(opts),
+        getSources: (opts) => backend.getLatestSubIndoBySource({ ...opts, refresh }),
         getEpisode: (slug, ep, opts) => backend.getBackendEpisode(slug, ep, opts),
         signal,
+        sourceIds,
     });
 }
 

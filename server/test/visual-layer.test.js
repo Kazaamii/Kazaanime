@@ -18,7 +18,7 @@ test('homepage keeps Japanese Sub Indo in a separate per-provider section', () =
     assert.match(homeHtml, /server atau track subtitle Indonesia ditemukan pada episode terbarunya/);
     assert.match(homeHtml, /judul yang sama dari situs berbeda tetap tampil terpisah/);
     assert.match(homeHtml, /id="subindoSources"/);
-    assert.match(homeJs, /getSubIndoHomeSources\(\)/);
+    assert.match(homeJs, /getSubIndoHomeSources\(\{ refresh \}\)/);
     assert.match(homeJs, /data-subindo-source-grid/);
     assert.match(homeJs, /variant: 'source'.*episodeOf: latestEpisodeOf/s);
 });

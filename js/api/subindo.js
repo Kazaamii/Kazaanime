@@ -2,7 +2,16 @@
  * Kazanime — verifikasi katalog Sub Indo untuk section terpisah di homepage.
  * Hanya judul dari katalog scraper yang diperiksa; hasil metadata cadangan
  * dan server tanpa bukti subtitle Indonesia tidak dimasukkan.
+ *
+ * Penguatan 23 Okt 2026:
+ *  - batas waktu total (`SUB_INDO.timeBudgetMs`) → panel tidak menunggu selamanya;
+ *    hasil yang sudah terverifikasi tetap ditampilkan dengan penanda "batas waktu";
+ *  - batas kandidat per sumber (`perSourceChecks`) supaya satu situs tidak menghabiskan
+ *    jatah pemeriksaan situs lain;
+ *  - bila episode terbaru belum punya bukti Sub Indo, episode sebelumnya diperiksa
+ *    (terbatas) dan kartu menunjuk episode yang benar-benar terverifikasi.
  */
+import { SUB_INDO } from '../config.js';
 
 const SUB_INDO_SOURCE_IDS = new Set([
     'samehadaku',
@@ -13,10 +22,52 @@ const SUB_INDO_SOURCE_IDS = new Set([
     'animeindo',
 ]);
 
-const SOURCE_CHECK_LIMIT = 18;
-const RESULT_LIMIT = 12;
-const CONCURRENCY = 3;
+const SOURCE_CHECK_LIMIT = SUB_INDO.maxChecks;
+const RESULT_LIMIT = SUB_INDO.resultLimit;
+const CONCURRENCY = SUB_INDO.concurrency;
 const LATEST_FEED_SOURCE_IDS = new Set(['samehadaku', 'sakunime', 'otakudesu', 'kuramanime']);
+
+function limitOf(value, fallback, min = 1, max = 60) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function budgetOf(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.min(60 * 1000, Math.floor(n));
+}
+
+function budgetAbortError() {
+    const error = new Error('Batas waktu pemeriksaan tercapai.');
+    error.name = 'AbortError';
+    return error;
+}
+
+/**
+ * Berhenti menunggu getEpisode saat anggaran waktu habis. Request asli tetap
+ * dibatalkan lewat signal yang sama; race ini menjaga verifier tidak menggantung
+ * bila implementasi getEpisode mengabaikan signal.
+ */
+function raceAbort(promise, signal) {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(budgetAbortError());
+    return new Promise((resolve, reject) => {
+        const onAbort = () => reject(budgetAbortError());
+        signal.addEventListener('abort', onAbort, { once: true });
+        promise.then(
+            (value) => {
+                signal.removeEventListener('abort', onAbort);
+                resolve(value);
+            },
+            (error) => {
+                signal.removeEventListener('abort', onAbort);
+                reject(error);
+            },
+        );
+    });
+}
 
 function slugSourceOf(anime) {
     return String(anime?.slug || '').split(/[~:]/, 1)[0].trim().toLowerCase();
@@ -138,8 +189,17 @@ export async function getVerifiedSubIndoAnime({
 }
 
 /**
- * Versi berkelompok dari verifier: cek episode terbaru dengan batas global,
- * tetapi pertahankan panel dan duplikat judul antar-sumber.
+ * Versi berkelompok dari verifier: cek episode terbaru dengan batas global dan
+ * batas per sumber, lalu pertahankan panel dan duplikat judul antar-sumber.
+ *
+ * Anggaran waktu: bila `timeBudgetMs` habis, pemeriksaan yang belum selesai
+ * dibatalkan dan hasil yang sudah terverifikasi tetap dikembalikan dengan
+ * `timedOut: true` pada sumber terkait (bukan error seluruh feed).
+ *
+ * Episode sebelumnya: bila episode terbaru tidak punya bukti Sub Indo, episode
+ * sebelumnya boleh diperiksa (terbatas). Kartu lalu menunjuk episode yang
+ * benar-benar terverifikasi (`latestEpisode` diperbarui) agar tautan tidak
+ * menjanjikan subtitle yang belum ada.
  */
 export async function getVerifiedSubIndoSources({
     getSources,
@@ -147,77 +207,188 @@ export async function getVerifiedSubIndoSources({
     signal,
     limit = RESULT_LIMIT,
     maxChecks = SOURCE_CHECK_LIMIT,
+    perSourceChecks = SUB_INDO.perSourceChecks,
     concurrency = CONCURRENCY,
+    timeBudgetMs = SUB_INDO.timeBudgetMs,
+    retryPreviousEpisode = SUB_INDO.retryPreviousEpisode,
+    previousEpisodeChecks = SUB_INDO.previousEpisodeChecks,
+    sourceIds = null,
 } = {}) {
     if (typeof getSources !== 'function' || typeof getEpisode !== 'function') {
         throw new TypeError('getSources dan getEpisode wajib berupa fungsi.');
     }
+    const startedAt = Date.now();
     throwIfAborted(signal);
 
     const catalog = await getSources({ signal });
     throwIfAborted(signal);
-    if (!catalog || catalog.fallback) return { sections: [], checked: 0, unavailable: true };
+    if (!catalog || catalog.fallback) {
+        return { sections: [], checked: 0, timedOut: false, unavailable: true };
+    }
 
+    const normalizeSourceId = (value) => String(value || '').trim().toLowerCase();
+    const onlySources = Array.isArray(sourceIds) && sourceIds.length
+        ? new Set(sourceIds.map(normalizeSourceId).filter(Boolean))
+        : null;
     const sources = (Array.isArray(catalog.sections) ? catalog.sections : [])
-        .filter((source) => LATEST_FEED_SOURCE_IDS.has(String(source?.id || '').trim().toLowerCase()))
-        .map((source) => ({
-            id: String(source.id).trim().toLowerCase(),
-            name: String(source.name || source.id),
-            stale: Boolean(source.stale),
-            error: source.error || null,
-            checked: 0,
-            failedChecks: 0,
-            items: [],
-            candidates: (Array.isArray(source.items) ? source.items : [])
-                .filter((anime) => anime?.slug
-                    && sourceIdOf(anime) === String(source.id).trim().toLowerCase()
-                    && slugSourceOf(anime) === String(source.id).trim().toLowerCase()),
-        }));
+        .filter((source) => {
+            const id = normalizeSourceId(source?.id);
+            return onlySources ? onlySources.has(id) : LATEST_FEED_SOURCE_IDS.has(id);
+        })
+        .map((source) => {
+            const id = normalizeSourceId(source.id);
+            const seenSlugs = new Set();
+            const candidates = (Array.isArray(source.items) ? source.items : [])
+                .filter((anime) => {
+                    if (!anime?.slug || sourceIdOf(anime) !== id || slugSourceOf(anime) !== id) return false;
+                    if (seenSlugs.has(anime.slug)) return false;
+                    seenSlugs.add(anime.slug);
+                    return true;
+                });
+            return {
+                id,
+                name: String(source.name || source.id),
+                homeUrl: String(source.homeUrl || ''),
+                stale: Boolean(source.stale),
+                error: source.error || null,
+                checked: 0,
+                failedChecks: 0,
+                timedOut: false,
+                scheduled: 0,
+                processed: 0,
+                items: [],
+                candidates,
+            };
+        });
 
-    const checkLimit = Math.max(0, Math.min(60, Number(maxChecks) || SOURCE_CHECK_LIMIT));
+    // Jatah global + jatah per sumber, dibagikan bergiliran agar setiap panel
+    // mendapat kesempatan yang sama (sumber dengan kandidat sedikit tidak
+    // menghabiskan jatah sumber lain).
+    const checkLimit = limitOf(maxChecks, SOURCE_CHECK_LIMIT, 0, 60);
+    const perSourceLimit = limitOf(perSourceChecks, SUB_INDO.perSourceChecks, 1, 60);
     const candidates = [];
     for (let index = 0; candidates.length < checkLimit; index++) {
         let added = false;
         for (const source of sources) {
+            if (source.scheduled >= perSourceLimit) continue;
             const anime = source.candidates[index];
-            if (!anime || candidates.length >= checkLimit) continue;
+            if (!anime) continue;
             candidates.push({ source, anime });
+            source.scheduled++;
             added = true;
+            if (candidates.length >= checkLimit) break;
         }
         if (!added) break;
     }
 
-    const checks = new Array(candidates.length).fill(null);
+    // Anggaran waktu dihitung sejak fungsi dipanggil (termasuk katalog), bukan
+    // hanya verifikasi, supaya panel tidak menunggu dua kali lipat saat backend lambat.
+    const budgetMs = budgetOf(timeBudgetMs);
+    const remainingMs = budgetMs ? Math.max(0, budgetMs - (Date.now() - startedAt)) : 0;
+    const controller = new AbortController();
+    let timedOut = false;
+    let timer = null;
+    if (budgetMs && remainingMs <= 0) {
+        timedOut = true;
+        controller.abort();
+    } else if (remainingMs > 0) {
+        timer = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+        }, remainingMs);
+    }
+    const onUserAbort = () => controller.abort();
+    signal?.addEventListener('abort', onUserAbort, { once: true });
+
+    const isBudgetStop = () => controller.signal.aborted && !signal?.aborted;
+    const requestEpisode = (anime, episode) => raceAbort(
+        getEpisode(anime.slug, episode, { signal: controller.signal }),
+        controller.signal,
+    );
+
+    const results = new Array(candidates.length).fill(null);
+    const previousLimit = retryPreviousEpisode
+        ? limitOf(previousEpisodeChecks, 0, 0, checkLimit)
+        : 0;
+    const previousBudget = { used: 0 };
+
+    /** Periksa satu kandidat; `results[index]` hanya diisi bila bukti Sub Indo ada. */
+    const verifyCandidate = async (source, anime, index) => {
+        const episode = episodeOf(anime);
+        source.checked++;
+        try {
+            const media = await requestEpisode(anime, episode);
+            if (hasIndonesianSubtitle(media?.servers)) {
+                results[index] = { source, anime: { ...anime, latestEpisode: episode }, key: titleKey(anime) };
+                return;
+            }
+        } catch {
+            if (signal?.aborted) throwIfAborted(signal);
+            if (isBudgetStop()) {
+                source.timedOut = true;
+                return;
+            }
+            source.failedChecks++;
+            return;
+        }
+
+        if (!previousLimit || episode <= 1 || previousBudget.used >= previousLimit) return;
+        previousBudget.used++;
+        const previousEpisode = episode - 1;
+        source.checked++;
+        try {
+            const media = await requestEpisode(anime, previousEpisode);
+            if (hasIndonesianSubtitle(media?.servers)) {
+                results[index] = {
+                    source,
+                    anime: { ...anime, latestEpisode: previousEpisode },
+                    key: titleKey(anime),
+                };
+            }
+        } catch {
+            if (signal?.aborted) throwIfAborted(signal);
+            if (isBudgetStop()) {
+                source.timedOut = true;
+                return;
+            }
+            source.failedChecks++;
+        }
+    };
+
     let cursor = 0;
-    const workerCount = Math.max(1, Math.min(6, Number(concurrency) || CONCURRENCY));
+    const workerCount = limitOf(concurrency, CONCURRENCY, 1, 6);
     const worker = async () => {
         while (true) {
+            if (timedOut || controller.signal.aborted) return;
             throwIfAborted(signal);
             const index = cursor++;
             if (index >= candidates.length) return;
             const { source, anime } = candidates[index];
-            const episode = episodeOf(anime);
-            source.checked++;
             try {
-                const media = await getEpisode(anime.slug, episode, { signal });
-                if (hasIndonesianSubtitle(media?.servers)) {
-                    checks[index] = { source, anime: { ...anime, latestEpisode: episode }, key: titleKey(anime) };
-                }
-            } catch (error) {
-                if (signal?.aborted || error?.kind === 'abort' || error?.name === 'AbortError') throw error;
-                source.failedChecks++;
+                await verifyCandidate(source, anime, index);
+            } finally {
+                source.processed++;
             }
         }
     };
 
-    if (candidates.length) {
-        await Promise.all(Array.from({ length: Math.min(workerCount, candidates.length) }, worker));
+    try {
+        if (candidates.length) {
+            await Promise.all(Array.from({ length: Math.min(workerCount, candidates.length) }, worker));
+        }
+    } finally {
+        if (timer) clearTimeout(timer);
+        signal?.removeEventListener('abort', onUserAbort);
     }
     throwIfAborted(signal);
 
+    for (const source of sources) {
+        if (timedOut && source.processed < source.scheduled) source.timedOut = true;
+    }
+
     const seenBySource = new Map(sources.map((source) => [source.id, new Set()]));
-    const resultLimit = Math.max(1, Number(limit) || RESULT_LIMIT);
-    for (const check of checks) {
+    const resultLimit = limitOf(limit, RESULT_LIMIT, 1, 60);
+    for (const check of results) {
         if (!check || check.source.items.length >= resultLimit) continue;
         const seen = seenBySource.get(check.source.id);
         if (check.key && seen.has(check.key)) continue;
@@ -226,10 +397,11 @@ export async function getVerifiedSubIndoSources({
     }
 
     return {
-        sections: sources.map(({ id, name, stale, error, checked, failedChecks, items }) => ({
-            id, name, stale, error, checked, failedChecks, items,
+        sections: sources.map(({ id, name, homeUrl, stale, error, checked, failedChecks, timedOut: expired, items }) => ({
+            id, name, homeUrl, stale, error, checked, failedChecks, timedOut: expired, items,
         })),
-        checked: candidates.length,
+        checked: sources.reduce((sum, source) => sum + source.checked, 0),
+        timedOut: Boolean(timedOut),
         unavailable: Boolean(catalog.unavailable),
     };
 }

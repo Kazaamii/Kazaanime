@@ -177,7 +177,9 @@
 .section-note button:hover{transform:scale(1.03)}
 
 /* ---------- Homepage: rilis Sub Indo dipisah per situs sumber ---------- */
-.subindo-intro{margin:-10px 0 18px;color:var(--text-secondary);font-size:13px;line-height:1.6}
+.subindo-intro{margin:-10px 0 10px;color:var(--text-secondary);font-size:13px;line-height:1.6}
+.subindo-status{margin:0 0 16px;color:var(--text-secondary);font-size:12px;line-height:1.5}
+.subindo-status:empty{display:none}
 .subindo-sources[aria-busy="true"]{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:22px}
 .subindo-source{padding:22px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .subindo-source:last-child{border-bottom:0}
@@ -185,8 +187,24 @@
 .subindo-source-header h3{font-family:var(--font-display);font-size:18px;font-weight:700}
 .subindo-source-count{flex-shrink:0;padding:4px 9px;border:1px solid rgba(var(--primary-rgb),.18);border-radius:999px;background:rgba(var(--primary-rgb),.08);color:var(--text-secondary);font-size:11px}
 .subindo-source-count.is-stale{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.08);color:#fbbf24}
+.subindo-source-meta{margin:-8px 0 8px;color:var(--text-secondary);font-size:11px;line-height:1.5}
 .subindo-source-warning{margin:-5px 0 10px;color:var(--text-secondary);font-size:12px;line-height:1.5}
+.subindo-retry{display:inline-flex;align-items:center;gap:6px;margin-left:6px;padding:4px 10px;border:1px solid rgba(var(--primary-rgb),.25);border-radius:999px;background:rgba(var(--primary-rgb),.08);color:var(--primary);font:inherit;font-size:11px;font-weight:600;cursor:pointer;vertical-align:baseline;transition:background .2s}
+.subindo-retry:hover{background:rgba(var(--primary-rgb),.16)}
+.subindo-retry .ic{width:13px;height:13px}
 .subindo-source .anime-grid{margin-top:12px}
+.subindo-source.is-empty{padding:14px 0}
+.subindo-source.is-empty .subindo-source-header{margin-bottom:0}
+.subindo-empty{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0;padding:10px 12px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.02);color:var(--text-secondary);font-size:12px;line-height:1.55}
+.subindo-empty.is-policy{border-color:rgba(245,158,11,.22);background:rgba(245,158,11,.05)}
+.subindo-empty-icon{display:inline-flex;flex-shrink:0;color:rgba(var(--primary-rgb),.75)}
+.subindo-empty.is-policy .subindo-empty-icon{color:#fbbf24}
+.subindo-empty-icon .ic{width:15px;height:15px}
+.subindo-empty-text{flex:1 1 240px;min-width:0}
+.subindo-empty-actions{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+.subindo-empty-link{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid rgba(var(--primary-rgb),.25);border-radius:999px;background:rgba(var(--primary-rgb),.08);color:var(--primary);font-size:11px;font-weight:600;text-decoration:none;transition:background .2s}
+.subindo-empty-link:hover{background:rgba(var(--primary-rgb),.16)}
+.subindo-empty-link .ic{width:13px;height:13px}
 
 /* ---------- Tombol aksi bersama (hero & halaman watch) ---------- */
 .btn-watch,.btn-bookmark-hero{display:flex;align-items:center;gap:8px;padding:12px 28px;border:0;border-radius:30px;font-weight:600;cursor:pointer;font-size:14px;transition:all .3s;font-family:inherit;text-decoration:none}
