@@ -1,0 +1,50 @@
+name: sample-upstream (sementara)
+
+on:
+  push:
+    branches: [arena/3972393a-kazaanime]
+    paths: ['.github/workflows/sample-upstream.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/3972393a-kazaanime
+      - name: Fetch samples
+        run: |
+          set -u
+          mkdir -p samples2
+          UA='KazanimeBot/1.0 (+https://github.com/Kazaamii/Kazaanime; contact)'
+          fetch() {
+            name="$1"; url="$2"
+            code=$(curl -sS -L --compressed --max-time 45 -A "$UA" \
+              -H 'Accept: text/html,application/xhtml+xml' \
+              -o "samples2/$name.html" -w '%{http_code}' "$url" || echo 000)
+            bytes=$(wc -c < "samples2/$name.html" | tr -d ' ')
+            printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$bytes" "$url" >> samples2/manifest.txt
+            sleep 1
+          }
+          fetch animeku-search      'https://ww2.animeku.lol/?s=douluo'
+          fetch animeku-genre       'https://ww2.animeku.lol/genre/'
+          fetch animeku-donghua     'https://ww2.animeku.lol/donghua/'
+          fetch animeku-baru        'https://ww2.animeku.lol/baru-utnwb9y/'
+          fetch animeku-favorit     'https://ww2.animeku.lol/favorit-sixkqhv/'
+          fetch oploverz-search     'https://oploverz.ch/?s=one+piece'
+          fetch oploverz-genre      'https://oploverz.ch/series/?genre%5B%5D=action'
+          fetch oploverz-upcoming   'https://oploverz.ch/series/?status=upcoming'
+          fetch oploverz-popular    'https://oploverz.ch/series/?order=popular'
+          fetch oploverz-az         'https://oploverz.ch/az-list/'
+          cat samples2/manifest.txt
+      - name: Commit samples
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add samples2
+          git commit -m 'chore(sample): HTML sampel sementara dari upstream [skip ci]' || echo 'nothing to commit'
+          git push origin HEAD:arena/3972393a-kazaanime
