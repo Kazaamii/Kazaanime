@@ -124,7 +124,8 @@ test('katalog.js: ringkas 6 kartu + tombol Tampilkan lebih banyak + Lihat Semua'
     assert.match(pageJs, /class="see-all" data-see-all href="\$\{katalogUrl\(\{ source: state\.source, filter: def\.id, genre: state\.genre \}\)\}"/);
     assert.match(pageJs, /Lihat Semua \$\{icon\('chevron-right'\)\}/);
     assert.match(pageJs, /filter: state\.query \? '' : runtime\.def\.id/);
-    assert.match(pageJs, /refresh,/, 'Coba Lagi melewati cache/circuit frontend');
+    // Ronde 5: "Coba Lagi" tetap memaksa refresh; percobaan ulang otomatis juga melewati circuit.
+    assert.match(pageJs, /refresh: refresh \|\| attempt > 1,/, 'Coba Lagi melewati cache/circuit frontend');
     assert.match(pageJs, /loadSection\(runtime, \{ reset: true, refresh: true \}\)/);
 });
 

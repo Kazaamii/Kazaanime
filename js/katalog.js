@@ -33,6 +33,7 @@ import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from '
 import { showSkeleton } from './ui/skeleton.js';
 import { browseAnime, friendlyError, getUpcomingAnime } from './api/index.js';
 import { getSourceBrowse } from './api/sources.js';
+import { withAutoRetry } from './api/retry.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { html, $, delegate } from './ui/dom.js';
 import { icon } from './ui/icons.js';
@@ -429,11 +430,13 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
         //  - donghua  : rilis donghua dari feed Donghua Kazanime.
         // Keduanya mengembalikan objek Anime yang sudah dinormalisasi.
         const mode = runtime.def.loader || 'browse';
+        // Auto refresh (24 Okt 2026): kegagalan sementara (timeout/jaringan/5xx/circuit)
+        // dicoba sekali lagi sebelum panel menampilkan "Coba Lagi".
         const res = mode === 'metadata'
-            ? await getUpcomingAnime({ page: runtime.page + 1, perPage: PREVIEW * 2 })
+            ? await withAutoRetry(() => getUpcomingAnime({ page: runtime.page + 1, perPage: PREVIEW * 2 }))
             : mode === 'donghua'
-                ? await browseAnime('donghua', { page: runtime.page + 1 })
-                : await getSourceBrowse(state.source, {
+                ? await withAutoRetry(() => browseAnime('donghua', { page: runtime.page + 1 }))
+                : await withAutoRetry((attempt) => getSourceBrowse(state.source, {
                     // Saat mencari, id bagian sintetis ("hasil") bukan filter situs — jangan dikirim.
                     filter: state.query ? '' : runtime.def.id,
                     genre: state.genre,
@@ -442,7 +445,10 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
                     q: state.query,
                     page: runtime.page + 1,
                     // "Coba Lagi" melewati cache + circuit breaker frontend, sama seperti panel beranda.
-                    refresh,
+                    refresh: refresh || attempt > 1,
+                }), {
+                    // Catatan di atas daftar: pengguna tahu bagian ini sedang dicoba ulang.
+                    onRetry: () => setNote('Jaringan lambat — mencoba sekali lagi…'),
                 });
         if (token !== runtime.token || sourceToken !== state.loadToken) return;
         const paged = mode !== 'browse';

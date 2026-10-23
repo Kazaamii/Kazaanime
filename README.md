@@ -19,6 +19,7 @@ beradapter.
 | **H** | Pengganti saat sumber gagal 23 Okt 2026: **AnimeKu** (`ww2.animeku.lol`) dan **Oploverz** (`oploverz.ch`, dikenal juga sebagai Animeloverz) sebagai adapter penuh + panel Sub Indo cadangan; bukti Sub Indo tetap per episode | ✅ Selesai |
 | **I** | Katalog 23 Okt 2026: panel Sub Indo tinggal **AnimeKu** + **Oploverz** (Samehadaku, Sakunime, Otakudesu, Kuramanime tidak lagi jadi panel); endpoint **`/api/anime/browse`**; halaman baru **Jelajah** (`katalog.html`) dengan tiga tab (AnimeKu / Oploverz / Donghua), bagian berurutan, filter genre, dan Coming Soon dari metadata | ✅ Selesai |
 | **J** | 24 Okt 2026: **verifikasi per episode dihapus** — panel beranda menampilkan katalog AnimeKu & Oploverz apa adanya (tanpa batas waktu, tanpa "tanpa bukti"), plus tombol **Tampilkan lebih banyak** di tiap panel; **Jelajah** kembali punya tombol expand per bagian (tetap dengan **Lihat Semua** → `?filter=<bagian>`) | ✅ Selesai |
+| **K** | 24 Okt 2026 (lanjutan): **menu genre situs** (±70 chip jadi satu tombol), **Donghua dari AnimeKu & Oploverz**, **auto refresh AnimeKu & Oploverz** (percobaan ulang otomatis untuk timeout/jaringan/5xx, muat ulang saat jaringan kembali/tab aktif/data basi, cadangan lokal `kz:donghua-last`, tombol **Muat ulang** di bagian Donghua), Sub Indo tahan jaringan ponsel | ✅ Selesai |
 
 ---
 
@@ -62,6 +63,7 @@ kazanime/
 │   ├── api/                   ← SATU-SATUNYA tempat request jaringan
 │   │   ├── normalize.js       ✅🅒 KONTRAK format Anime (+ field detail) + helper label, isSameAnime, airedEpisodeCount
 │   │   ├── http.js            ✅🅓 fetchJSON: timeout, retry, cache Map+sessionStorage, dedupe, throttle, circuit breaker
+│   │   ├── retry.js           ✅🅚 denganAutoRetry: percobaan ulang khusus kegagalan sementara (timeout/jaringan/5xx/circuit) — 403/429/challenge tidak pernah diulang
 │   │   ├── anilist.js         ✅🅒 GraphQL (homepage gabungan, search, jadwal) + detail+rekomendasi dalam 1 query
 │   │   ├── kitsu.js           ✅🅒 Kitsu (JSON:API, simple GET) + detail dengan mapping id MAL/AniList
 │   │   ├── sources.js         ✅🅓🅔🅕 klien backend /api/anime/* + /api/stream/servers + /api/stream/subai (aktif; mati otomatis bila /api tidak ada) + normalisasi server/download
@@ -99,9 +101,9 @@ kazanime/
 │   │   └── download-list.js   🅒🅓 daftar link download per kualitas (+ format & bahasa subtitle dari backend)
 │   ├── vendor/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
-│   ├── home.js                ✅🅓🅔🅗🅚 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol + filter Tahun/Musim/Urutan + genre situs dari `/api/anime/genres`; kartu donghua backend → episode terbaru)
+│   ├── home.js                ✅🅓🅔🅗🅚 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol + filter Tahun/Musim/Urutan + genre situs dari `/api/anime/genres`; panel Donghua AnimeKu & Oploverz + **auto refresh**; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
-│   ├── katalog.js             ✅🅘🅙🅚 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre + Tahun/Musim (Oploverz), pencarian per sumber
+│   ├── katalog.js             ✅🅘🅙🅚 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre + Tahun/Musim (Oploverz), pencarian per sumber, percobaan ulang otomatis
 │   ├── bookmark.js            🅙 halaman Bookmark: baca services/bookmark.js, cari & urutkan, ajakan login
 │   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
@@ -126,6 +128,7 @@ kazanime/
     │   ├── subtitle-evidence.js bukti Sub Indo per episode (track/judul/download/label/deskripsi) — wajib sebelum `lang: 'id'`
     │   ├── rate-limit.js      throttle per host, circuit breaker, rate limit per IP
     │   ├── cache.js           cache TTL + LRU + dedupe + stale-if-error
+    │   ├── concurrency.js     🅚 mapLimit(): tugas async paralel berbatas, hasil tetap urut (pencarian donghua)
     │   ├── anime.js           makeAnime()/makeEpisode(): format SERAGAM untuk frontend
     │   ├── slug.js            slug "sumber~path" (animexin~soul-land-2…)
     │   ├── text.js            helper urai teks (episode, status, format, URL, judul)
@@ -1062,6 +1065,45 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - **Perbaikan kecil:** filter pencarian Jelajah tidak lagi mengirim `filter=hasil` (id bagian sintetis) ke
   backend; label + tombol muat ulang Sub Indo dibungkus `.subindo-header-actions` agar tidak berdesakan
   di layar kecil.
+
+### Perubahan perilaku (24 Okt 2026 — putaran kelima: auto refresh AnimeKu & Oploverz)
+Permintaan pengguna: *"tambahkan auto refresh nya untuk animeloverz dan animeku agar tidak gagal memuat"*.
+Empat lapis pengaman, semuanya tanpa menembus pembatasan situs:
+
+1. **Percobaan ulang otomatis** (`js/api/retry.js`, `withAutoRetry`). Panel donghua AnimeKu/Oploverz,
+   panel Sub Indo, dan bagian katalog Jelajah mencoba **sekali lagi** (jeda 0,9 dtk) bila gagal karena
+   `timeout`, jaringan putus, HTTP 5xx, atau circuit breaker yang baru terbuka. Percobaan kedua memakai
+   `refresh: true` supaya circuit breaker 90 dtk tidak langsung menolak. **403, 429, challenge keamanan,
+   robots.txt, dan permintaan yang dibatalkan tidak pernah diulang** — itu sama dengan menerobos situs.
+2. **Muat ulang otomatis (auto refresh).** Bagian AnimeKu/Oploverz yang gagal, kosong, atau datanya lebih
+   tua dari **15 menit** dimuat ulang sendiri saat: koneksi kembali (`online`), tab dibuka lagi
+   (`visibilitychange`), atau tiap **5 menit** (`setInterval`). Pemuatannya **quiet**: panel yang sudah
+   terisi tidak dikosongkan lebih dulu, hasil baru menggantikan setelah datang.
+3. **Jeda bertahap setelah gagal:** 15 dtk → 45 dtk → 2 mnt (maksimum tiga kali), lalu menyerah ke
+   penjadwalan 5 menit. Klik **Muat ulang** manual mengembalikan jatah percobaan.
+4. **Cadangan lokal** `kz:donghua-last`: hasil sukses terakhir panel Donghua disimpan (judul + poster +
+   slug) dan dipakai bila kedua situs benar-benar tidak bisa dihubungi — dengan catatan
+   "Menampilkan data tersimpan dari <waktu>", bukan kotak kosong. Panel Sub Indo sudah memakai cara yang
+   sama lewat `kz:subindo-last`.
+
+**Tombol “Muat ulang” di bagian Donghua** (`#donghuaRefresh`,`.subindo-refresh`) memakai pola yang sama
+dengan Sub Indo: ikon berputar, tombol nonaktif selama bekerja, lalu aktif kembali. Situs yang gagal juga
+punya tombol **Coba lagi** di catatan `#donghuaNote`.
+
+**Akar masalah di sisi server juga dipangkas.** Pacing sopan `SCRAPER_MIN_INTERVAL_MS` (1 dtk/permintaan
+per host) membuat lima kueri pencarian donghua berurutan memakan ~7–8 dtk — melewati batas waktu klien
+(12 dtk) dan terlihat sebagai “gagal memuat”. Sekarang:
+
+- kueri donghua dijalankan **paralel berbatas** (`server/lib/concurrency.js`, `mapLimit`, maks 3) dengan
+  urutan hasil yang tetap sama;
+- AnimeKu memakai **3 kueri** (tiga seed) alih-alih 5, jadi respons pertama ~3–5 dtk dan sesudah itu
+  dilayani cache `browse:donghua:<sumber>`;
+- satu kueri gagal tidak lagi menggagalkan permintaan selama kueri lain memberi hasil.
+
+**Batas jujur.** Auto refresh hanya membantu kegagalan **sementara**. Kalau situs mengirim 403/429 atau
+halaman berubah struktur, setelah percobaan habis panel tetap menampilkan pesan + “Buka situs”, tanpa
+percobaan tanpa henti. Di sandbox pengembangan (tanpa akses keluar ke AnimeKu/Oploverz) jalur ini hanya
+diuji dengan respons tiruan (happy-dom) dan uji unit; bukti produksi menyusul setelah deploy.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
