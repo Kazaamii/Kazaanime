@@ -35,8 +35,10 @@ export function logoHTML({ tag = 'a' } = {}) {
 
 function navLinksHTML(page) {
     return html`${NAV_LINKS.map((link) => {
-        const href = page === 'home' ? (link.section ? `#${link.section}` : 'index.html') : homeSectionUrl(link.section);
-        const active = page === 'home' && !link.section;
+        const href = link.page
+            ? link.page
+            : (page === 'home' ? (link.section ? `#${link.section}` : 'index.html') : homeSectionUrl(link.section));
+        const active = link.page ? page === String(link.page).replace(/\.html$/, '') : page === 'home' && !link.section;
         return html`<li${link.authOnly ? raw(' data-auth-only hidden') : ''}><a href="${href}"${active ? raw(' class="active" aria-current="page"') : ''} data-section="${link.section || ''}">${link.label}</a></li>`;
     })}`;
 }

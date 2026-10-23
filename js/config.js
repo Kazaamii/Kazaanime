@@ -69,6 +69,7 @@ export const NAV_LINKS = Object.freeze([
     { label: 'Donghua',  section: 'donghua' },
     { label: 'Bookmark', section: 'bookmarks', authOnly: true },
     { label: 'Genre',    section: 'genre' },
+    { label: 'Jelajah',  page: 'katalog.html' },
     { label: 'Jadwal',   section: 'jadwal' },
 ]);
 
@@ -211,16 +212,16 @@ export const SCHEDULE = Object.freeze({
  * tidak menahan panel situs lain.
  */
 export const SUB_INDO = Object.freeze({
-    /** Maks. kartu per panel sumber (sama dengan batas backend per feed). */
-    resultLimit: 12,
+    /** Maks. kartu per panel sumber. 23 Okt 2026: 2 sumber saja → tampilkan lebih banyak. */
+    resultLimit: 24,
     /** Maks. total pemeriksaan episode per pemuatan homepage. */
-    maxChecks: 18,
+    maxChecks: 24,
     /** Maks. kandidat per sumber per pemuatan (keadilan antar-situs). */
-    perSourceChecks: 6,
+    perSourceChecks: 12,
     /** Pemeriksaan paralel; backend tetap membatasi laju per host. */
     concurrency: 4,
     /** Batas waktu total verifikasi (ms). Hasil yang sudah terverifikasi tetap tampil. */
-    timeBudgetMs: 12000,
+    timeBudgetMs: 15000,
     /** Bila episode terbaru belum punya bukti Sub Indo, periksa episode sebelumnya. */
     retryPreviousEpisode: true,
     /** Maks. pemeriksaan episode sebelumnya per pemuatan (di luar `maxChecks`). */

@@ -3,6 +3,7 @@
  * Endpoint yang dipanggil frontend (js/api/sources.js):
  *   GET /api/anime/latest
  *   GET /api/anime/latest-subindo  (rilis anime Jepang Sub Indo, per sumber)
+ *   GET /api/anime/browse?source=oploverz&filter=popular&genre=action&page=1   (halaman Jelajah)
  *   GET /api/anime/search?q=
  *   GET /api/anime/schedule          (jadwal rilis Sub Indo per hari, WIB — ditambahkan 22 Okt 2026)
  *   GET /api/anime/downloads/kusonime?title=<Romaji>
@@ -49,6 +50,35 @@ export function readRomajiTitles(value) {
     }
     if (!out.length) throw badRequest('Kandidat judul Romaji minimal 2 karakter dan harus memakai huruf Latin.');
     return out;
+}
+
+/** Token filter/genre: huruf kecil, angka, garis; kosong = default adapter. */
+export function readFilterToken(value, name) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (raw === undefined || raw === null || raw === '') return '';
+    if (typeof raw !== 'string' || raw.length > 40 || !/^[a-z0-9-]+$/i.test(raw)) {
+        throw badRequest(`Parameter ${name} tidak valid.`);
+    }
+    return raw.toLowerCase();
+}
+
+/** Id sumber untuk katalog: huruf kecil, angka, garis (mis. "animeku", "oploverz"). */
+export function readSourceId(value) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (typeof raw !== 'string' || !/^[a-z][a-z0-9-]{1,30}$/i.test(raw)) {
+        throw badRequest('Parameter source tidak valid.');
+    }
+    return raw.toLowerCase();
+}
+
+/** Halaman katalog 1–500. */
+export function readPageNumber(value) {
+    if (value === undefined || value === null || value === '') return 1;
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (typeof raw !== 'string' || !/^\d{1,3}$/.test(raw)) throw badRequest('Parameter page tidak valid.');
+    const n = Number.parseInt(raw, 10);
+    if (n < 1 || n > 500) throw badRequest('Parameter page tidak valid.');
+    return n;
 }
 
 /** "12" → 12 ; selain bilangan bulat 1–5000 → 400. */
@@ -157,7 +187,13 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
             ? registry.kusonimeDownloads(titles, ctx)
             : { source: 'kusonime', data: { query: '', matchedTitle: '', downloads: [] }, fallback: false, stale: false, errors: [], disabled: true };
     }));
-    // Harus SEBELUM '/:slug' — kalau tidak, "schedule" dianggap slug anime.
+    // Harus SEBELUM '/:slug' — kalau tidak, "browse"/"schedule" dianggap slug anime.
+    router.get('/browse', handle((req, ctx) => registry.browse({
+        source: readSourceId(req.query.source),
+        filter: readFilterToken(req.query.filter, 'filter'),
+        genre: readFilterToken(req.query.genre, 'genre'),
+        page: readPageNumber(req.query.page),
+    }, ctx)));
     router.get('/schedule', handle((req, ctx) => registry.schedule(ctx)));
     router.get('/:slug/episode/:ep', handle((req, ctx) => registry.episode(req.params.slug, readEpisode(req.params.ep), ctx)));
     router.get('/:slug', handle((req, ctx) => registry.detail(req.params.slug, ctx)));

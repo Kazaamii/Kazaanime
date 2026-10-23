@@ -32,6 +32,7 @@ function stub(id, impl = {}, policy = {}) {
         getAnime: track('getAnime', impl.getAnime || (async () => { throw fail('not_found', id); })),
         getEpisode: track('getEpisode', impl.getEpisode || (async () => { throw fail('not_found', id); })),
         ...(impl.schedule ? { schedule: track('schedule', impl.schedule) } : {}),
+        ...(impl.browse ? { browse: track('browse', impl.browse), supportsBrowse: true } : {}),
         calls,
     };
 }
@@ -65,27 +66,52 @@ test('latest: semua sumber paralel; satu gagal → hasil sebagian + daftar error
     assert.deepEqual(r.errors.map((e) => [e.source, e.kind]), [['kuramanime', 'blocked']]);
 });
 
-test('latestSubIndo: feed per sumber, judul lintas sumber tidak digabung, sumber lain dilewati', async () => {
-    const samehadaku = stub('samehadaku', { latest: async () => [anime('samehadaku', 'x', 'Anime Sama')] });
+test('latestSubIndo: hanya AnimeKu & Oploverz yang menjadi panel (23 Okt 2026)', async () => {
+    const animeku = stub('animeku', { latest: async () => [anime('animeku', 'x', 'Anime Sama')], browse: async () => ({ items: [] }) });
+    const oploverz = stub('oploverz', { latest: async () => [anime('oploverz', 'x', 'Anime Sama')] });
+    const samehadaku = stub('samehadaku', { latest: async () => [anime('samehadaku', 'x', 'Tidak dipakai')] });
     const otakudesu = stub('otakudesu', { latest: async () => { throw fail('blocked', 'otakudesu'); } });
-    const kuramanime = stub('kuramanime', { latest: async () => [anime('kuramanime', 'x', 'Anime Sama')] });
-    const hianime = stub('hianime', { latest: async () => [anime('hianime', 'x', 'English-only')] });
-    const anoboy = stub('anoboy', { latest: async () => [anime('anoboy', 'x', 'Unverified feed')] });
-    const animeindo = stub('animeindo', { latest: async () => [anime('animeindo', 'x', 'Lookup-only')] });
-    animeindo.supportsLatest = false;
+    const sakunime = stub('sakunime', { latest: async () => [anime('sakunime', 'x', 'Tidak dipakai')] });
+    const kuramanime = stub('kuramanime', { latest: async () => [anime('kuramanime', 'x', 'Tidak dipakai')] });
 
-    const result = await reg([samehadaku, otakudesu, kuramanime, hianime, anoboy, animeindo], null, { enrichImages: false }).latestSubIndo();
-    assert.deepEqual(result.data.map((source) => source.id), ['samehadaku', 'otakudesu', 'kuramanime']);
+    const result = await reg([samehadaku, otakudesu, sakunime, kuramanime, oploverz, animeku], null, { enrichImages: false }).latestSubIndo();
+    assert.deepEqual(result.data.map((source) => source.id), ['animeku', 'oploverz'], 'urutan panel: AnimeKu lalu Oploverz');
     assert.deepEqual(result.data[0].items.map((item) => item.title), ['Anime Sama']);
-    assert.deepEqual(result.data[2].items.map((item) => item.title), ['Anime Sama'], 'judul yang sama tetap disajikan oleh sumber kedua');
-    assert.equal(result.data[1].error.kind, 'blocked', 'sumber gagal tetap ditampilkan per panel');
-    assert.equal(result.data[0].homeUrl, 'https://samehadaku.test', 'panel sukses membawa tautan situs');
-    assert.equal(result.data[1].homeUrl, 'https://otakudesu.test', 'panel gagal tetap bisa dibuka manual');
-    assert.deepEqual(result.errors.map((error) => [error.source, error.kind]), [['otakudesu', 'blocked']]);
+    assert.deepEqual(result.data[1].items.map((item) => item.title), ['Anime Sama'], 'judul yang sama tetap disajikan oleh sumber kedua');
+    assert.equal(result.data[0].homeUrl, 'https://animeku.test');
+    assert.deepEqual(result.data.map((source) => source.browse), [true, false],
+        'flag browse sesuai kemampuan adapter (tautan "Lihat semua" tidak dibuat untuk sumber tanpa halaman daftar)');
+    for (const old of [samehadaku, otakudesu, sakunime, kuramanime]) {
+        assert.deepEqual(old.calls, [], `${old.id} tidak boleh dipanggil untuk panel Sub Indo`);
+    }
+});
+
+test('latestSubIndo: sumber pengganti yang gagal tetap tampil sebagai panel dengan diagnosis', async () => {
+    const animeku = stub('animeku', { latest: async () => { throw fail('blocked', 'animeku'); } });
+    const oploverz = stub('oploverz', { latest: async () => [anime('oploverz', 'x', 'Masih Jalan')] });
+    const result = await reg([animeku, oploverz], null, { enrichImages: false }).latestSubIndo();
+    assert.deepEqual(result.data.map((source) => source.id), ['animeku', 'oploverz']);
+    assert.equal(result.data[0].error.kind, 'blocked');
+    assert.equal(result.data[0].homeUrl, 'https://animeku.test', 'panel gagal tetap bisa dibuka manual');
+    assert.deepEqual(result.data[1].items.map((item) => item.title), ['Masih Jalan']);
     assert.equal(result.partial, true);
-    assert.deepEqual(hianime.calls, []);
-    assert.deepEqual(anoboy.calls, []);
-    assert.deepEqual(animeindo.calls, []);
+});
+
+test('browse: diteruskan ke adapter yang mendukung daftar + hasil di-cache', async () => {
+    const payload = { items: [anime('oploverz', 'x', 'Satu')], page: 1, hasNext: true, filters: [], genres: [], filter: 'popular', genre: '' };
+    const O = stub('oploverz', { browse: async () => payload });
+    const A = stub('animexin', {});
+    const registry = reg([O, A], null, { enrichImages: false });
+
+    const first = await registry.browse({ source: 'oploverz', filter: 'popular' });
+    const second = await registry.browse({ source: 'oploverz', filter: 'popular' });
+    assert.equal(first.source, 'oploverz');
+    assert.equal(first.data.items[0].title, 'Satu');
+    assert.deepEqual(O.calls, ['browse'], 'panggilan kedua memakai cache');
+    assert.equal(second.data.hasNext, true);
+
+    await assert.rejects(() => registry.browse({ source: 'animexin' }), (err) => err.status === 400);
+    await assert.rejects(() => registry.browse({ source: 'tidak-ada' }), (err) => err.kind === 'not_found');
 });
 
 test('health melaporkan mode gerbang robots.txt yang aktif', () => {

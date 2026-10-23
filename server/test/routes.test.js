@@ -29,6 +29,25 @@ function fakeRegistry() {
                 errors: [{ source: 'kuramanime', kind: 'blocked', message: 'diblokir' }],
             };
         },
+        async browse({ source, filter = '', genre = '', page = 1 }) {
+            seen.push(`browse:${source}:${filter}:${genre}:${page}`);
+            if (source === 'kusonime') throw badRequest('Sumber Kusonime downloads tidak menyediakan halaman daftar.');
+            return {
+                source,
+                data: {
+                    items: [makeAnime({ title: 'Katalog', slug: `${source}~katalog-satu`, source, latestEpisode: null })],
+                    page,
+                    hasNext: true,
+                    filters: [{ id: 'update', label: 'Terbaru' }],
+                    genres: [{ id: 'action', label: 'Action' }],
+                    filter: filter || 'update',
+                    genre,
+                },
+                fallback: false,
+                stale: false,
+                errors: [],
+            };
+        },
         async search(q) {
             seen.push(`search:${q}`);
             if (q === 'gagal total') throw new AppError('Pencarian gagal: semua sumber sedang bermasalah.', { status: 503, code: 'SOURCES_UNAVAILABLE', retryAfter: 120 });
@@ -89,6 +108,30 @@ test('GET /api/anime/latest: kontrak {ok, source, data} + header cache CDN', asy
         assert.match(res.headers.get('content-type'), /application\/json/);
         assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
         assert.equal(res.headers.get('x-powered-by'), null);
+    });
+});
+
+test('GET /api/anime/browse: sumber, filter, genre, dan halaman diteruskan', async () => {
+    await withApp({}, async (base, registry) => {
+        const { res, json } = await get(`${base}/api/anime/browse?source=oploverz&filter=popular&genre=action&page=3`);
+        assert.equal(res.status, 200);
+        assert.equal(json.ok, true);
+        assert.equal(json.source, 'oploverz');
+        assert.equal(json.data.filter, 'popular');
+        assert.equal(json.data.genre, 'action');
+        assert.equal(json.data.page, 3);
+        assert.equal(json.data.hasNext, true);
+        assert.ok(registry.seen.includes('browse:oploverz:popular:action:3'));
+    });
+});
+
+test('GET /api/anime/browse: parameter tidak valid → 400, sumber tanpa daftar → 400', async () => {
+    await withApp({}, async (base) => {
+        assert.equal((await get(`${base}/api/anime/browse`)).res.status, 400);
+        assert.equal((await get(`${base}/api/anime/browse?source=BAD!`)).res.status, 400);
+        assert.equal((await get(`${base}/api/anime/browse?source=oploverz&page=0`)).res.status, 400);
+        assert.equal((await get(`${base}/api/anime/browse?source=oploverz&genre=Action%20Sub`)).res.status, 400);
+        assert.equal((await get(`${base}/api/anime/browse?source=kusonime`)).res.status, 400);
     });
 });
 
@@ -324,7 +367,7 @@ test('server lokal: hanya file frontend yang dilayani (server/, package.json tid
         assert.equal(home.res.status, 200);
         assert.match(home.text, /<html/i);
         assert.equal(home.res.headers.get('x-frame-options'), null, 'lokal boleh dipratinjau dalam iframe');
-        for (const p of ['/watch.html', '/search.html', '/index.html', '/css/base.css', '/js/config.js']) {
+        for (const p of ['/watch.html', '/search.html', '/index.html', '/katalog.html', '/css/base.css', '/js/config.js']) {
             assert.equal((await get(`${base}${p}`)).res.status, 200, p);
         }
         assert.match((await fetch(`${base}/js/config.js`)).headers.get('content-type'), /javascript/);

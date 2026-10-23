@@ -13,8 +13,9 @@
  */
 import { SUB_INDO } from '../config.js';
 
-// Urutan di sini tidak menentukan urutan panel — backend mengirim `sections` berurutan.
-// AnimeKu & Oploverz ditambahkan 23 Okt 2026 sebagai sumber pengganti saat sumber lama gagal.
+// Id yang dikenali sebagai sumber Sub Indo. Panel yang benar-benar tampil ditentukan
+// backend (`SUB_INDO_LATEST_SOURCE_ORDER` = AnimeKu & Oploverz sejak 23 Okt 2026);
+// daftar ini tetap luas supaya sumber lama bisa diaktifkan lagi lewat SCRAPER_SOURCES.
 const SUB_INDO_SOURCE_IDS = new Set([
     'animeku',
     'oploverz',

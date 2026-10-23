@@ -51,7 +51,7 @@ export function rememberAnime(anime) {
 
 /**
  * @param {import('../api/normalize.js').Anime} anime
- * @param {{variant?: 'default'|'search'|'bookmark', bookmarked?: boolean, episodeText?: string, episode?: number}} [opts]
+ * @param {{variant?: 'default'|'search'|'bookmark'|'source'|'catalog', bookmarked?: boolean, episodeText?: string, episode?: number}} [opts]
  *   episode: episode tujuan link (default 1; "Baru Rilis" memakai episode terbarunya)
  */
 export function cardHTML(anime, { variant = 'default', bookmarked = false, episodeText, episode = 1 } = {}) {
@@ -65,12 +65,15 @@ export function cardHTML(anime, { variant = 'default', bookmarked = false, episo
     let metaLeft = episodeText || episodeLabel(anime);
     let metaRight = ratingHtml(anime);
 
-    if (variant === 'source' || variant === 'search') {
+    if (variant === 'source' || variant === 'search' || variant === 'catalog') {
         const src = SOURCE_BADGES[anime.source];
         badge = src ? src.label : statusBadge(anime);
         badgeClass = src ? src.cls : '';
     }
     if (variant === 'source') quality = 'Sub Indo';
+    // Katalog situs bukan bukti Sub Indo per judul: tampilkan nomor episode terakhir
+    // (atau label netral) sampai halaman episodenya benar-benar diperiksa.
+    if (variant === 'catalog') quality = anime.latestEpisode != null ? `Ep ${anime.latestEpisode}` : 'Katalog';
     if (variant === 'search') {
         quality = anime.format || 'TV';
         metaLeft = `${anime.year ? `${anime.year} • ` : ''}${episodeLabel(anime)}`;

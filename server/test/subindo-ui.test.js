@@ -34,11 +34,11 @@ test('homepage renders per-source counts, timeout state, and a per-source retry'
 test('Sub Indo verification limits are centralised in config.js', () => {
     assert.match(configJs, /export const SUB_INDO = Object\.freeze\(\{/);
     for (const entry of [
-        'resultLimit: 12',
-        'maxChecks: 18',
-        'perSourceChecks: 6',
+        'resultLimit: 24',
+        'maxChecks: 24',
+        'perSourceChecks: 12',
         'concurrency: 4',
-        'timeBudgetMs: 12000',
+        'timeBudgetMs: 15000',
         'retryPreviousEpisode: true',
         'previousEpisodeChecks: 6',
     ]) {
