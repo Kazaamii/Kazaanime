@@ -1,14 +1,14 @@
 /**
  * Kazanime backend — sources/kuramanime.js
- * Adapter Kuramanime (default https://v20.kuramanime.ing; pilih domain per deployment lewat KURAMANIME_BASE_URL).
+ * Adapter Kuramanime (default https://v9.kuramanime.work; pilih domain per deployment lewat KURAMANIME_BASE_URL).
  * Server streaming berlabel Indonesia diklasifikasikan Hardsub; label Hardsub/Softsub pada unduhan
  * tetap dibaca per grup, karena sumber dapat menawarkan kedua format unduhan.
  *
  * STATUS 2026-10-21/22: baseline v20 TIDAK BISA DIVERIFIKASI LANGSUNG.
- *   Pada baseline lama, URL termasuk /robots.txt membalas Cloudflare 403 untuk bot ini
+ *   Baseline v20 lama: URL termasuk /robots.txt membalas Cloudflare 403 untuk bot ini
  *   ("Sorry, you have been blocked" / "Attention Required!"); status mencerminkan blokir IP/WAF.
- *   Pengguna memberi v9.kuramanime.blog dan v9.kuramanime.work sebagai kandidat domain baru,
- *   tetapi keduanya belum dicek live. Pilih tepat satu lewat KURAMANIME_BASE_URL; tidak ada
+ *   Pengguna memilih v9.kuramanime.work sebagai domain yang ingin diuji. robots.txt/ToS masih harus
+ *   lolos pemeriksaan saat runtime. Pilih tepat satu domain lewat KURAMANIME_BASE_URL; tidak ada
  *   failover/rotasi domain dan blokir tetap dihormati.
  *   Scraper open-source lain mencatat situs ini memeriksa header Sec-Fetch-*, fingerprint TLS,
  *   dan memakai token anti-bot berlapis untuk player. Semua itu adalah proteksi akses →
@@ -249,7 +249,7 @@ export function parseEpisodePage($, base) {
  * @param {{network: any, createClient: Function, baseUrl: string}} deps
  */
 export function createKuramanime({ network, createClient, baseUrl, sourceConfig = {} }) {
-    const base = String(baseUrl || 'https://v20.kuramanime.ing').replace(/\/+$/, '');
+    const base = String(baseUrl || 'https://v9.kuramanime.work').replace(/\/+$/, '');
     const host = new URL(base).hostname;
     const client = createClient(network, {
         source: ID,
