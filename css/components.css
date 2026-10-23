@@ -45,6 +45,9 @@
 .source-anilist{background:rgba(59,130,246,.15);color:#60a5fa}
 .source-mal{background:rgba(46,86,173,.15);color:#6b9bd2}
 .source-kitsu{background:rgba(255,165,0,.15);color:#ffa500}
+/* 24 Okt 2026 (putaran 7): grup AnimeKu & Oploverz di autocomplete header. */
+.source-site{background:rgba(var(--primary-rgb),.16);color:var(--primary)}
+.search-result-info .source-site{padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700}
 .search-result-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;transition:all .2s;color:inherit;text-decoration:none}
 .search-result-item:hover,.search-result-item:focus-visible,.search-result-item.is-active{background:rgba(var(--primary-rgb),.08);outline:0}
 .search-result-item img{width:45px;height:62px;object-fit:cover;border-radius:8px;flex-shrink:0}
@@ -57,6 +60,7 @@
 .search-dropdown-footer a,.search-dropdown-footer button{padding:6px 14px;background:var(--gradient-1);border:0;border-radius:10px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;text-decoration:none}
 .search-dropdown-footer a:hover,.search-dropdown-footer button:hover{transform:scale(1.03)}
 .search-dropdown-footer span{font-size:11px;color:var(--text-secondary)}
+.search-dropdown-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .search-loading{padding:20px;text-align:center;color:var(--text-secondary);font-size:13px}
 .search-loading--inline{padding:8px 12px;font-size:11px;text-align:left}
 .search-no-results{padding:25px;text-align:center;color:var(--text-secondary)}
@@ -130,7 +134,7 @@
 .anime-card-badge.src-anilist::before,.anime-card-badge.src-kitsu::before,.anime-card-badge.src-backend::before,.src-dot{content:'';width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block}
 .anime-card-badge.src-anilist::before,.src-dot--anilist,[data-source="anilist"] .src-dot{background:#3db4f2}
 .anime-card-badge.src-kitsu::before,.src-dot--kitsu,[data-source="kitsu"] .src-dot{background:#f97316}
-.anime-card-badge.src-backend::before{background:var(--primary)}
+.anime-card-badge.src-backend::before,[data-source="backend"] .src-dot{background:var(--primary)}
 .anime-card-badge .ic{font-size:12px}
 /* 22 Okt 2026: kualitas pindah ke kiri bawah poster — pojok kanan atas untuk tombol bookmark */
 .anime-card-quality{position:absolute;bottom:10px;left:10px;padding:3px 8px;background:rgba(0,0,0,.7);border:1px solid var(--accent);border-radius:8px;font-size:10px;color:var(--accent);font-weight:600}

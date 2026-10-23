@@ -2,7 +2,9 @@
  * Kazanime — search.js (entry point search.html)
  *
  * Tiga mode dari query string (lihat routes.js):
- *   ?q=naruto            pencarian gabungan AniList + Kitsu (MyAnimeList/Jikan dihapus 22 Okt 2026)
+ *   ?q=naruto            pencarian gabungan AniList + Kitsu + AnimeKu/Oploverz
+ *                        (24 Okt 2026, putaran 7: hasil situs tampil di bagian sendiri
+ *                         karena kartunya memutar episode langsung dari situs)
  *   ?browse=ongoing      "Lihat Semua" dari homepage (ongoing|popular|new|donghua)
  *   ?genre=Action        "Lihat Semua" untuk genre
  * + &sort= &format= &source= disimpan di URL (refresh / bagikan link tetap sama).
@@ -32,6 +34,7 @@ import {
 import { sourceLabel } from './api/normalize.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
+import { SITE_SOURCES, SITE_LABELS, siteOfSuggestion, siteResults } from './ui/search-suggest.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -43,6 +46,14 @@ const tabsEl = $('#searchSourceTabs');
 const filtersEl = $('#searchFilters');
 const loadMoreWrap = $('#searchLoadMore');
 const loadMoreBtn = $('#searchLoadMoreBtn');
+const siteWrap = $('#searchSiteResults');
+const siteGrid = $('#searchSiteGrid');
+const siteNote = $('#searchSiteNote');
+
+/** Sumber situs untuk pencarian header → hasil AnimeKu & Oploverz (24 Okt 2026). */
+const SITE_SOURCE = 'backend';
+/** Batas judul per situs di halaman hasil (dropdown header memakai 3). */
+const SITE_SEARCH_LIMIT = 8;
 
 const BROWSE_TITLES = { ongoing: 'Ongoing Anime', popular: 'Anime Populer', new: 'Baru Rilis', donghua: 'Donghua (Anime China)' };
 const SHORT_NAMES = { kitsu: 'Kitsu', anilist: 'AniList' };
@@ -68,6 +79,9 @@ const state = {
     errors: {},
     merged: [],
     mergedSeen: new Set(),
+    /** Hasil AnimeKu & Oploverz (dipisah dari grid metadata). */
+    siteItems: [],
+    siteError: null,
     // mode jelajah
     items: [],
     itemSeen: new Set(),
@@ -153,6 +167,8 @@ function resetSearch() {
     state.page = 1;
     state.merged = [];
     state.mergedSeen = new Set();
+    state.siteItems = [];
+    state.siteError = null;
     SEARCH_SOURCE_ORDER.forEach((s) => {
         state.bySource[s] = [];
         state.sourceSeen[s] = new Set();
@@ -185,14 +201,40 @@ function renderSearchEmpty() {
         return;
     }
     const q = encodeURIComponent(state.q);
+    const fromSites = state.siteItems.length;
     gridMessage(grid, {
         icon: 'search',
-        title: `Tidak ditemukan "${state.q}"`,
-        text: 'Coba kata kunci lain atau cek ejaan judul anime',
+        // Bila situs menemukan judulnya, jangan bilang "tidak ditemukan" begitu saja.
+        title: fromSites ? `Tidak ada di AniList & Kitsu` : `Tidak ditemukan "${state.q}"`,
+        text: fromSites
+            ? 'Judulnya tersedia langsung di situs — lihat bagian "Langsung dari AnimeKu & Oploverz" di bawah.'
+            : 'Coba kata kunci lain atau cek ejaan judul anime',
         actions: html`
             <a class="btn-ext btn-ext--mal" href="https://myanimelist.net/anime.php?q=${q}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Cari di MAL</a>
             <a class="btn-ext btn-ext--anilist" href="https://anilist.co/search/anime?search=${q}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Cari di AniList</a>`,
     });
+}
+
+/**
+ * Hasil AnimeKu & Oploverz untuk kata kunci yang sama (24 Okt 2026, putaran 7).
+ * Ditampilkan di bagian sendiri: kartunya langsung memutar episode dari situs,
+ * sedangkan grid di atas berisi halaman anime dari AniList/Kitsu.
+ */
+function renderSiteResults() {
+    if (!siteWrap || !siteGrid) return;
+    const items = mode === 'search' ? state.siteItems : [];
+    const problem = mode === 'search' ? state.siteError : null;
+    siteWrap.hidden = items.length === 0 && !problem;
+    if (!items.length) {
+        siteGrid.innerHTML = '';
+        if (problem) siteNote.textContent = `Pencarian langsung di AnimeKu & Oploverz belum bisa dimuat (${friendlyError(problem)}).`;
+        return;
+    }
+    renderCards(siteGrid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
+    const counts = SITE_SOURCES
+        .map((site) => `${SITE_LABELS[site]} (${items.filter((anime) => siteOfSuggestion(anime) === site).length})`)
+        .join(' + ');
+    siteNote.innerHTML = String(html`Judul yang sudah tersedia di situs — ${counts}. Klik kartu untuk memutar episodenya; urutan/filter di atas hanya berlaku untuk hasil AniList & Kitsu.`);
 }
 
 /**
@@ -206,8 +248,11 @@ function renderSearch({ append = null } = {}) {
 
     const failed = SEARCH_SOURCE_ORDER.filter((s) => state.errors[s]);
     const counts = SEARCH_SOURCE_ORDER.map((s) => `${SHORT_NAMES[s]} (${state.bySource[s].length})`).join(' + ');
-    subtitleEl.textContent = `Ditemukan ${state.merged.length} anime — ${counts}`
+    const siteCount = state.siteItems.length ? ` · situs (${state.siteItems.length})` : '';
+    subtitleEl.textContent = `Ditemukan ${state.merged.length} anime — ${counts}${siteCount}`
         + (failed.length ? ` · ${failed.map((s) => SHORT_NAMES[s]).join(', ')} tidak merespons` : '');
+
+    renderSiteResults();
 
     const list = visibleSearchList();
     if (!list.length) {
@@ -235,7 +280,11 @@ async function runSearch({ append = false } = {}) {
     }
     setLoading(true, append);
 
-    const sources = append ? SEARCH_SOURCE_ORDER.filter((s) => state.hasNext[s]) : SEARCH_SOURCE_ORDER;
+    // Halaman pertama juga mencari di AnimeKu & Oploverz (24 Okt 2026, putaran 7).
+    // Sumber situs tidak punya paginasi → tidak ikut pada "Muat Lebih Banyak".
+    const sources = append
+        ? SEARCH_SOURCE_ORDER.filter((s) => state.hasNext[s])
+        : [...SEARCH_SOURCE_ORDER, SITE_SOURCE];
     let res;
     try {
         res = await searchAnime(state.q, { page: state.page, sort: state.sort, formats: state.formats, sources });
@@ -249,7 +298,7 @@ async function runSearch({ append = false } = {}) {
     if (token !== state.token) return; // filter sudah diganti → abaikan hasil lama
 
     const fresh = { all: [] };
-    for (const s of sources) {
+    for (const s of sources.filter((source) => source !== SITE_SOURCE)) {
         const r = res[s];
         state.errors[s] = r.error && r.error.kind !== 'abort' ? r.error : null;
         state.hasNext[s] = r.hasNext;
@@ -259,6 +308,12 @@ async function runSearch({ append = false } = {}) {
             return true;
         });
         state.bySource[s].push(...fresh[s]);
+    }
+    if (!append) {
+        const siteRes = res[SITE_SOURCE];
+        const siteError = siteRes?.error && !['abort', 'disabled'].includes(siteRes.error.kind) ? siteRes.error : null;
+        state.siteError = siteError;
+        state.siteItems = siteResults(siteRes?.items || [], SITE_SEARCH_LIMIT);
     }
     fresh.all = mergeAnimeLists(fresh, { sort: state.sort, seen: state.mergedSeen });
     state.merged.push(...fresh.all);
@@ -384,6 +439,11 @@ loadMoreBtn.addEventListener('click', () => {
 
 bindCardActions(grid, (anime) => ctx.toggleBookmark(anime));
 onBookmarksChange(() => syncBookmarkButtons(isBookmarked, grid));
+// Kartu AnimeKu/Oploverz juga punya tombol bookmark (24 Okt 2026, putaran 7).
+if (siteGrid) {
+    bindCardActions(siteGrid, (anime) => ctx.toggleBookmark(anime));
+    onBookmarksChange(() => syncBookmarkButtons(isBookmarked, siteGrid));
+}
 
 /* ------------------------------------------------------------------ */
 /* Mulai                                                               */
@@ -394,7 +454,7 @@ if (mode === 'empty') {
     gridMessage(grid, {
         icon: 'search',
         title: 'Ketik judul anime di kotak pencarian',
-        text: 'Minimal 2 huruf, lalu tekan Enter untuk hasil lengkap dari AniList & Kitsu.',
+        text: 'Minimal 2 huruf, lalu tekan Enter untuk hasil lengkap dari AniList, Kitsu, AnimeKu & Oploverz.',
     });
     if (window.matchMedia?.('(min-width: 769px)').matches) getSearchElements()?.input.focus();
 } else {
