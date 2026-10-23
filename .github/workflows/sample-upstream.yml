@@ -30,6 +30,8 @@ jobs:
             printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$bytes" "$url" >> samples2/manifest.txt
             sleep 1
           }
+          fetch animeku-negara-cn2 'https://ww2.animeku.lol/negara/china-n5z6n97/'
+          fetch animeku-negara-cn2-p2 'https://ww2.animeku.lol/negara/china-n5z6n97/page/2/'
           fetch animeku-genre-aksi  'https://ww2.animeku.lol/genre/aksi-siacdd4/'
           fetch animeku-negara-jp   'https://ww2.animeku.lol/negara/japan-v87miwu/'
           fetch animeku-tahun-2018  'https://ww2.animeku.lol/tahun/2018-jft2rtb/'
