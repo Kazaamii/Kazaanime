@@ -70,6 +70,11 @@ jobs:
           akser=$(grep -oE 'https://ww2\.animeku\.lol/(anime|series|detail)/[a-z0-9-]+/?' samples/animeku-episode.html 2>/dev/null | head -1 || true)
           if [ -n "${akser:-}" ]; then botfetch animeku-series "$akser"; fi
 
+          # Halaman episode & seri Animeku (URL ditemukan dari sampel beranda)
+          botfetch animeku-episode 'https://ww2.animeku.lol/play/steel-ball-run-jojo-no-kimyou-na-bouken-episode-6-6mzizy9/'
+          botfetch animeku-series 'https://ww2.animeku.lol/steel-ball-run-jojo-no-kimyou-na-bouken-ecxqye3/'
+          botfetch animeku-series-2 'https://ww2.animeku.lol/sousou-no-frieren/'
+
           # robots.txt Oploverz (informasi kebijakan, bukan gerbang)
           fetch oploverz-robots 'https://oploverz.ch/robots.txt'
 
