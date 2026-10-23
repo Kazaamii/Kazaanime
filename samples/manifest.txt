@@ -4,3 +4,12 @@ oploverz-episode	200	95218	https://oploverz.ch/toaru-anbu-no-item-episode-3-subt
 oploverz-series	200	84189	https://oploverz.ch/series/toaru-anbu-no-item/
 animeku-home	403	931	https://ww2.animeku.lol/
 animeku-apex	403	931	https://animeku.lol/
+oploverz-home	522	7224	https://oploverz.ch/
+oploverz-series-list	200	131693	https://oploverz.ch/series/?status=&type=&order=update
+oploverz-series	200	84997	https://oploverz.ch/series/toaru-anbu-no-item/
+animeku-home	403	931	https://ww2.animeku.lol/
+animeku-apex	403	931	https://animeku.lol/
+animeku-anime	403	931	https://ww2.animeku.lol/anime/
+animeku-ongoing	403	931	https://ww2.animeku.lol/ongoing/
+animeku-robots	403	931	https://ww2.animeku.lol/robots.txt
+oploverz-robots	200	169	https://oploverz.ch/robots.txt

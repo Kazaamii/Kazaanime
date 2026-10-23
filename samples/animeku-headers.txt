@@ -1,0 +1,16 @@
+HTTP/2 200 
+date: Fri, 23 Oct 2026 16:08:18 GMT
+content-type: text/html; charset=UTF-8
+server: cloudflare
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+vary: Accept-Encoding
+cache-control: public, max-age=3600, s-maxage=3600
+x-jarvis-ttl: 3600
+link: <https://ww2.animeku.lol/wp-json/>; rel="https://api.w.org/"
+x-jarvis-cache: HIT
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=90mSOW6Mz%2BCjNOABStPM1any8YZnUVQqm87bq0R6g9VSVttRiI4EhXP0%2FzfN43hDOiXzu7RAv2FPTKa1ebP4c%2B0ZekGju6fgIHg7dr62z18YlqUYEb4C4mvTAAuOENeRdlw%3D"}]}
+last-modified: Fri, 23 Oct 2026 16:08:18 GMT
+cf-cache-status: MISS
+cf-ray: a4f1ffe82c62e97e-MCI
+alt-svc: h3=":443"; ma=86400
+
