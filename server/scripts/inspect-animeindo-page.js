@@ -297,7 +297,16 @@ async function main() {
         await page.route('**/*', async (route) => {
             const request = route.request();
             const url = request.url();
+            // Keep ordinary embedded assets working so the site's own JavaScript can run.
+            // Cross-origin API calls, embeds, and navigation remain blocked.
             if (!isAllowedHost(url)) {
+                const staticAsset = ['script', 'stylesheet', 'image', 'font'].includes(request.resourceType());
+                let assetUrl;
+                try { assetUrl = new URL(url); } catch { assetUrl = null; }
+                if (staticAsset && assetUrl?.protocol === 'https:' && !assetUrl.username && !assetUrl.password) {
+                    await route.continue().catch(() => {});
+                    return;
+                }
                 report.policyBlockedRequestCount += 1;
                 await route.abort().catch(() => {});
                 return;
