@@ -1,0 +1,62 @@
+name: sample-upstream (sementara)
+
+# SEMENTARA: mengambil HTML mentah dari situs sumber untuk menyusun adapter
+# Oploverz/Animeku. Workflow ini dihapus setelah sampel dipakai.
+on:
+  push:
+    branches:
+      - arena/01a476bb-kazaanime
+    paths:
+      - '.github/workflows/sample-upstream.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    name: Fetch raw HTML samples
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/01a476bb-kazaanime
+
+      - name: Fetch upstream samples
+        run: |
+          set -u
+          mkdir -p samples
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'
+          fetch() {
+            name="$1"; url="$2"
+            code=$(curl -sS -L --max-time 45 --compressed -A "$UA" \
+              -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
+              -H 'Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7' \
+              -o "samples/$name.tmp" -w '%{http_code}' "$url" || echo 000)
+            head -c 900000 "samples/$name.tmp" > "samples/$name.html" 2>/dev/null || : > "samples/$name.html"
+            rm -f "samples/$name.tmp"
+            printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$(wc -c < "samples/$name.html")" "$url" >> samples/manifest.txt
+          }
+
+          # Oploverz (WordPress, tema dramastream/themesia)
+          fetch oploverz-home 'https://oploverz.ch/'
+          fetch oploverz-series-list 'https://oploverz.ch/series/?status=&type=&order=update'
+          ep=$(grep -o 'https://oploverz\.ch/[a-z0-9-]*-episode-[0-9]*-subtitle-indonesia/' samples/oploverz-home.html | head -1 || true)
+          if [ -n "${ep:-}" ]; then fetch oploverz-episode "$ep"; fi
+          ser=$(grep -o 'https://oploverz\.ch/series/[a-z0-9-]*/' samples/oploverz-episode.html 2>/dev/null | head -1 || true)
+          if [ -n "${ser:-}" ]; then fetch oploverz-series "$ser"; fi
+
+          # Animeku
+          fetch animeku-home 'https://ww2.animeku.lol/'
+          fetch animeku-apex 'https://animeku.lol/'
+
+          cat samples/manifest.txt
+
+      - name: Commit samples
+        run: |
+          git config user.name 'kazanime-bot'
+          git config user.email 'bot@users.noreply.github.com'
+          git add samples
+          git commit -m 'chore(sample): HTML sampel sementara dari upstream [skip ci]' || echo 'no changes'
+          git push origin HEAD:arena/01a476bb-kazaanime
