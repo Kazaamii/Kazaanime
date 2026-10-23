@@ -38,6 +38,7 @@ import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
 import { applySubtitleEvidence } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
+import { mapLimit } from '../lib/concurrency.js';
 import {
     absoluteUrl, cleanText, clip, firstInt, parseEpisodeNumber, parseFormat,
     parseScore10, parseStatus, parseYear, stripSeason, titleKey,
@@ -87,8 +88,13 @@ const FILTERS = Object.freeze([
 ]);
 
 const NAV_TTL_MS = 6 * 60 * 60 * 1000;
-/** Batas pencarian donghua: tiap kueri = satu request ke situs (jeda 1 detik/host). */
-const DONGHUA_QUERIES = 5;
+/**
+ * Batas pencarian donghua: tiap kueri = satu request ke situs (jeda ~1 dtk/host).
+ * 3 kueri (bukan 5) karena setiap kueri menambah ~1,5 dtk ke respons; tiga seed
+ * sudah cukup untuk mengisi panel beranda (24 Okt 2026).
+ */
+const DONGHUA_QUERIES = 3;
+const DONGHUA_CONCURRENCY = 3;
 const DONGHUA_LIMIT = 24;
 
 /**
@@ -564,22 +570,29 @@ export function createAnimeku({ network, createClient, baseUrl }) {
                 .map((title) => cleanText(title))
                 .filter((title) => title.length >= 4))]
                 .slice(0, DONGHUA_QUERIES);
-            const items = [];
-            const seen = new Set();
-            for (const query of queries) {
-                const key = titleKey(stripSeason(query));
-                if (!key) continue;
+            // Kueri paralel berbatas (24 Okt 2026): urutan hasil tetap seperti urutan kueri,
+            // tetapi waktu respons tiap kueri tidak lagi dijumlahkan.
+            const fetched = await mapLimit(queries, DONGHUA_CONCURRENCY, async (query) => {
                 const url = new URL(`${base}/`);
                 url.searchParams.set('s', query);
-                let cards = [];
                 try {
                     const page = await client.html(url.href, ctx);
-                    cards = parseCards(page.$, base).series;
+                    return { query, cards: parseCards(page.$, base).series, error: null };
                 } catch (error) {
-                    // Satu kueri gagal: pakai hasil kueri lain bila sudah ada.
-                    if (items.length) break;
-                    throw error;
+                    return { query, cards: [], error };
                 }
+            });
+            const items = [];
+            const seen = new Set();
+            let firstError = null;
+            for (const { query, cards, error } of fetched) {
+                // Satu kueri gagal: pakai hasil kueri lain; error hanya dilempar bila kosong total.
+                if (error) {
+                    firstError = firstError || error;
+                    continue;
+                }
+                const key = titleKey(stripSeason(query));
+                if (!key) continue;
                 for (const card of cards) {
                     const cardKey = titleKey(stripSeason(card.title));
                     const related = cardKey === key
@@ -592,6 +605,7 @@ export function createAnimeku({ network, createClient, baseUrl }) {
                     items.push(toAnime({ ...card, country: 'CN' }));
                 }
             }
+            if (!items.length && firstError) throw firstError;
             return items.slice(0, DONGHUA_LIMIT);
         },
 

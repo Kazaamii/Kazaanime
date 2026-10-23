@@ -32,6 +32,7 @@ import { icon } from './ui/icons.js';
 import { isPolicyStop, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 import { panelSections } from './api/subindo.js';
 import { getSourceBrowse, getSourceGenres } from './api/sources.js';
+import { withAutoRetry } from './api/retry.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -63,6 +64,8 @@ const subIndoRefreshBtn = $('#subIndoRefresh');
 let subIndoLoadToken = 0;
 /** Hasil terakhir supaya tombol "Coba lagi" per panel bisa memperbarui satu sumber saja. */
 let subIndoState = null;
+/** Kapan panel Sub Indo terakhir benar-benar berhasil dimuat (untuk auto refresh). */
+let subIndoLastOkAt = 0;
 /**
  * Salinan hasil terakhir di localStorage (24 Okt 2026). Kalau feed live gagal
  * (jaringan mobile lambat/timeout), panel tetap terisi judul — bukan kotak kosong.
@@ -220,22 +223,30 @@ function renderSubIndoSources(sources) {
     });
 }
 
-async function loadSubIndoSection({ refresh = false, retry = true } = {}) {
+async function loadSubIndoSection({ refresh = false, retry = true, quiet = false } = {}) {
     const token = ++subIndoLoadToken;
-    // Status teks selalu terlihat (termasuk di layar kecil) supaya bagian ini tidak
-    // pernah tampil "kosong" tanpa penjelasan saat jaringan lambat.
-    if (subIndoStatus && !subIndoState) subIndoStatus.textContent = 'Memuat katalog AnimeKu & Oploverz…';
-    showSkeleton(subIndoRoot, 4);
-    setSectionNote(subIndoRoot);
+    // `quiet` = muat ulang otomatis saat panel SUDAH terisi: layar tidak dikosongkan,
+    // hasil baru menggantikan setelah datang (24 Okt 2026).
+    if (!quiet || !subIndoState) {
+        // Status teks selalu terlihat (termasuk di layar kecil) supaya bagian ini tidak
+        // pernah tampil "kosong" tanpa penjelasan saat jaringan lambat.
+        if (subIndoStatus && !subIndoState) subIndoStatus.textContent = 'Memuat katalog AnimeKu & Oploverz…';
+        showSkeleton(subIndoRoot, 4);
+        setSectionNote(subIndoRoot);
+    }
     try {
         const result = await getSubIndoHomeSources({ refresh });
         if (token !== subIndoLoadToken) return;
         const sections = panelSections(result.sections);
         if (!sections.length) throw new Error('Backend tidak mengirim panel Sub Indo.');
         subIndoState = { sections };
+        subIndoLastOkAt = Date.now();
+        autoRetryStreak = 0;
         writeSubIndoCache(sections);
         renderSubIndoSources(sections);
         updateSubIndoNote(sections);
+        // Sebagian situs gagal (bukan gagal total): beri kesempatan muat ulang otomatis.
+        if (sections.every((source) => source.error || source.stale)) scheduleAutoRefresh();
     } catch (error) {
         if (token !== subIndoLoadToken || error?.kind === 'abort') return;
         // Jaringan ponsel sering putus sebentar: satu percobaan ulang otomatis sebelum
@@ -244,7 +255,17 @@ async function loadSubIndoSection({ refresh = false, retry = true } = {}) {
             if (subIndoStatus) subIndoStatus.textContent = 'Jaringan lambat — mencoba sekali lagi…';
             await new Promise((resolve) => setTimeout(resolve, 800));
             if (token !== subIndoLoadToken) return;
-            return loadSubIndoSection({ refresh: true, retry: false });
+            return loadSubIndoSection({ refresh: true, retry: false, quiet });
+        }
+        // Muat ulang latar (auto refresh) gagal padahal panel sudah terisi: biarkan yang tampil,
+        // cukup beri catatan + tombol coba lagi. Panel tidak boleh berubah jadi kotak kosong.
+        if (quiet && subIndoState?.sections?.some((source) => source.items?.length)) {
+            setSectionNote(subIndoRoot, {
+                text: `Katalog live belum bisa dimuat (${friendlyError(error)}). Data yang tampil berasal dari permintaan sebelumnya.`,
+                onRetry: () => loadSubIndoSection({ refresh: true }),
+            });
+            scheduleAutoRefresh();
+            return;
         }
         // Fallback: hasil sukses terakhir dari perangkat ini (mobile sering timeout).
         const cached = readSubIndoCache();
@@ -259,6 +280,7 @@ async function loadSubIndoSection({ refresh = false, retry = true } = {}) {
                 text: `Katalog live belum bisa dimuat (${friendlyError(error)}). Menampilkan data tersimpan${when ? ` dari ${when}` : ''}.`,
                 onRetry: () => loadSubIndoSection({ refresh: true }),
             });
+            scheduleAutoRefresh();
             return;
         }
         subIndoState = null;
@@ -269,6 +291,7 @@ async function loadSubIndoSection({ refresh = false, retry = true } = {}) {
             text: friendlyError(error),
             actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
         });
+        scheduleAutoRefresh();
     }
 }
 
@@ -281,6 +304,7 @@ async function refreshSubIndoSection() {
         subIndoRefreshBtn.setAttribute('aria-busy', 'true');
     }
     retrySourcesNow();
+    autoRetryStreak = 0;
     try {
         await loadSubIndoSection({ refresh: true, retry: false });
     } finally {
@@ -817,9 +841,54 @@ void loadSiteGenres();
 /* ------------------------------------------------------------------ */
 const donghuaSites = $('#donghuaSites');
 const donghuaNote = $('#donghuaNote');
+const donghuaRefreshBtn = $('#donghuaRefresh');
 const DONGHUA_SITE_IDS = ['animeku', 'oploverz'];
 const DONGHUA_SITE_LABELS = { animeku: 'AnimeKu', oploverz: 'Oploverz' };
 const DONGHUA_SITE_LIMIT = 12;
+/**
+ * Cadangan hasil sukses terakhir (24 Okt 2026). Auto refresh boleh gagal berkali-kali,
+ * tetapi bagian Donghua tidak boleh berubah jadi kotak kosong di layar pengguna.
+ */
+const DONGHUA_CACHE_KEY = 'kz:donghua-last';
+let donghuaLoadToken = 0;
+/** Hasil terakhir yang tampil di layar (dipakai saat muat ulang latar / coba lagi). */
+let donghuaState = null;
+/** Kapan salah satu panel terakhir berhasil dimuat (untuk auto refresh). */
+let donghuaLastOkAt = 0;
+/** true setelah bagian ini diminta tampil; auto refresh tidak boleh memuat lebih awal. */
+let donghuaStarted = false;
+
+function readDonghuaCache() {
+    try {
+        const raw = window.localStorage.getItem(DONGHUA_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.panels)) return null;
+        const panels = parsed.panels
+            .filter((panel) => panel && typeof panel.id === 'string' && Array.isArray(panel.items) && panel.items.length)
+            .map((panel) => ({
+                id: panel.id,
+                name: panel.name || DONGHUA_SITE_LABELS[panel.id] || panel.id,
+                items: panel.items.slice(0, DONGHUA_SITE_LIMIT),
+                error: null,
+            }));
+        return panels.length ? { savedAt: Number(parsed.savedAt) || 0, panels } : null;
+    } catch {
+        return null; // localStorage diblokir / isinya rusak
+    }
+}
+
+function writeDonghuaCache(panels) {
+    try {
+        const slim = (Array.isArray(panels) ? panels : [])
+            .filter((panel) => panel && Array.isArray(panel.items) && panel.items.length)
+            .map((panel) => ({ id: panel.id, name: panel.name, items: panel.items.slice(0, DONGHUA_SITE_LIMIT) }));
+        if (!slim.length) return;
+        window.localStorage.setItem(DONGHUA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), panels: slim }));
+    } catch {
+        // Mode privat / kuota penuh: cache dilewati, tidak mengganggu render.
+    }
+}
 
 function setDonghuaNote(text, { retry = false } = {}) {
     if (!donghuaNote) return;
@@ -833,8 +902,7 @@ function setDonghuaNote(text, { retry = false } = {}) {
     }
     donghuaNote.innerHTML = String(html`${text} <button type="button" class="donghua-retry" data-action="retry-donghua">${icon('refresh-cw')} Coba lagi</button>`);
     donghuaNote.querySelector('[data-action="retry-donghua"]')?.addEventListener('click', () => {
-        retrySourcesNow();
-        loadDonghuaSites();
+        void refreshDonghuaSites();
     }, { once: true });
 }
 
@@ -872,32 +940,204 @@ function renderDonghuaPanels(panels) {
     const note = missing.length
         ? `${missing.join(' · ')}. Daftar di bawah dari metadata AniList.`
         : 'Donghua tayang dari katalog AnimeKu & Oploverz. Daftar di bawah dari metadata AniList sebagai pelengkap.';
-    setDonghuaNote(note);
+    // Situs yang gagal tetap bisa dicoba lagi tanpa menunggu halaman dimuat ulang.
+    setDonghuaNote(note, { retry: panels.some((panel) => panel.error && !panel.items.length) });
 }
 
-/** Muat donghua dari kedua situs sumber (paralel, kegagalan satu tidak menggagalkan yang lain). */
-async function loadDonghuaSites() {
-    if (!donghuaSites) return;
-    donghuaSites.setAttribute('aria-busy', 'true');
-    donghuaSites.innerHTML = String(html`<section class="subindo-source donghua-site is-loading">
-        <div class="subindo-source-header"><h3>Donghua dari situs</h3><span class="subindo-source-count">memuat…</span></div>
-        <div class="anime-grid">${skeletonCards(4)}</div>
-    </section>`);
-    setDonghuaNote('');
-    const panels = await Promise.all(DONGHUA_SITE_IDS.map(async (id) => {
-        const name = DONGHUA_SITE_LABELS[id] || id;
-        try {
-            const res = await getSourceBrowse(id, { filter: 'donghua' });
-            const items = (Array.isArray(res.items) ? res.items : []).slice(0, DONGHUA_SITE_LIMIT);
-            return { id, name, items };
-        } catch (error) {
-            if (error?.kind !== 'abort') console.info(`[donghua] ${id} gagal dimuat:`, error?.message || error);
-            return { id, name, items: [], error };
-        }
-    }));
-    donghuaSites.setAttribute('aria-busy', 'false');
-    renderDonghuaPanels(panels);
+/**
+ * Satu panel situs dengan percobaan ulang otomatis (24 Okt 2026).
+ * Percobaan kedua memakai `refresh` supaya circuit breaker yang baru terbuka akibat
+ * timeout tadi tidak langsung menolak permintaan ulang.
+ */
+async function fetchDonghuaPanel(id, { refresh = false, retry = true } = {}) {
+    const name = DONGHUA_SITE_LABELS[id] || id;
+    try {
+        const res = await withAutoRetry(
+            (attempt) => getSourceBrowse(id, { filter: 'donghua', refresh: refresh || attempt > 1 }),
+            {
+                attempts: retry ? 2 : 1,
+                onRetry: () => setDonghuaNote(`Jaringan lambat — menghubungkan ulang ke ${name}…`),
+            },
+        );
+        return {
+            id,
+            name,
+            items: (Array.isArray(res.items) ? res.items : []).slice(0, DONGHUA_SITE_LIMIT),
+            // Kegagalan sebagian dari backend (mis. feed metadata mati) tetap dianggap gagal:
+            // panel menawarkan "Coba lagi", bukan pura-pura "situs kosong".
+            error: res.error || null,
+        };
+    } catch (error) {
+        if (error?.kind !== 'abort') console.info(`[donghua] ${id} gagal dimuat:`, error?.message || error);
+        return { id, name, items: [], error };
+    }
 }
+
+/**
+ * Muat donghua dari kedua situs sumber (paralel, kegagalan satu tidak menggagalkan yang lain).
+ * `quiet` dipakai auto refresh: panel yang sudah terisi tidak dikosongkan lebih dulu.
+ */
+async function loadDonghuaSites(options = {}) {
+    const { refresh = false, retry = true, quiet = false } = options && typeof options === 'object' ? options : {};
+    if (!donghuaSites) return;
+    donghuaStarted = true;
+    const token = ++donghuaLoadToken;
+    if (!quiet || !donghuaState) {
+        donghuaSites.setAttribute('aria-busy', 'true');
+        donghuaSites.innerHTML = String(html`<section class="subindo-source donghua-site is-loading">
+            <div class="subindo-source-header"><h3>Donghua dari situs</h3><span class="subindo-source-count">memuat…</span></div>
+            <div class="anime-grid">${skeletonCards(4)}</div>
+        </section>`);
+        setDonghuaNote('');
+    }
+    const panels = await Promise.all(DONGHUA_SITE_IDS.map((id) => fetchDonghuaPanel(id, { refresh, retry })));
+    if (token !== donghuaLoadToken) return;
+    donghuaSites.setAttribute('aria-busy', 'false');
+    const filled = panels.filter((panel) => panel.items.length);
+    if (filled.length) {
+        donghuaLastOkAt = Date.now();
+        autoRetryStreak = 0;
+        writeDonghuaCache(panels);
+        donghuaState = { panels };
+        renderDonghuaPanels(panels);
+        return;
+    }
+    // Semua panel kosong. Bila penyebabnya kegagalan (bukan situs yang memang kosong),
+    // pakai hasil terakhir perangkat ini agar bagian Donghua tidak kosong melompong.
+    const failed = panels.filter((panel) => panel.error);
+    if (failed.length && quiet && donghuaState?.panels?.some((panel) => panel.items.length)) {
+        // Auto refresh gagal padahal panel sudah tampil: pertahankan hasil sebelumnya.
+        setDonghuaNote(
+            `Katalog live AnimeKu & Oploverz belum bisa dimuat (${friendlyError(failed[0].error)}).`
+            + ' Panel menampilkan data dari permintaan sebelumnya.',
+            { retry: true },
+        );
+        scheduleAutoRefresh();
+        return;
+    }
+    if (failed.length) {
+        const cached = readDonghuaCache();
+        if (cached?.panels?.length) {
+            // `stale: true` membuat auto refresh tahu data ini belum segar → dicoba lagi
+            // pada jadwal berikutnya (15 dtk / 45 dtk / 2 mnt, lalu tiap 5 menit).
+            const stalePanels = cached.panels.map((panel) => ({ ...panel, stale: true }));
+            donghuaState = { panels: stalePanels, savedAt: cached.savedAt };
+            renderDonghuaPanels(stalePanels);
+            const when = cached.savedAt
+                ? new Date(cached.savedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+                : '';
+            setDonghuaNote(
+                `Katalog live AnimeKu & Oploverz belum bisa dimuat (${friendlyError(failed[0].error)}).`
+                + ` Menampilkan data tersimpan${when ? ` dari ${when}` : ''}.`,
+                { retry: true },
+            );
+            scheduleAutoRefresh();
+            return;
+        }
+    }
+    donghuaState = { panels };
+    renderDonghuaPanels(panels);
+    if (failed.length) scheduleAutoRefresh();
+}
+
+/** Tombol "Muat ulang" di kepala bagian Donghua (permintaan manual, tanpa cache). */
+async function refreshDonghuaSites() {
+    if (donghuaRefreshBtn?.disabled) return;
+    if (donghuaRefreshBtn) {
+        donghuaRefreshBtn.disabled = true;
+        donghuaRefreshBtn.classList.add('is-busy');
+        donghuaRefreshBtn.setAttribute('aria-busy', 'true');
+    }
+    retrySourcesNow();
+    autoRetryStreak = 0;
+    try {
+        await loadDonghuaSites({ refresh: true });
+    } finally {
+        if (donghuaRefreshBtn) {
+            donghuaRefreshBtn.disabled = false;
+            donghuaRefreshBtn.classList.remove('is-busy');
+            donghuaRefreshBtn.removeAttribute('aria-busy');
+        }
+    }
+}
+
+donghuaRefreshBtn?.addEventListener('click', () => {
+    void refreshDonghuaSites();
+});
+
+/* ------------------------------------------------------------------ */
+/* Auto refresh AnimeKu & Oploverz (24 Okt 2026)                       */
+/* Permintaan pengguna: "tambahkan auto refresh nya untuk animeloverz  */
+/* dan animeku agar tidak gagal memuat".                               */
+/*  1. Tiap panel memakai percobaan ulang otomatis (js/api/retry.js):   */
+/*     timeout/jaringan/5xx/circuit dicoba sekali lagi sebelum gagal.   */
+/*  2. Bagian yang gagal atau datanya lebih tua dari 15 menit dimuat    */
+/*     ulang sendiri saat jaringan kembali, tab dibuka lagi, atau tiap   */
+/*     5 menit — tanpa mengosongkan panel yang sudah terisi (quiet).    */
+/*  3. Setelah gagal, percobaan ulang dijeda 15 dtk → 45 dtk → 2 mnt.   */
+/*  4. Hasil sukses terakhir disimpan dan dipakai bila situs benar-benar */
+/*     tidak bisa dihubungi.                                           */
+/* ------------------------------------------------------------------ */
+const AUTO_REFRESH_STALE_MS = 15 * 60 * 1000;
+const AUTO_REFRESH_TICK_MS = 5 * 60 * 1000;
+const AUTO_REFRESH_MIN_GAP_MS = 45 * 1000;
+/** Jeda percobaan ulang setelah gagal; berhenti setelah tiga kali (tick 5 menit tetap jalan). */
+const AUTO_RETRY_PLAN_MS = [15000, 45000, 120000];
+let autoRefreshAt = 0;
+let autoRetryStreak = 0;
+let autoRetryTimer = 0;
+
+/** Panel dianggap belum termuat: belum ada data, semua gagal, atau hanya berisi cache. */
+function sectionNeedsRefresh(state, lastOkAt, entriesOf, now = Date.now()) {
+    if (!state) return true;
+    if (lastOkAt && now - lastOkAt > AUTO_REFRESH_STALE_MS) return true;
+    const entries = entriesOf(state);
+    return entries.length > 0 && entries.every((entry) => entry.error || entry.stale);
+}
+
+/** Muat ulang bagian AnimeKu/Oploverz yang gagal atau basi (tanpa mengosongkan layar). */
+function autoRefreshSources({ ignoreGap = false } = {}) {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const now = Date.now();
+    if (!ignoreGap && now - autoRefreshAt < AUTO_REFRESH_MIN_GAP_MS) return;
+    let touched = false;
+    // Bagian donghua baru boleh dimuat setelah section-nya benar-benar diminta tampil.
+    if (donghuaStarted && sectionNeedsRefresh(donghuaState, donghuaLastOkAt, (state) => state.panels, now)) {
+        touched = true;
+        void loadDonghuaSites({ refresh: true, quiet: Boolean(donghuaState) });
+    }
+    if (sectionNeedsRefresh(subIndoState, subIndoLastOkAt, (state) => state.sections, now)) {
+        touched = true;
+        void loadSubIndoSection({ refresh: true, quiet: Boolean(subIndoState) });
+    }
+    if (touched) autoRefreshAt = now;
+}
+
+/** Jadwalkan muat ulang otomatis setelah kegagalan (maks 3 kali, jeda bertambah). */
+function scheduleAutoRefresh() {
+    if (autoRetryTimer || autoRetryStreak >= AUTO_RETRY_PLAN_MS.length) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const delay = AUTO_RETRY_PLAN_MS[autoRetryStreak];
+    autoRetryStreak += 1;
+    autoRetryTimer = setTimeout(() => {
+        autoRetryTimer = 0;
+        autoRefreshSources({ ignoreGap: true });
+    }, delay);
+}
+
+window.addEventListener('online', () => {
+    // Sambungan kembali: permintaan yang tadi timeout/gagal langsung dicoba lagi.
+    autoRefreshAt = 0;
+    autoRetryStreak = 0;
+    autoRefreshSources({ ignoreGap: true });
+});
+
+document.addEventListener('visibilitychange', () => {
+    // Tab dibuka lagi setelah lama di latar: data lama boleh dimuat ulang diam-diam.
+    if (!document.hidden) autoRefreshSources({ ignoreGap: true });
+});
+
+setInterval(() => autoRefreshSources(), AUTO_REFRESH_TICK_MS);
 
 /* ------------------------------------------------------------------ */
 /* Bookmark: pindah ke bookmark.html (24 Okt 2026)                      */

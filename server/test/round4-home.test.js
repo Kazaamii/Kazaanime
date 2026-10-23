@@ -64,7 +64,8 @@ test('donghua beranda: panel AnimeKu & Oploverz di atas grid metadata', () => {
     assert.ok(sites > -1 && grid > sites, 'panel situs tampil sebelum grid metadata AniList');
 
     assert.match(homeJs, /const DONGHUA_SITE_IDS = \['animeku', 'oploverz'\]/);
-    assert.match(homeJs, /getSourceBrowse\(id, \{ filter: 'donghua' \}\)/);
+    // Ronde 5: permintaan panel donghua memakai percobaan ulang otomatis (refresh pada percobaan kedua).
+    assert.match(homeJs, /getSourceBrowse\(id, \{ filter: 'donghua', refresh: refresh \|\| attempt > 1 \}\)/);
     assert.match(homeJs, /katalogUrl\(\{ source: source\.id, filter: 'donghua' \}\)/);
     assert.match(homeJs, /whenVisible\(\$\('#donghua'\), loadDonghuaSites\)/, 'panel donghua situs dimuat saat section mendekati layar');
     assert.match(homeJs, /data-donghua-source/);
