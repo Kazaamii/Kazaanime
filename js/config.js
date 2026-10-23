@@ -43,7 +43,7 @@ export const STORAGE_KEYS = Object.freeze({
     anilistNoBatch: 'kz:anilist-nobatch',   // localStorage  — waktu saat query gabungan AniList ditolak
     history: 'kz:history',                  // localStorage  — episode yang sudah dibuka per anime (Tahap C)
     autoNext: 'kz:autonext',                // localStorage  — preferensi auto-next ('1' / '0') (Tahap C)
-    popupGuard: 'kz:popup-guard',           // localStorage  — 'off' = pengguna mengizinkan pop-up player (24 Okt 2026)
+    popupGuard: 'kz:popup-guard',           // localStorage  — 'on' = pengguna menyalakan mode blokir pop-up/sandbox (default mati, 24 Okt 2026)
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */
@@ -377,21 +377,31 @@ export const PLAYER = Object.freeze({
     episodesPerRange: 100,
     /** Batas aman nomor episode dari URL / input manual. */
     maxEpisode: 3000,
+    /**
+     * Pemeriksaan Sub Indo per episode di daftar episode (24 Okt 2026, putaran 3).
+     * Backend memeriksa halaman episode satu per satu (maks 3 permintaan bersamaan), jadi
+     * jumlahnya dibatasi. Episode >24 tetap bisa ditonton; badge-nya menyusul saat dibuka.
+     */
+    subtitleMapLimit: 24,
     /** Izin iframe. Tanpa camera/microphone/display-capture (dulu diberikan tanpa perlu). */
     allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
     /** Sebagian penyedia embed memeriksa Referer (cukup origin) — MegaPlay WAJIB ada Referer. */
     referrerPolicy: 'origin',
     /**
-     * Atribut sandbox iframe — 24 Okt 2026 (permintaan adblock, "bila memungkinkan").
+     * Atribut sandbox iframe untuk MODE KETAT (opsional) — 24 Okt 2026.
      *
      * Nilai ini TIDAK memuat `allow-popups`, `allow-popups-to-escape-sandbox`, maupun
      * `allow-top-navigation`, jadi skrip iklan di dalam player tidak bisa membuka tab
      * baru atau membajak tab Kazanime. `allow-scripts allow-same-origin` tetap ada supaya
      * player (MegaPlay dkk.) bisa memutar video.
      *
-     * Sebagian embed bisa menolak diputar saat di-sandbox. Untuk itu pengguna punya
-     * tombol "Pop-up diblokir / Izinkan pop-up" di bawah player; pilihannya disimpan di
-     * localStorage (STORAGE_KEYS.popupGuard) dan hanya melepas sandbox untuk browser itu.
+     * 24 Okt 2026 (putaran 3): mode ini DEFAULT MATI. Banyak embed menolak berjalan di dalam
+     * iframe ber-sandbox dan hanya menampilkan "Opss! Sandboxed our player is not allowed.
+     * Remove sandbox to use it." — video dan subtitle jadi tidak muncul. Tombol
+     * "Pop-up diizinkan / Pop-up diblokir" di bawah player menyalakannya kembali bila
+     * pengguna memang menginginkan proteksi; pilihan disimpan di localStorage
+     * (STORAGE_KEYS.popupGuard = 'on'). Host yang menolak sandbox otomatis dikecualikan
+     * (ui/player.js) supaya layar penolakan tidak pernah menjadi jalan buntu.
      * Server `kind: 'hls' | 'video'` memakai <video> sendiri — tanpa iframe, tanpa pop-up.
      */
     sandbox: 'allow-scripts allow-same-origin allow-forms allow-presentation',

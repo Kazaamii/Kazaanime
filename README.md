@@ -614,6 +614,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
 | `GET /api/anime/:slug` | satu anime + `episodeList: [{ number, title, released, url }]` |
 | `GET /api/anime/:slug/episode/:ep` | `{ episode, title, released, url, servers: [{ name, url, lang, subtitleType?, kind?: 'hls'|'video', subtitles? }], downloads: [...] }`. AnimeOnsen media memakai URL proxy same-origin bertanda tangan; respons episode `no-store`. |
+| `GET /api/anime/:slug/subtitles?from=&to=` | **(baru, 24 Okt 2026)** Sub Indo **per episode** untuk badge di daftar episode: `{ slug, source, from, to, episodes: [{ number, sub: 'id' \| '' \| null, evidence }] }`. `id` = ada bukti (daftar episode / server / judul episode), `''` = sudah diperiksa tanpa bukti, `null` = belum bisa diperiksa (tanpa badge). Maks **24** episode per panggilan, diperiksa maks 3 permintaan bersamaan, hasil di-cache `CACHE_SUBTITLE_MAP_SEC` (default 30 menit). |
 | `GET /api/stream/servers?ep=&anilist=&title=&title=&year=` | **(baru, 22 Okt 2026)** `{ episode, servers: [{ provider, kind: 'embed', name, label, lang, url } \| { provider, kind: 'hls', name, lang: 'multi', url: '/api/stream/hls?…', direct, poster, subtitles: [{ label, lang, default, url: '/api/stream/sub?…' }], ai: { url: '/api/stream/subai?…', from, sourceLabel, label } \| null }], status: { reanime, anizone } }` — status: `ok` / `not_found` / `blocked` / `error` / `stale`. `ai` (Tahap F) hanya ada bila episode **tidak** punya subtitle Indonesia dan `GEMINI_API_KEY` diisi |
 | `GET /api/stream/hls?u=&s=&p=` | proxy media bertanda tangan (HLS, MP4/WebM). Tanpa `p` = provider AniZone; `p=animeonsen` hanya untuk URL yang ditandatangani adapter dan exact hostname dalam `ANIMEONSEN_MEDIA_HOSTS`. Playlist ditulis ulang, segmen/key diteruskan; AnimeOnsen memakai `private, no-store` dan robots gate per URL. |
 | `GET /api/stream/sub?u=&f=&s=&p=` | ASS/SSA/SRT/VTT dikonversi ke WebVTT. `p=animeonsen` diverifikasi dalam tanda tangan, hostname exact + robots gate; respons no-store. |
@@ -686,7 +687,7 @@ Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di Us
 `SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anoboy,sakunime,anichin,otakudesu,hianime`; `kuramanime` opt-in; `animeonsen` auto-enabled hanya bila kredensial + allowlist media disediakan),
 `SAMEHADAKU_BASE_URL` / `ANOBOY_BASE_URL` / `SAKUNIME_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` / `ANIMEKU_BASE_URL` / `OPLOVERZ_BASE_URL` (domain sering berganti; Kuramanime hanya satu domain manual per deployment, tanpa failover otomatis), `KUSONIME_BASE_URL` / `KUSONIME_DOWNLOADS_ENABLED` (lookup paket Romaji; terpisah dari `SCRAPER_SOURCES`, robots wajib mengizinkan),
 `ANIMEONSEN_CLIENT_ID` / `ANIMEONSEN_CLIENT_SECRET` (authorized credentials, server-side only) dan `ANIMEONSEN_MEDIA_HOSTS` (allowlist operator-confirmed; kosong = no playback),
-`CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
+`CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC` dan `CACHE_SUBTITLE_MAP_SEC` untuk peta Sub Indo per episode), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
 Penyedia stream: `STREAM_PROVIDERS` (default `reanime,anizone`), **`STREAM_SECRET`** (≥ 16 karakter acak — isi di
 Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RATE_LIMIT_PER_MIN`,
 `ANIZONE_MEDIA_HOSTS`, `REANIME_EMBED_HOSTS`. Subtitle AI (Tahap F): **`GEMINI_API_KEY`** (kosong = fitur mati),
@@ -1001,6 +1002,30 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - **Semua genre di beranda**: 19 genre AniList + seluruh genre situs yang belum terwakili (dedupe lewat
   padanan istilah, mis. *aksi* = *Action*), masing-masing mengambil data nyata (AniList untuk genre AniList,
   arsip situs untuk genre situs) — bukan tombol dekoratif.
+
+### Perubahan perilaku (24 Okt 2026 — putaran ketiga: player, subtitle, badge per episode)
+- **Sandbox iframe player DEFAULT MATI.** Sejak mode blokir pop-up dinyalakan, banyak embed menolak
+  berjalan di dalam sandbox dan hanya menampilkan pesannya sendiri —
+  *“Opss! Sandboxed our player is not allowed. Remove sandbox to use it.”* — sehingga area player hitam,
+  tanpa video dan tanpa subtitle. Sekarang iframe dimuat **tanpa** `sandbox` secara default, dan tombol di
+  bawah player berubah menjadi **“Pop-up diizinkan”**. Mode ketat tetap tersedia (klik → “Pop-up diblokir”,
+  disimpan di `localStorage` `kz:popup-guard = 'on'`); host yang terbukti menolak sandbox otomatis
+  dikecualikan (`sandboxFor`/`sandboxRefused`) dan iframe ber-sandbox yang gagal dimuat dicoba ulang tanpa
+  sandbox untuk server yang sama — bukan langsung “Streaming Tidak Tersedia”.
+- **Subtitle di Chrome (iPad & macOS).** Tiga perbaikan: (1) `<track>` default kini juga ditulis sebagai
+  atribut `default` dan modenya dipaksa `showing` setelah `loadedmetadata` (Chrome tidak selalu menyalakan
+  track yang dipasang dinamis); (2) di WebKit + **ManagedMediaSource** (iPadOS 17.1+) episode yang punya
+  subtitle diputar lewat hls.js/MSE karena HLS native WebKit tidak menampilkan `<track>` inline;
+  (3) bila hls.js tidak tersedia, pemutar kembali ke HLS native lewat proxy alih-alih menggagalkan server.
+- **Badge “Sub Indo” per episode.** Endpoint baru `GET /api/anime/:slug/subtitles` memeriksa **setiap**
+  episode pada rentang yang diminta; `js/ui/episode-list.js` menampilkan badge kecil di tombol episode.
+  Bukti diambil dari daftar episode situs bila ada (Oploverz menulis “Episode N Subtitle Indonesia”),
+  sisanya dari halaman episode (AnimeKu). Episode tanpa bukti **tidak** diberi badge — tidak ada klaim
+  Sub Indo tanpa bukti, dan episode yang gagal diperiksa dibiarkan `null`.
+- **Batas & biaya:** maks 24 episode per permintaan (frontend `PLAYER.subtitleMapLimit`, backend
+  `SUBTITLES.maxEpisodes`), 3 pemeriksaan bersamaan, hasil di-cache 30 menit
+  (`CACHE_SUBTITLE_MAP_SEC`). Episode di luar daftar situs tidak diperiksa; episode >24 tetap bisa
+  ditonton, badge-nya menyusul saat episode itu dibuka.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

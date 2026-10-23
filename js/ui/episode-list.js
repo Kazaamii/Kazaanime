@@ -9,6 +9,8 @@
  *    hanya tombol rentang aktif yang dirender (One Piece: 100 tombol, bukan 1000+).
  *  - Jumlah tidak diketahui → input nomor episode manual (seperti file asli).
  *  - Penanda "sudah ditonton" (.is-watched).
+ *  - Badge "Sub Indo" per episode dari hasil pemeriksaan backend (setSubtitles). Episode
+ *    tanpa badge = belum diperiksa / tidak ada bukti subtitle Indonesia — bukan tombol mati.
  * Tidak ada fetch di sini.
  */
 import { PLAYER } from '../config.js';
@@ -30,6 +32,8 @@ export function createEpisodeList({ grid, tabs, hrefFor, onSelect }) {
     let total;
     let current = 1;
     let watched = new Set();
+    /** @type {Map<number, 'id'|''>} hasil pemeriksaan subtitle per episode ('' = diperiksa, tanpa bukti) */
+    let subtitles = new Map();
     let rangeStart = 1;
     let emptyText = '';
 
@@ -77,7 +81,13 @@ export function createEpisodeList({ grid, tabs, hrefFor, onSelect }) {
         grid.innerHTML = String(html`${items.map((n) => {
             const on = n === current;
             const seen = watched.has(n);
-            return html`<a class="ep-btn${on ? ' active' : ''}${seen ? ' is-watched' : ''}" href="${hrefFor(n)}" data-ep="${n}" ${on ? raw('aria-current="page"') : ''} title="${seen ? `Episode ${n} (sudah ditonton)` : `Episode ${n}`}">EP ${n}</a>`;
+            const indo = subtitles.get(n) === 'id';
+            const hover = [
+                indo ? 'Subtitle Indonesia tersedia' : '',
+                seen ? 'sudah ditonton' : '',
+            ].filter(Boolean).join(' · ');
+            const sub = indo ? html`<span class="ep-sub">Sub Indo</span>` : '';
+            return html`<a class="ep-btn${on ? ' active' : ''}${seen ? ' is-watched' : ''}" href="${hrefFor(n)}" data-ep="${n}" ${on ? raw('aria-current="page"') : ''} title="Episode ${n}${hover ? ` (${hover})` : ''}" aria-label="Episode ${n}${indo ? ', subtitle Indonesia' : ''}">EP ${n}${sub}</a>`;
         })}`);
     }
 
@@ -154,6 +164,29 @@ export function createEpisodeList({ grid, tabs, hrefFor, onSelect }) {
         /** @param {Set<number>} set */
         setWatched(set) {
             watched = set;
+            if (total) renderGrid();
+        },
+
+        /**
+         * Badge Sub Indo per episode. `map` boleh Map atau objek: nomor episode → 'id' | ''.
+         * Episode yang tidak ada di map tidak diberi badge (belum diperiksa).
+         * @param {Map<number, string>|Record<string, string>} map
+         */
+        setSubtitles(map) {
+            const next = new Map();
+            const entries = map instanceof Map ? map.entries() : Object.entries(map || {});
+            for (const [key, value] of entries) {
+                const n = Number(key);
+                if (Number.isInteger(n) && n > 0) next.set(n, value === 'id' ? 'id' : '');
+            }
+            subtitles = next;
+            if (total) renderGrid();
+        },
+
+        /** Hapus semua badge (mis. saat pindah anime). */
+        clearSubtitles() {
+            if (!subtitles.size) return;
+            subtitles = new Map();
             if (total) renderGrid();
         },
 

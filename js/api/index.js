@@ -32,7 +32,7 @@ import { loadSubIndoSources } from './subindo.js';
 
 export { ApiError, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests };
 export { listStreamServers, getEpisodeExtras, withProviderServers } from './streams.js';
-export { getStreamServers, getAiSubtitlePart, getKusonimeDownloads } from './sources.js';
+export { getStreamServers, getAiSubtitlePart, getKusonimeDownloads, getEpisodeSubtitles } from './sources.js';
 /** Dipakai tombol "Coba lagi": izinkan semua sumber dicoba lagi sekarang juga. */
 export const retrySourcesNow = resetCircuits;
 export const isBackendEnabled = backend.isBackendEnabled;

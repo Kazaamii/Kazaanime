@@ -38,7 +38,7 @@ import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
 import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
 import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
-    friendlyError, getAiSubtitlePart, getEpisodeExtras, getKusonimeDownloads, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
+    friendlyError, getAiSubtitlePart, getEpisodeExtras, getEpisodeSubtitles, getKusonimeDownloads, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
     retrySourcesNow, withProviderServers,
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
@@ -169,6 +169,38 @@ const servers = () => {
 const scrapeTitles = () => [ref.title, ref.alt, anime.title, anime.titleAlt];
 /** Kunci himpunan judul (untuk tahu apakah detail membawa judul yang belum dicari). */
 const titlesKey = (list) => [...new Set(list.map(titleKey).filter(Boolean))].sort().join('|');
+
+/**
+ * Pemeriksaan Sub Indo per episode untuk badge di daftar episode (24 Okt 2026, putaran 3).
+ * Sebelumnya badge hanya muncul untuk episode yang sedang dibuka; sekarang backend memeriksa
+ * seluruh rentang (maks PLAYER.subtitleMapLimit episode) sekali per anime.
+ */
+let subtitleMapCtrl = null;
+let subtitleMapKey = '';
+
+/**
+ * @param {number} limit jumlah episode yang ingin diperiksa (dipotong PLAYER.subtitleMapLimit)
+ */
+async function loadSubtitleMap(limit) {
+    if (!fromBackendSource() || !ref.slug || !(limit > 0)) return;
+    const to = Math.min(limit, PLAYER.subtitleMapLimit);
+    const key = `${ref.slug}:${to}`;
+    if (key === subtitleMapKey) return;
+    subtitleMapKey = key;
+    subtitleMapCtrl?.abort();
+    const ctrl = new AbortController();
+    subtitleMapCtrl = ctrl;
+    try {
+        const map = await getEpisodeSubtitles(ref.slug, { from: 1, to, signal: ctrl.signal });
+        if (ctrl.signal.aborted) return;
+        episodes.setSubtitles(map);
+    } catch (err) {
+        if (err?.kind !== 'abort') {
+            console.info('[watch] pemeriksaan Sub Indo per episode tidak tersedia:', err?.message || err);
+        }
+        if (subtitleMapKey === key) subtitleMapKey = ''; // boleh dicoba lagi saat episode lain dibuka
+    }
+}
 
 /**
  * Lepas penahanan episode n dan mulai putar.
@@ -425,15 +457,17 @@ function renderPopupGuard(enabled = player.popupGuard()) {
     els.popupGuard.classList.toggle('is-off', !enabled);
     if (els.popupGuardText) els.popupGuardText.textContent = enabled ? 'Pop-up diblokir' : 'Pop-up diizinkan';
     els.popupGuard.title = enabled
-        ? 'Pop-up & tab baru dari player diblokir. Klik bila player tidak bisa diputar.'
-        : 'Pop-up diizinkan untuk player ini. Klik untuk memblokir lagi.';
+        ? 'Mode ketat: pop-up & tab baru dari player diblokir. Sebagian player menolak mode ini — matikan bila video tidak muncul.'
+        : 'Player berjalan normal (tanpa sandbox). Klik untuk memblokir pop-up/tab baru dari embed.';
 }
 renderPopupGuard();
 els.popupGuard?.addEventListener('click', () => {
     const enabled = player.setPopupGuard(!player.popupGuard());
     renderPopupGuard(enabled);
     showToast(
-        enabled ? 'Pop-up & tab baru dari player diblokir.' : 'Player boleh membuka pop-up (khusus browser ini).',
+        enabled
+            ? 'Mode blokir pop-up aktif. Bila video tidak muncul, klik tombol ini lagi.'
+            : 'Player berjalan normal tanpa sandbox (khusus browser ini).',
         enabled ? 'success' : 'info',
     );
 });
@@ -499,6 +533,8 @@ function applyDetail(data) {
             : 'Belum ada episode yang tayang.',
     });
     refreshWatched();
+    // Badge Sub Indo per episode: backend memeriksa halaman tiap episode (maks 24).
+    void loadSubtitleMap(total);
 
     // Tautan Jadwal Rilis (ep=latest): buka episode terbaru yang sudah ada (atau episode 1)
     if (wantLatest) {
@@ -769,6 +805,8 @@ function start() {
     renderHeader();
     renderPlatforms();
     syncWatchBookmark();
+    subtitleMapKey = '';
+    episodes.clearSubtitles();
     episodes.setCurrent(ep);
     episodes.setLoading();
     updateNav();

@@ -174,6 +174,9 @@
 .ep-btn:hover,.ep-btn.active{background:rgba(var(--primary-rgb),.15);border-color:var(--primary);color:var(--primary)}
 .ep-btn.is-watched:not(.active){color:var(--text-primary);border-color:rgba(var(--accent-rgb),.35)}
 a.ep-btn{display:block;text-decoration:none}
+/* Badge Sub Indo per episode (24 Okt 2026) — hanya bila backend menemukan bukti subtitle Indonesia. */
+.ep-btn .ep-sub{display:block;margin:3px auto 0;padding:1px 6px;width:max-content;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.02em;background:rgba(var(--accent-rgb),.16);color:var(--accent)}
+.ep-btn.active .ep-sub{background:rgba(var(--primary-rgb),.2);color:var(--primary)}
 .ep-btn:focus-visible,.ep-range-tab:focus-visible,.server-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .ep-btn.ep-skeleton{height:37px;padding:0;border:0;cursor:default}
 .episode-manual,.episode-empty{grid-column:1/-1}

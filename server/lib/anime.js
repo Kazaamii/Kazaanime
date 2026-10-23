@@ -68,7 +68,16 @@ export function makeEpisodeList(list = []) {
     const seen = new Set();
     return list
         .filter((e) => posInt(e?.number, 5000) && !seen.has(e.number) && seen.add(e.number))
-        .map((e) => ({ number: e.number, title: clip(e.title, 160), released: clip(e.released, 40), url: absoluteUrl(e.url) || null }))
+        .map((e) => ({
+            number: e.number,
+            title: clip(e.title, 160),
+            released: clip(e.released, 40),
+            url: absoluteUrl(e.url) || null,
+            // 24 Okt 2026: bahasa subtitle per episode bila situs mencantumkannya di daftar
+            // episode ('id' = bukti teks Indonesia, '' = diperiksa dan tidak ada buktinya).
+            // Tidak ada properti `sub` = belum diperiksa (butuh halaman episode).
+            ...(e.sub === 'id' || e.sub === '' ? { sub: e.sub } : {}),
+        }))
         .sort((a, b) => a.number - b.number)
         .slice(0, 5000);
 }
