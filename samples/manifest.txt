@@ -13,3 +13,12 @@ animeku-anime	403	931	https://ww2.animeku.lol/anime/
 animeku-ongoing	403	931	https://ww2.animeku.lol/ongoing/
 animeku-robots	403	931	https://ww2.animeku.lol/robots.txt
 oploverz-robots	200	169	https://oploverz.ch/robots.txt
+oploverz-home	200	119167	https://oploverz.ch/
+oploverz-series-list	200	131692	https://oploverz.ch/series/?status=&type=&order=update
+oploverz-episode	200	96344	https://oploverz.ch/toaru-anbu-no-item-episode-3-subtitle-indonesia/
+oploverz-series	200	84925	https://oploverz.ch/series/toaru-anbu-no-item/
+animeku-home	200	67097	https://ww2.animeku.lol/
+animeku-anime	200	40093	https://ww2.animeku.lol/anime/
+animeku-ongoing	404	35586	https://ww2.animeku.lol/ongoing/
+animeku-robots	200	0	https://ww2.animeku.lol/robots.txt
+oploverz-robots	200	169	https://oploverz.ch/robots.txt
