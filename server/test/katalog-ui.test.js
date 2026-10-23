@@ -90,7 +90,7 @@ test('katalog.js: bagian Donghua AnimeKu dijelaskan sebagai deteksi, bukan kateg
     assert.ok(block.length > 0, 'bagian Donghua di AnimeKu harus ada');
     assert.match(block, /tidak memberi kategori donghua yang bisa dipakai/, 'pengguna diberi tahu batas sumbernya');
     assert.match(block, /metadata/, 'asal daftar dijelaskan');
-    assert.match(pageJs, /filter: runtime\.def\.id/, 'bagian dikirim sebagai filter=donghua ke backend');
+    assert.match(pageJs, /filter: state\.query \? '' : runtime\.def\.id/, 'bagian dikirim sebagai filter=donghua ke backend (kecuali saat mencari)');
 });
 
 test('katalog.js: tab Donghua memakai feed Donghua Kazanime (bukan kategori karangan)', () => {
@@ -123,7 +123,7 @@ test('katalog.js: ringkas 6 kartu + tombol Tampilkan lebih banyak + Lihat Semua'
     // Tautan bergaya section beranda tetap ada untuk daftar penuh.
     assert.match(pageJs, /class="see-all" data-see-all href="\$\{katalogUrl\(\{ source: state\.source, filter: def\.id, genre: state\.genre \}\)\}"/);
     assert.match(pageJs, /Lihat Semua \$\{icon\('chevron-right'\)\}/);
-    assert.match(pageJs, /filter: runtime\.def\.id/);
+    assert.match(pageJs, /filter: state\.query \? '' : runtime\.def\.id/);
     assert.match(pageJs, /refresh,/, 'Coba Lagi melewati cache/circuit frontend');
     assert.match(pageJs, /loadSection\(runtime, \{ reset: true, refresh: true \}\)/);
 });
@@ -233,6 +233,17 @@ test('css/katalog.css: blok bagian + pemilih genre memakai variabel tema', () =>
     assert.doesNotMatch(css, /#0[0-9a-f]{5}|#1[0-9a-f]{5}/i, 'warna latar harus memakai variabel tema');
 });
 
+test('katalog: filter Tahun & Musim diteruskan ke browse dan disimpan di URL', () => {
+    assert.match(pageHtml, /id="katalogYear"/);
+    assert.match(pageHtml, /id="katalogSeason"/);
+    assert.match(pageJs, /year: state\.year,\s*season: state\.season,/s);
+    assert.match(pageJs, /if \(state\.year\) q\.set\('year', state\.year\)/);
+    assert.match(pageJs, /if \(state\.season\) q\.set\('season', state\.season\)/);
+    assert.match(pageJs, /yearSelect\?\.addEventListener\('change'/);
+    assert.match(pageJs, /seasonSelect\?\.addEventListener\('change'/);
+    assert.match(routesJs, /p\.set\('year', String\(year\)\)/);
+});
+
 test('beranda: Jadwal & Genre di atas panel Sub Indo, tanpa paragraf pengantar (24 Okt 2026)', () => {
     const jadwal = homeHtml.indexOf('id="jadwal"');
     const genre = homeHtml.indexOf('id="genre"');
@@ -253,16 +264,16 @@ test('home.js: sort Tahun/Musim + genre situs (Oploverz & AnimeKu) memakai data 
     assert.match(homeJs, /SITE_ORDER = \{ oploverz:/, 'urutan situs memakai token order Oploverz');
     assert.match(homeJs, /getGenreAnime\(genre, \{\s*year: genreState\.year,\s*season: genreState\.season,/s);
     assert.match(homeJs, /data-site-genres/, 'genre situs dirender sebagai grup terpisah');
-    assert.match(homeJs, /katalogUrl\(\{ source, genre: id \}\)/, 'Lihat Semua membuka katalog sumber+genre');
+    assert.match(homeJs, /katalogUrl\(\{\s*source, genre: id, year: genreState\.year, season: genreState\.season,/s, 'Lihat Semua membuka katalog sumber+genre (tahun/musim ikut)');
 });
 
 test('katalog: filter Tahun & Musim diteruskan ke browse dan disimpan di URL', () => {
     assert.match(pageHtml, /id="katalogYear"/);
     assert.match(pageHtml, /id="katalogSeason"/);
     assert.match(pageJs, /year: state\.year,\s*season: state\.season,/s);
-    assert.match(pageJs, /if \(state\.year\) q\.set\('year', state\.year\)/);
-    assert.match(pageJs, /if \(state\.season\) q\.set\('season', state\.season\)/);
-    assert.match(pageJs, /yearSelect\?\.addEventListener\('change'/);
-    assert.match(pageJs, /seasonSelect\?\.addEventListener\('change'/);
-    assert.match(routesJs, /p\.set\('year', String\(year\)\)/);
+    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', q = '', page = 1, year = '', season = '' \}/);
+    assert.match(routesJs, /if \(\/\^\\d\{4\}\$\/\.test\(String\(year \|\| ''\)\)\) p\.set\('year'/);
+    assert.match(routesJs, /winter\|spring\|summer\|fall/);
+    assert.match(css, /\.katalog-genre-select\{/);
+    assert.match(pageHtml, /<select id="katalogYear" class="katalog-genre-select">/);
 });

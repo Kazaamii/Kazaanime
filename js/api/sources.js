@@ -205,6 +205,9 @@ export function getSourceBrowse(source, {
                 filter: String(data.filter || ''),
                 genre: String(data.genre || ''),
                 query: String(data.query || ''),
+                // Kegagalan sebagian (mis. metadata donghua mati) diteruskan agar panel bisa
+                // membedakan "situs kosong" dari "gagal dimuat" — 24 Okt 2026.
+                error: fromBackendError(Array.isArray(json.errors) ? json.errors[0] : null) || null,
             };
         },
     });

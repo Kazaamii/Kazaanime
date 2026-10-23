@@ -182,6 +182,15 @@
 .subindo-status{margin:0 0 16px;color:var(--text-secondary);font-size:12px;line-height:1.5}
 .subindo-status:empty{display:none}
 .subindo-sources[aria-busy="true"]{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:22px}
+/* Tombol "Muat ulang" global (24 Okt 2026) — permintaan pengguna untuk ponsel */
+/* Label + tombol muat ulang tetap satu baris di desktop, boleh membungkus di ponsel. */
+.subindo-header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+@media(max-width:600px){.subindo-header-actions{width:100%;margin-left:0;justify-content:space-between}}
+.subindo-refresh{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:999px;border:1px solid rgba(var(--primary-rgb),.24);background:rgba(var(--primary-rgb),.08);color:var(--primary);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.subindo-refresh:hover{background:rgba(var(--primary-rgb),.16)}
+.subindo-refresh:disabled{opacity:.6;cursor:progress}
+.subindo-refresh.is-busy svg{animation:spin 1s linear infinite}
+@media (prefers-reduced-motion: reduce){.subindo-refresh.is-busy svg{animation:none}}
 .subindo-source{padding:22px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .subindo-source:last-child{border-bottom:0}
 .subindo-source-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}

@@ -61,7 +61,9 @@ test('Sub Indo hanya AnimeKu & Oploverz, tanpa batas verifikasi di config', () =
     assert.match(subindoJs, /export function groupSubIndoSources\(/);
     assert.match(subindoJs, /export async function loadSubIndoSources\(/);
     assert.match(homeJs, /import \{ panelSections \} from '\.\/api\/subindo\.js'/);
-    assert.match(homeJs, /sections: panelSections\(result\.sections\)/);
+    // 24 Okt 2026: hasil filter disimpan ke `sections` dulu supaya feed kosong bisa ditangani.
+    assert.match(homeJs, /panelSections\(result\.sections\)/);
+    assert.match(homeJs, /if \(!sections\.length\) throw new Error\('Backend tidak mengirim panel Sub Indo\.'\)/);
 
     assert.match(configJs, /export const SUB_INDO = Object\.freeze\(\{/);
     for (const entry of ['resultLimit: 24', 'previewLimit: 6']) {

@@ -450,8 +450,19 @@ export function createRegistry({
                 // Donghua per sumber (24 Okt 2026): daftar judul donghua tayang dari metadata
                 // lalu dicari di situs sumber. Dipakai AnimeKu yang tidak punya kategori donghua.
                 if (!metadata) throw badRequest(`Donghua ${adapter.name} membutuhkan metadata untuk mencocokkan judul.`);
-                const feed = await wrap('donghua:titles', ttl.latestTtlMs, () => metadata.latestDonghua(ctx));
-                const titles = (feed.value?.items || []).map((item) => item.title).filter(Boolean).slice(0, 8);
+                // Metadata boleh gagal: bagian Donghua tetap diisi seed situs, bukan 502.
+                let feed = { value: null, cache: 'fresh', error: null };
+                try {
+                    feed = await wrap('donghua:titles', ttl.latestTtlMs, () => metadata.latestDonghua(ctx));
+                } catch (error) {
+                    if (isAbort(error)) throw error;
+                    feed = { value: null, cache: 'fresh', error };
+                }
+                const metaTitles = (feed.value?.items || []).map((item) => item.title).filter(Boolean);
+                // Seed situs lebih dulu: metadata bisa kosong/gagal (AniList) dan judul yang
+                // sedang tayang sering belum ada di situs, sehingga pencarian jadi kosong.
+                const seeds = Array.isArray(adapter.donghuaSeeds) ? adapter.donghuaSeeds : [];
+                const titles = [...new Set([...seeds, ...metaTitles])].slice(0, 12);
                 const found = await wrap(`browse:donghua:${adapter.id}`, ttl.searchTtlMs, () => adapter.browseDonghua(titles, ctx));
                 const options = browseOptionsOf(adapter);
                 return {
@@ -469,7 +480,9 @@ export function createRegistry({
                     },
                     fallback: false,
                     stale: found.cache === 'stale' || feed.cache === 'stale',
-                    errors: found.error ? [describeError(found.error)] : [],
+                    // Kegagalan metadata ikut dilaporkan: dulu tersembunyi sehingga bagian
+                    // Donghua tampak kosong tanpa penjelasan.
+                    errors: [feed.error, found.error].filter(Boolean).map((error) => describeError(error)),
                 };
             }
             if (adapter.supportsBrowse !== true || typeof adapter.browse !== 'function') {

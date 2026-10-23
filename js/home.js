@@ -20,7 +20,7 @@ import { createHeroSlider } from './ui/hero.js';
 import { renderCards, bindCardActions, syncBookmarkButtons, gridMessage } from './ui/card.js';
 import { renderSchedule, renderScheduleSkeleton } from './ui/schedule.js';
 import { setSectionNote } from './ui/notice.js';
-import { showSkeleton } from './ui/skeleton.js';
+import { showSkeleton, skeletonCards } from './ui/skeleton.js';
 import { html, $, delegate } from './ui/dom.js';
 import { GENRES, SCHEDULE, SUB_INDO } from './config.js';
 import { genreUrl, watchUrl, latestEpisodeOf, katalogUrl } from './routes.js';
@@ -59,9 +59,46 @@ const GRIDS = {
     donghua: $('#donghuaGrid'),
 };
 const subIndoRoot = $('#subindoSources');
+const subIndoRefreshBtn = $('#subIndoRefresh');
 let subIndoLoadToken = 0;
 /** Hasil terakhir supaya tombol "Coba lagi" per panel bisa memperbarui satu sumber saja. */
 let subIndoState = null;
+/**
+ * Salinan hasil terakhir di localStorage (24 Okt 2026). Kalau feed live gagal
+ * (jaringan mobile lambat/timeout), panel tetap terisi judul — bukan kotak kosong.
+ */
+const SUB_INDO_CACHE_KEY = 'kz:subindo-last';
+
+function readSubIndoCache() {
+    try {
+        const raw = window.localStorage.getItem(SUB_INDO_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.sections) || !parsed.sections.length) return null;
+        return parsed;
+    } catch {
+        return null; // localStorage diblokir / isinya rusak
+    }
+}
+
+function writeSubIndoCache(sections) {
+    try {
+        const slim = (Array.isArray(sections) ? sections : [])
+            .map((source) => ({
+                id: source.id,
+                name: source.name,
+                homeUrl: source.homeUrl,
+                browse: Boolean(source.browse),
+                total: Number(source.total) || (source.items || []).length,
+                items: (Array.isArray(source.items) ? source.items : []).slice(0, SUB_INDO.resultLimit),
+            }))
+            .filter((source) => source.items.length);
+        if (!slim.length) return;
+        window.localStorage.setItem(SUB_INDO_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), sections: slim }));
+    } catch {
+        // Mode privat / kuota penuh: cache dilewati, tidak mengganggu render.
+    }
+}
 
 async function loadSection(kind) {
     const grid = GRIDS[kind];
@@ -183,18 +220,47 @@ function renderSubIndoSources(sources) {
     });
 }
 
-async function loadSubIndoSection({ refresh = false } = {}) {
+async function loadSubIndoSection({ refresh = false, retry = true } = {}) {
     const token = ++subIndoLoadToken;
+    // Status teks selalu terlihat (termasuk di layar kecil) supaya bagian ini tidak
+    // pernah tampil "kosong" tanpa penjelasan saat jaringan lambat.
+    if (subIndoStatus && !subIndoState) subIndoStatus.textContent = 'Memuat katalog AnimeKu & Oploverz…';
     showSkeleton(subIndoRoot, 4);
     setSectionNote(subIndoRoot);
     try {
         const result = await getSubIndoHomeSources({ refresh });
         if (token !== subIndoLoadToken) return;
-        subIndoState = { sections: panelSections(result.sections) };
-        renderSubIndoSources(subIndoState.sections);
-        updateSubIndoNote(subIndoState.sections);
+        const sections = panelSections(result.sections);
+        if (!sections.length) throw new Error('Backend tidak mengirim panel Sub Indo.');
+        subIndoState = { sections };
+        writeSubIndoCache(sections);
+        renderSubIndoSources(sections);
+        updateSubIndoNote(sections);
     } catch (error) {
         if (token !== subIndoLoadToken || error?.kind === 'abort') return;
+        // Jaringan ponsel sering putus sebentar: satu percobaan ulang otomatis sebelum
+        // menyerah ke cache/pesan error. Status tetap terlihat selama percobaan ini.
+        if (retry && (error?.kind === 'timeout' || error?.kind === 'network')) {
+            if (subIndoStatus) subIndoStatus.textContent = 'Jaringan lambat — mencoba sekali lagi…';
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            if (token !== subIndoLoadToken) return;
+            return loadSubIndoSection({ refresh: true, retry: false });
+        }
+        // Fallback: hasil sukses terakhir dari perangkat ini (mobile sering timeout).
+        const cached = readSubIndoCache();
+        if (cached?.sections?.length) {
+            const sections = cached.sections.map((source) => ({ ...source, error: null, stale: true }));
+            subIndoState = { sections };
+            renderSubIndoSources(sections);
+            const when = cached.savedAt
+                ? new Date(cached.savedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+                : '';
+            setSectionNote(subIndoRoot, {
+                text: `Katalog live belum bisa dimuat (${friendlyError(error)}). Menampilkan data tersimpan${when ? ` dari ${when}` : ''}.`,
+                onRetry: () => loadSubIndoSection({ refresh: true }),
+            });
+            return;
+        }
         subIndoState = null;
         renderSubIndoSummary([]);
         gridMessage(subIndoRoot, {
@@ -203,6 +269,26 @@ async function loadSubIndoSection({ refresh = false } = {}) {
             text: friendlyError(error),
             actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
         });
+    }
+}
+
+/** Tombol "Muat ulang" global di kepala bagian: ambil ulang katalog tanpa cache. */
+async function refreshSubIndoSection() {
+    if (subIndoRefreshBtn?.disabled) return;
+    if (subIndoRefreshBtn) {
+        subIndoRefreshBtn.disabled = true;
+        subIndoRefreshBtn.classList.add('is-busy');
+        subIndoRefreshBtn.setAttribute('aria-busy', 'true');
+    }
+    retrySourcesNow();
+    try {
+        await loadSubIndoSection({ refresh: true, retry: false });
+    } finally {
+        if (subIndoRefreshBtn) {
+            subIndoRefreshBtn.disabled = false;
+            subIndoRefreshBtn.classList.remove('is-busy');
+            subIndoRefreshBtn.removeAttribute('aria-busy');
+        }
     }
 }
 
@@ -234,8 +320,11 @@ function updateSubIndoNote(sections) {
 }
 
 delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
-    retrySourcesNow();
-    loadSubIndoSection({ refresh: true });
+    refreshSubIndoSection();
+});
+
+subIndoRefreshBtn?.addEventListener('click', () => {
+    refreshSubIndoSection();
 });
 
 /** Buka/tutup sisa judul satu panel (tanpa request baru: semua sudah dimuat). */
@@ -329,6 +418,14 @@ const genreYear = $('#genreYear');
 const genreSeason = $('#genreSeason');
 const genreSort = $('#genreSort');
 const genreReset = $('#genreFilterReset');
+/* Menu genre situs (24 Okt 2026): deretan ±70 tombol dipindah ke panel yang bisa dibuka. */
+const genreMenuBtn = $('#genreMenuBtn');
+const genreMenu = $('#genreMenu');
+const genreMenuBody = $('#genreMenuBody');
+const genreMenuSearch = $('#genreMenuSearch');
+const genreMenuClose = $('#genreMenuClose');
+const genreMenuCount = $('#genreMenuCount');
+const genreMenuEmpty = $('#genreMenuEmpty');
 /**
  * Filter aktif: genre (label AniList atau kunci `sumber:token`), tahun, musim
  * (winter/spring/summer/fall), urutan. `siteGenres` diisi dari `/api/anime/genres`.
@@ -393,8 +490,14 @@ const tagKey = (tag) => (tag.dataset.source
     ? `${tag.dataset.source}:${tag.dataset.genre || ''}`
     : (tag.dataset.genre || ''));
 
+/** Semua tombol genre: chip AniList di beranda + tombol situs di dalam menu. */
+function genreTagNodes() {
+    const menuTags = genreMenuBody ? [...genreMenuBody.querySelectorAll('.genre-tag')] : [];
+    return [...genreBox.querySelectorAll('.genre-tag'), ...menuTags];
+}
+
 function markGenre(key) {
-    genreBox.querySelectorAll('.genre-tag').forEach((tag) => {
+    genreTagNodes().forEach((tag) => {
         const on = tagKey(tag) === key;
         tag.classList.toggle('active', on);
         tag.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -469,9 +572,11 @@ async function selectGenre(genre, { keepOpen = false } = {}) {
  * dilewati agar tidak ada tombol kembar; sisanya ditampilkan semua (permintaan pengguna).
  */
 function renderSiteGenres() {
-    genreBox.querySelector('[data-site-genres]')?.remove();
+    if (!genreMenuBody) return;
+    genreMenuBody.querySelector('[data-site-genres]')?.remove();
     const known = new Set(GENRES.map((genre) => genre.label.toLowerCase()));
     const groups = [];
+    let total = 0;
     for (const source of genreState.siteGenres) {
         const list = source.genres.filter((genre) => {
             // Kunci: padanan AniList bila ada ("aksi" → "action"), kalau tidak labelnya sendiri.
@@ -481,13 +586,60 @@ function renderSiteGenres() {
             return true;
         });
         if (!list.length) continue;
+        total += list.length;
         groups.push(html`<div class="genre-group">
             <span class="genre-group-label">${source.name}</span>
             <span class="genre-group-tags">${list.map((genre) => html`<button type="button" class="genre-tag genre-tag--site" data-source="${source.id}" data-genre="${genre.id}" aria-pressed="false" aria-controls="genreResults">${genre.label}</button>`)}</span>
         </div>`);
     }
-    if (!groups.length) return;
-    genreBox.insertAdjacentHTML('beforeend', String(html`<div class="genre-group-list" data-site-genres>${groups}</div>`));
+    if (!groups.length) {
+        // Tidak ada genre situs: tombol menu tidak ditampilkan supaya tidak membuka panel kosong.
+        if (genreMenuBtn) genreMenuBtn.hidden = true;
+        return;
+    }
+    genreMenuBody.insertAdjacentHTML('beforeend', String(html`<div class="genre-group-list" data-site-genres>${groups}</div>`));
+    if (genreMenuBtn) genreMenuBtn.hidden = false;
+    if (genreMenuCount) {
+        genreMenuCount.textContent = String(total);
+        genreMenuCount.hidden = false;
+    }
+    filterGenreMenu(genreMenuSearch?.value || '');
+}
+
+/**
+ * Buka/tutup panel genre situs. Fokus pindah ke kotak cari saat dibuka supaya
+ * pengguna ponsel tidak perlu menggulir daftar panjang untuk menemukan genre.
+ */
+function setGenreMenuOpen(open) {
+    if (!genreMenu || !genreMenuBtn) return;
+    genreMenu.hidden = !open;
+    genreMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+        genreMenuSearch?.focus({ preventScroll: true });
+        return;
+    }
+    if (genreMenuSearch && genreMenuSearch.value) {
+        genreMenuSearch.value = '';
+        filterGenreMenu('');
+    }
+}
+
+/** Saring tombol genre situs berdasarkan kata kunci; grup kosong disembunyikan. */
+function filterGenreMenu(term) {
+    if (!genreMenuBody) return;
+    const needle = String(term || '').trim().toLowerCase();
+    let shown = 0;
+    genreMenuBody.querySelectorAll('.genre-group').forEach((group) => {
+        let visible = 0;
+        group.querySelectorAll('.genre-tag').forEach((tag) => {
+            const match = !needle || (tag.textContent || '').toLowerCase().includes(needle);
+            tag.hidden = !match;
+            if (match) visible += 1;
+        });
+        group.hidden = visible === 0;
+        shown += visible;
+    });
+    if (genreMenuEmpty) genreMenuEmpty.hidden = shown > 0;
 }
 
 /** Muat daftar genre situs; gagal = tombol AniList tetap bisa dipakai (tanpa pesan). */
@@ -520,7 +672,9 @@ async function selectSiteGenre(source, id, label, { keepOpen = false } = {}) {
     const def = genreState.siteGenres.find((item) => item.id === source);
     const filters = genreFilterLabel();
     genreTitle.textContent = `Genre: ${label}${filters ? ` · ${filters}` : ''} — ${def?.name || source}`;
-    genreSeeAll.href = katalogUrl({ source, genre: id });
+    genreSeeAll.href = katalogUrl({
+        source, genre: id, year: genreState.year, season: genreState.season,
+    });
     genreResults.hidden = false;
     showSkeleton(genreGrid);
     revealGenreResults();
@@ -574,12 +728,46 @@ function applyGenreFilters() {
     selectGenre(genreState.genre, { keepOpen: true });
 }
 
-delegate(genreBox, 'click', '.genre-tag', (_e, tag) => {
+function handleGenreTag(tag) {
+    if (!tag) return;
     if (tag.dataset.source) {
         selectSiteGenre(tag.dataset.source, tag.dataset.genre || '', (tag.textContent || '').trim());
         return;
     }
     selectGenre(tag.dataset.genre || '');
+}
+
+delegate(genreBox, 'click', '.genre-tag', (_e, tag) => handleGenreTag(tag));
+// Genre situs ada di dalam menu: klik tombol = pilih genre + tutup menu.
+delegate(genreMenuBody, 'click', '.genre-tag', (_e, tag) => {
+    setGenreMenuOpen(false);
+    handleGenreTag(tag);
+});
+
+genreMenuBtn?.addEventListener('click', () => {
+    setGenreMenuOpen(Boolean(genreMenu?.hidden));
+});
+genreMenuClose?.addEventListener('click', () => {
+    setGenreMenuOpen(false);
+    genreMenuBtn?.focus({ preventScroll: true });
+});
+genreMenuSearch?.addEventListener('input', () => filterGenreMenu(genreMenuSearch.value));
+genreMenuSearch?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        setGenreMenuOpen(false);
+        genreMenuBtn?.focus({ preventScroll: true });
+    }
+});
+// Klik di luar menu menutup panel (perilaku menu pada umumnya, termasuk di ponsel).
+document.addEventListener('click', (event) => {
+    if (!genreMenu || genreMenu.hidden) return;
+    if (genreMenu.contains(event.target) || genreMenuBtn?.contains(event.target)) return;
+    setGenreMenuOpen(false);
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !genreMenu || genreMenu.hidden) return;
+    setGenreMenuOpen(false);
+    genreMenuBtn?.focus({ preventScroll: true });
 });
 $('#genreClose').addEventListener('click', closeGenre);
 genreYear?.addEventListener('change', () => {
@@ -619,6 +807,97 @@ delegate(genreGrid, 'click', '[data-action="retry-genre"]', () => {
 
 // Daftar genre situs dimuat menyusul agar tombol AniList tampil tanpa menunggu backend.
 void loadSiteGenres();
+
+/* ------------------------------------------------------------------ */
+/* Donghua dari situs sumber: AnimeKu & Oploverz (24 Okt 2026)         */
+/* Permintaan pengguna: "tambahkan Data Donghua dari kedua itu di      */
+/* Oploverz dan AnimeKu, jangan AniList saja". Panel di atas grid       */
+/* metadata; grid AniList tetap jadi pelengkap untuk judul yang belum   */
+/* ada di kedua situs.                                                 */
+/* ------------------------------------------------------------------ */
+const donghuaSites = $('#donghuaSites');
+const donghuaNote = $('#donghuaNote');
+const DONGHUA_SITE_IDS = ['animeku', 'oploverz'];
+const DONGHUA_SITE_LABELS = { animeku: 'AnimeKu', oploverz: 'Oploverz' };
+const DONGHUA_SITE_LIMIT = 12;
+
+function setDonghuaNote(text, { retry = false } = {}) {
+    if (!donghuaNote) return;
+    if (!text) {
+        donghuaNote.textContent = '';
+        return;
+    }
+    if (!retry) {
+        donghuaNote.textContent = text;
+        return;
+    }
+    donghuaNote.innerHTML = String(html`${text} <button type="button" class="donghua-retry" data-action="retry-donghua">${icon('refresh-cw')} Coba lagi</button>`);
+    donghuaNote.querySelector('[data-action="retry-donghua"]')?.addEventListener('click', () => {
+        retrySourcesNow();
+        loadDonghuaSites();
+    }, { once: true });
+}
+
+/** Panel donghua satu situs: kepala ringkas + grid kartu dari katalog situs itu. */
+function renderDonghuaPanels(panels) {
+    if (!donghuaSites) return;
+    const filled = panels.filter((panel) => panel.items.length);
+    if (!filled.length) {
+        donghuaSites.innerHTML = '';
+        const failed = panels.some((panel) => panel.error);
+        setDonghuaNote(
+            failed
+                ? 'Donghua dari AnimeKu & Oploverz belum bisa dimuat. Daftar di bawah memakai metadata AniList.'
+                : 'Belum ada judul donghua di katalog AnimeKu & Oploverz saat ini. Daftar di bawah memakai metadata AniList.',
+            { retry: failed },
+        );
+        return;
+    }
+    donghuaSites.innerHTML = String(html`${filled.map((source) => html`
+        <section class="subindo-source donghua-site" data-donghua-source="${source.id}">
+            <div class="subindo-source-header">
+                <h3>${source.name}</h3>
+                <span class="subindo-source-count">${source.items.length} judul</span>
+                <a class="see-all subindo-source-more" href="${katalogUrl({ source: source.id, filter: 'donghua' })}">Lihat Semua ${icon('chevron-right')}</a>
+            </div>
+            <div class="anime-grid" data-donghua-grid="${source.id}" aria-busy="false"></div>
+        </section>`)}`);
+    filled.forEach((source) => {
+        const grid = donghuaSites.querySelector(`[data-donghua-grid="${source.id}"]`);
+        renderCards(grid, source.items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
+    });
+    const missing = panels
+        .filter((panel) => !panel.items.length)
+        .map((panel) => (panel.error ? `${panel.name} gagal dimuat` : `Donghua ${panel.name} belum ada di katalognya`));
+    const note = missing.length
+        ? `${missing.join(' · ')}. Daftar di bawah dari metadata AniList.`
+        : 'Donghua tayang dari katalog AnimeKu & Oploverz. Daftar di bawah dari metadata AniList sebagai pelengkap.';
+    setDonghuaNote(note);
+}
+
+/** Muat donghua dari kedua situs sumber (paralel, kegagalan satu tidak menggagalkan yang lain). */
+async function loadDonghuaSites() {
+    if (!donghuaSites) return;
+    donghuaSites.setAttribute('aria-busy', 'true');
+    donghuaSites.innerHTML = String(html`<section class="subindo-source donghua-site is-loading">
+        <div class="subindo-source-header"><h3>Donghua dari situs</h3><span class="subindo-source-count">memuat…</span></div>
+        <div class="anime-grid">${skeletonCards(4)}</div>
+    </section>`);
+    setDonghuaNote('');
+    const panels = await Promise.all(DONGHUA_SITE_IDS.map(async (id) => {
+        const name = DONGHUA_SITE_LABELS[id] || id;
+        try {
+            const res = await getSourceBrowse(id, { filter: 'donghua' });
+            const items = (Array.isArray(res.items) ? res.items : []).slice(0, DONGHUA_SITE_LIMIT);
+            return { id, name, items };
+        } catch (error) {
+            if (error?.kind !== 'abort') console.info(`[donghua] ${id} gagal dimuat:`, error?.message || error);
+            return { id, name, items: [], error };
+        }
+    }));
+    donghuaSites.setAttribute('aria-busy', 'false');
+    renderDonghuaPanels(panels);
+}
 
 /* ------------------------------------------------------------------ */
 /* Bookmark: pindah ke bookmark.html (24 Okt 2026)                      */
@@ -690,6 +969,9 @@ function whenVisible(el, callback) {
 /* ------------------------------------------------------------------ */
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
 loadSubIndoSection();
+// Panel donghua situs dimuat saat bagiannya mendekati layar: dua permintaan katalog
+// (AnimeKu & Oploverz) tidak boleh berebut jaringan dengan hero/section di awal halaman.
+whenVisible($('#donghua'), loadDonghuaSites);
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
 
