@@ -16,6 +16,7 @@ beradapter.
 | **E** | Perbaikan 22 Okt 2026 (3): **Genre & Jadwal di atas** beranda (hasil genre langsung di bawah tombol); server cadangan #2 → **ReAnime**, + tombol **AniZone "Multi Sub"** (player HLS bawaan + proxy); **tombol bookmark kartu** di pojok poster; **ikon** pengganti emoji; font **Figtree + Bricolage Grotesque**; donghua + **Anichin**; Sub Indo + **Otakudesu**, **Anoboy** & **Sakunime** (robots.txt fail-closed) + **hianime.ro**; **Jikan dihapus** | ✅ Selesai — lihat [Batasan Cloudflare](#-batasan-cloudflare-dicek-22-okt-2026) |
 | **F+** | Subtitle lokal untuk pemutar HLS: pilih `.srt` / `.vtt` di browser, konversi SRT→WebVTT, ganti/hapus track; tidak diunggah | ✅ Selesai |
 | **G** | Penguatan feed Sub Indo 23 Okt 2026: verifikasi beranggaran waktu, batas kandidat per situs, fallback episode sebelumnya, ringkasan & tombol coba lagi per panel, panel gagal ringkas dengan diagnosis tergabung dan tautan "Buka situs" (tanpa bypass) | ✅ Selesai |
+| **H** | Pengganti saat sumber gagal 23 Okt 2026: **AnimeKu** (`ww2.animeku.lol`) dan **Oploverz** (`oploverz.ch`, dikenal juga sebagai Animeloverz) sebagai adapter penuh + panel Sub Indo cadangan; bukti Sub Indo tetap per episode | ✅ Selesai |
 
 ---
 
@@ -130,6 +131,8 @@ kazanime/
     │   ├── anichin.js         🅔 adapter Anichin — donghua Sub Indo (tema AnimeStream, parser bersama AnimeXin) + jadwal berjam
     │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Hardsub Indonesia (diblokir Cloudflare untuk IP pusat data, lihat batasan)
     │   ├── kuramanime.js      adapter Kuramanime opt-in; nonaktif default; klaim bahasa hanya bila halaman menyebutnya; token player tidak di-bypass
+    │   ├── animeku.js         adapter AnimeKu — kartu rilis terbaru → slug seri; judul episode tanpa "Sub Indo" tidak diklaim Indonesia
+    │   ├── oploverz.js        adapter Oploverz (Animeloverz) — kartu `article.bs`, daftar episode `.eplister`, server `#embed_holder`; tanpa klaim bahasa otomatis
     │   ├── hianime.js         🅔 adapter hianime.ro — anime Jepang, subtitle Inggris (REST otakuthemes)
     │   └── metadata.js        fallback API publik Kitsu → AniList (Jikan dihapus) + poster Kitsu → Bangumi → MangaBaka
     ├── providers/             🅔 penyedia server berbasis id/judul (bukan katalog)
@@ -262,6 +265,7 @@ yang punya server/track subtitle Indonesia eksplisit. Batasnya dipusatkan di
 | Panel gagal ringkas | Situs tanpa judul terverifikasi tampil sebagai **satu baris** (ikon + diagnosis + tindakan), bukan kotak kosong besar yang mengulang kepala panel. Diagnosis hanya ditulis sekali: pesan yang sama untuk beberapa situs digabung pada keterangan global ("Penyebab: … (Samehadaku, Otakudesu)"). |
 | Label jujur | `blocked`/`policy`/`rate_limited`/`robots` diberi label **Akses dibatasi** (kita sengaja berhenti), sedangkan `parse`/`network` tetap **Sumber bermasalah**. Tidak ada kesan situsnya "rusak" saat penyebabnya kebijakan. |
 | Buka situs | Panel kosong/gagal menyertakan tautan `homeUrl` (`target="_blank"`, `rel="noopener noreferrer"`, hanya `http(s)`) agar pengguna bisa memeriksa situsnya sendiri. Ini tautan biasa — **bukan** upaya menembus Cloudflare/robots, dan tidak ada stealth, solver CAPTCHA, atau rotasi proxy. |
+| **Sumber pengganti** | Panel diambil dari backend (`SUB_INDO_LATEST_SOURCE_ORDER`): **AnimeKu**, **Oploverz**, Samehadaku, Sakunime, Otakudesu, Kuramanime. Bila Samehadaku/Sakunime/Otakudesu/Kuramanime dibalas 403 atau kehabisan waktu, panel **AnimeKu** dan **Oploverz** tetap tampil dan diisi judul yang lolos bukti per episode — bukan judul yang diklaim Sub Indo karena situsnya situs Indonesia. |
 | Tanpa backend | Tetap seperti sebelumnya: section menampilkan pesan yang bisa dicoba lagi; tidak ada judul metadata cadangan yang diklaim Sub Indo. |
 
 Tes offline: `server/test/subindo-home.test.js` (urutan pemeriksaan, pemisahan
@@ -276,6 +280,25 @@ dan pembuangan klaim bahasa tanpa bukti. `server/test/subtitle-report.test.js` m
 laporan `npm run check:subindo` tetap jujur: halaman berpenanda lolos, kontrol negatif dari
 situs yang sama tidak.
 
+## 🔁 Sumber pengganti: AnimeKu & Oploverz (23 Okt 2026)
+
+Saat panel Samehadaku/Sakunime/Otakudesu/Kuramanime kosong karena `403`, batas waktu, atau
+robots.txt yang tidak terbaca, dua situs berikut dipakai sebagai **sumber pengganti**.
+
+| Sumber | Id | Alamat default | Yang diambil | Batas |
+|---|---|---|---|---|
+| **AnimeKu** | `animeku` | `https://ww2.animeku.lol` (`ANIMEKU_BASE_URL`) | Beranda (`article.aku-sel` untuk seri, `article.aku-rel-sel` untuk rilis terbaru), halaman seri `.aku-eplist`, halaman episode `/play/<slug>/` | Situs membalas **403** untuk User-Agent browser dari IP pusat data, tetapi **200** untuk User-Agent bot jujur (`KazanimeBot/1.0 …`) — jadi adapter memakai UA bot bawaan proyek (`SCRAPER_USER_AGENT`). 403 tetap dilaporkan sebagai `blocked` dan **tidak** diulang, diakali, atau dilewati dengan stealth/proxy/solver. |
+| **Oploverz** (Animeloverz) | `oploverz` | `https://oploverz.ch` (`OPLOVERZ_BASE_URL`) | Beranda `article.bs`, halaman seri `/series/<slug>/` + `.eplister`, halaman episode `#embed_holder` | Snapshot halaman episode tidak memuat daftar unduhan/mirror, jadi `downloads` dikirim kosong (tidak dikarang). Player yang tampil hanya iframe yang benar-benar ada di HTML. |
+
+**Bukti Sub Indo tetap per episode.** AnimeKu menyebut "Nonton … Sub Indo HD" di halaman episode
+(judul + deskripsi); Oploverz memakai judul "… Episode N Subtitle Indonesia". Bila penanda itu
+dihapus dari halaman yang sama, server tetap bisa diputar tetapi judulnya **tidak** dihitung
+Sub Indo — lihat baris kontrol negatif `animeku`/`oploverz` pada `npm run check:subindo`.
+
+**Mematikan:** hapus `animeku` dan/atau `oploverz` dari `SCRAPER_SOURCES` (atau dari
+`SOURCES.enabled` di `server/config.js`). Keduanya juga ikut di pencarian halaman nonton
+(`/?s=<judul>`) tanpa mengubah urutan sumber lama.
+
 ## 🎬 Halaman nonton (Tahap C)
 
 Satu implementasi player (`ui/player.js`) menggantikan **dua** salinan di file asli
@@ -283,8 +306,8 @@ Satu implementasi player (`ui/player.js`) menggantikan **dua** salinan di file a
 
 ```
 watch.html?title=...&ep=3&anilist=...&mal=...[&alt=judul romaji]
-   │  1. cari episode di situs backend aktif lewat judul (default: Samehadaku, Anoboy, Sakunime, Otakudesu,
-   │     AnimeXin, Anichin, hianime.ro; Anoboy/Sakunime hanya berjalan jika robots.txt eksplisit mengizinkan),
+   │  1. cari episode di situs backend aktif lewat judul (default: Samehadaku, AnimeKu, Oploverz, Anoboy, Sakunime,
+   │     Otakudesu, AnimeXin, Anichin, hianime.ro; Anoboy/Sakunime hanya berjalan jika robots.txt eksplisit mengizinkan),
    │     judul alternatif & judul tanpa season → Multi Sub diprioritaskan bila tersedia; bahasa lain tetap jadi opsi
    │  2. paralel: GET /api/stream/servers → AniZone (HLS "Multi Sub") + ReAnime (embed) untuk episode itu
    │  3. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan sesuai urutan config
@@ -473,7 +496,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Endpoint | Isi `data` |
 |---|---|
 | `GET /api/anime/latest` | daftar anime (rilis terbaru semua sumber; animexin = episode terbaru tiap seri) |
-| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Feed terbaru hanya mencakup Samehadaku, Sakunime, Otakudesu, dan Kuramanime. Homepage memeriksa endpoint episode terbaru dan hanya menampilkan anime dengan metadata server/track subtitle Indonesia yang eksplisit; judul yang sama dari situs berbeda tetap menjadi kartu terpisah. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
+| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Feed terbaru mencakup AnimeKu, Oploverz, Samehadaku, Sakunime, Otakudesu, dan Kuramanime (AnimeKu & Oploverz = pengganti saat sumber lain 403/timeout). Homepage memeriksa endpoint episode terbaru dan hanya menampilkan anime dengan metadata server/track subtitle Indonesia yang eksplisit; judul yang sama dari situs berbeda tetap menjadi kartu terpisah. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
 | `GET /api/anime/search?q=` | daftar anime (2–100 karakter) |
 | `GET /api/anime/downloads/kusonime?title=<romaji>` | paket unduhan Kusonime yang judul detailnya cocok persis setelah normalisasi (dapat mengirim beberapa `title`). Diakses hanya dari bagian unduhan; hasil bisa berupa satu season/seri, bukan episode tunggal. Mirror tidak di-fetch atau di-decode. |
 | `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
@@ -549,7 +572,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 ### Environment variable (semua opsional)
 Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di User-Agent),
 `SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anoboy,sakunime,anichin,otakudesu,hianime`; `kuramanime` opt-in; `animeonsen` auto-enabled hanya bila kredensial + allowlist media disediakan),
-`SAMEHADAKU_BASE_URL` / `ANOBOY_BASE_URL` / `SAKUNIME_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti; Kuramanime hanya satu domain manual per deployment, tanpa failover otomatis), `KUSONIME_BASE_URL` / `KUSONIME_DOWNLOADS_ENABLED` (lookup paket Romaji; terpisah dari `SCRAPER_SOURCES`, robots wajib mengizinkan),
+`SAMEHADAKU_BASE_URL` / `ANOBOY_BASE_URL` / `SAKUNIME_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` / `ANIMEKU_BASE_URL` / `OPLOVERZ_BASE_URL` (domain sering berganti; Kuramanime hanya satu domain manual per deployment, tanpa failover otomatis), `KUSONIME_BASE_URL` / `KUSONIME_DOWNLOADS_ENABLED` (lookup paket Romaji; terpisah dari `SCRAPER_SOURCES`, robots wajib mengizinkan),
 `ANIMEONSEN_CLIENT_ID` / `ANIMEONSEN_CLIENT_SECRET` (authorized credentials, server-side only) dan `ANIMEONSEN_MEDIA_HOSTS` (allowlist operator-confirmed; kosong = no playback),
 `CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
 Penyedia stream: `STREAM_PROVIDERS` (default `reanime,anizone`), **`STREAM_SECRET`** (≥ 16 karakter acak — isi di

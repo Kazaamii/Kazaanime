@@ -31,6 +31,7 @@ import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
+import { createAnimeku } from './animeku.js';
 import { createAnimeIndo } from './animeindo.js';
 import { createAnoboy } from './anoboy.js';
 import { createAnimeOnsen } from './animeonsen.js';
@@ -39,6 +40,7 @@ import { createHianime } from './hianime.js';
 import { createKuramanime } from './kuramanime.js';
 import { createKusonimeDownloader } from './kusonime.js';
 import { createMetadata, hasCjk } from './metadata.js';
+import { createOploverz } from './oploverz.js';
 import { createOtakudesu } from './otakudesu.js';
 import { createSamehadaku } from './samehadaku.js';
 import { createSakunime } from './sakunime.js';
@@ -47,6 +49,8 @@ import { createSakunime } from './sakunime.js';
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
     animeindo: createAnimeIndo,
+    animeku: createAnimeku,
+    oploverz: createOploverz,
     samehadaku: createSamehadaku,
     animeonsen: createAnimeOnsen,
     anoboy: createAnoboy,
@@ -60,10 +64,13 @@ export const FACTORIES = Object.freeze({
 /** Prefix slug untuk anime dari API metadata (kitsu~123, mal~456, anilist~789). */
 const METADATA_KINDS = new Set(['kitsu', 'mal', 'anilist']);
 const NOT_FOUND = Symbol('notFound');
-// Latest feed dari sumber yang secara eksplisit berisi anime Jepang Sub Indo.
-// AnimeIndo masih lookup-only; Anoboy belum punya rute latest yang terverifikasi;
+// Latest feed dari sumber anime Jepang Sub Indo. URUTAN = urutan panel di beranda.
+// AnimeKu & Oploverz diletakkan lebih dulu (23 Okt 2026) supaya panel yang paling sering
+// bisa diakses tetap tampil walau Samehadaku/Sakunime/Otakudesu/Kuramanime sedang gagal.
+// AnimeIndo masih lookup-only; Anoboy belum punya rute latest terverifikasi;
 // Anichin/AnimeXin tampil pada section Donghua yang terpisah.
-const SUB_INDO_LATEST_SOURCE_IDS = new Set(['samehadaku', 'sakunime', 'otakudesu', 'kuramanime']);
+const SUB_INDO_LATEST_SOURCE_ORDER = ['animeku', 'oploverz', 'samehadaku', 'sakunime', 'otakudesu', 'kuramanime'];
+const SUB_INDO_LATEST_SOURCE_IDS = new Set(SUB_INDO_LATEST_SOURCE_ORDER);
 const SUB_INDO_LATEST_LIMIT = 12;
 
 /**
@@ -289,8 +296,10 @@ export function createRegistry({
          * Tidak memakai fallback metadata: tanpa bukti bahasa dari sumber, judul tidak boleh diklaim Sub Indo.
          */
         async latestSubIndo(ctx = {}) {
-            const candidates = usable().filter((a) => SUB_INDO_LATEST_SOURCE_IDS.has(a.id)
-                && a.supportsLatest !== false && typeof a.latest === 'function');
+            const candidates = usable()
+                .filter((a) => SUB_INDO_LATEST_SOURCE_IDS.has(a.id)
+                    && a.supportsLatest !== false && typeof a.latest === 'function')
+                .sort((a, b) => SUB_INDO_LATEST_SOURCE_ORDER.indexOf(a.id) - SUB_INDO_LATEST_SOURCE_ORDER.indexOf(b.id));
             if (!candidates.length) {
                 throw new AppError('Tidak ada sumber latest Sub Indo yang aktif.', { status: 503, code: 'NO_SUBINDO_SOURCES' });
             }

@@ -159,7 +159,8 @@ export const CACHE = Object.freeze({
 const animeOnsenClientId = String(env.ANIMEONSEN_CLIENT_ID || '').trim();
 const animeOnsenClientSecret = String(env.ANIMEONSEN_CLIENT_SECRET || '').trim();
 const animeOnsenMediaHosts = list('ANIMEONSEN_MEDIA_HOSTS', []).map((s) => s.toLowerCase().replace(/^\.+/, ''));
-const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime', 'kuramanime'];
+const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime', 'kuramanime',
+    'animeku', 'oploverz'];
 // AnimeOnsen is opt-in: authorized runtime credentials + an operator-confirmed media allowlist.
 if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length) defaultSources.push('animeonsen');
 
@@ -192,6 +193,10 @@ export const SOURCES = Object.freeze({
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('KURAMANIME_COOKIES', true),
     }),
     hianime: Object.freeze({ baseUrl: (env.HIANIME_BASE_URL || 'https://hianime.ro').replace(/\/+$/, '') }),
+    // AnimeKu: memblokir UA browser dari IP pusat data, menerima UA bot jujur (lihat adapter).
+    animeku: Object.freeze({ baseUrl: (env.ANIMEKU_BASE_URL || 'https://ww2.animeku.lol').replace(/\/+$/, '') }),
+    // Oploverz: WordPress tema dramastream/themesia; robots.txt mengizinkan semua.
+    oploverz: Object.freeze({ baseUrl: (env.OPLOVERZ_BASE_URL || 'https://oploverz.ch').replace(/\/+$/, '') }),
     animeonsen: Object.freeze({
         baseUrl: 'https://www.animeonsen.xyz',
         // Secrets are server-only; health output and request logs never serialize this object.

@@ -62,6 +62,18 @@ test('panel tanpa judul terverifikasi memakai satu baris ringkas, bukan kotak ko
     assert.match(homeHtml, /Bila situs membatasi akses otomatis, panel menampilkan tautan untuk membuka situsnya sendiri\./);
 });
 
+test('sumber pengganti AnimeKu & Oploverz dikenal frontend', () => {
+    const subindoJs = fs.readFileSync(path.join(root, 'js/api/subindo.js'), 'utf8');
+    const cardJs = fs.readFileSync(path.join(root, 'js/ui/card.js'), 'utf8');
+    const sourceIds = subindoJs.match(/const SUB_INDO_SOURCE_IDS = new Set\(\[([^\]]+)\]\)/);
+    assert.ok(sourceIds, 'SUB_INDO_SOURCE_IDS harus berupa Set literal');
+    for (const id of ['animeku', 'oploverz']) {
+        assert.ok(sourceIds[1].includes(`'${id}'`), `SUB_INDO_SOURCE_IDS harus memuat ${id}`);
+        assert.ok(subindoJs.includes(`'${id}'`), `feed terbaru harus memuat ${id}`);
+        assert.match(cardJs, new RegExp(`backend:${id}'?: \\{ cls: 'src-backend', label: `), `badge ${id}`);
+    }
+});
+
 test('styles for the summary, per-source meta, and retry button exist', () => {
     assert.match(componentsCss, /\.subindo-status\{/);
     assert.match(componentsCss, /\.subindo-status:empty\{display:none\}/);
