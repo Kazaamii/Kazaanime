@@ -17,7 +17,7 @@ beradapter.
 | **F+** | Subtitle lokal untuk pemutar HLS: pilih `.srt` / `.vtt` di browser, konversi SRT→WebVTT, ganti/hapus track; tidak diunggah | ✅ Selesai |
 | **G** | Penguatan feed Sub Indo 23 Okt 2026: verifikasi beranggaran waktu, batas kandidat per situs, fallback episode sebelumnya, ringkasan & tombol coba lagi per panel, panel gagal ringkas dengan diagnosis tergabung dan tautan "Buka situs" (tanpa bypass) | ✅ Selesai |
 | **H** | Pengganti saat sumber gagal 23 Okt 2026: **AnimeKu** (`ww2.animeku.lol`) dan **Oploverz** (`oploverz.ch`, dikenal juga sebagai Animeloverz) sebagai adapter penuh + panel Sub Indo cadangan; bukti Sub Indo tetap per episode | ✅ Selesai |
-| **I** | Katalog 23 Okt 2026: panel Sub Indo tinggal **AnimeKu** + **Oploverz** (Samehadaku, Sakunime, Otakudesu, Kuramanime tidak lagi jadi panel); endpoint **`/api/anime/browse`**; halaman baru **Jelajah** (`katalog.html`) dengan bagian berurutan, tombol **Expand**, dan filter genre | ✅ Selesai |
+| **I** | Katalog 23 Okt 2026: panel Sub Indo tinggal **AnimeKu** + **Oploverz** (Samehadaku, Sakunime, Otakudesu, Kuramanime tidak lagi jadi panel); endpoint **`/api/anime/browse`**; halaman baru **Jelajah** (`katalog.html`) dengan tiga tab (AnimeKu / Oploverz / Donghua), bagian berurutan, tombol **Expand**, filter genre, dan Coming Soon dari metadata | ✅ Selesai |
 
 ---
 
@@ -32,7 +32,7 @@ kazanime/
 ├── index.html                 ✅🅔 homepage: hero, SUB INDO (per sumber), GENRE (+hasil), JADWAL, ongoing, populer, bookmark, baru rilis, donghua
 ├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
-├── katalog.html               ✅🅘 Jelajah: ?source=animeku|oploverz&genre=<slug>; bagian berurutan + Expand
+├── katalog.html               ✅🅘 Jelajah: ?source=animeku|oploverz|donghua&genre=<slug>; bagian berurutan + Expand
 ├── README.md                  ✅🅓
 ├── package.json               🅓🅔 dependency backend (cheerio/Express/Undici/fetch-socks/tough-cookie; Playwright opsional), skrip dev/start/test/check:sources
 ├── package-lock.json          🅓
@@ -96,7 +96,7 @@ kazanime/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
 │   ├── home.js                ✅🅓🅔🅗 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
-│   ├── katalog.js             ✅🅘 Jelajah: bagian per sumber, Expand/Ringkas, Muat Lagi per bagian, genre
+│   ├── katalog.js             ✅🅘 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian + Expand/Ringkas, Muat Lagi, genre
 │   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
     ├── app.js                 createApp(): /api/health, /api/bot, /api/anime/*, /api/stream/*, error handler, rate limit masuk (+ klien Gemini bila GEMINI_API_KEY ada 🅕)
@@ -206,7 +206,7 @@ Yang bisa dicoba (Tahap B):
 - `/search.html?browse=ongoing` · `?browse=new` · `?browse=donghua` · `?genre=Isekai`
 - `/katalog.html` — **Jelajah**: AnimeKu (Terbaru → New Anime Populer → Top Favorit → Coming Soon → Complete),
   tiap bagian ringkas 6 kartu + tombol **Expand**; tab **Oploverz** (Terbaru → Populer → Rating Tertinggi →
-  Ongoing → Completed → Movie) dengan **filter genre**
+  Ongoing → Completed → Movie) dengan **filter genre**; tab **Donghua** (rilis terbaru)
 - footer → **📡 Status API** untuk mengecek ulang semua sumber
 
 Membuka dari HP di jaringan yang sama (`http://192.168.x.x:5500`) juga didukung: login tetap
@@ -308,13 +308,14 @@ Sub Indo — lihat baris kontrol negatif `animeku`/`oploverz` pada `npm run chec
 
 ## 🧭 Halaman Jelajah / katalog (23 Okt 2026)
 
-`katalog.html` (menu **Jelajah**) menampilkan katalog langsung dari dua situs yang paling
-stabil, dikelompokkan per bagian, tanpa perlu mengetik pencarian.
+`katalog.html` (menu **Jelajah**) menampilkan katalog per bagian, tanpa perlu mengetik
+pencarian. Ada tiga tab:
 
-| Sumber | Bagian (urutan tetap) | Filter genre |
+| Tab | Bagian (urutan tetap) | Filter genre |
 |---|---|---|
-| **AnimeKu** | Terbaru (`baru`) → New Anime Populer (`populer`) → Top Favorit (`favorit`) → Coming Soon (`coming`) → Complete (`selesai`) | — (situs tidak punya arsip genre; pemilih disembunyikan) |
-| **Oploverz** | Terbaru (`update`) → Populer (`popular`) → Rating Tertinggi (`rating`) → Ongoing → Completed → Movie | ✅ 80 genre dari form `/series/` |
+| **AnimeKu** | Terbaru (`baru`) → New Anime Populer (`populer`) → Top Favorit (`favorit`) → Coming Soon → Complete (`selesai`) | — (situs tidak punya arsip genre; pemilih disembunyikan) |
+| **Oploverz (Animeloverz)** | Terbaru (`update`) → Populer (`popular`) → Rating Tertinggi (`rating`) → Ongoing → Completed → Movie | ✅ 80 genre dari form `/series/` |
+| **Donghua** | Donghua Baru Upload (feed Donghua Kazanime: AniList negara CN → backend AnimeXin/Anichin) | — |
 
 **Expand.** Setiap bagian tampil ringkas **6 kartu**; tombol **Expand** menampilkan semua judul
 yang sudah dimuat untuk bagian itu, tombol yang sama berubah jadi **Ringkas**. Di mode expanded,
@@ -325,12 +326,20 @@ menambahkan kartu baru tanpa mengacak urutan.
 400 px); bagian pertama langsung dimuat. Fetcher tetap menahan 1 request/detik/host, jadi enam
 bagian tidak menembak bersamaan.
 
-**Dua bagian turunan (AnimeKu).** Situs tidak punya URL khusus untuk "New Anime Populer" dan
-"Coming Soon", jadi adapter memakai halaman yang ada: `populer` = daftar **Favorit** diurutkan
-skor tertinggi pada halaman itu; `coming` = daftar **Ongoing** yang belum punya nomor episode
-(status `UPCOMING`). Tidak ada URL yang dikarang.
+**Bagian turunan & batas situs (dicek 23 Okt 2026).**
 
-**State URL.** `katalog.html?source=animeku|oploverz&genre=<slug>` (disimpan dengan
+| Keinginan | Kenyataan di situs | Yang dipakai |
+|---|---|---|
+| AnimeKu "New Anime Populer" | tidak ada halaman populer | token `populer` = halaman **Baru** (rilis terbaru) diurutkan skor tertinggi pada halaman itu |
+| AnimeKu "Coming Soon" | `/upcoming/`, `/jadwal/`, `/jadwal-rilis/`, `/schedule/` → **404**; tidak ada sitemap | bagian **Coming Soon** memakai metadata **AniList** (`status: NOT_YET_RELEASED`, cadangan Kitsu) dan kartunya diberi label sumber + "Segera" |
+| AnimeKu "Filter Genre" | `/genre/`, `/genres/`, `/genre/<slug>/` → **404** | pemilih genre disembunyikan; genre tersedia di tab Oploverz |
+| Oploverz "Donghua" | `?type=donghua` & `?genre[]=donghua` → **0 kartu**, `/donghua/` → **404**, tidak ada genre donghua | tab **Donghua** memakai feed Donghua Kazanime (bukan mengarang kategori di Oploverz) |
+| Oploverz "Coming Soon" | `?status=upcoming` valid tetapi **0 kartu** saat dicek | tidak ditampilkan; tab Oploverz memakai Ongoing/Completed |
+
+Tidak ada URL atau kategori yang dikarang: setiap token filter yang dipakai sudah diuji ke halaman
+aslinya (`server/test/animeku.test.js`, `server/test/oploverz.test.js`).
+
+**State URL.** `katalog.html?source=animeku|oploverz|donghua&genre=<slug>` (disimpan dengan
 `history.replaceState`, jadi refresh/berbagi tautan tetap sama). Kartu memakai varian `catalog`
 (badge sumber + nomor episode terakhir) dan membuka **episode terbaru** begitu detail dimuat; kartu
 di sini **tidak** mengklaim Sub Indo — klaim itu hanya datang dari panel beranda yang memeriksa

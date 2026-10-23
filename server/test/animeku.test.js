@@ -103,37 +103,37 @@ test('animeku: katalog memakai menu untuk menemukan path berurutan, bukan path h
     assert.equal(page.items[0].latestEpisode, 4);
     assert.equal(page.hasNext, true);
     assert.deepEqual(page.filters.map((f) => f.id),
-        ['baru', 'populer', 'favorit', 'coming', 'selesai', 'ongoing', 'film'],
-        'urutan bagian: Terbaru → New Anime Populer → Top Favorit → Coming Soon → Complete');
+        ['baru', 'populer', 'favorit', 'selesai', 'ongoing', 'film'],
+        'urutan bagian: Terbaru → New Anime Populer → Top Favorit → Complete (+ Ongoing/Movie)');
     assert.deepEqual(page.genres, [], 'AnimeKu tidak punya arsip genre');
     assert.deepEqual(calls, [`${BASE}/`, `${BASE}/baru-utnwb9y/`]);
 });
 
-test('animeku: New Anime Populer memakai daftar Favorit diurutkan skor tertinggi', async () => {
+test('animeku: New Anime Populer = daftar Baru diurutkan skor tertinggi', async () => {
     const { createClient, calls } = fakeClientFactory({
         [`${BASE}/`]: fixture('animeku-home.html'),
-        // Halaman Favorit memakai markup kartu yang sama; fixture Baru cukup untuk urutan skor.
-        [`${BASE}/favorit-sixkqhv/`]: fixture('animeku-baru.html'),
+        [`${BASE}/baru-utnwb9y/`]: fixture('animeku-baru.html'),
     });
     const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
     const page = await adapter.browse({ filter: 'populer', page: 1 });
     const scores = page.items.map((item) => item.score ?? -1);
+    assert.ok(scores.length > 1);
     assert.deepEqual(scores, [...scores].sort((a, b) => b - a), 'kartu urut skor menurun');
     assert.equal(page.filter, 'populer');
     assert.equal(page.items.every((item) => item.status === 'ONGOING'), true);
-    assert.deepEqual(calls, [`${BASE}/`, `${BASE}/favorit-sixkqhv/`]);
+    assert.deepEqual(calls, [`${BASE}/`, `${BASE}/baru-utnwb9y/`],
+        'token populer memakai halaman Baru, bukan Favorit');
 });
 
-test('animeku: Coming Soon = daftar Ongoing tanpa episode + status UPCOMING', async () => {
-    const { createClient } = fakeClientFactory({
-        [`${BASE}/`]: fixture('animeku-home.html'),
-        [`${BASE}/jalan-uf5ms8g/`]: fixture('animeku-baru.html'),
-    });
+test('animeku: tidak mengarang halaman genre/coming soon', async () => {
+    const { createClient } = fakeClientFactory({});
     const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
-    const page = await adapter.browse({ filter: 'coming', page: 1 });
-    assert.ok(page.items.length >= 1, 'fixture memuat judul yang belum punya episode');
-    assert.equal(page.items.every((item) => item.latestEpisode == null), true);
-    assert.equal(page.items.every((item) => item.status === 'UPCOMING'), true);
+    const ids = adapter.browseOptions().filters.map((f) => f.id);
+    for (const missing of ['coming', 'genre', 'jadwal', 'upcoming']) {
+        assert.equal(ids.includes(missing), false, `${missing} tidak boleh ada di daftar filter`);
+    }
+    await assert.rejects(() => adapter.browse({ filter: 'baru', genre: 'action' }),
+        (err) => err.kind === 'bad_request');
 });
 
 test('animeku: filter Complete memakai halaman /selesai/ dari menu + status COMPLETED', async () => {

@@ -28,7 +28,7 @@ function sectionIds(sourceId) {
     assert.notEqual(start, -1, `sumber ${sourceId} harus ada di katalog.js`);
     const block = pageJs.slice(start);
     const list = block.slice(block.indexOf('sections: ['), block.indexOf('],'));
-    return [...list.matchAll(/\{ id: '([^']+)'/g)].map((match) => match[1]);
+    return [...list.matchAll(/\{\s*id: '([^']+)'/g)].map((match) => match[1]);
 }
 
 const stubAdapter = (create, name) => create({
@@ -45,6 +45,7 @@ test('katalog.html: halaman mandiri dengan wadah bagian + pemilih genre', () => 
     assert.match(pageHtml, /id="katalogSourceTabs"[^>]*role="tablist"/);
     assert.match(pageHtml, /data-source="animeku"/);
     assert.match(pageHtml, /data-source="oploverz"/);
+    assert.match(pageHtml, /data-source="donghua"/, 'tab Donghua (feed Kazanime, bukan kategori Oploverz)');
     assert.match(pageHtml, /id="katalogGenre"[^>]*>/);
     assert.match(pageHtml, /css\/katalog\.css/);
     assert.match(pageHtml, /js\/katalog\.js/);
@@ -64,13 +65,34 @@ test('katalog.js: urutan bagian AnimeKu sesuai permintaan', () => {
     assert.deepEqual(sectionIds('oploverz'), ['update', 'popular', 'rating', 'ongoing', 'completed', 'movie']);
 });
 
-test('katalog.js: setiap bagian = filter yang benar-benar ada di adapter', () => {
+test('katalog.js: bagian berbasis situs = filter yang benar-benar ada di adapter', () => {
     const animekuFilters = stubAdapter(createAnimeku, 'animeku').browseOptions().filters.map((f) => f.id);
     const oploverzFilters = stubAdapter(createOploverz, 'oploverz').browseOptions().filters.map((f) => f.id);
-    assert.deepEqual(animekuFilters.slice(0, 5), sectionIds('animeku'), 'lima bagian pertama = urutan filter AnimeKu');
+    // Coming Soon bukan halaman situs: AnimeKu tidak punya /upcoming/ (404, dicek 23 Okt 2026).
+    const siteSections = sectionIds('animeku').filter((id) => id !== 'coming');
+    assert.deepEqual(animekuFilters.slice(0, siteSections.length), siteSections, 'urutan bagian = urutan filter AnimeKu');
     assert.deepEqual(oploverzFilters, sectionIds('oploverz'), 'bagian Oploverz = urutan filter situs');
+    assert.equal(animekuFilters.includes('coming'), false, 'tidak ada filter coming yang dikarang');
     assert.equal(stubAdapter(createAnimeku, 'animeku').browseOptions().genres.length, 0,
         'AnimeKu memang tanpa arsip genre → pemilih genre disembunyikan');
+});
+
+test('katalog.js: tab Donghua memakai feed Donghua Kazanime (bukan kategori karangan)', () => {
+    assert.deepEqual(sectionIds('donghua'), ['donghua']);
+    assert.match(pageJs, /loader: 'donghua'/);
+    assert.match(pageJs, /browseAnime\('donghua', \{ page: runtime\.page \+ 1 \}\)/);
+    const indexJs = read('js/api/index.js');
+    assert.match(indexJs, /case 'donghua':/);
+    assert.match(pageJs, /\{\s*id: 'donghua',\s*label: 'Donghua'/, 'tab ketiga berlabel Donghua');
+});
+
+test('katalog.js: Coming Soon memakai metadata, bukan halaman karangan', () => {
+    assert.match(pageJs, /loader: 'metadata'/);
+    assert.match(pageJs, /getUpcomingAnime\(\{ page: runtime\.page \+ 1, perPage: PREVIEW \* 2 \}\)/);
+    const indexJs = read('js/api/index.js');
+    assert.match(indexJs, /export async function getUpcomingAnime\(/);
+    assert.match(indexJs, /status: 'NOT_YET_RELEASED'/);
+    assert.match(indexJs, /status: 'upcoming'/);
 });
 
 test('katalog.js: ringkas 6 kartu, Expand membuka sisanya, Muat Lagi per bagian', () => {
@@ -88,7 +110,8 @@ test('kartu katalog memakai varian "catalog": nomor episode, bukan klaim "Sub In
     assert.match(pageJs, /variant: 'catalog'/);
     const cardJs = read('js/ui/card.js');
     assert.match(cardJs, /variant === 'catalog'/);
-    assert.match(cardJs, /quality = anime\.latestEpisode != null \? `Ep \$\{anime\.latestEpisode\}` : 'Katalog'/);
+    assert.match(cardJs, /anime\.status === 'UPCOMING' \? 'Segera'/);
+    assert.match(cardJs, /anime\.latestEpisode != null \? `Ep \$\{anime\.latestEpisode\}` : 'Katalog'/);
     // Klaim Sub Indo tetap eksklusif untuk panel beranda yang sudah memverifikasi episode.
     assert.match(cardJs, /if \(variant === 'source'\) quality = 'Sub Indo';/);
 });
@@ -109,7 +132,7 @@ test('katalog.js: state sumber & genre disimpan di URL', () => {
 });
 
 test('katalog.js: genre hanya muncul bila backend mengirim daftarnya', () => {
-    assert.match(pageJs, /if \(res\.genres\.length && !state\.genres\.length\)/);
+    assert.match(pageJs, /if \(!paged && res\.genres\.length && !state\.genres\.length\)/);
     assert.match(pageJs, /if \(!state\.genres\.length\) \{/);
     assert.match(pageJs, /genreWrap\.hidden = true/);
 });

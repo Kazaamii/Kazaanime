@@ -62,13 +62,17 @@ const EPISODE_SLUG_RE = /-episode-\d+-[a-z0-9]+$/;
 /**
  * Urutan bagian di halaman Jelajah + halaman daftar asalnya.
  * `nav` dipakai untuk membaca menu beranda (token acak bisa berubah); entri turunan
- * (populer/coming) meminjam halaman daftar lain, jadi `nav` sengaja kosong.
+ * (`populer`) memakai halaman daftar lain, jadi `nav` sengaja kosong.
+ *
+ * Situs tidak punya halaman genre, jadwal, maupun "coming soon" (dicek 23 Okt 2026:
+ * /genre/, /genres/, /jadwal/, /upcoming/, /populer/ → 404; sitemap juga tidak ada),
+ * jadi ketiganya tidak dibuat di sini — bagian Coming Soon di halaman Jelajah memakai
+ * metadata AniList dan diberi label sumbernya.
  */
 const FILTERS = Object.freeze([
     { id: 'baru', label: 'Terbaru', nav: /^baru$/i, path: '/baru-utnwb9y/' },
-    { id: 'populer', label: 'New Anime Populer', nav: null, path: '/favorit-sixkqhv/', sort: 'rating' },
+    { id: 'populer', label: 'New Anime Populer', nav: null, base: 'baru', path: '/baru-utnwb9y/', sort: 'rating' },
     { id: 'favorit', label: 'Top Favorit', nav: /^favorit$/i, path: '/favorit-sixkqhv/' },
-    { id: 'coming', label: 'Coming Soon', nav: null, path: '/jalan-uf5ms8g/', only: 'upcoming' },
     { id: 'selesai', label: 'Complete', nav: /^selesai$/i, path: '/selesai-bjyzaqn/' },
     { id: 'ongoing', label: 'Ongoing', nav: /^ongoing$/i, path: '/jalan-uf5ms8g/' },
     { id: 'film', label: 'Movie', nav: /^movie$/i, path: '/film-anime-6d23pb8/' },
@@ -411,16 +415,14 @@ export function createAnimeku({ network, createClient, baseUrl }) {
             if (genre) throw new SourceError('AnimeKu tidak menyediakan arsip genre.', { kind: 'bad_request', source: ID });
             const chosen = FILTERS.find((item) => item.id === filter) || FILTERS[0];
             const paths = await navPaths(ctx);
-            const path = paths[chosen.id] || chosen.path;
+            const path = paths[chosen.base || chosen.id] || chosen.path;
             const target = `${base}${pagePath(path, page)}`;
             const res = await client.html(target, ctx);
-            // Dua bagian turunan memakai halaman daftar yang sama dengan bagian lain:
-            //  - populer : daftar Favorit, diurutkan skor tertinggi pada halaman ini;
-            //  - coming  : daftar Ongoing yang belum punya episode (belum tayang).
-            const status = chosen.id === 'selesai' ? 'COMPLETED'
-                : chosen.id === 'coming' ? 'UPCOMING' : 'ONGOING';
+            // Bagian turunan "New Anime Populer" memakai halaman Baru (rilis terbaru),
+            // lalu diurutkan skor tertinggi pada halaman itu — berbeda dari Top Favorit
+            // yang memang sudah urut skor untuk seluruh katalog.
+            const status = chosen.id === 'selesai' ? 'COMPLETED' : 'ONGOING';
             let cards = parseCards(res.$, base).series;
-            if (chosen.only === 'upcoming') cards = cards.filter((card) => card.latestEpisode == null);
             if (chosen.sort === 'rating') cards = [...cards].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
             const items = cards
                 .map((card) => toAnime({ ...card, status }))

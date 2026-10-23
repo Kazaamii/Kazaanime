@@ -73,7 +73,10 @@ export function cardHTML(anime, { variant = 'default', bookmarked = false, episo
     if (variant === 'source') quality = 'Sub Indo';
     // Katalog situs bukan bukti Sub Indo per judul: tampilkan nomor episode terakhir
     // (atau label netral) sampai halaman episodenya benar-benar diperiksa.
-    if (variant === 'catalog') quality = anime.latestEpisode != null ? `Ep ${anime.latestEpisode}` : 'Katalog';
+    if (variant === 'catalog') {
+        quality = anime.status === 'UPCOMING' ? 'Segera'
+            : anime.latestEpisode != null ? `Ep ${anime.latestEpisode}` : 'Katalog';
+    }
     if (variant === 'search') {
         quality = anime.format || 'TV';
         metaLeft = `${anime.year ? `${anime.year} • ` : ''}${episodeLabel(anime)}`;

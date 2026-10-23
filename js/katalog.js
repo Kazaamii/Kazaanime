@@ -1,9 +1,10 @@
 /**
  * Kazanime — katalog.js (entry point katalog.html, menu "Jelajah")
  *
- * Dua situs, dua susunan bagian:
+ * Tiga tab:
  *   AnimeKu  : Terbaru → New Anime Populer → Top Favorit → Coming Soon → Complete
  *   Oploverz : Terbaru → Populer → Rating Tertinggi → Ongoing → Completed → Movie (+ genre)
+ *   Donghua  : donghua baru upload (feed Donghua Kazanime; situs tidak punya kategori ini)
  *
  * Setiap bagian adalah baris kartu ringkas (6 judul) dengan tombol **Expand** untuk
  * menampilkan seluruh judul yang sudah dimuat dan **Muat Lagi** untuk halaman berikutnya.
@@ -16,7 +17,7 @@
 import { initLayout } from './ui/layout.js';
 import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
 import { showSkeleton } from './ui/skeleton.js';
-import { friendlyError } from './api/index.js';
+import { browseAnime, friendlyError, getUpcomingAnime } from './api/index.js';
 import { getSourceBrowse } from './api/sources.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { html, $, delegate } from './ui/dom.js';
@@ -36,19 +37,24 @@ const SOURCES = Object.freeze([
     {
         id: 'animeku',
         label: 'AnimeKu',
-        hint: 'AnimeKu tidak menyediakan halaman genre; bagian di bawah mengikuti menu situsnya.',
+        hint: 'AnimeKu tidak menyediakan halaman genre (dicek: 404); filter genre tersedia di tab Oploverz.',
         sections: [
             { id: 'baru', label: 'Terbaru', hint: 'Rilis paling baru dari halaman Baru.' },
-            { id: 'populer', label: 'New Anime Populer', hint: 'Daftar Favorit diurutkan skor tertinggi pada halaman ini.' },
+            { id: 'populer', label: 'New Anime Populer', hint: 'Halaman Baru diurutkan skor tertinggi — rilis baru yang paling populer.' },
             { id: 'favorit', label: 'Top Favorit', hint: 'Urutan favorit situs (skor tertinggi lebih dulu).' },
-            { id: 'coming', label: 'Coming Soon', hint: 'Seri ongoing yang belum punya episode.' },
+            {
+                id: 'coming',
+                label: 'Coming Soon',
+                loader: 'metadata',
+                hint: 'Anime yang belum tayang, dari metadata AniList — situs AnimeKu tidak punya halaman Coming Soon.',
+            },
             { id: 'selesai', label: 'Complete', hint: 'Seri yang sudah tamat.' },
         ],
     },
     {
         id: 'oploverz',
         label: 'Oploverz (Animeloverz)',
-        hint: 'Genre tersedia; situs tidak punya kategori Donghua, jadi hanya jenis yang benar-benar ada yang tampil.',
+        hint: 'Genre tersedia (80 genre dari form situs). Situs tidak punya kategori Donghua — donghua ada di tab Donghua.',
         sections: [
             { id: 'update', label: 'Terbaru', hint: 'Update terakhir dari situs.' },
             { id: 'popular', label: 'Populer', hint: 'Urutan populer situs.' },
@@ -56,6 +62,19 @@ const SOURCES = Object.freeze([
             { id: 'ongoing', label: 'Ongoing', hint: 'Sedang berjalan.' },
             { id: 'completed', label: 'Completed', hint: 'Sudah tamat.' },
             { id: 'movie', label: 'Movie', hint: 'Hanya film.' },
+        ],
+    },
+    {
+        id: 'donghua',
+        label: 'Donghua',
+        hint: 'Situs Oploverz tidak punya kategori Donghua (dicek 23 Okt 2026), jadi tab ini memakai feed Donghua Kazanime: AniList (negara CN) → backend AnimeXin/Anichin.',
+        sections: [
+            {
+                id: 'donghua',
+                label: 'Donghua Baru Upload',
+                loader: 'donghua',
+                hint: 'Rilis donghua terbaru beserta nomor episode terakhir.',
+            },
         ],
     },
 ]);
@@ -272,19 +291,29 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
     updateNote();
 
     try {
-        const res = await getSourceBrowse(state.source, {
-            filter: runtime.def.id,
-            genre: state.genre,
-            page: runtime.page + 1,
-            // "Coba Lagi" melewati cache + circuit breaker frontend, sama seperti panel beranda.
-            refresh,
-        });
+        // Dua jenis bagian tidak datang dari halaman situs:
+        //  - metadata : Coming Soon (AnimeKu/Oploverz tidak punya halaman itu);
+        //  - donghua  : rilis donghua dari feed Donghua Kazanime.
+        // Keduanya mengembalikan objek Anime yang sudah dinormalisasi.
+        const mode = runtime.def.loader || 'browse';
+        const res = mode === 'metadata'
+            ? await getUpcomingAnime({ page: runtime.page + 1, perPage: PREVIEW * 2 })
+            : mode === 'donghua'
+                ? await browseAnime('donghua', { page: runtime.page + 1 })
+                : await getSourceBrowse(state.source, {
+                    filter: runtime.def.id,
+                    genre: state.genre,
+                    page: runtime.page + 1,
+                    // "Coba Lagi" melewati cache + circuit breaker frontend, sama seperti panel beranda.
+                    refresh,
+                });
         if (token !== runtime.token || sourceToken !== state.loadToken) return;
-        runtime.page = res.page;
-        runtime.hasNext = res.hasNext;
+        const paged = mode !== 'browse';
+        runtime.page = paged ? runtime.page + 1 : res.page;
+        runtime.hasNext = Boolean(res.hasNext);
         runtime.loaded = true;
-        runtime.error = '';
-        if (res.genres.length && !state.genres.length) {
+        runtime.error = paged && !res.items.length && res.error ? friendlyError(res.error) : '';
+        if (!paged && res.genres.length && !state.genres.length) {
             state.genres = res.genres;
             renderGenre();
         }
