@@ -50,3 +50,18 @@ test('Kusonime downloads default on, can be disabled, and keeps a normalized con
         baseUrl: 'https://www.kusonime.com',
     });
 });
+
+
+test('Kuramanime v9 is part of the default source list and remains configurable', () => {
+    assert.ok(enabledSources().includes('kuramanime'));
+
+    const configScript = "import { SOURCES } from './server/config.js'; console.log(JSON.stringify(SOURCES.kuramanime));";
+    const readConfig = (overrides = {}) => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', configScript], {
+        cwd: process.cwd(),
+        env: { ...process.env, KURAMANIME_BASE_URL: '', KURAMANIME_RENDER_JAVASCRIPT: '', KURAMANIME_COOKIES: '', ...overrides },
+        encoding: 'utf8',
+    }));
+
+    assert.equal(readConfig().baseUrl, 'https://v9.kuramanime.work');
+    assert.equal(readConfig({ KURAMANIME_BASE_URL: 'https://example.test/' }).baseUrl, 'https://example.test');
+});
