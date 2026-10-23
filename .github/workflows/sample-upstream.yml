@@ -1,0 +1,47 @@
+name: sample-upstream (sementara)
+
+on:
+  push:
+    branches: [arena/b55bc2a7-kazaanime]
+    paths: ['.github/workflows/sample-upstream.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/b55bc2a7-kazaanime
+      - name: Fetch samples
+        run: |
+          set -u
+          mkdir -p samples3
+          UA='KazanimeBot/1.0 (+https://github.com/Kazaamii/Kazaanime; contact)'
+          fetch() {
+            name="$1"; url="$2"
+            code=$(curl -sS -L --compressed --max-time 45 -A "$UA" \
+              -H 'Accept: text/html,application/xhtml+xml' \
+              -o "samples3/$name.out" -w '%{http_code}' "$url" || echo 000)
+            bytes=$(wc -c < "samples3/$name.out" | tr -d ' ')
+            printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$bytes" "$url" >> samples3/manifest.txt
+            sleep 1
+          }
+          fetch animeku-rest-root     'https://ww2.animeku.lol/wp-json/'
+          fetch animeku-rest-genre    'https://ww2.animeku.lol/wp-json/wp/v2/wai_genre?per_page=100&_fields=name,link,slug'
+          fetch animeku-wp-sitemap    'https://ww2.animeku.lol/wp-sitemap.xml'
+          fetch animeku-wp-sitemap-tx 'https://ww2.animeku.lol/wp-sitemap-taxonomies-wai_genre-1.xml'
+          fetch animeku-genre-noc     'https://ww2.animeku.lol/genre/aksi/'
+          fetch oploverz-search-douluo 'https://oploverz.ch/?s=douluo+dalu'
+          fetch oploverz-search-perfect 'https://oploverz.ch/?s=perfect+world'
+          cat samples3/manifest.txt
+      - name: Commit samples
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add samples3
+          git commit -m 'chore(sample): probe genre index & donghua [skip ci]' || echo 'nothing to commit'
+          git push origin HEAD:arena/b55bc2a7-kazaanime
