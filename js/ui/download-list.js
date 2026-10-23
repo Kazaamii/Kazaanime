@@ -32,8 +32,12 @@ function qualityKey(q) {
  * @param {HTMLElement} box  #downloadList
  * @param {{
  *   loading?: boolean,
+ *   loadingText?: string,
  *   items?: {quality:string,size:string,format?:string,subtitle?:string,links:{provider:string,url:string}[]}[],
  *   ep?: number,
+ *   contextLabel?: string,
+ *   emptyText?: string,
+ *   emptyHeading?: string,
  *   source?: string|null,
  *   disabled?: boolean,         backend belum aktif
  *   error?: {message?:string}|null,
@@ -49,7 +53,7 @@ export function renderDownloads(box, state = {}) {
         box.innerHTML = String(html`
             <div class="download-loading">
                 <div class="loading-shimmer" aria-hidden="true"></div>
-                <p>${icon('loader-circle', { cls: 'ic--spin' })} Mencari link download...</p>
+                <p>${icon('loader-circle', { cls: 'ic--spin' })} ${state.loadingText || 'Mencari link download...'}</p>
             </div>`);
         return;
     }
@@ -75,19 +79,19 @@ export function renderDownloads(box, state = {}) {
                 </div>`;
             })}
             <div class="download-notice download-notice--ok">
-                <strong>${icon('circle-check')} Episode ${state.ep || ''}</strong> — link dari ${state.source || 'sumber'} (dibuka di tab baru).
+                <strong>${icon('circle-check')} ${state.contextLabel || (state.ep ? `Episode ${state.ep}` : 'Download')}</strong> — link dari ${state.source || 'sumber'} (dibuka di tab baru).
             </div>`);
         return;
     }
 
     const text = state.disabled
-        ? 'untuk episode ini. Gunakan platform streaming legal di bawah atau coba anime lain.'
+        ? (state.emptyText || 'untuk episode ini. Gunakan platform streaming legal di bawah atau coba anime lain.')
         : state.error
             ? `— ${state.errorText || 'gagal memuat link download.'}`
-            : 'untuk episode ini. Gunakan platform streaming legal di bawah atau coba anime lain.';
+            : (state.emptyText || 'untuk episode ini. Gunakan platform streaming legal di bawah atau coba anime lain.');
     box.innerHTML = String(html`
         <div class="download-notice download-notice--warn">
-            <p><strong>${icon('triangle-alert')} Link download belum tersedia</strong> ${text}</p>
+            <p><strong>${icon('triangle-alert')} ${state.emptyHeading || 'Link download belum tersedia'}</strong> ${text}</p>
             ${state.onRetry && state.error ? html`<button type="button" class="download-retry" data-action="retry">${icon('refresh-cw')} Coba lagi</button>` : ''}
         </div>`);
     if (state.onRetry && state.error) {

@@ -39,7 +39,7 @@
 [data-theme="forest"]{--primary:#00b894;--primary-rgb:0,184,148;--primary-dark:#00a381;--secondary:#55efc4;--secondary-rgb:85,239,196;--accent:#ffeaa7;--accent-rgb:255,234,167;--bg-dark:#0a1a0f;--bg-dark-2:#0f2514;--bg-card:#142e1a;--bg-card-hover:#1a4022;--text-secondary:#80b090;--hero-bg:linear-gradient(135deg,#142e1a,#1a4022,#0f6030)}
 
 /* ---------- Elemen global ---------- */
-body{font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;background:var(--bg-dark);color:var(--text-primary);min-height:100vh;overflow-x:hidden;transition:background .4s}
+body{font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;background:radial-gradient(ellipse 48rem 34rem at 8% 4%,rgba(var(--primary-rgb),.12),transparent 72%),radial-gradient(ellipse 42rem 36rem at 96% 30%,rgba(var(--secondary-rgb),.1),transparent 74%),radial-gradient(ellipse 52rem 40rem at 50% 100%,rgba(var(--accent-rgb),.055),transparent 76%),var(--bg-dark);color:var(--text-primary);min-height:100vh;overflow-x:hidden;transition:background .4s}
 button,input,select,textarea{font-family:inherit}
 h1,h2,h3{letter-spacing:-.01em}
 /* Pengganti document.body.style.overflow='hidden' saat modal terbuka */

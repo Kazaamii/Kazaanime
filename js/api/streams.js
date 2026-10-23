@@ -232,6 +232,8 @@ const LANG_RANK = { id: 0, multi: 1, en: 2 };
  * @param {{slug?: string|null, titles?: string[], signal?: AbortSignal}} [opts]
  *   slug   = slug dari URL (item yang berasal dari backend) → tanpa pencarian
  *   titles = semua judul yang diketahui untuk mencari padanan (default: judul & judul alternatif anime)
+ * Full-series Kusonime packages intentionally use getKusonimeDownloads() separately (sources.js)
+ * from the title-level watch flow; they are not episode downloads and must not be merged here.
  * @returns {Promise<{servers: StreamServer[], downloads: DownloadGroup[], source: string|null, slug?: string|null, matchedTitle?: string, disabled?: boolean, error?: ApiError}>}
  */
 export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {}) {

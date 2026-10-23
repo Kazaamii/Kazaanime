@@ -21,7 +21,7 @@
  *     (AniList: 1 request; cadangan Kitsu → data dari URL).
  *  5. Ganti episode tanpa reload; URL ikut diperbarui (replaceState) → bisa di-share.
  *  6. Auto-next lewat postMessage player, penanda episode yang sudah ditonton,
- *     server + link download dari backend scraper, rekomendasi.
+ *     server/link download per-episode; paket full-series Kusonime dicari terpisah dari metadata judul.
  *
  * Tidak ada fetch di sini: data dari js/api, tampilan dari js/ui.
  */
@@ -38,7 +38,7 @@ import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
 import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
 import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
-    friendlyError, getAiSubtitlePart, getEpisodeExtras, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
+    friendlyError, getAiSubtitlePart, getEpisodeExtras, getKusonimeDownloads, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
     retrySourcesNow, withProviderServers,
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
@@ -64,6 +64,7 @@ const els = {
     synopsis: $('#watchSynopsis'),
     genres: $('#watchGenres'),
     downloads: $('#downloadList'),
+    kusonimeDownloads: $('#kusonimeDownloadList'),
     platforms: $('#platformsGrid'),
     platformsSection: $('#platformsSection'),
     nextAiring: $('#watchNextAiring'),
@@ -90,6 +91,9 @@ let detailToken = 0;
 let backendServers = [];
 /** @type {AbortController|null} */
 let extrasCtrl = null;
+/** Kusonime package lookup follows anime detail, not the per-episode extras lifecycle. */
+let kusonimeCtrl = null;
+let kusonimeLoadToken = 0;
 /**
  * Episode yang sedang MENUNGGU hasil scraping sebelum diputar (scrape-first).
  * Selama menunggu, server cadangan tidak dimulai — supaya yang pertama diputar adalah
@@ -456,6 +460,7 @@ player.on('retry', () => {
 function applyDetail(data) {
     anime = data.anime;
     detailLoaded = true;
+    void loadKusonimeDownloads(); // full-series packs follow title metadata, not the active episode
     total = computeTotal();
 
     renderHeader();
@@ -564,6 +569,73 @@ async function loadDetail() {
     }
 }
 
+function kusonimeTitleCandidates() {
+    const seen = new Set();
+    return [anime.titleAlt, ref.alt, anime.title, ref.title]
+        .map((value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 100))
+        .filter((value) => {
+            if (value.length < 2 || !/\p{Script=Latin}/u.test(value)
+                || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(value)) return false;
+            const key = titleKey(value);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .slice(0, 4);
+}
+
+/** Look up full-series Kusonime packs once per anime detail, independently of each episode. */
+async function loadKusonimeDownloads() {
+    if (!els.kusonimeDownloads) return;
+    kusonimeCtrl?.abort();
+    const ctrl = new AbortController();
+    kusonimeCtrl = ctrl;
+    const token = ++kusonimeLoadToken;
+    const isCurrent = () => kusonimeCtrl === ctrl && token === kusonimeLoadToken && !ctrl.signal.aborted;
+    const titles = kusonimeTitleCandidates();
+    if (!titles.length || !isBackendEnabled()) {
+        renderDownloads(els.kusonimeDownloads, {
+            disabled: true,
+            emptyHeading: 'Paket Kusonime tidak tersedia',
+            emptyText: !isBackendEnabled()
+                ? 'Backend diperlukan untuk mencari paket di Kusonime.'
+                : 'Judul Romaji belum tersedia untuk pencarian paket.',
+        });
+        return;
+    }
+    renderDownloads(els.kusonimeDownloads, { loading: true, loadingText: 'Mencari paket anime...' });
+    try {
+        const result = await getKusonimeDownloads(titles, { signal: ctrl.signal });
+        if (!isCurrent()) return;
+        renderDownloads(els.kusonimeDownloads, {
+            items: result.downloads,
+            emptyHeading: 'Paket Kusonime tidak ditemukan',
+            source: result.source || 'Kusonime',
+            contextLabel: result.matchedTitle ? `Paket anime — ${result.matchedTitle}` : 'Paket anime',
+            disabled: result.disabled,
+            emptyText: result.disabled
+                ? 'Sumber Kusonime dinonaktifkan di konfigurasi deployment.'
+                : 'Tidak ditemukan paket dengan judul Romaji yang cocok di Kusonime.',
+            onRetry: () => {
+                retrySourcesNow();
+                loadKusonimeDownloads();
+            },
+        });
+    } catch (err) {
+        if (err?.kind === 'abort' || !isCurrent()) return;
+        renderDownloads(els.kusonimeDownloads, {
+            error: err,
+            emptyHeading: 'Paket Kusonime belum bisa dimuat',
+            errorText: friendlyError(err),
+            emptyText: 'Paket Kusonime belum bisa dimuat.',
+            onRetry: () => {
+                retrySourcesNow();
+                loadKusonimeDownloads();
+            },
+        });
+    }
+}
+
 async function loadExtras(n) {
     extrasCtrl?.abort();
     const ctrl = new AbortController();
@@ -571,6 +643,7 @@ async function loadExtras(n) {
     extrasBusy = true;
     scrapedTitles = titlesKey(scrapeTitles());
     renderDownloads(els.downloads, { loading: true });
+    // Full-series Kusonime packs load from applyDetail, not with episode-specific extras.
     try {
         const res = await getEpisodeExtras(anime, n, { slug: ref.slug, titles: scrapeTitles(), signal: ctrl.signal });
         if (extrasCtrl === ctrl) extrasBusy = false;

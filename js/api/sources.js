@@ -128,6 +128,49 @@ export function getBackendAnime(slug, { signal } = {}) {
 
 const clip = (v, max, fallback = '') => String(v ?? '').trim().slice(0, max) || fallback;
 
+/** Search Kusonime's download packs using known Latin-script title variants; no stream hosts are fetched. */
+export function getKusonimeDownloads(titles, { signal } = {}) {
+    const params = new URLSearchParams();
+    const seen = new Set();
+    for (const raw of (Array.isArray(titles) ? titles : [titles])) {
+        const title = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+        if (title.length < 2 || !/\p{Script=Latin}/u.test(title)
+            || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(title)) continue;
+        const key = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        params.append('title', title);
+        if (seen.size >= 4) break;
+    }
+    if (!seen.size) return Promise.resolve({ downloads: [], matchedTitle: '', query: '' });
+    return call(`/downloads/kusonime?${params}`, {
+        ttl: CACHE_TTL.search,
+        signal,
+        transform: (json) => {
+            const data = json.data || {};
+            const downloads = (Array.isArray(data.downloads) ? data.downloads : []).slice(0, 24)
+                .map((group) => ({
+                    quality: clip(group?.quality, 40, 'Download'),
+                    size: clip(group?.size, 20),
+                    format: clip(group?.format, 20, 'Tidak diketahui'),
+                    subtitle: clip(group?.subtitle, 24, 'Tidak diketahui'),
+                    links: (Array.isArray(group?.links) ? group.links : [])
+                        .map((link) => ({ provider: clip(link?.provider, 30, 'Link'), url: toHttpUrl(link?.url) }))
+                        .filter((link) => link.url)
+                        .slice(0, 12),
+                }))
+                .filter((group) => group.links.length);
+            return {
+                query: clip(data.query, 100),
+                matchedTitle: clip(data.matchedTitle, 120),
+                downloads,
+                source: 'Kusonime',
+                disabled: Boolean(json.disabled),
+            };
+        },
+    });
+}
+
 /** Payload episode backend → { servers: StreamServer[], downloads: DownloadGroup[], source }. */
 function toEpisodeMedia(json) {
     const d = json.data || {};

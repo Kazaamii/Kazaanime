@@ -36,3 +36,17 @@ test('AnimeOnsen auto-enables only with both authorized credentials and an expli
 test('explicit SCRAPER_SOURCES may opt in without credentials, but adapter methods still fail closed', () => {
     assert.deepEqual(enabledSources({ SCRAPER_SOURCES: 'animexin,animeonsen' }), ['animexin', 'animeonsen']);
 });
+
+test('Kusonime downloads default on, can be disabled, and keeps a normalized configurable base URL', () => {
+    const configScript = "import { SOURCES } from './server/config.js'; console.log(JSON.stringify(SOURCES.kusonimeDownloads));";
+    const readConfig = (overrides = {}) => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', configScript], {
+        cwd: process.cwd(),
+        env: { ...process.env, KUSONIME_DOWNLOADS_ENABLED: '', KUSONIME_BASE_URL: '', ...overrides },
+        encoding: 'utf8',
+    }));
+    assert.deepEqual(readConfig(), { enabled: true, baseUrl: 'https://kusonime.com' });
+    assert.deepEqual(readConfig({ KUSONIME_DOWNLOADS_ENABLED: '0', KUSONIME_BASE_URL: 'https://www.kusonime.com/' }), {
+        enabled: false,
+        baseUrl: 'https://www.kusonime.com',
+    });
+});

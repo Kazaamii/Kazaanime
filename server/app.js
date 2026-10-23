@@ -65,7 +65,8 @@ function requestLogger(req, res, next) {
 }
 
 function botInfo(req, res) {
-    const hosts = SOURCES.enabled.map((id) => {
+    const configuredSources = [...SOURCES.enabled, ...(SOURCES.kusonimeDownloads.enabled ? ['kusonimeDownloads'] : [])];
+    const hosts = configuredSources.map((id) => {
         try { return new URL(SOURCES[id]?.baseUrl).origin; } catch { return null; }
     }).filter(Boolean);
     res.set('Cache-Control', 'public, max-age=3600');

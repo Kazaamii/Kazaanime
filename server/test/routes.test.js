@@ -140,6 +140,29 @@ test('GET /api/anime/:slug & /episode/:ep: sukses, 400, 404, 500 (pesan aman), 5
     });
 });
 
+test('GET /api/anime/downloads/kusonime: hanya kandidat Romaji diproses dan payload paket dipertahankan', async () => {
+    const registry = fakeRegistry();
+    let receivedTitles = null;
+    registry.kusonimeDownloads = async (titles) => {
+        receivedTitles = titles;
+        return {
+            source: 'kusonime', fallback: false, stale: false, errors: [],
+            data: { query: titles[0], matchedTitle: 'Sousou no Frieren', downloads: [{ quality: '720p', links: [{ provider: 'Drive', url: 'https://drive.example.test/file' }] }] },
+        };
+    };
+    await withApp({ registry }, async (base) => {
+        const r = await get(`${base}/api/anime/downloads/kusonime?title=${encodeURIComponent('Sousou no Frieren')}&title=${encodeURIComponent('フリーレン')}`);
+        assert.equal(r.res.status, 200);
+        assert.match(r.res.headers.get('cache-control'), /private, no-store/);
+        assert.deepEqual(receivedTitles, ['Sousou no Frieren']);
+        assert.equal(r.json.source, 'kusonime');
+        assert.equal(r.json.data.matchedTitle, 'Sousou no Frieren');
+        assert.equal(r.json.data.downloads[0].links[0].url, 'https://drive.example.test/file');
+        const invalid = await get(`${base}/api/anime/downloads/kusonime?title=${encodeURIComponent('葬送のフリーレン')}`);
+        assert.equal(invalid.res.status, 400);
+    });
+});
+
 test('/api/health, /api/bot, /api/<tidak-ada>', async () => {
     await withApp({}, async (base) => {
         const h = await get(`${base}/api/health`);

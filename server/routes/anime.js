@@ -4,6 +4,7 @@
  *   GET /api/anime/latest
  *   GET /api/anime/search?q=
  *   GET /api/anime/schedule          (jadwal rilis Sub Indo per hari, WIB — ditambahkan 22 Okt 2026)
+ *   GET /api/anime/downloads/kusonime?title=<Romaji>
  *   GET /api/anime/:slug
  *   GET /api/anime/:slug/episode/:ep
  *
@@ -15,6 +16,7 @@ import { Router } from 'express';
 import { CACHE, SOURCES } from '../config.js';
 import { encodeTarget } from '../lib/stream-proxy.js';
 import { badRequest } from '../lib/errors.js';
+import { titleKey } from '../lib/text.js';
 
 /** Validasi ?q= : string 1–100 karakter, tanpa karakter kontrol. */
 export function readQuery(value) {
@@ -25,6 +27,27 @@ export function readQuery(value) {
     if (q.length < 2) throw badRequest('Kata kunci minimal 2 karakter.');
     if (q.length > 100) throw badRequest('Kata kunci maksimal 100 karakter.');
     return q;
+}
+
+/** Up to four Latin-script title candidates (Romaji/known aliases), with no CJK guessing. */
+export function readRomajiTitles(value) {
+    const candidates = Array.isArray(value) ? value : [value];
+    const out = [];
+    const seen = new Set();
+    for (const raw of candidates) {
+        if (typeof raw !== 'string') continue;
+        // eslint-disable-next-line no-control-regex
+        const title = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (title.length < 2 || title.length > 100 || !/\p{Script=Latin}/u.test(title)
+            || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(title)) continue;
+        const key = titleKey(title);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(title);
+        if (out.length === 4) break;
+    }
+    if (!out.length) throw badRequest('Kandidat judul Romaji minimal 2 karakter dan harus memakai huruf Latin.');
+    return out;
 }
 
 /** "12" → 12 ; selain bilangan bulat 1–5000 → 400. */
@@ -109,7 +132,7 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
             : rawResult;
         res.locals.result = result;
         setCacheHeaders(res, result, cdn);
-        if (req.params?.ep && result.source === 'animeonsen') res.set('Cache-Control', 'private, no-store');
+        if ((req.params?.ep && result.source === 'animeonsen') || req.path === '/downloads/kusonime') res.set('Cache-Control', 'private, no-store');
         res.json({
             ok: true,
             source: result.source,
@@ -117,6 +140,7 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
             fallback: Boolean(result.fallback),
             stale: Boolean(result.stale),
             ...(result.errors?.length ? { errors: result.errors } : {}),
+            ...(result.disabled ? { disabled: true } : {}),
             generatedAt: new Date().toISOString(),
             data: result.data,
         });
@@ -124,6 +148,12 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
 
     router.get('/latest', handle((req, ctx) => registry.latest(ctx)));
     router.get('/search', handle((req, ctx) => registry.search(readQuery(req.query.q), ctx)));
+    router.get('/downloads/kusonime', handle((req, ctx) => {
+        const titles = readRomajiTitles(req.query.title);
+        return typeof registry.kusonimeDownloads === 'function'
+            ? registry.kusonimeDownloads(titles, ctx)
+            : { source: 'kusonime', data: { query: '', matchedTitle: '', downloads: [] }, fallback: false, stale: false, errors: [], disabled: true };
+    }));
     // Harus SEBELUM '/:slug' — kalau tidak, "schedule" dianggap slug anime.
     router.get('/schedule', handle((req, ctx) => registry.schedule(ctx)));
     router.get('/:slug/episode/:ep', handle((req, ctx) => registry.episode(req.params.slug, readEpisode(req.params.ep), ctx)));

@@ -65,6 +65,30 @@ test('latest: semua sumber paralel; satu gagal → hasil sebagian + daftar error
     assert.deepEqual(r.errors.map((e) => [e.source, e.kind]), [['kuramanime', 'blocked']]);
 });
 
+test('download-only provider tidak ikut latest/search fan-out; Kusonime lookup tetap memakai cache terpisah', async () => {
+    const A = stub('animexin', { latest: async () => [anime('animexin', 'x', 'X')], search: async () => [anime('animexin', 'x', 'X')] });
+    let calls = 0;
+    const downloader = {
+        id: 'kusonime-downloads',
+        name: 'Kusonime downloads',
+        baseUrl: 'https://kusonime.com',
+        policy: { tos: { verdict: 'unknown' } },
+        async findDownloads(titles) {
+            calls++;
+            return { query: titles[0], matchedTitle: 'Sousou no Frieren', downloads: [] };
+        },
+    };
+    const registry = createRegistry({ adapters: [A], downloaders: [downloader], metadata: metaStub(), cache: new TtlCache(), ttl: TTL });
+    await registry.latest();
+    await registry.search('frieren');
+    assert.equal(calls, 0);
+    const first = await registry.kusonimeDownloads(['Sousou no Frieren']);
+    const second = await registry.kusonimeDownloads(['Sousou no Frieren']);
+    assert.equal(first.data.matchedTitle, 'Sousou no Frieren');
+    assert.equal(second.source, 'kusonime');
+    assert.equal(calls, 1);
+});
+
 test('latest: adapter yang mendeklarasikan supportsLatest=false dilewati', async () => {
     const O = stub('animeonsen', { latest: async () => { throw new Error('must not call'); } });
     O.supportsLatest = false;

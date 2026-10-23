@@ -181,6 +181,11 @@ export const SOURCES = Object.freeze({
         // Exact media CDN hostnames are not hard-coded; the operator must confirm and allowlist them.
         mediaHosts: Object.freeze(animeOnsenMediaHosts),
     }),
+    // Kusonime hanya dipanggil dari panel download; setiap halaman wajib lolos robots gate.
+    kusonimeDownloads: Object.freeze({
+        enabled: bool('KUSONIME_DOWNLOADS_ENABLED', true),
+        baseUrl: (env.KUSONIME_BASE_URL || 'https://kusonime.com').replace(/\/+$/, ''),
+    }),
 });
 
 /**
