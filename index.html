@@ -82,6 +82,30 @@
             <button type="button" class="genre-filter-reset" id="genreFilterReset" hidden>Reset filter</button>
         </div>
         <div class="genre-tags" id="genreTags" role="toolbar" aria-label="Pilih genre"></div>
+        <!-- Genre situs (AnimeKu/Oploverz ±70) tidak lagi dijajarkan di beranda — 24 Okt 2026,
+             permintaan pengguna: "dibuat tombol menu genre agar tidak panjang". -->
+        <div class="genre-menu-wrap">
+            <button type="button" class="genre-menu-btn" id="genreMenuBtn" aria-expanded="false" aria-controls="genreMenu" hidden>
+                <span class="ic-slot" data-icon="tags"></span>
+                <span>Genre situs</span>
+                <span class="genre-menu-count" id="genreMenuCount" hidden></span>
+                <span class="ic-slot genre-menu-caret" data-icon="chevron-down"></span>
+            </button>
+            <div class="genre-menu" id="genreMenu" hidden>
+                <div class="genre-menu-head">
+                    <label class="sr-only" for="genreMenuSearch">Cari genre situs</label>
+                    <input type="search" class="genre-menu-search" id="genreMenuSearch" placeholder="Cari genre…" autocomplete="off" enterkeyhint="search">
+                    <button type="button" class="genre-menu-close" id="genreMenuClose" aria-label="Tutup daftar genre">
+                        <span class="ic-slot" data-icon="x"></span>
+                    </button>
+                </div>
+                <div class="genre-menu-body" id="genreMenuBody"></div>
+                <p class="genre-menu-foot">
+                    <span class="genre-menu-empty" id="genreMenuEmpty" hidden>Tidak ada genre yang cocok.</span>
+                    <a class="see-all" href="katalog.html">Buka Jelajah <span class="ic-slot" data-icon="chevron-right"></span></a>
+                </p>
+            </div>
+        </div>
         <div class="genre-results" id="genreResults" hidden>
             <div class="genre-results-head">
                 <h3 class="genre-results-title" id="genreResultsTitle">Genre</h3>
@@ -101,7 +125,12 @@
                 <span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="captions"></span></span>
                 <span class="section-title-text">Anime Jepang Sub Indo</span>
             </h2>
-            <span class="subindo-label">Katalog langsung dari AnimeKu &amp; Oploverz</span>
+            <div class="subindo-header-actions">
+                <span class="subindo-label">Katalog langsung dari AnimeKu &amp; Oploverz</span>
+                <button type="button" class="subindo-refresh" id="subIndoRefresh" aria-label="Muat ulang daftar Sub Indo">
+                    <span class="ic-slot" data-icon="refresh-cw"></span><span class="subindo-refresh-text">Muat ulang</span>
+                </button>
+            </div>
         </div>
         <p class="subindo-status" id="subIndoStatus" role="status" aria-live="polite"></p>
         <div class="subindo-sources" id="subindoSources" aria-live="polite" aria-busy="true"></div>
@@ -141,6 +170,10 @@
             <h2 class="section-title"><span class="section-icon" aria-hidden="true"><span class="ic-slot" data-icon="swords"></span></span><span class="section-title-text">Donghua (Anime China)</span></h2>
             <a href="search.html?browse=donghua" class="see-all">Lihat Semua <span class="ic-slot" data-icon="chevron-right"></span></a>
         </div>
+        <!-- Donghua dari situs sumber (AnimeKu & Oploverz) — 24 Okt 2026, permintaan pengguna:
+             "jangan AniList saja". Grid metadata di bawah tetap jadi cadangan. -->
+        <div class="donghua-sites" id="donghuaSites" aria-busy="false"></div>
+        <p class="donghua-note" id="donghuaNote"></p>
         <div class="anime-grid" id="donghuaGrid" aria-busy="true"></div>
     </section>
 

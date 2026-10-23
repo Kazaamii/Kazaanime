@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'cheerio';
 import {
-    createAnimeku, episodeSlugFromUrl, parseCards, parseEpisodePage, parsePagination,
+    createAnimeku, DONGHUA_SEEDS, episodeSlugFromUrl, parseCards, parseEpisodePage, parsePagination,
     parseSeriesPage, seriesSlugFromUrl,
 } from '../sources/animeku.js';
 import { fakeClientFactory, fixture, fixture$ } from './helpers.js';
+import { stripSeason, titleKey } from '../lib/text.js';
 
 const BASE = 'https://ww2.animeku.lol';
 const SERIES = `${BASE}/steel-ball-run-jojo-no-kimyou-na-bouken-ecxqye3/`;
@@ -173,6 +174,27 @@ test('animeku: donghua dicari per judul, kartu lain dibuang, negara CN', async (
     assert.equal(items.every((item) => item.country === 'CN'), true, 'ditandai CN karena berasal dari daftar donghua metadata');
     assert.equal(items[0].slug, 'animeku~douluo-dalu-cq4dfat');
     assert.equal(calls.length, 2, 'satu request pencarian per judul');
+});
+
+test('animeku: menyediakan seed donghua untuk registry (24 Okt 2026)', () => {
+    const { createClient } = fakeClientFactory({});
+    const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
+    assert.deepEqual([...adapter.donghuaSeeds], [...DONGHUA_SEEDS]);
+    assert.ok(adapter.donghuaSeeds.includes('Douluo Dalu'), 'seed berisi franchise yang terbukti ada di AnimeKu');
+    assert.ok(adapter.donghuaSeeds.length >= 3);
+});
+
+test('animeku: seed cocok dengan judul asli hasil pencarian situs (24 Okt 2026)', () => {
+    // Judul diambil dari respons produksi `browse?source=animeku&q=Douluo` (24 Okt 2026).
+    const real = [
+        'Douluo Dalu: Hanhai Qian Kun', 'Douluo Dalu: Xiaowu Juebie', 'Douluo Dalu: Hao Tian Yang Wei',
+        'Douluo Dalu: Qian Hua Xi Jin', 'Douluo Dalu: Xingdou Xian Ji Pian', 'Douluo Dalu', 'Douluo Dalu: Jingying Sai',
+    ];
+    const key = titleKey(stripSeason('Douluo Dalu'));
+    assert.ok(key.length >= 5);
+    real.forEach((title) => {
+        assert.ok(titleKey(title).includes(key), `${title} harus cocok dengan seed "Douluo Dalu"`);
+    });
 });
 
 test('animeku: donghua tanpa judul → daftar kosong tanpa request', async () => {

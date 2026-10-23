@@ -67,7 +67,7 @@ const SOURCES = Object.freeze([
             {
                 id: 'donghua',
                 label: 'Donghua di AnimeKu',
-                hint: 'AnimeKu mengunggah donghua Sub Indo (mis. Douluo Dalu, Perfect World). Situs tidak memberi kategori donghua yang bisa dipakai — arsip genre/negara memakai token acak dan seri donghua pun dilabeli "Japan" — jadi daftar ini disusun dari judul donghua tayang (metadata) yang dicari di AnimeKu. Donghua lama bisa belum tercakup.',
+                hint: 'AnimeKu mengunggah donghua Sub Indo (mis. Douluo Dalu, Perfect World). Situs tidak memberi kategori donghua yang bisa dipakai — arsip genre/negara memakai token acak dan seri donghua pun dilabeli "Japan" — jadi daftar ini disusun dari judul donghua populer + judul yang sedang tayang (metadata) yang dicari di AnimeKu. Donghua lama di luar daftar itu belum tercakup.',
             },
         ],
     },
@@ -85,7 +85,7 @@ const SOURCES = Object.freeze([
             {
                 id: 'donghua',
                 label: 'Donghua di Oploverz',
-                hint: 'Oploverz tidak punya kategori Donghua, jadi judul donghua tayang dicari di pencarian situs lalu hanya kartu yang judulnya cocok yang ditampilkan — sama seperti cara AnimeKu dibuat.',
+                hint: 'Oploverz tidak punya kategori Donghua dan pencarian situsnya fuzzy (kueri "Battle Through the Heavens" menjawab "Kingdom"), jadi bagian ini bisa kosong — itu batas situsnya, bukan data yang disembunyikan. Kalau Oploverz mengunggah donghua, judulnya ikut dicari di sini.',
             },
         ],
     },
@@ -434,7 +434,8 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
             : mode === 'donghua'
                 ? await browseAnime('donghua', { page: runtime.page + 1 })
                 : await getSourceBrowse(state.source, {
-                    filter: runtime.def.id,
+                    // Saat mencari, id bagian sintetis ("hasil") bukan filter situs — jangan dikirim.
+                    filter: state.query ? '' : runtime.def.id,
                     genre: state.genre,
                     year: state.year,
                     season: state.season,

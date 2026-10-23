@@ -88,8 +88,26 @@ const FILTERS = Object.freeze([
 
 const NAV_TTL_MS = 6 * 60 * 60 * 1000;
 /** Batas pencarian donghua: tiap kueri = satu request ke situs (jeda 1 detik/host). */
-const DONGHUA_QUERIES = 3;
+const DONGHUA_QUERIES = 4;
 const DONGHUA_LIMIT = 24;
+
+/**
+ * Judul donghua populer sebagai jaring pengaman (24 Okt 2026).
+ *
+ * Kenapa perlu: daftar donghua situs **tidak bisa** diambil dari arsip (tidak ada kategori
+ * donghua; `/negara/china-n5z6n97/` kosong) sehingga judul harus dicari satu per satu.
+ * Kalau metadata AniList sedang tidak tersedia — atau judul yang sedang tayang belum ada
+ * di situs — pencarian hanya berisi judul yang tidak cocok dan bagian Donghua jadi kosong
+ * (terbukti di produksi: `filter=donghua` mengembalikan 0 item). Seed ini membuat bagian
+ * itu tetap berisi judul nyata yang memang ada di AnimeKu (mis. Douluo Dalu → 7 seri).
+ */
+export const DONGHUA_SEEDS = Object.freeze([
+    'Douluo Dalu',
+    'Soul Land',
+    'Battle Through the Heavens',
+    'Perfect World',
+    'Swallowed Star',
+]);
 
 function siteUrl(value, base) {
     const url = absoluteUrl(value, base);
@@ -439,6 +457,8 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         country: 'JP',
         policy: POLICY,
         supportsBrowse: true,
+        /** Dipakai registry saat metadata donghua kosong/gagal (lihat browseDonghua). */
+        donghuaSeeds: DONGHUA_SEEDS,
 
         parseRef(parts) {
             const slug = String(parts[0] || '').toLowerCase();

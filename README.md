@@ -1027,6 +1027,39 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   (`CACHE_SUBTITLE_MAP_SEC`). Episode di luar daftar situs tidak diperiksa; episode >24 tetap bisa
   ditonton, badge-nya menyusul saat episode itu dibuka.
 
+### Perubahan perilaku (24 Okt 2026 — putaran keempat: genre situs, Donghua, Sub Indo di ponsel)
+- **Genre situs jadi tombol menu.** ±70 chip Oploverz + 6 chip AnimeKu tidak lagi dijajarkan di beranda
+  (5 baris). Chip genre AniList tetap terlihat; genre situs dibuka lewat tombol **“Genre situs”**
+  (`#genreMenuBtn` → `#genreMenu`) yang berisi grup per situs, **kotak cari** di dalam panel, tombol tutup,
+  klik-di-luar, dan `Esc`. Panel bisa dibuka-tutup (`aria-expanded`), jumlah genre tampil di badge, dan
+  pemilihan genre langsung menutup panel lalu menampilkan hasil di bawahnya. Pembersihan render tetap
+  memakai kunci `[data-site-genres]`.
+- **Filter tahun/musim/urutan ikut ke situs.** Tahun & musim diteruskan ke `browse` (Oploverz mendukung
+  `season[]`; AnimeKu tidak punya filter itu dan diberi catatan), urutan memakai token Oploverz
+  (`order=popular|rating|update`), dan tautan **Lihat Semua** membawa `source+genre+year+season`.
+- **Donghua dari AnimeKu & Oploverz di beranda.** Bagian Donghua kini punya panel per situs
+  (`#donghuaSites`) yang memanggil `GET /api/anime/browse?source=…&filter=donghua`; grid metadata AniList
+  tetap ada di bawahnya sebagai pelengkap, tidak lagi satu-satunya sumber.
+  - Bagian Donghua AnimeKu sebelumnya **kosong** di produksi (0 item) karena hanya mengandalkan judul
+    metadata yang sedang tayang. Adapter kini membawa **seed** franchise donghua populer (`DONGHUA_SEEDS`:
+    Douluo Dalu, Soul Land, Battle Through the Heavens, Perfect World, Swallowed Star) yang dikirim
+    registry sebelum judul metadata. Kegagalan feed metadata tidak lagi senyap — masuk ke `errors`.
+  - **Batas Oploverz (jujur):** situs ini tidak punya kategori donghua dan pencariannya fuzzy
+    (kueri “Battle Through the Heavens” dijawab “Kingdom 6th Season”). Bagian Donghua Oploverz bisa kosong;
+    UI menjelaskannya dan tidak mengarang judul.
+- **Sub Indo di ponsel.** Tidak ada aturan CSS yang menyembunyikan panel (dijaga tes regresi), jadi
+  perbaikannya di sisi perilaku:
+  - status teks **selalu** terisi saat memuat (`Memuat katalog AnimeKu & Oploverz…`), bukan kotak kosong;
+  - tombol **“Muat ulang”** global (`#subIndoRefresh`, ikon berputar saat bekerja) di samping tombol
+    “Coba lagi” per panel;
+  - **satu percobaan ulang otomatis** saat `timeout`/`network`, dengan status “Jaringan lambat — mencoba
+    sekali lagi…”;
+  - hasil sukses terakhir disimpan di `localStorage` (`kz:subindo-last`, hanya judul+poster+slug) dan
+    dipakai bila feed live gagal — panel tetap terisi dengan label “cache” dan catatan “data tersimpan”.
+- **Perbaikan kecil:** filter pencarian Jelajah tidak lagi mengirim `filter=hasil` (id bagian sintetis) ke
+  backend; label + tombol muat ulang Sub Indo dibungkus `.subindo-header-actions` agar tidak berdesakan
+  di layar kecil.
+
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
 - "Streaming page" di dalam homepage → menjadi `watch.html` (punya URL, bisa di-share, tombol Back browser bekerja)
