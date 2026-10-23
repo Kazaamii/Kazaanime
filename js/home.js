@@ -969,7 +969,9 @@ function whenVisible(el, callback) {
 /* ------------------------------------------------------------------ */
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
 loadSubIndoSection();
-loadDonghuaSites();
+// Panel donghua situs dimuat saat bagiannya mendekati layar: dua permintaan katalog
+// (AnimeKu & Oploverz) tidak boleh berebut jaringan dengan hero/section di awal halaman.
+whenVisible($('#donghua'), loadDonghuaSites);
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
 

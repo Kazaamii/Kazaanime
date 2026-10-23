@@ -66,7 +66,7 @@ test('donghua beranda: panel AnimeKu & Oploverz di atas grid metadata', () => {
     assert.match(homeJs, /const DONGHUA_SITE_IDS = \['animeku', 'oploverz'\]/);
     assert.match(homeJs, /getSourceBrowse\(id, \{ filter: 'donghua' \}\)/);
     assert.match(homeJs, /katalogUrl\(\{ source: source\.id, filter: 'donghua' \}\)/);
-    assert.match(homeJs, /loadDonghuaSites\(\);/);
+    assert.match(homeJs, /whenVisible\(\$\('#donghua'\), loadDonghuaSites\)/, 'panel donghua situs dimuat saat section mendekati layar');
     assert.match(homeJs, /data-donghua-source/);
     assert.doesNotMatch(homeJs, /DONGHUA_SITE_IDS = \['animeku'\]/, 'Oploverz tidak boleh tertinggal');
 

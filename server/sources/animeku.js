@@ -88,7 +88,7 @@ const FILTERS = Object.freeze([
 
 const NAV_TTL_MS = 6 * 60 * 60 * 1000;
 /** Batas pencarian donghua: tiap kueri = satu request ke situs (jeda 1 detik/host). */
-const DONGHUA_QUERIES = 4;
+const DONGHUA_QUERIES = 5;
 const DONGHUA_LIMIT = 24;
 
 /**
@@ -102,11 +102,11 @@ const DONGHUA_LIMIT = 24;
  * itu tetap berisi judul nyata yang memang ada di AnimeKu (mis. Douluo Dalu → 7 seri).
  */
 export const DONGHUA_SEEDS = Object.freeze([
+    // Terverifikasi ada di AnimeKu (pencarian "Douluo" → 7 seri, 24 Okt 2026).
     'Douluo Dalu',
-    'Soul Land',
-    'Battle Through the Heavens',
+    // Dicoba berikutnya; kartu yang tidak cocok dibuang oleh aturan `related`.
     'Perfect World',
-    'Swallowed Star',
+    'Battle Through the Heavens',
 ]);
 
 function siteUrl(value, base) {

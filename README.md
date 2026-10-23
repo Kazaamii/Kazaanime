@@ -1041,9 +1041,12 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   (`#donghuaSites`) yang memanggil `GET /api/anime/browse?source=…&filter=donghua`; grid metadata AniList
   tetap ada di bawahnya sebagai pelengkap, tidak lagi satu-satunya sumber.
   - Bagian Donghua AnimeKu sebelumnya **kosong** di produksi (0 item) karena hanya mengandalkan judul
-    metadata yang sedang tayang. Adapter kini membawa **seed** franchise donghua populer (`DONGHUA_SEEDS`:
-    Douluo Dalu, Soul Land, Battle Through the Heavens, Perfect World, Swallowed Star) yang dikirim
-    registry sebelum judul metadata. Kegagalan feed metadata tidak lagi senyap — masuk ke `errors`.
+    metadata yang sedang tayang. Adapter kini membawa **seed** franchise donghua (`DONGHUA_SEEDS`:
+    Douluo Dalu, Perfect World, Battle Through the Heavens) yang dikirim registry sebelum judul metadata;
+    `Douluo Dalu` sudah dicocokkan dengan hasil pencarian asli situs (7 seri). Kegagalan feed metadata
+    tidak lagi membatalkan permintaan dan tidak lagi senyap — masuk ke `errors`.
+  - Panel donghua situs dimuat **saat bagiannya mendekati layar** (`whenVisible`) supaya dua permintaan
+    katalog tidak berebut jaringan dengan hero/section di awal halaman.
   - **Batas Oploverz (jujur):** situs ini tidak punya kategori donghua dan pencariannya fuzzy
     (kueri “Battle Through the Heavens” dijawab “Kingdom 6th Season”). Bagian Donghua Oploverz bisa kosong;
     UI menjelaskannya dan tidak mengarang judul.
