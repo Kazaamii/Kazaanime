@@ -21,6 +21,7 @@ beradapter.
 | **J** | 24 Okt 2026: **verifikasi per episode dihapus** — panel beranda menampilkan katalog AnimeKu & Oploverz apa adanya (tanpa batas waktu, tanpa "tanpa bukti"), plus tombol **Tampilkan lebih banyak** di tiap panel; **Jelajah** kembali punya tombol expand per bagian (tetap dengan **Lihat Semua** → `?filter=<bagian>`) | ✅ Selesai |
 | **K** | 24 Okt 2026 (lanjutan): **menu genre situs** (±70 chip jadi satu tombol), **Donghua dari AnimeKu & Oploverz**, **auto refresh AnimeKu & Oploverz** (percobaan ulang otomatis untuk timeout/jaringan/5xx, muat ulang saat jaringan kembali/tab aktif/data basi, cadangan lokal `kz:donghua-last`, tombol **Muat ulang** di bagian Donghua), Sub Indo tahan jaringan ponsel | ✅ Selesai |
 | **L** | 24 Okt 2026 (putaran 6): **filter genre ringkas** — genre situs (AnimeKu/Oploverz) pindah dari panel ±80 tombol ke satu `<select>` di kartu **Tahun/Musim/Urutkan** (`#genreSite`, `<optgroup>` per situs, daftar baru diminta saat disentuh, cache `kz:site-genres`); **Sub Indo diprioritaskan** — server **AnimeKu & Oploverz** selalu dicoba dan tampil paling depan di daftar server, sumber sudah ada baru menambah keduanya | ✅ Selesai |
+| **M** | 24 Okt 2026 (putaran 7): **pencarian header menggabungkan AnimeKu & Oploverz** — grup "AnimeKu & Oploverz" di autocomplete (maks 3 judul/situs, kartu langsung memutar episode) + bagian **"Langsung dari AnimeKu & Oploverz"** di halaman hasil pencarian | ✅ Selesai |
 
 ---
 
@@ -32,6 +33,7 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅙 permintaan 24 Okt 2026: pencarian per sumber, Donghua AnimeKu, semua genre, halaman Bookmark, lapisan efek, proteksi pop-up
 🅚 permintaan 24 Okt 2026 (lanjutan): **Jadwal & Genre di paling atas**, paragraf pengantar Sub Indo dihapus, **sort Tahun/Musim/Urutan** di genre, genre **AnimeKu** (23 slug) & **Oploverz** (80 genre + 24 musim), Donghua di **kedua** situs
 🅛 putaran 6 (24 Okt 2026): genre situs jadi **satu `<select>`** di kartu filter (beranda ringan) + **server Sub Indo AnimeKu & Oploverz** diprioritaskan di player
+🅜 putaran 7 (24 Okt 2026): pencarian header & halaman hasil juga memakai **AnimeKu & Oploverz** (bukan hanya AniList/Kitsu)
 
 ```
 kazanime/
@@ -93,7 +95,8 @@ kazanime/
 │   │   ├── skeleton.js        ✅
 │   │   ├── schedule.js        ✅ jadwal (link + nomor episode, kerangka loading)
 │   │   ├── notice.js          ✅ keterangan "data cadangan" + tombol Coba lagi
-│   │   ├── search-dropdown.js ✅🅔 autocomplete AniList + Kitsu (bertahap, bisa dibatalkan, keyboard, ARIA)
+│   │   ├── search-dropdown.js ✅🅔🅜 autocomplete AniList + Kitsu + **AnimeKu & Oploverz** (bertahap, bisa dibatalkan, keyboard, ARIA)
+│   │   ├── search-suggest.js  🅜 pengelompokan saran pencarian (metadata vs situs) — murni, bisa diuji tanpa DOM
 │   │   ├── api-status.js      ✅ widget status sumber data
 │   │   ├── player.js          🅒🅔🅕🅖 SATU player: iframe ATAU video HLS (hls.js / HLS native), mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI & lokal
 │   │   ├── ai-subtitle.js     🅕 "Subtitle Indonesia (AI)": track AI (TextTrack/VTTCue) per bagian, subtitle bawaan disembunyikan, pilihan pengguna dihormati
@@ -213,7 +216,7 @@ Yang bisa dicoba (Tahap C):
 Yang bisa dicoba (Tahap B):
 - `/` — homepage dengan data live, genre, jadwal WIB (scroll ke bawah), bookmark setelah login
 - ketik di kotak cari (min. 2 huruf) → dropdown MAL + Kitsu + AniList; ↑/↓ lalu Enter
-- `/search.html?q=one piece` — tab sumber, urutan, filter format, "Muat Lebih Banyak"
+- `/search.html?q=one piece` — tab sumber, urutan, filter format, "Muat Lebih Banyak", + bagian **Langsung dari AnimeKu & Oploverz** (24 Okt 2026, putaran 7)
 - `/search.html?browse=ongoing` · `?browse=new` · `?browse=donghua` · `?genre=Isekai`
 - `/katalog.html` — **Jelajah**: AnimeKu (Terbaru → New Anime Populer → Top Favorit → Coming Soon → Complete),
   tiap bagian ringkas 6 kartu + tombol **Tampilkan lebih banyak** + tautan **Lihat Semua**; tab **Oploverz** (Terbaru → Populer → Rating Tertinggi →
@@ -1137,6 +1140,35 @@ tambahkan server dari animeku dan oploverz untuk opsi stream"*.
 3. **Batas jujur.** Prioritas hanya mengubah **urutan**; kalau AnimeKu/Oploverz tidak punya judul atau
    episode itu, server lain tetap dipakai seperti biasa. Tidak ada penerobosan pembatasan situs.
    Deploy produksi putaran ini masih tertahan batas build Vercel (masih build putaran 3).
+
+### Perubahan perilaku (24 Okt 2026 — putaran ketujuh: pencarian header memakai AnimeKu & Oploverz)
+
+Permintaan pengguna: *"gabungkan pencarian data yg di top header jangan dari kitsu dan anilist saja,
+gunakan yg di anime ku dan oploverz juga"*.
+
+1. **Autocomplete header (`js/ui/search-dropdown.js`).** Kotak pencarian navbar kini punya tiga grup:
+   **AnimeKu & Oploverz** (paling atas), **AniList**, **Kitsu**. Grup situs memakai satu panggilan
+   backend (`/api/anime/search?q=`) yang sudah dipakai halaman Jelajah, jadi tidak ada endpoint baru.
+   - Maksimal **3 judul per situs** (AnimeKu dulu) supaya dropdown tetap ringkas; sumber situs lain
+     (hianime, anoboy, …) tidak ditampilkan di sini.
+   - Tiap item situs diberi badge nama situs + **Sub Indo** dan langsung membuka
+     `watch.html?…&slug=<situs>~…&src=<situs>` — tidak lewat halaman metadata.
+   - Judul yang sama **tetap muncul** di grup situs walau sudah tampil dari AniList/Kitsu: tujuannya
+     berbeda (putar langsung vs halaman anime), jadi tidak dibuang oleh dedupe metadata.
+   - Footer menampilkan **"Cari di situs →"** (katalog dengan kata kunci) saat ada hasil situs.
+   - Aturan pengelompokan dipisah ke `js/ui/search-suggest.js` (fungsi murni) sehingga bisa diuji
+     tanpa browser.
+2. **Halaman hasil pencarian (`search.html`).** `searchAnime()` kini mengenal sumber `backend`;
+   halaman pencarian meminta AniList + Kitsu + situs sekaligus lalu menampilkan bagian
+   **"Langsung dari AnimeKu & Oploverz"** di bawah grid metadata (maks **8 judul per situs**).
+   - Hasil situs **tidak** dicampur ke tab/merge metadata dan tidak ikut "Muat Lebih Banyak"
+     (situs tidak punya paginasi).
+   - Subjudul menyebut jumlahnya (`… · situs (2)`), dan bagiannya menyembunyikan diri bila kosong.
+   - Bila backend pencarian gagal (bukan sekadar nonaktif), bagian itu menjelaskannya, bukan menghilang
+     tanpa kabar.
+3. **Batas jujur.** Hasil situs mengikuti apa yang dikembalikan pencarian situs itu (judul Indonesia,
+   ejaan situs, dan bisa saja tidak lengkap); urutan/filter format tetap hanya berlaku untuk AniList
+   dan Kitsu. Tidak ada penerobosan pembatasan situs.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

@@ -26,8 +26,15 @@
 /* ---------- Muat lebih banyak ---------- */
 .search-load-more{text-align:center;margin-top:25px}
 
+/* ---------- Hasil langsung dari situs (24 Okt 2026, putaran 7) ---------- */
+.search-site-section{display:block;padding:0 40px 40px;max-width:var(--desktop-max);margin:0 auto;border-top:1px solid rgba(255,255,255,.07);padding-top:30px}
+.search-site-section[hidden]{display:none}
+.search-site-note{margin:6px 0 18px;color:var(--text-secondary);font-size:13px;line-height:1.6}
+.search-site-note strong{color:var(--primary)}
+
 @media(max-width:768px){
     .search-results-section{padding:25px 16px}
+    .search-site-section{padding:22px 16px 30px}
     .search-results-header h2{font-size:20px}
     .search-source-tabs{gap:8px}
     .search-source-tab{padding:8px 14px;font-size:12px}

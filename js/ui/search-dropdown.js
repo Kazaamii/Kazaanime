@@ -1,9 +1,14 @@
 /**
  * Kazanime — ui/search-dropdown.js
- * Autocomplete kotak pencarian navbar (AniList + Kitsu; MyAnimeList/Jikan dihapus 22 Okt 2026).
+ * Autocomplete kotak pencarian navbar: AniList + Kitsu + **AnimeKu & Oploverz**
+ * (24 Okt 2026, putaran 7 — permintaan pengguna: "gabungkan pencarian data yg di top
+ * header, jangan dari Kitsu dan AniList saja, gunakan yg di AnimeKu dan Oploverz juga").
  *
- * Tampilan grup sama seperti file asli (kini AniList 5, Kitsu 5 — kuota MAL dibagi,
- * tanpa duplikat), dengan perbaikan:
+ * Grup situs muncul paling atas begitu hasilnya datang dan tiap item langsung membuka
+ * episode di situs itu (slug + src), bukan halaman metadata. Judul yang sama tetap
+ * ditampilkan di kedua grup karena tujuannya berbeda (putar langsung vs halaman anime).
+ *
+ * Tampilan grup sama seperti file asli (AniList 5, Kitsu 5, situs 3 per situs), dengan perbaikan:
  *  - Request sebelumnya DIBATALKAN saat user mengetik lagi (dulu hasil lama
  *    bisa menimpa hasil baru karena balapan request).
  *  - Grup tampil bertahap: sumber yang cepat tidak menunggu sumber yang lambat.
@@ -14,13 +19,15 @@
  *  - Judul dari API di-escape (dulu disisipkan mentah → XSS).
  */
 import { UI } from '../config.js';
-import { suggestAnime, dedupeKeys } from '../api/index.js';
+import { suggestAnime } from '../api/index.js';
 import { scoreLabel } from '../api/normalize.js';
 import { html, debounce, placeholderImage } from './dom.js';
-import { watchUrl, searchUrl } from '../routes.js';
+import { watchUrl, searchUrl, katalogUrl } from '../routes.js';
 import { icon } from './icons.js';
+import { groupSuggestions, siteOfSuggestion, SITE_LABELS } from './search-suggest.js';
 
 const GROUPS = [
+    { source: 'backend', label: 'AnimeKu & Oploverz', badge: 'source-site', name: 'AnimeKu & Oploverz' },
     { source: 'anilist', label: 'AniList', badge: 'source-anilist', name: 'AniList' },
     { source: 'kitsu', label: 'Kitsu', badge: 'source-kitsu', name: 'Kitsu' },
 ];
@@ -71,32 +78,16 @@ export function initSearchDropdown(els) {
     function renderLoading(q) {
         options = [];
         active = -1;
-        dropdown.innerHTML = String(html`<div class="search-loading">${icon('loader-circle', { cls: 'ic--spin' })} Mencari "${q}" di AniList + Kitsu...</div>`);
+        dropdown.innerHTML = String(html`<div class="search-loading">${icon('loader-circle', { cls: 'ic--spin' })} Mencari "${q}" di AniList, Kitsu, AnimeKu & Oploverz...</div>`);
         show();
     }
 
     function render(q) {
-        const seen = new Set();
-        const groups = [];
-        const pendingNames = [];
-        let failed = 0;
+        const { groups, pending: pendingNames, failed, total } = groupSuggestions(state, {
+            groups: GROUPS,
+            limitOf: (source) => UI.suggestLimits[source] ?? 5,
+        });
 
-        for (const g of GROUPS) {
-            const value = state[g.source];
-            if (value === undefined) { pendingNames.push(g.name); continue; }
-            if (!Array.isArray(value)) { failed++; continue; }
-            const unique = [];
-            for (const anime of value) {
-                const keys = dedupeKeys(anime);
-                if (keys.some((k) => seen.has(k))) continue;
-                keys.forEach((k) => seen.add(k));
-                unique.push(anime);
-                if (unique.length >= UI.suggestLimits[g.source]) break;
-            }
-            if (unique.length) groups.push({ ...g, items: unique });
-        }
-
-        const total = groups.reduce((n, g) => n + g.items.length, 0);
         if (!total && pendingNames.length) return; // tetap tampilkan "Mencari..."
 
         options = [];
@@ -111,6 +102,9 @@ export function initSearchDropdown(els) {
             return;
         }
 
+        // Ada hasil dari AnimeKu/Oploverz → tawarkan pencarian penuh di katalog situs.
+        const siteHref = groups.some((g) => g.source === 'backend') ? katalogUrl({ source: 'animeku', q }) : '';
+
         let index = 0;
         const body = groups.map((g) => html`
             <div class="search-dropdown-header" data-source="${g.source}" role="presentation"><span class="src-dot" aria-hidden="true"></span>${g.label} <span class="source-badge ${g.badge}">${g.items.length} hasil</span></div>
@@ -118,12 +112,15 @@ export function initSearchDropdown(els) {
                 const i = index++;
                 const href = watchUrl(anime, 1);
                 options.push({ href });
+                const site = siteOfSuggestion(anime);
                 return html`
                 <a class="search-result-item" id="search-opt-${i}" role="option" aria-selected="false" href="${href}" data-index="${i}">
                     <img src="${anime.image || placeholderImage(anime.title, anime.color)}" alt="" loading="lazy" decoding="async" data-fallback data-color="${anime.color || ''}">
                     <div class="search-result-info">
                         <h4>${anime.title}</h4>
-                        <p><span class="sr-score">${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}</span><span>${epText(anime)}</span><span class="sr-format">${anime.format}</span></p>
+                        <p>${site
+                            ? html`<span class="source-badge source-site">${SITE_LABELS[site]}</span><span>Sub Indo</span>${anime.latestEpisode ? html`<span class="sr-format">EP ${anime.latestEpisode}</span>` : ''}`
+                            : html`<span class="sr-score">${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}</span><span>${epText(anime)}</span><span class="sr-format">${anime.format}</span>`}</p>
                     </div>
                 </a>`;
             })}`);
@@ -132,8 +129,11 @@ export function initSearchDropdown(els) {
             ${body}
             ${pendingNames.length ? html`<div class="search-loading search-loading--inline" role="presentation">${icon('loader-circle', { cls: 'ic--spin' })} Memuat ${pendingNames.join(' & ')}...</div>` : ''}
             <div class="search-dropdown-footer" role="presentation">
-                <span>Tekan Enter untuk hasil lengkap</span>
-                <a href="${searchUrl(q)}">Lihat Semua →</a>
+                <span>${siteHref ? 'Hasil situs langsung memutar episode' : 'Tekan Enter untuk hasil lengkap'}</span>
+                <span class="search-dropdown-actions">
+                    ${siteHref ? html`<a href="${siteHref}">Cari di situs →</a>` : ''}
+                    <a href="${searchUrl(q)}">Lihat Semua →</a>
+                </span>
             </div>`);
         show();
     }

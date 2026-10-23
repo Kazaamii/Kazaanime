@@ -337,6 +337,12 @@ export async function searchAnime(q, { page = 1, sort = 'relevance', formats = [
     const runners = {
         anilist: () => anilist.searchMedia({ q, page, sort, formats, perPage: UI.searchPerPage, signal }),
         kitsu: () => kitsu.searchAnime({ q, page, sort, formats, limit: UI.searchPerPage, signal }),
+        // Situs (24 Okt 2026, putaran 7): AnimeKu & Oploverz dicari lewat backend dalam satu
+        // panggilan. Situs tidak punya halaman berikutnya maupun filter urutan/format.
+        backend: async () => {
+            const found = await backend.searchBackend(q, { signal });
+            return { items: found.items || [], hasNext: false, total: null };
+        },
     };
     const list = sources.filter((s) => runners[s]);
     const settled = await Promise.allSettled(list.map((s) => runners[s]()));
@@ -397,9 +403,16 @@ export function mergeAnimeLists(bySource, { sort = 'relevance', seen = new Set()
 /**
  * Saran autocomplete: satu Promise per sumber agar dropdown bisa tampil
  * bertahap (sumber yang lambat tidak menahan yang cepat).
+ *
+ * 24 Okt 2026 (putaran 7) — permintaan pengguna: "gabungkan pencarian data yg di top
+ * header jangan dari Kitsu dan AniList saja, gunakan yg di AnimeKu dan Oploverz juga".
+ * `backend` mencari di SEMUA adapter scraper (AnimeKu, Oploverz, dll.) dalam satu
+ * panggilan; `ui/search-suggest.js` hanya menampilkan AnimeKu & Oploverz. Backend yang
+ * tidak aktif akan menolak promise ini → grup situs tidak muncul (tanpa pesan galat).
+ *
  * @param {string} q
  * @param {{signal?: AbortSignal}} [opts]
- * @returns {{kitsu: Promise<Anime[]>, anilist: Promise<Anime[]>}}
+ * @returns {{kitsu: Promise<Anime[]>, anilist: Promise<Anime[]>, backend: Promise<Anime[]>}}
  */
 export function suggestAnime(q, { signal } = {}) {
     const timeout = API_CONFIG.suggestTimeout;
@@ -407,6 +420,7 @@ export function suggestAnime(q, { signal } = {}) {
     return {
         kitsu: kitsu.searchAnime({ q, limit: n, signal, timeout }).then((r) => r.items),
         anilist: anilist.searchMedia({ q, page: 1, perPage: n, sort: 'relevance', signal, timeout }).then((r) => r.items),
+        backend: backend.searchBackend(q, { signal }).then((r) => r.items || []),
     };
 }
 
