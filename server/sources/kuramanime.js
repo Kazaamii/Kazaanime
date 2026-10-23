@@ -44,7 +44,7 @@ export const POLICY = Object.freeze({
         url: null,
         reviewedAt: '2026-10-21',
         verdict: 'unknown',
-        note: 'Halaman ToS/robots.txt tidak bisa dibuka (Cloudflare 403 untuk bot). Kebijakan: sumber dengan ToS '
+        note: 'ToS dan robots.txt untuk domain v9 yang dipilih belum diverifikasi independen. Kebijakan: sumber dengan ToS '
             + '"unknown" hanya diakses bila robots.txt terbaca DAN mengizinkan (requireExplicitRobots).',
     }),
 });
