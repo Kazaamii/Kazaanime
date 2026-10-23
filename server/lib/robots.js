@@ -192,15 +192,19 @@ export class RobotsGate {
         const u = new URL(url);
         const entry = await this.load(u.origin, signal);
         const crawlDelayMs = entry.crawlDelay != null ? Math.round(entry.crawlDelay * 1000) : 0;
+        const withStatus = () => entry.httpStatus ? { httpStatus: entry.httpStatus } : {};
         switch (entry.state) {
-            case 'blocked': return { allowed: false, reason: 'blocked', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
-            case 'unreachable': return { allowed: false, reason: 'unreachable', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
+            case 'blocked': return { allowed: false, reason: 'blocked', crawlDelayMs, ...withStatus() };
+            case 'unreachable': return { allowed: false, reason: 'unreachable', crawlDelayMs, ...withStatus() };
             case 'unavailable': return requireExplicit
-                ? { allowed: false, reason: 'unverified', crawlDelayMs, httpStatus: entry.httpStatus || 0 }
-                : { allowed: true, reason: 'no-robots', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
+                ? { allowed: false, reason: 'unverified', crawlDelayMs, ...withStatus() }
+                : { allowed: true, reason: 'no-robots', crawlDelayMs };
             default: {
                 const ok = isAllowed(entry.rules, u.pathname + u.search);
-                return { allowed: ok, reason: ok ? 'allowed' : 'disallowed', crawlDelayMs, httpStatus: entry.httpStatus || 0 };
+                // Keep the original success shape stable. Status is diagnostic only for a blocked path.
+                return ok
+                    ? { allowed: true, reason: 'allowed', crawlDelayMs }
+                    : { allowed: false, reason: 'disallowed', crawlDelayMs, ...withStatus() };
             }
         }
     }
