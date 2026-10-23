@@ -79,33 +79,17 @@
                     <option value="newest">Terbaru</option>
                 </select>
             </label>
+            <label class="genre-filter genre-filter--site" for="genreSite">
+                <span>Genre situs</span>
+                <select id="genreSite" aria-label="Genre dari AnimeKu atau Oploverz">
+                    <option value="">Semua genre situs</option>
+                </select>
+            </label>
             <button type="button" class="genre-filter-reset" id="genreFilterReset" hidden>Reset filter</button>
         </div>
         <div class="genre-tags" id="genreTags" role="toolbar" aria-label="Pilih genre"></div>
-        <!-- Genre situs (AnimeKu/Oploverz ±70) tidak lagi dijajarkan di beranda — 24 Okt 2026,
-             permintaan pengguna: "dibuat tombol menu genre agar tidak panjang". -->
-        <div class="genre-menu-wrap">
-            <button type="button" class="genre-menu-btn" id="genreMenuBtn" aria-expanded="false" aria-controls="genreMenu" hidden>
-                <span class="ic-slot" data-icon="tags"></span>
-                <span>Genre situs</span>
-                <span class="genre-menu-count" id="genreMenuCount" hidden></span>
-                <span class="ic-slot genre-menu-caret" data-icon="chevron-down"></span>
-            </button>
-            <div class="genre-menu" id="genreMenu" hidden>
-                <div class="genre-menu-head">
-                    <label class="sr-only" for="genreMenuSearch">Cari genre situs</label>
-                    <input type="search" class="genre-menu-search" id="genreMenuSearch" placeholder="Cari genre…" autocomplete="off" enterkeyhint="search">
-                    <button type="button" class="genre-menu-close" id="genreMenuClose" aria-label="Tutup daftar genre">
-                        <span class="ic-slot" data-icon="x"></span>
-                    </button>
-                </div>
-                <div class="genre-menu-body" id="genreMenuBody"></div>
-                <p class="genre-menu-foot">
-                    <span class="genre-menu-empty" id="genreMenuEmpty" hidden>Tidak ada genre yang cocok.</span>
-                    <a class="see-all" href="katalog.html">Buka Jelajah <span class="ic-slot" data-icon="chevron-right"></span></a>
-                </p>
-            </div>
-        </div>
+        <!-- Genre situs (AnimeKu/Oploverz) memakai satu <select> di kartu filter di atas —
+             24 Okt 2026: ±80 tombol diganti pilihan ringkas agar beranda tidak berat. -->
         <div class="genre-results" id="genreResults" hidden>
             <div class="genre-results-head">
                 <h3 class="genre-results-title" id="genreResultsTitle">Genre</h3>

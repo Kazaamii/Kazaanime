@@ -256,7 +256,8 @@ test('beranda: Jadwal & Genre di atas panel Sub Indo, tanpa paragraf pengantar (
     assert.match(homeHtml, /id="genreSeason"/);
     assert.match(homeHtml, /id="genreSort"/);
     assert.match(homeCss, /\.genre-filters\{/);
-    assert.match(homeCss, /\.genre-group-list\{/);
+    // Ronde 6: genre situs memakai <select> di kartu filter (bukan chip/grup terpisah).
+    assert.match(homeCss, /\.genre-filter--site select\{/);
 });
 
 test('home.js: sort Tahun/Musim + genre situs (Oploverz & AnimeKu) memakai data backend', () => {
@@ -264,7 +265,7 @@ test('home.js: sort Tahun/Musim + genre situs (Oploverz & AnimeKu) memakai data 
     assert.match(homeJs, /getSourceBrowse\(source, \{\s*genre: id,\s*year: genreState\.year,\s*season: genreState\.season,/s);
     assert.match(homeJs, /SITE_ORDER = \{ oploverz:/, 'urutan situs memakai token order Oploverz');
     assert.match(homeJs, /getGenreAnime\(genre, \{\s*year: genreState\.year,\s*season: genreState\.season,/s);
-    assert.match(homeJs, /data-site-genres/, 'genre situs dirender sebagai grup terpisah');
+    assert.match(homeJs, /<optgroup label="\$\{source\.name\}">/, 'genre situs dirender sebagai optgroup per situs');
     assert.match(homeJs, /katalogUrl\(\{\s*source, genre: id, year: genreState\.year, season: genreState\.season,/s, 'Lihat Semua membuka katalog sumber+genre (tahun/musim ikut)');
 });
 

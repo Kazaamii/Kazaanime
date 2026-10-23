@@ -20,6 +20,7 @@ beradapter.
 | **I** | Katalog 23 Okt 2026: panel Sub Indo tinggal **AnimeKu** + **Oploverz** (Samehadaku, Sakunime, Otakudesu, Kuramanime tidak lagi jadi panel); endpoint **`/api/anime/browse`**; halaman baru **Jelajah** (`katalog.html`) dengan tiga tab (AnimeKu / Oploverz / Donghua), bagian berurutan, filter genre, dan Coming Soon dari metadata | ✅ Selesai |
 | **J** | 24 Okt 2026: **verifikasi per episode dihapus** — panel beranda menampilkan katalog AnimeKu & Oploverz apa adanya (tanpa batas waktu, tanpa "tanpa bukti"), plus tombol **Tampilkan lebih banyak** di tiap panel; **Jelajah** kembali punya tombol expand per bagian (tetap dengan **Lihat Semua** → `?filter=<bagian>`) | ✅ Selesai |
 | **K** | 24 Okt 2026 (lanjutan): **menu genre situs** (±70 chip jadi satu tombol), **Donghua dari AnimeKu & Oploverz**, **auto refresh AnimeKu & Oploverz** (percobaan ulang otomatis untuk timeout/jaringan/5xx, muat ulang saat jaringan kembali/tab aktif/data basi, cadangan lokal `kz:donghua-last`, tombol **Muat ulang** di bagian Donghua), Sub Indo tahan jaringan ponsel | ✅ Selesai |
+| **L** | 24 Okt 2026 (putaran 6): **filter genre ringkas** — genre situs (AnimeKu/Oploverz) pindah dari panel ±80 tombol ke satu `<select>` di kartu **Tahun/Musim/Urutkan** (`#genreSite`, `<optgroup>` per situs, daftar baru diminta saat disentuh, cache `kz:site-genres`); **Sub Indo diprioritaskan** — server **AnimeKu & Oploverz** selalu dicoba dan tampil paling depan di daftar server, sumber sudah ada baru menambah keduanya | ✅ Selesai |
 
 ---
 
@@ -30,6 +31,7 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅗 feed Sub Indo per sumber (23 Okt 2026, verifikasi dihapus 24 Okt 2026) · 🅘 katalog Jelajah (23 Okt 2026) ·
 🅙 permintaan 24 Okt 2026: pencarian per sumber, Donghua AnimeKu, semua genre, halaman Bookmark, lapisan efek, proteksi pop-up
 🅚 permintaan 24 Okt 2026 (lanjutan): **Jadwal & Genre di paling atas**, paragraf pengantar Sub Indo dihapus, **sort Tahun/Musim/Urutan** di genre, genre **AnimeKu** (23 slug) & **Oploverz** (80 genre + 24 musim), Donghua di **kedua** situs
+🅛 putaran 6 (24 Okt 2026): genre situs jadi **satu `<select>`** di kartu filter (beranda ringan) + **server Sub Indo AnimeKu & Oploverz** diprioritaskan di player
 
 ```
 kazanime/
@@ -1104,6 +1106,37 @@ per host) membuat lima kueri pencarian donghua berurutan memakan ~7–8 dtk — 
 halaman berubah struktur, setelah percobaan habis panel tetap menampilkan pesan + “Buka situs”, tanpa
 percobaan tanpa henti. Di sandbox pengembangan (tanpa akses keluar ke AnimeKu/Oploverz) jalur ini hanya
 diuji dengan respons tiruan (happy-dom) dan uji unit; bukti produksi menyusul setelah deploy.
+
+### Perubahan perilaku (24 Okt 2026 — putaran keenam: filter genre ringkas & Sub Indo diprioritaskan)
+
+Permintaan pengguna: *"untuk genre home page yg bagian animeku dan oploverz buat seperti ini agar web
+tidak berat"* dan *"prioritaskan data anime streamingnya ke Sub Indo yg sudah tersedia di ke 2 web itu,
+tambahkan server dari animeku dan oploverz untuk opsi stream"*.
+
+1. **Genre situs jadi satu pilihan di kartu filter.** Panel menu (±80 tombol + kotak cari) dan chip
+   genre situs dihapus dari beranda. Sekarang `#genreSite` — satu `<select>` di dalam `.genre-filters`
+   bersama **Tahun / Musim / Urutkan**, seperti kartu filter di screenshot:
+   - isi awal hanya `Semua genre situs`; setelah daftar datang, `<optgroup>` per situs (AnimeKu/Oploverz)
+     dengan genre yang belum ada di chip AniList (genre kembar tidak ditampilkan dua kali);
+   - daftar genre **tidak diminta saat beranda dibuka** — baru saat pilihan disentuh/difokus
+     (`pointerdown`/`focus`/`keydown`), lalu disimpan di `sessionStorage` (`kz:site-genres`);
+   - memilih genre menjalankan jalur yang sama seperti sebelumnya: hasil di bawah kartu filter, filter
+     tahun/musim ikut terkirim, dan **Lihat Semua** membuka `katalog.html?source=…&genre=…&year=…&season=…`;
+   - pilihan **tidak pernah** di-`disabled` (elemen disabled tidak mengirim event, sehingga daftar genre
+     tidak akan pernah termuat).
+2. **Server AnimeKu & Oploverz selalu jadi opsi dan diputar lebih dulu.**
+   - `SUB_INDO_SOURCES = ['animeku', 'oploverz']` di `js/api/streams.js` (di-ekspor lewat `js/api/index.js`).
+   - `getEpisodeExtras()` selalu mencari padanan di kedua situs itu; bila sumber asal sudah punya server
+     Sub Indo, pencarian dibatasi ke dua situs tersebut (tidak menarik semua situs lagi), bila belum,
+     semua padanan dipakai.
+   - Urutan server: **AnimeKu → Oploverz → Multi Sub → bahasa lain → server cadangan → Sub Eng**
+     (`js/watch.js`). Server statis ber-Sub Eng kini juga di urutan akhir, tidak lagi terselip di blok
+     cadangan.
+   - Padanan hasil pencarian diurutkan dengan peringkat yang sama (`subIndoRank`) sehingga dua situs
+     Sub Indo berada di depan.
+3. **Batas jujur.** Prioritas hanya mengubah **urutan**; kalau AnimeKu/Oploverz tidak punya judul atau
+   episode itu, server lain tetap dipakai seperti biasa. Tidak ada penerobosan pembatasan situs.
+   Deploy produksi putaran ini masih tertahan batas build Vercel (masih build putaran 3).
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
