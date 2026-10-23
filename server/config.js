@@ -154,6 +154,11 @@ export const SOURCES = Object.freeze({
     // Anoboy/Sakunime aktif untuk menambah Sub Indo, tetapi ToS unknown dan fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime opt-in; base yang dipilih dibatasi ke satu host dan tidak ada failover.
     enabled: list('SCRAPER_SOURCES', defaultSources).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
+    // AnimeIndo opt-in only: add "animeindo" to SCRAPER_SOURCES after verifying robots.txt/terms.
+    animeindo: Object.freeze({
+        baseUrl: (env.ANIMEINDO_BASE_URL || 'https://animeindo.cloud').replace(/\/+$/, ''),
+        renderJavaScript: bool('ANIMEINDO_RENDER_JAVASCRIPT', false),
+    }),
     samehadaku: Object.freeze({
         baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, ''),
         renderJavaScript: bool('SAMEHADAKU_RENDER_JAVASCRIPT', false),
