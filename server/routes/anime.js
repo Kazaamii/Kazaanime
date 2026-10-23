@@ -4,6 +4,8 @@
  *   GET /api/anime/latest
  *   GET /api/anime/latest-subindo  (rilis anime Jepang Sub Indo, per sumber)
  *   GET /api/anime/browse?source=oploverz&filter=popular&genre=action&page=1   (halaman Jelajah)
+ *   GET /api/anime/browse?source=oploverz&genre=action&year=2024&season=fall  (filter Tahun/Musim)
+ *   GET /api/anime/genres            (genre + musim per sumber, 24 Okt 2026)
  *   GET /api/anime/search?q=
  *   GET /api/anime/schedule          (jadwal rilis Sub Indo per hari, WIB — ditambahkan 22 Okt 2026)
  *   GET /api/anime/downloads/kusonime?title=<Romaji>
@@ -58,6 +60,29 @@ export function readFilterToken(value, name) {
     if (raw === undefined || raw === null || raw === '') return '';
     if (typeof raw !== 'string' || raw.length > 40 || !/^[a-z0-9-]+$/i.test(raw)) {
         throw badRequest(`Parameter ${name} tidak valid.`);
+    }
+    return raw.toLowerCase();
+}
+
+/**
+ * Tahun rilis untuk filter katalog (opsional): empat digit 1950–2100.
+ * @returns {number|''} angka tahun, atau '' bila tidak dikirim
+ */
+export function readCatalogYear(value) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (raw === undefined || raw === null || raw === '') return '';
+    if (typeof raw !== 'string' || !/^\d{4}$/.test(raw)) throw badRequest('Parameter year tidak valid.');
+    const year = Number.parseInt(raw, 10);
+    if (year < 1950 || year > 2100) throw badRequest('Parameter year di luar rentang 1950–2100.');
+    return year;
+}
+
+/** Musim rilis untuk filter katalog (opsional): winter|spring|summer|fall. */
+export function readCatalogSeason(value) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (raw === undefined || raw === null || raw === '') return '';
+    if (typeof raw !== 'string' || !/^(winter|spring|summer|fall)$/i.test(raw)) {
+        throw badRequest('Parameter season tidak valid (winter|spring|summer|fall).');
     }
     return raw.toLowerCase();
 }
@@ -209,7 +234,11 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
         genre: readFilterToken(req.query.genre, 'genre'),
         page: readPageNumber(req.query.page),
         q: readCatalogQuery(req.query.q),
+        year: readCatalogYear(req.query.year),
+        season: readCatalogSeason(req.query.season),
     }, ctx)));
+    // Daftar genre + musim per sumber (permintaan 24 Okt 2026: "tampilkan semua genre" di beranda).
+    router.get('/genres', handle((req, ctx) => registry.genres(ctx)));
     router.get('/schedule', handle((req, ctx) => registry.schedule(ctx)));
     router.get('/:slug/episode/:ep', handle((req, ctx) => registry.episode(req.params.slug, readEpisode(req.params.ep), ctx)));
     router.get('/:slug', handle((req, ctx) => registry.detail(req.params.slug, ctx)));

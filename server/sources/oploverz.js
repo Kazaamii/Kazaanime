@@ -24,7 +24,7 @@ import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
     absoluteUrl, cleanText, clip, firstInt, parseEpisodeNumber, parseFormat,
-    parseScore10, parseStatus, parseYear,
+    parseScore10, parseStatus, parseYear, stripSeason, titleKey,
 } from '../lib/text.js';
 
 export const ID = 'oploverz';
@@ -299,6 +299,10 @@ export function parseEpisodePage($, base) {
  * order=update|popular|rating, status=ongoing|completed|upcoming, type=movie|drama|...
  * "Upcoming" tidak dipakai: saat dicek, halaman `?status=upcoming` tidak berisi kartu.
  */
+/** Jumlah judul donghua yang dicari & batas hasil per permintaan (24 Okt 2026). */
+const DONGHUA_QUERIES = 3;
+const DONGHUA_LIMIT = 24;
+
 export const BROWSE_FILTERS = Object.freeze([
     { id: 'update', label: 'Terbaru', params: { order: 'update' } },
     { id: 'popular', label: 'Populer', params: { order: 'popular' } },
@@ -323,6 +327,29 @@ export function parseGenreOptions($) {
     return out;
 }
 
+/**
+ * Musim dari form filter `/series/` (`input[name="season[]"]`, nilai `summer-2026`).
+ * Oploverz tidak punya field tahun terpisah — tahun dibaca dari nilai musim.
+ * @returns {{id: string, label: string, season: string, year: number}[]}
+ */
+export function parseSeasonOptions($) {
+    const out = [];
+    const seen = new Set();
+    const LABELS = { winter: 'Winter', spring: 'Spring', summer: 'Summer', fall: 'Fall' };
+    $('input[name="season[]"][value]').each((_, el) => {
+        const input = $(el);
+        const id = cleanText(input.attr('value')).toLowerCase();
+        const m = /^(winter|spring|summer|fall)-(\d{4})$/.exec(id);
+        if (!m || seen.has(id)) return;
+        seen.add(id);
+        const label = cleanText($(`label[for="${input.attr('id')}"]`).first().text())
+            || `${LABELS[m[1]]} ${m[2]}`;
+        out.push({ id, label, season: m[1], year: Number(m[2]) });
+    });
+    const order = { winter: 0, spring: 1, summer: 2, fall: 3 };
+    return out.sort((a, b) => b.year - a.year || order[b.season] - order[a.season]);
+}
+
 /** URL halaman berikutnya dari `<link rel=next>` / `a.next.page-numbers`. */
 export function nextPageHref($, base) {
     return siteUrl($('link[rel="next"]').attr('href'), base)
@@ -340,6 +367,8 @@ export function createOploverz({ network, createClient, baseUrl }) {
     });
     /** Daftar genre dari form filter situs; dimuat sekali lalu dipakai ulang. */
     let genreCache = null;
+    /** Daftar musim (`summer-2026`, …) dari form filter yang sama. */
+    let seasonCache = null;
 
     const toAnime = (card) => makeAnime({
         title: card.title,
@@ -347,7 +376,7 @@ export function createOploverz({ network, createClient, baseUrl }) {
         latestEpisode: card.latestEpisode,
         format: card.format,
         status: card.latestEpisode ? 'ONGOING' : parseStatus(card.label),
-        country: 'JP',
+        country: card.country || 'JP',
         slug: encodeSlug(ID, card.slug),
         source: ID,
         url: card.url,
@@ -379,25 +408,67 @@ export function createOploverz({ network, createClient, baseUrl }) {
                 .map(toAnime);
         },
 
-        /** Opsi urutan + genre dari form `/series/` (genre di-cache 6 jam). */
+        /** Opsi urutan + genre + musim dari form `/series/` (di-cache 6 jam). */
         browseOptions() {
-            return { filters: BROWSE_FILTERS.map(({ id, label }) => ({ id, label })), genres: genreCache?.list || [] };
+            return {
+                filters: BROWSE_FILTERS.map(({ id, label }) => ({ id, label })),
+                genres: genreCache?.list || [],
+                seasons: (seasonCache?.list || []).map(({ id, label, season, year }) => ({ id, label, season, year })),
+            };
         },
 
         /**
-         * Halaman daftar `/series/`: filter = id urutan/status/tipe, genre = id genre.
-         * @param {{filter?: string, genre?: string, page?: number}} opts
+         * Daftar genre + musim untuk panel Jelajah (permintaan 24 Okt 2026).
+         * Satu permintaan `/series/` mengisi kedua cache.
          */
-        async browse({ filter = '', genre = '', page = 1 } = {}, ctx = {}) {
+        async genres(ctx = {}) {
+            const fresh = genreCache && seasonCache && Date.now() - genreCache.at < NAV_TTL_MS;
+            if (!fresh) {
+                const res = await client.html(`${base}/series/`, ctx);
+                const list = parseGenreOptions(res.$);
+                const seasons = parseSeasonOptions(res.$);
+                if (list.length) genreCache = { at: Date.now(), list };
+                if (seasons.length) seasonCache = { at: Date.now(), list: seasons };
+            }
+            return {
+                genres: (genreCache?.list || []).map(({ id, label }) => ({ id, label })),
+                seasons: (seasonCache?.list || []).map(({ id, label, season, year }) => ({ id, label, season, year })),
+            };
+        },
+
+        /**
+         * Halaman daftar `/series/`: filter = id urutan/status/tipe, genre = id genre,
+         * `year` + `season` = musim (nilai `season[]` berbentuk `summer-2026`).
+         * @param {{filter?: string, genre?: string, page?: number, year?: number|string, season?: string}} opts
+         */
+        async browse({ filter = '', genre = '', page = 1, year = '', season = '' } = {}, ctx = {}) {
             const chosen = BROWSE_FILTERS.find((item) => item.id === filter) || BROWSE_FILTERS[0];
             const params = new URLSearchParams(chosen.params);
             if (genre) params.append('genre[]', genre);
+            // Musim: satu nilai bila musim dipilih; empat nilai bila hanya tahun dipilih.
+            const seasonName = /^(winter|spring|summer|fall)$/.test(String(season || '').toLowerCase())
+                ? String(season).toLowerCase()
+                : '';
+            const seasonYear = /^\d{4}$/.test(String(year || '')) ? String(year) : '';
+            if (seasonYear) {
+                // Format nilai diambil dari form filter & tautan arsip situs (`fall-2026`). Semua nilai
+                // diminta apa adanya: menyaring ke daftar cache akan diam-diam mempersempit hasil
+                // (mis. tahun yang hanya sebagian ada di form) sehingga filter tahun jadi menyesatkan.
+                const values = seasonName
+                    ? [`${seasonName}-${seasonYear}`]
+                    : ['winter', 'spring', 'summer', 'fall'].map((name) => `${name}-${seasonYear}`);
+                for (const value of values) params.append('season[]', value);
+            }
             const path = page > 1 ? `/series/page/${page}/` : '/series/';
             const query = params.toString();
             const res = await client.html(`${base}${path}${query ? `?${query}` : ''}`, ctx);
             if (!genreCache || Date.now() - genreCache.at > NAV_TTL_MS) {
                 const list = parseGenreOptions(res.$);
                 if (list.length) genreCache = { at: Date.now(), list };
+            }
+            if (!seasonCache || Date.now() - seasonCache.at > NAV_TTL_MS) {
+                const list = parseSeasonOptions(res.$);
+                if (list.length) seasonCache = { at: Date.now(), list };
             }
             const seen = new Set();
             const items = parseCards(res.$, base)
@@ -411,8 +482,13 @@ export function createOploverz({ network, createClient, baseUrl }) {
                 hasNext: Boolean(nextPageHref(res.$, base)),
                 filters: BROWSE_FILTERS.map(({ id, label }) => ({ id, label })),
                 genres: genreCache?.list || [],
+                seasons: (seasonCache?.list || []).map(({ id, label, season: name, year: seasonYearValue }) => ({
+                    id, label, season: name, year: seasonYearValue,
+                })),
                 filter: chosen.id,
                 genre,
+                year: seasonYear,
+                season: seasonName,
             };
         },
 
@@ -424,6 +500,51 @@ export function createOploverz({ network, createClient, baseUrl }) {
             return parseCards(page.$, base)
                 .filter((card) => (seen.has(card.slug) ? false : seen.add(card.slug)))
                 .map(toAnime);
+        },
+
+        /**
+         * Donghua di Oploverz (24 Okt 2026, permintaan pengguna: donghua harus ada di
+         * Oploverz DAN AnimeKu). Situs tidak punya kategori donghua, jadi judul donghua yang
+         * sedang tayang (metadata AniList, negara CN) dicari lewat `?s=`, lalu hanya kartu
+         * seri yang judulnya cocok yang dipakai. Tidak ada klaim Sub Indo per judul.
+         *
+         * @param {string[]} titles judul donghua dari metadata
+         * @param {object} ctx
+         */
+        async browseDonghua(titles = [], ctx = {}) {
+            const queries = [...new Set((Array.isArray(titles) ? titles : [])
+                .map((title) => cleanText(title))
+                .filter((title) => title.length >= 4))]
+                .slice(0, DONGHUA_QUERIES);
+            const items = [];
+            const seen = new Set();
+            for (const query of queries) {
+                const key = titleKey(stripSeason(query));
+                if (!key) continue;
+                const url = new URL(`${base}/`);
+                url.searchParams.set('s', query);
+                let cards = [];
+                try {
+                    const page = await client.html(url.href, ctx);
+                    cards = parseCards(page.$, base).filter((card) => card.kind === 'series');
+                } catch (error) {
+                    // Satu kueri gagal: pakai hasil kueri lain bila sudah ada.
+                    if (items.length) break;
+                    throw error;
+                }
+                for (const card of cards) {
+                    const cardKey = titleKey(stripSeason(card.title));
+                    const related = cardKey === key
+                        || (key.length >= 5 && cardKey.includes(key))
+                        || (cardKey.length >= 5 && key.includes(cardKey));
+                    if (!related) continue;
+                    const slug = encodeSlug(ID, card.slug);
+                    if (!slug || seen.has(slug)) continue;
+                    seen.add(slug);
+                    items.push(toAnime({ ...card, country: 'CN' }));
+                }
+            }
+            return items.slice(0, DONGHUA_LIMIT);
         },
 
         async getAnime(ref, ctx = {}) {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { load } from 'cheerio';
 import {
     createOploverz, episodeSlugFromUrl, isEpisodeSlug, nextPageHref, parseAnimePage,
-    parseCards, parseEpisodePage, parseGenreOptions, seriesSlugFromUrl,
+    parseCards, parseEpisodePage, parseGenreOptions, parseSeasonOptions, seriesSlugFromUrl,
 } from '../sources/oploverz.js';
 import { fixture, fixture$, fakeClientFactory } from './helpers.js';
 
@@ -159,6 +159,60 @@ test('oploverz: katalog — filter urutan, genre, dan paginasi membentuk URL sit
     assert.equal(page2.filter, 'completed');
     assert.equal(page2.page, 2);
     assert.equal(calls[2], `${BASE}/series/page/2/?status=completed`);
+});
+
+test('oploverz: musim dibaca dari form filter (season[] = fall-2026, 24 Okt 2026)', () => {
+    const $ = load(`<form>
+        <input type="checkbox" id="s-fall-2026" name="season[]" value="fall-2026">
+        <label for="s-fall-2026">Fall 2026</label>
+        <input type="checkbox" id="s-summer-2026" name="season[]" value="summer-2026">
+        <label for="s-summer-2026">Summer 2026</label>
+        <input type="checkbox" id="s-fall-2025" name="season[]" value="fall-2025">
+        <label for="s-fall-2025">Fall 2025</label>
+        <input type="checkbox" id="s-rusak" name="season[]" value="bukan-musim">
+    </form>`);
+    const seasons = parseSeasonOptions($);
+    assert.deepEqual(seasons.map((season) => season.id), ['fall-2026', 'summer-2026', 'fall-2025'],
+        'urut tahun terbaru lalu Winter→Fall, nilai aneh diabaikan');
+    assert.deepEqual(seasons[0], { id: 'fall-2026', label: 'Fall 2026', season: 'fall', year: 2026 });
+});
+
+test('oploverz: filter tahun & musim diteruskan sebagai season[] ke situs', async () => {
+    const list = fixture('oploverz-series-list.html');
+    const { createClient, calls } = fakeClientFactory({
+        [`${BASE}/series/?order=update&season%5B%5D=fall-2026`]: list,
+        [`${BASE}/series/?order=popular&season%5B%5D=winter-2020&season%5B%5D=spring-2020&season%5B%5D=summer-2020&season%5B%5D=fall-2020`]: list,
+    });
+    const adapter = createOploverz({ network: null, createClient, baseUrl: BASE });
+
+    const bySeason = await adapter.browse({ filter: 'update', season: 'fall', year: 2026 });
+    assert.equal(bySeason.season, 'fall');
+    assert.equal(bySeason.year, '2026');
+    assert.equal(calls[0], `${BASE}/series/?order=update&season%5B%5D=fall-2026`);
+
+    const byYear = await adapter.browse({ filter: 'popular', year: 2020 });
+    assert.equal(calls[1],
+        `${BASE}/series/?order=popular&season%5B%5D=winter-2020&season%5B%5D=spring-2020&season%5B%5D=summer-2020&season%5B%5D=fall-2020`,
+        'tanpa musim: empat musim pada tahun itu diminta sekaligus');
+    assert.equal(byYear.items.length > 0, true);
+});
+
+test('oploverz: donghua dicari lewat ?s= dan hanya judul yang cocok dipakai (24 Okt 2026)', async () => {
+    const card = (slug, title) => `<article class="bs"><div class="bsx">
+        <a href="${BASE}/series/${slug}/" title="${title}">
+            <div class="limit"><span class="epx">Ongoing</span><img src="${BASE}/img/${slug}.jpg"/></div>
+            <div class="tt">${title}<h2>${title}</h2></div>
+        </a></div></article>`;
+    const results = `<html><body>${card('perfect-world', 'Perfect World')}${card('tenmaku-no-jaadugar', 'Tenmaku no Jaadugar')}</body></html>`;
+    const { createClient, calls } = fakeClientFactory({
+        [`${BASE}/?s=Perfect+World`]: results,
+    });
+    const adapter = createOploverz({ network: null, createClient, baseUrl: BASE });
+    const items = await adapter.browseDonghua(['Perfect World', 'Perfect World']);
+
+    assert.equal(calls.length, 1, 'judul ganda cukup satu permintaan');
+    assert.deepEqual(items.map((item) => item.slug), ['oploverz~perfect-world']);
+    assert.equal(items[0].country, 'CN', 'donghua ditandai CN hanya karena cocok dengan judul metadata');
 });
 
 test('oploverz: filter tak dikenal memakai urutan Terbaru (bukan error)', async () => {

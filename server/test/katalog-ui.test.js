@@ -21,7 +21,9 @@ const sourcesJs = read('js/api/sources.js');
 const routesJs = read('js/routes.js');
 const configJs = read('js/config.js');
 const homeJs = read('js/home.js');
+const homeHtml = read('index.html');
 const css = read('css/katalog.css');
+const homeCss = read('css/home.css');
 
 /** Id bagian dari literal SOURCES di katalog.js. */
 function sectionIds(sourceId) {
@@ -64,7 +66,8 @@ test('katalog.js: hanya AnimeKu & Oploverz, tanpa empat sumber yang dihapus', ()
 test('katalog.js: urutan bagian AnimeKu sesuai permintaan', () => {
     assert.deepEqual(sectionIds('animeku'), ['baru', 'populer', 'favorit', 'coming', 'selesai', 'donghua'],
         'lima bagian tetap sesuai permintaan; Donghua ditambahkan sebagai bagian keenam');
-    assert.deepEqual(sectionIds('oploverz'), ['update', 'popular', 'rating', 'ongoing', 'completed', 'movie']);
+    assert.deepEqual(sectionIds('oploverz'), ['update', 'popular', 'rating', 'ongoing', 'completed', 'movie', 'donghua'],
+        'enam bagian situs + Donghua di Oploverz (24 Okt 2026)');
 });
 
 test('katalog.js: bagian berbasis situs = filter yang benar-benar ada di adapter', () => {
@@ -74,16 +77,18 @@ test('katalog.js: bagian berbasis situs = filter yang benar-benar ada di adapter
     const siteSections = sectionIds('animeku').filter((id) => id !== 'coming');
     assert.deepEqual(animekuFilters.filter((id) => siteSections.includes(id)), siteSections,
         'urutan bagian = urutan filter AnimeKu (Donghua memakai filter khusus)');
-    assert.deepEqual(oploverzFilters, sectionIds('oploverz'), 'bagian Oploverz = urutan filter situs');
+    // `donghua` di kedua sumber ditangani registry lewat browseDonghua, bukan filter form situs.
+    assert.deepEqual(oploverzFilters, sectionIds('oploverz').filter((id) => id !== 'donghua'),
+        'bagian Oploverz = urutan filter situs');
     assert.equal(animekuFilters.includes('coming'), false, 'tidak ada filter coming yang dikarang');
-    assert.equal(stubAdapter(createAnimeku, 'animeku').browseOptions().genres.length, 0,
-        'AnimeKu memang tanpa arsip genre → pemilih genre disembunyikan');
+    assert.ok(stubAdapter(createAnimeku, 'animeku').browseOptions().genres.length > 0,
+        'AnimeKu punya arsip genre bertoken → pemilih genre tersedia (24 Okt 2026)');
 });
 
 test('katalog.js: bagian Donghua AnimeKu dijelaskan sebagai deteksi, bukan kategori situs', () => {
     const block = pageJs.slice(pageJs.indexOf("id: 'donghua',\n                label: 'Donghua di AnimeKu'"));
     assert.ok(block.length > 0, 'bagian Donghua di AnimeKu harus ada');
-    assert.match(block, /tidak punya kategori donghua/, 'pengguna diberi tahu batas sumbernya');
+    assert.match(block, /tidak memberi kategori donghua yang bisa dipakai/, 'pengguna diberi tahu batas sumbernya');
     assert.match(block, /metadata/, 'asal daftar dijelaskan');
     assert.match(pageJs, /filter: runtime\.def\.id/, 'bagian dikirim sebagai filter=donghua ke backend');
 });
@@ -158,7 +163,7 @@ test('katalog.js: "Lihat Semua" membuka daftar penuh satu bagian (?filter=) deng
 });
 
 test('katalogUrl() mendukung filter bagian tanpa memaksa halaman 1', () => {
-    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', q = '', page = 1 \} = \{\}\)/);
+    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', q = '', page = 1, year = '', season = '' \} = \{\}\)/);
     assert.match(routesJs, /if \(filter\) p\.set\('filter', filter\)/);
 });
 
@@ -188,8 +193,8 @@ test('katalog.js: state sumber & genre disimpan di URL', () => {
 });
 
 test('katalog.js: genre hanya muncul bila backend mengirim daftarnya', () => {
-    assert.match(pageJs, /if \(!paged && res\.genres\.length && !state\.genres\.length\)/);
-    assert.match(pageJs, /if \(!state\.genres\.length \|\| state\.query\) \{/,
+    assert.match(pageJs, /if \(!paged && \(res\.genres\.length \|\| res\.seasons\.length\)\)/);
+    assert.match(pageJs, /if \(\(!state\.genres\.length && !state\.seasons\.length\) \|\| state\.query\) \{/,
         'pemilih genre disembunyikan saat mode pencarian');
     assert.match(pageJs, /genreWrap\.hidden = true/);
 });
@@ -226,4 +231,38 @@ test('css/katalog.css: blok bagian + pemilih genre memakai variabel tema', () =>
     assert.match(css, /\.katalog-block-head\{/);
     assert.match(css, /\.katalog-block-hint\{/);
     assert.doesNotMatch(css, /#0[0-9a-f]{5}|#1[0-9a-f]{5}/i, 'warna latar harus memakai variabel tema');
+});
+
+test('beranda: Jadwal & Genre di atas panel Sub Indo, tanpa paragraf pengantar (24 Okt 2026)', () => {
+    const jadwal = homeHtml.indexOf('id="jadwal"');
+    const genre = homeHtml.indexOf('id="genre"');
+    const subindo = homeHtml.indexOf('id="subindo"');
+    assert.ok(jadwal > -1 && genre > jadwal, 'Jadwal lalu Genre harus di paling atas beranda');
+    assert.ok(subindo > genre, 'panel Sub Indo tetap ada SETELAH Jadwal & Genre');
+    assert.doesNotMatch(homeHtml, /subindo-intro/, 'paragraf pengantar di atas panel Sub Indo dihapus');
+    assert.match(homeHtml, /id="genreYear"/);
+    assert.match(homeHtml, /id="genreSeason"/);
+    assert.match(homeHtml, /id="genreSort"/);
+    assert.match(homeCss, /\.genre-filters\{/);
+    assert.match(homeCss, /\.genre-group-list\{/);
+});
+
+test('home.js: sort Tahun/Musim + genre situs (Oploverz & AnimeKu) memakai data backend', () => {
+    assert.match(homeJs, /getSourceGenres\(\)/);
+    assert.match(homeJs, /getSourceBrowse\(source, \{\s*genre: id,\s*year: genreState\.year,\s*season: genreState\.season,/s);
+    assert.match(homeJs, /SITE_ORDER = \{ oploverz:/, 'urutan situs memakai token order Oploverz');
+    assert.match(homeJs, /getGenreAnime\(genre, \{\s*year: genreState\.year,\s*season: genreState\.season,/s);
+    assert.match(homeJs, /data-site-genres/, 'genre situs dirender sebagai grup terpisah');
+    assert.match(homeJs, /katalogUrl\(\{ source, genre: id \}\)/, 'Lihat Semua membuka katalog sumber+genre');
+});
+
+test('katalog: filter Tahun & Musim diteruskan ke browse dan disimpan di URL', () => {
+    assert.match(pageHtml, /id="katalogYear"/);
+    assert.match(pageHtml, /id="katalogSeason"/);
+    assert.match(pageJs, /year: state\.year,\s*season: state\.season,/s);
+    assert.match(pageJs, /if \(state\.year\) q\.set\('year', state\.year\)/);
+    assert.match(pageJs, /if \(state\.season\) q\.set\('season', state\.season\)/);
+    assert.match(pageJs, /yearSelect\?\.addEventListener\('change'/);
+    assert.match(pageJs, /seasonSelect\?\.addEventListener\('change'/);
+    assert.match(routesJs, /p\.set\('year', String\(year\)\)/);
 });

@@ -162,13 +162,19 @@ export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
  * `filter` = urutan/status dari sumber (mis. "popular", "selesai"), `genre` = id genre.
  * @param {string} source id sumber backend ("animeku" | "oploverz" | ...)
  * `q` = cari di dalam satu sumber (min. 2 karakter) — hasil satu halaman tanpa paginasi.
- * @param {{filter?: string, genre?: string, page?: number, q?: string, signal?: AbortSignal, refresh?: boolean}} [opts]
+ * `year` + `season` = filter Tahun & Musim (24 Okt 2026); hanya sumber yang mendukungnya
+ * (Oploverz) yang memakainya — AnimeKu mengabaikan keduanya.
+ * @param {{filter?: string, genre?: string, page?: number, q?: string, year?: number|string, season?: string, signal?: AbortSignal, refresh?: boolean}} [opts]
  */
-export function getSourceBrowse(source, { filter = '', genre = '', page = 1, q: query = '', signal, refresh = false } = {}) {
+export function getSourceBrowse(source, {
+    filter = '', genre = '', page = 1, q: query = '', year = '', season = '', signal, refresh = false,
+} = {}) {
     const q = new URLSearchParams({ source: String(source || '') });
     if (filter) q.set('filter', filter);
     if (genre) q.set('genre', genre);
     if (page > 1) q.set('page', String(page));
+    if (/^\d{4}$/.test(String(year || ''))) q.set('year', String(year));
+    if (/^(winter|spring|summer|fall)$/.test(String(season || ''))) q.set('season', String(season));
     const keyword = String(query || '').trim().slice(0, 100);
     if (keyword) q.set('q', keyword);
     return call(`/browse?${q.toString()}`, {
@@ -188,9 +194,45 @@ export function getSourceBrowse(source, { filter = '', genre = '', page = 1, q: 
                 hasNext: Boolean(data.hasNext),
                 filters: options(data.filters),
                 genres: options(data.genres),
+                seasons: (Array.isArray(data.seasons) ? data.seasons : [])
+                    .filter((entry) => entry && entry.id)
+                    .map((entry) => ({
+                        id: String(entry.id),
+                        label: String(entry.label || entry.id),
+                        season: String(entry.season || ''),
+                        year: Number(entry.year) || null,
+                    })),
                 filter: String(data.filter || ''),
                 genre: String(data.genre || ''),
                 query: String(data.query || ''),
+            };
+        },
+    });
+}
+
+/**
+ * Genre + musim yang tersedia di tiap situs sumber (permintaan 24 Okt 2026).
+ * AnimeKu: genre dari tautan `/genre/<slug>-<token>/` (musim kosong — situs tidak punya musim).
+ * Oploverz: 80 genre + 24 musim dari form `/series/`.
+ * @returns {Promise<{sources: {id: string, name: string, genres: {id: string, label: string}[], seasons: object[]}[], errors: object[]}>}
+ */
+export function getSourceGenres({ signal } = {}) {
+    return call('/genres', {
+        signal,
+        ttl: CACHE_TTL.browse,
+        transform: (json) => {
+            const list = Array.isArray(json.data?.sources) ? json.data.sources : [];
+            const options = (entries) => (Array.isArray(entries) ? entries : [])
+                .filter((entry) => entry && entry.id)
+                .map((entry) => ({ id: String(entry.id), label: String(entry.label || entry.id) }));
+            return {
+                sources: list.map((source) => ({
+                    id: String(source.id || ''),
+                    name: String(source.name || source.id || ''),
+                    genres: options(source.genres),
+                    seasons: options(source.seasons),
+                })).filter((source) => source.id && source.genres.length),
+                errors: (Array.isArray(json.errors) ? json.errors : []).map((error) => fromBackendError(error)).filter(Boolean),
             };
         },
     });

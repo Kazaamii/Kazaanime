@@ -16,9 +16,11 @@ test('homepage keeps Japanese Sub Indo in a separate per-provider section', () =
     assert.ok(subindoIndex >= 0 && donghuaIndex > subindoIndex, 'Sub Indo gets its own section before the Donghua section');
     assert.equal((homeHtml.match(/id="subindo"/g) || []).length, 1, 'only one verified Sub Indo homepage section is rendered');
     assert.doesNotMatch(homeHtml, /id="subIndoGrid"/, 'the old combined list is not rendered alongside the provider panels');
-    assert.match(homeHtml, /tanpa pemeriksaan episode/);
-    assert.match(homeHtml, /Tampilkan lebih banyak/);
+    assert.match(homeHtml, /tanpa verifikasi episode/);
+    assert.match(homeJs, /Tampilkan lebih banyak/);
     assert.doesNotMatch(homeHtml, /Diverifikasi dari episode terbaru/);
+    // 24 Okt 2026: paragraf pengantar di atas panel Sub Indo dihapus.
+    assert.doesNotMatch(homeHtml, /subindo-intro/);
     assert.match(homeHtml, /id="subindoSources"/);
     assert.match(homeJs, /getSubIndoHomeSources\(\{ refresh \}\)/);
     assert.match(homeJs, /data-subindo-source-grid/);

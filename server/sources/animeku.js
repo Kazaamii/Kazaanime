@@ -19,9 +19,10 @@
  *                   player .aku-layar iframe[src], tautan "Semua episode" a.aku-link.
  *                   Tidak ada daftar unduhan → downloads: [].
  *
- * Genre: halaman arsip genre bertoken ADA (mis. `/genre/aksi-siacdd4/`, 30 kartu/halaman —
- * dicek 24 Okt 2026), tetapi tidak ada halaman indeks genre (`/genre/` 404) dan token di
- * belakang slug acak, jadi genre tidak ditawarkan sebagai filter stabil di Kazanime.
+ * Genre: arsip genre ADA dan bisa dibuka lewat slug saja (`/genre/aksi/` → dialihkan situs
+ * ke `/genre/aksi-<token>/`, 30 kartu + paginasi; dicek 24 Okt 2026 lewat sampler Actions).
+ * Tidak ada halaman indeks genre (`/genre/` 404), jadi dipakai daftar `GENRE_CATALOG` berisi
+ * slug Indonesia yang benar-benar 200 dan berisi kartu. Genre di luar daftar → bad_request.
  *
  * Donghua: situs mengunggah donghua Sub Indo (mis. seri Douluo Dalu), tetapi TIDAK punya
  * kategori donghua. `/negara/china-n5z6n97/` balas 200 dengan 0 kartu, dan halaman seri
@@ -297,6 +298,40 @@ export function parseEpisodePage($, base) {
     };
 }
 
+/**
+ * Genre AnimeKu (24 Okt 2026) — slug arsip yang diverifikasi: `/genre/<slug>/` membalas 200
+ * dan berisi kartu (30/halaman). Slug yang 404 atau arsipnya kosong TIDAK dimasukkan supaya
+ * tombol genre tidak pernah menuntun ke halaman kosong:
+ *   - 404: sci-fi, mahou-shoujo, kehidupan-sehari-hari, sekolah, laga
+ *   - 200 tetapi 0 kartu: josei
+ * Menambah genre baru cukup menambah satu baris di sini (label mengikuti situs).
+ */
+export const GENRE_CATALOG = Object.freeze([
+    { id: 'aksi', label: 'Aksi' },
+    { id: 'animasi', label: 'Animasi' },
+    { id: 'drama', label: 'Drama' },
+    { id: 'ecchi', label: 'Ecchi' },
+    { id: 'fantasi', label: 'Fantasi' },
+    { id: 'horor', label: 'Horor' },
+    { id: 'isekai', label: 'Isekai' },
+    { id: 'komedi', label: 'Komedi' },
+    { id: 'mecha', label: 'Mecha' },
+    { id: 'misteri', label: 'Misteri' },
+    { id: 'musik', label: 'Musik' },
+    { id: 'olahraga', label: 'Olahraga' },
+    { id: 'petualangan', label: 'Petualangan' },
+    { id: 'psikologis', label: 'Psikologis' },
+    { id: 'romantis', label: 'Romantis' },
+    { id: 'seinen', label: 'Seinen' },
+    { id: 'sejarah', label: 'Sejarah' },
+    { id: 'shoujo', label: 'Shoujo' },
+    { id: 'shounen', label: 'Shounen' },
+    { id: 'slice-of-life', label: 'Slice of Life' },
+    { id: 'supernatural', label: 'Supernatural' },
+    { id: 'thriller', label: 'Thriller' },
+    { id: 'vampir', label: 'Vampir' },
+]);
+
 /** Paginasi `nav.aku-hal` → { hasNext, lastPage, nextPath }. */
 export function parsePagination($, base, currentPath) {
     const basePath = String(currentPath || '/').replace(/\/(?:page\/\d+\/)?$/, '/');
@@ -389,6 +424,14 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         return out;
     }
 
+    /**
+     * Daftar genre untuk panel Jelajah (permintaan 24 Okt 2026).
+     * AnimeKu tidak punya musim, jadi `seasons` selalu kosong.
+     */
+    async function genres() {
+        return { genres: GENRE_CATALOG.map(({ id, label }) => ({ id, label })), seasons: [] };
+    }
+
     return {
         id: ID,
         name: NAME,
@@ -408,24 +451,55 @@ export function createAnimeku({ network, createClient, baseUrl }) {
 
         latest,
 
-        /** Urutan + genre yang tersedia (genre memang tidak ada di situs ini). */
+        /**
+         * Urutan + genre yang tersedia. Genre berasal dari cache panen (atau benih sebelum
+         * panen pertama). Panggil `genres()` untuk daftar yang sudah dipanen penuh.
+         */
         browseOptions() {
             return {
                 filters: [
                     ...FILTERS.map(({ id, label }) => ({ id, label })),
                     { id: 'donghua', label: 'Donghua' },
                 ],
-                genres: [],
+                genres: GENRE_CATALOG.map(({ id, label }) => ({ id, label })),
+                seasons: [],
             };
         },
 
+        genres,
+
         /**
          * Halaman daftar: filter = id urutan (baru/ongoing/selesai/favorit/film), halaman 1..N.
+         * `genre` = slug dari `GENRE_CATALOG` (aksi, fantasi, …) → arsip `/genre/<slug>/`.
          * @param {{filter?: string, genre?: string, page?: number}} opts
          */
         async browse({ filter = '', genre = '', page = 1 } = {}, ctx = {}) {
             const options = this.browseOptions();
-            if (genre) throw new SourceError('AnimeKu tidak menyediakan arsip genre.', { kind: 'bad_request', source: ID });
+            if (genre) {
+                const chosenGenre = GENRE_CATALOG.find((item) => item.id === genre);
+                if (!chosenGenre) {
+                    throw new SourceError(`Genre "${genre}" tidak tersedia di AnimeKu.`, { kind: 'bad_request', source: ID });
+                }
+                const path = `genre/${chosenGenre.id}`;
+                const target = `${base}/${path}/${page > 1 ? `page/${page}/` : ''}`;
+                const res = await client.html(target, ctx);
+                const seen = new Set();
+                const items = parseCards(res.$, base).series
+                    .filter((card) => (seen.has(card.slug) ? false : seen.add(card.slug)))
+                    .map((card) => toAnime(card))
+                    .filter((anime) => anime.slug && anime.title);
+                const pagination = parsePagination(res.$, base, path);
+                return {
+                    items,
+                    page,
+                    hasNext: Boolean(pagination.nextPath),
+                    filters: options.filters,
+                    genres: GENRE_CATALOG.map(({ id, label }) => ({ id, label })),
+                    seasons: [],
+                    filter: '',
+                    genre: chosenGenre.id,
+                };
+            }
             const chosen = FILTERS.find((item) => item.id === filter) || FILTERS[0];
             const paths = await navPaths(ctx);
             const path = paths[chosen.base || chosen.id] || chosen.path;
@@ -447,6 +521,7 @@ export function createAnimeku({ network, createClient, baseUrl }) {
                 hasNext: Boolean(pagination.nextPath),
                 filters: options.filters,
                 genres: options.genres,
+                seasons: [],
                 filter: chosen.id,
                 genre: '',
             };

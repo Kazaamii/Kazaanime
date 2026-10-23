@@ -29,11 +29,13 @@ export function bookmarkUrl() {
  * URL halaman Jelajah (katalog situs sumber).
  * @param {{source?: string, filter?: string, genre?: string, page?: number}} [state]
  */
-export function katalogUrl({ source = 'animeku', filter = '', genre = '', q = '', page = 1 } = {}) {
+export function katalogUrl({ source = 'animeku', filter = '', genre = '', q = '', page = 1, year = '', season = '' } = {}) {
     const p = new URLSearchParams();
     p.set('source', source);
     if (filter) p.set('filter', filter);
     if (genre) p.set('genre', genre);
+    if (/^\d{4}$/.test(String(year || ''))) p.set('year', String(year));
+    if (/^(winter|spring|summer|fall)$/.test(String(season || ''))) p.set('season', String(season));
     if (q) p.set('q', String(q).slice(0, 100));
     if (page > 1) p.set('page', String(page));
     return `${PAGES.katalog}?${p.toString()}`;
