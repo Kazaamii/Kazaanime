@@ -8,6 +8,7 @@
  *   (Jikan/MyAnimeList dihapus 22 Okt 2026 atas permintaan pemilik proyek; id MAL dari AniList/Kitsu
  *    tetap disimpan di anime.ids.mal untuk tautan lama.)
  * Section Donghua (Tahap D):  backend scraper (rilis terbaru AnimeXin + Anichin) → AniList CN → Kitsu (judul pinyin) → data statis
+ * Section Anime Sub Indo: backend latest per-situs (Samehadaku/Sakunime/Otakudesu/Kuramanime), dipisah tanpa fallback metadata.
  * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin + Anichin) → AniList → data statis
  *  - Sumber yang baru gagal "diistirahatkan" sementara (circuit breaker di
  *    http.js), jadi kunjungan berikutnya langsung ke sumber yang hidup.
@@ -142,6 +143,11 @@ export async function getHomeSection(kind) {
     out.items = out.items.slice(0, size);
     out.hasNext = false;
     return out;
+}
+
+/** Rilis anime Jepang Sub Indo dari backend, dipisahkan berdasarkan situs sumber. */
+export function getSubIndoHomeSources({ signal } = {}) {
+    return backend.getLatestSubIndoBySource({ signal });
 }
 
 /**

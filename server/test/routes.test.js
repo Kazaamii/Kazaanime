@@ -14,6 +14,21 @@ function fakeRegistry() {
             seen.push('latest');
             return { source: 'animexin', data: [makeAnime({ title: 'Renegade Immortal', slug: 'animexin~renegade-immortal', source: 'animexin', latestEpisode: 163, country: 'CN' })], fallback: false, stale: false, errors: [{ source: 'kuramanime', kind: 'blocked', message: 'diblokir' }] };
         },
+        async latestSubIndo() {
+            seen.push('latest-subindo');
+            const title = 'Judul sama';
+            return {
+                source: 'samehadaku,otakudesu',
+                data: [
+                    { id: 'samehadaku', name: 'Samehadaku', items: [makeAnime({ title, slug: 'samehadaku~judul-sama', source: 'samehadaku', latestEpisode: 5 })], stale: false },
+                    { id: 'otakudesu', name: 'Otakudesu', items: [makeAnime({ title, slug: 'otakudesu~judul-sama', source: 'otakudesu', latestEpisode: 5 })], stale: false },
+                ],
+                fallback: false,
+                stale: false,
+                partial: true,
+                errors: [{ source: 'kuramanime', kind: 'blocked', message: 'diblokir' }],
+            };
+        },
         async search(q) {
             seen.push(`search:${q}`);
             if (q === 'gagal total') throw new AppError('Pencarian gagal: semua sumber sedang bermasalah.', { status: 503, code: 'SOURCES_UNAVAILABLE', retryAfter: 120 });
@@ -74,6 +89,24 @@ test('GET /api/anime/latest: kontrak {ok, source, data} + header cache CDN', asy
         assert.match(res.headers.get('content-type'), /application\/json/);
         assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
         assert.equal(res.headers.get('x-powered-by'), null);
+    });
+});
+
+test('GET /api/anime/latest-subindo: respons dikelompokkan per sumber dan tidak memakai fallback', async () => {
+    await withApp({}, async (base, registry) => {
+        const { res, json } = await get(`${base}/api/anime/latest-subindo`);
+        assert.equal(res.status, 200);
+        assert.equal(json.ok, true);
+        assert.equal(json.fallback, false);
+        assert.equal(json.partial, true);
+        assert.deepEqual(json.data.map((source) => source.id), ['samehadaku', 'otakudesu']);
+        assert.deepEqual(json.data.map((source) => source.items[0].slug), [
+            'samehadaku~judul-sama',
+            'otakudesu~judul-sama',
+        ]);
+        assert.equal(json.errors[0].source, 'kuramanime');
+        assert.match(res.headers.get('cache-control'), /s-maxage=60/);
+        assert.ok(registry.seen.includes('latest-subindo'));
     });
 });
 

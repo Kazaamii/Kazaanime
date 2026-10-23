@@ -6,6 +6,18 @@ import path from 'node:path';
 const root = process.cwd();
 const baseCss = fs.readFileSync(path.join(root, 'css/base.css'), 'utf8');
 const watchCss = fs.readFileSync(path.join(root, 'css/watch.css'), 'utf8');
+const homeHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const homeJs = fs.readFileSync(path.join(root, 'js/home.js'), 'utf8');
+
+test('homepage keeps Japanese Sub Indo in a separate per-provider section', () => {
+    const subindoIndex = homeHtml.indexOf('id="subindo"');
+    const donghuaIndex = homeHtml.indexOf('id="donghua"');
+    assert.ok(subindoIndex >= 0 && donghuaIndex > subindoIndex, 'Sub Indo gets its own section before the Donghua section');
+    assert.match(homeHtml, /id="subindoSources"/);
+    assert.match(homeJs, /getSubIndoHomeSources\(\)/);
+    assert.match(homeJs, /data-subindo-source-grid/);
+    assert.match(homeJs, /variant: 'source'.*episodeOf: latestEpisodeOf/s);
+});
 
 test('ambient background uses CSS gradients only and the player stacks above falling effects', () => {
     const bodyRule = /body\{[^}]*background:([^;]+);/.exec(baseCss)?.[1] || '';

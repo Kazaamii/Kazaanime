@@ -408,6 +408,7 @@ api/index.js → server/app.js (Express 5)
       ▼
 server/sources/index.js  (registry + aggregator)
       │   latest/search: semua scraper paralel → gabung + dedupe  ─┐ semua gagal
+      │   latest-subindo: daftar per sumber (tanpa merge/fallback)   │
       │   detail/episode: dirutekan lewat prefix slug               ├──────────────→ metadata.js
       ▼                                                             │                (Kitsu → AniList)
 animexin · samehadaku · anichin · otakudesu · hianime · kuramanime (opt-in) ── makeAnime()/makeEpisode() → format SERAGAM
@@ -432,6 +433,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Endpoint | Isi `data` |
 |---|---|
 | `GET /api/anime/latest` | daftar anime (rilis terbaru semua sumber; animexin = episode terbaru tiap seri) |
+| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Feed terbaru hanya mencakup sumber Sub Indo yang terverifikasi: Samehadaku, Sakunime, Otakudesu, dan Kuramanime. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
 | `GET /api/anime/search?q=` | daftar anime (2–100 karakter) |
 | `GET /api/anime/downloads/kusonime?title=<romaji>` | paket unduhan Kusonime yang judul detailnya cocok persis setelah normalisasi (dapat mengirim beberapa `title`). Diakses hanya dari bagian unduhan; hasil bisa berupa satu season/seri, bukan episode tunggal. Mirror tidak di-fetch atau di-decode. |
 | `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
@@ -682,7 +684,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - [x] Bookmark: kartu, hero, halaman watch, section "Bookmark Saya", badge jumlah — bookmark lama tetap tampil
 - [x] Bookmark saat belum login → modal login, lalu otomatis tersimpan setelah login
 - [x] Sinkron antar tab (login, logout, bookmark)
-- [x] Homepage data live: hero trending, ongoing, populer, baru rilis (episode yang benar-benar baru tayang), donghua (AniList CN)
+- [x] Homepage data live: hero trending, ongoing, populer, baru rilis (episode yang benar-benar baru tayang), anime Jepang Sub Indo per sumber, dan donghua (backend → AniList CN)
 - [x] Rantai fallback AniList → Jikan → Kitsu → data statis, dengan keterangan jujur + tombol "Coba lagi"
 - [x] Filter genre (bug variabel GraphQL diperbaiki, Isekai sebagai tag) + "Lihat Semua" per genre
 - [x] Dropdown autocomplete 3 sumber (urutan & batas sama: MAL 4, Kitsu 3, AniList 3; tanpa duplikat)

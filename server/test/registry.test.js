@@ -65,6 +65,27 @@ test('latest: semua sumber paralel; satu gagal → hasil sebagian + daftar error
     assert.deepEqual(r.errors.map((e) => [e.source, e.kind]), [['kuramanime', 'blocked']]);
 });
 
+test('latestSubIndo: feed per sumber, judul lintas sumber tidak digabung, sumber lain dilewati', async () => {
+    const samehadaku = stub('samehadaku', { latest: async () => [anime('samehadaku', 'x', 'Anime Sama')] });
+    const otakudesu = stub('otakudesu', { latest: async () => { throw fail('blocked', 'otakudesu'); } });
+    const kuramanime = stub('kuramanime', { latest: async () => [anime('kuramanime', 'x', 'Anime Sama')] });
+    const hianime = stub('hianime', { latest: async () => [anime('hianime', 'x', 'English-only')] });
+    const anoboy = stub('anoboy', { latest: async () => [anime('anoboy', 'x', 'Unverified feed')] });
+    const animeindo = stub('animeindo', { latest: async () => [anime('animeindo', 'x', 'Lookup-only')] });
+    animeindo.supportsLatest = false;
+
+    const result = await reg([samehadaku, otakudesu, kuramanime, hianime, anoboy, animeindo], null, { enrichImages: false }).latestSubIndo();
+    assert.deepEqual(result.data.map((source) => source.id), ['samehadaku', 'otakudesu', 'kuramanime']);
+    assert.deepEqual(result.data[0].items.map((item) => item.title), ['Anime Sama']);
+    assert.deepEqual(result.data[2].items.map((item) => item.title), ['Anime Sama'], 'judul yang sama tetap disajikan oleh sumber kedua');
+    assert.equal(result.data[1].error.kind, 'blocked', 'sumber gagal tetap ditampilkan per panel');
+    assert.deepEqual(result.errors.map((error) => [error.source, error.kind]), [['otakudesu', 'blocked']]);
+    assert.equal(result.partial, true);
+    assert.deepEqual(hianime.calls, []);
+    assert.deepEqual(anoboy.calls, []);
+    assert.deepEqual(animeindo.calls, []);
+});
+
 test('download-only provider tidak ikut latest/search fan-out; Kusonime lookup tetap memakai cache terpisah', async () => {
     const A = stub('animexin', { latest: async () => [anime('animexin', 'x', 'X')], search: async () => [anime('animexin', 'x', 'X')] });
     let calls = 0;

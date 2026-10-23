@@ -8,6 +8,7 @@
  * (+ /api/health untuk indikator status):
  *
  *   GET /api/anime/latest
+ *   GET /api/anime/latest-subindo (homepage, dipisahkan per sumber)
  *   GET /api/anime/search?q=
  *   GET /api/anime/schedule        (jadwal rilis per hari — ditambahkan 22 Okt 2026)
  *   GET /api/anime/:slug
@@ -108,6 +109,41 @@ const toList = (json) => ({
 /** Rilis terbaru dari situs sumber → { items, source, fallback }. */
 export function getLatest({ signal } = {}) {
     return call('/latest', { signal, transform: toList });
+}
+
+function fromBackendError(value, fallbackSource = 'backend') {
+    if (!value || typeof value !== 'object') return null;
+    return new ApiError(String(value.message || 'Sumber tidak dapat diperbarui.'), {
+        kind: String(value.kind || 'network'),
+        status: Number(value.status) || 0,
+        source: String(value.source || fallbackSource),
+    });
+}
+
+/** Rilis Sub Indo homepage, tiap sumber tetap menjadi grup dan kartu terpisah. */
+export function getLatestSubIndoBySource({ signal } = {}) {
+    return call('/latest-subindo', {
+        signal,
+        transform: (json) => ({
+            sections: (Array.isArray(json.data) ? json.data : []).map((entry) => {
+                const id = String(entry?.id || entry?.source || 'source').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'source';
+                return {
+                    id,
+                    name: String(entry?.name || id).slice(0, 60),
+                    items: (Array.isArray(entry?.items) ? entry.items : [])
+                        .map((item) => fromBackend(item, id))
+                        .filter(Boolean),
+                    stale: Boolean(entry?.stale),
+                    error: fromBackendError(entry?.error, id),
+                };
+            }),
+            source: String(json.source || 'backend'),
+            fallback: Boolean(json.fallback),
+            stale: Boolean(json.stale),
+            partial: Boolean(json.partial),
+            errors: (Array.isArray(json.errors) ? json.errors : []).map((error) => fromBackendError(error)).filter(Boolean),
+        }),
+    });
 }
 
 /** Cari judul di situs sumber → { items, source, fallback }. */

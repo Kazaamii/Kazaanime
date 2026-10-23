@@ -6,12 +6,12 @@
  *
  * Alur:
  *  1. initLayout()  → navbar, footer, modal, autocomplete, status API, auth.
- *  2. Hero + 4 section diminta bersamaan. Di AniList semuanya berasal dari
+ *  2. Hero + section metadata diminta bersamaan. Di AniList semuanya berasal dari
  *     SATU query gabungan (request dipakai bersama, di-cache 15 menit).
  *     Jika AniList gagal → Kitsu → data cadangan statis (+ keterangan
  *     & tombol "Coba lagi").
- *     Donghua (Tahap D): rilis terbaru dari backend scraper (animexin) lebih dulu —
- *     kartunya langsung membuka episode terbaru — lalu AniList CN → data cadangan.
+ *     Donghua (Tahap D): rilis terbaru dari backend scraper lebih dulu.
+ *     Anime Jepang Sub Indo memakai feed backend terpisah per situs, tanpa merge.
  *  3. Jadwal dimuat hanya saat section-nya mendekati layar (lazy).
  *  4. Bookmark/login mengubah tombol & section Bookmark tanpa request jaringan.
  */
@@ -25,7 +25,7 @@ import { html, $, delegate } from './ui/dom.js';
 import { GENRES, SCHEDULE } from './config.js';
 import { genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
 import {
-    getHeroSlides, getHomeSection, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
+    getHeroSlides, getHomeSection, getSubIndoHomeSources, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
@@ -55,6 +55,7 @@ const GRIDS = {
     recent: $('#newReleaseGrid'),
     donghua: $('#donghuaGrid'),
 };
+const subIndoRoot = $('#subindoSources');
 
 async function loadSection(kind) {
     const grid = GRIDS[kind];
@@ -75,6 +76,81 @@ async function loadSection(kind) {
         });
     }
 }
+
+const SUB_INDO_HOME_LIMIT = 12;
+
+function renderSubIndoSources(sources) {
+    const list = Array.isArray(sources) ? sources : [];
+    subIndoRoot.setAttribute('aria-busy', 'false');
+    if (!list.length) {
+        gridMessage(subIndoRoot, {
+            icon: 'inbox',
+            title: 'Belum ada sumber Sub Indo aktif',
+            text: 'Aktifkan sumber rilis Sub Indo di konfigurasi backend untuk menampilkan daftar per situs.',
+        });
+        return;
+    }
+
+    subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
+        const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
+        const status = source.error ? 'Perlu diperbarui' : source.stale ? 'Data cache' : items.length ? `${items.length} rilis` : 'Belum ada rilis';
+        return html`
+            <section class="subindo-source" aria-labelledby="subindo-source-title-${index}">
+                <div class="subindo-source-header">
+                    <h3 id="subindo-source-title-${index}">${source.name}</h3>
+                    <span class="subindo-source-count ${source.stale ? 'is-stale' : ''}">${status}</span>
+                </div>
+                ${source.stale ? html`<p class="subindo-source-warning">${source.error ? friendlyError(source.error) : 'Menampilkan cache karena pembaruan sumber belum berhasil.'}</p>` : ''}
+                <div class="anime-grid" data-subindo-source-grid="${source.id}" aria-busy="false"></div>
+            </section>`;
+    })}`);
+
+    list.forEach((source) => {
+        const grid = [...subIndoRoot.querySelectorAll('[data-subindo-source-grid]')]
+            .find((element) => element.dataset.subindoSourceGrid === source.id);
+        if (!grid) return;
+        const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
+        if (items.length) {
+            renderCards(grid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
+        } else if (source.error) {
+            gridMessage(grid, { icon: 'triangle-alert', title: 'Sumber belum dapat dimuat', text: friendlyError(source.error) });
+        } else {
+            gridMessage(grid, { icon: 'inbox', title: 'Belum ada rilis terdeteksi', text: 'Feed terbaru situs ini tidak mengembalikan anime saat ini.' });
+        }
+    });
+}
+
+async function loadSubIndoSection() {
+    showSkeleton(subIndoRoot, 4);
+    setSectionNote(subIndoRoot);
+    try {
+        const result = await getSubIndoHomeSources();
+        renderSubIndoSources(result.sections);
+        const failed = result.sections.filter((source) => source.error).length;
+        if (failed) {
+            setSectionNote(subIndoRoot, {
+                text: `${failed} sumber belum berhasil diperbarui. Setiap sumber tetap ditampilkan pada panelnya sendiri.`,
+                onRetry: () => {
+                    retrySourcesNow();
+                    loadSubIndoSection();
+                },
+            });
+        }
+    } catch (error) {
+        if (error?.kind === 'abort') return;
+        gridMessage(subIndoRoot, {
+            icon: 'triangle-alert',
+            title: 'Daftar Sub Indo belum tersedia',
+            text: friendlyError(error),
+            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
+        });
+    }
+}
+
+delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
+    retrySourcesNow();
+    loadSubIndoSection();
+});
 
 /* ------------------------------------------------------------------ */
 /* Genre — di bagian atas beranda (22 Okt 2026). Hasil tampil LANGSUNG  */
@@ -245,6 +321,7 @@ function whenVisible(el, callback) {
 /* ------------------------------------------------------------------ */
 renderBookmarkSection();
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
+loadSubIndoSection();
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
 
