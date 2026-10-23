@@ -8,6 +8,7 @@
  *   (Jikan/MyAnimeList dihapus 22 Okt 2026 atas permintaan pemilik proyek; id MAL dari AniList/Kitsu
  *    tetap disimpan di anime.ids.mal untuk tautan lama.)
  * Section Donghua (Tahap D):  backend scraper (rilis terbaru AnimeXin + Anichin) → AniList CN → Kitsu (judul pinyin) → data statis
+ * Section Anime Sub Indo: backend latest per-situs (Samehadaku/Sakunime/Otakudesu/Kuramanime), lalu cek episode terbaru untuk metadata subtitle Indonesia; panel dan judul lintas sumber tetap terpisah, tanpa fallback metadata.
  * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin + Anichin) → AniList → data statis
  *  - Sumber yang baru gagal "diistirahatkan" sementara (circuit breaker di
  *    http.js), jadi kunjungan berikutnya langsung ke sumber yang hidup.
@@ -27,7 +28,7 @@ import { createAnime, titleKey, withIds } from './normalize.js';
 import {
     FALLBACK_HERO, FALLBACK_ONGOING, FALLBACK_POPULAR, FALLBACK_NEW, FALLBACK_DONGHUA, FALLBACK_SCHEDULE,
 } from '../data/fallback.js';
-import { getVerifiedSubIndoAnime } from './subindo.js';
+import { getVerifiedSubIndoSources } from './subindo.js';
 
 export { ApiError, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests };
 export { listStreamServers, getEpisodeExtras, withProviderServers } from './streams.js';
@@ -145,17 +146,18 @@ export async function getHomeSection(kind) {
     return out;
 }
 
-/**
- * Katalog section khusus homepage: hanya mengembalikan anime dengan server
- * subtitle Indonesia yang benar-benar ditemukan pada endpoint episode terbaru.
- * Fungsi ini terpisah dari rantai data section homepage yang sudah ada.
- */
-export async function getSubIndoHomeSection({ signal } = {}) {
-    return getVerifiedSubIndoAnime({
-        getLatest: (opts) => backend.getLatest(opts),
+/** Rilis Sub Indo yang diverifikasi per sumber melalui server/track episode terbaru. */
+export function getSubIndoHomeSources({ signal } = {}) {
+    return getVerifiedSubIndoSources({
+        getSources: (opts) => backend.getLatestSubIndoBySource(opts),
         getEpisode: (slug, ep, opts) => backend.getBackendEpisode(slug, ep, opts),
         signal,
     });
+}
+
+/** Alias kompatibilitas; hasil Sub Indo tetap dikelompokkan dan diverifikasi per sumber. */
+export function getSubIndoHomeSection(opts = {}) {
+    return getSubIndoHomeSources(opts);
 }
 
 /**

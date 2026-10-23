@@ -2,6 +2,7 @@
  * Kazanime backend — routes/anime.js
  * Endpoint yang dipanggil frontend (js/api/sources.js):
  *   GET /api/anime/latest
+ *   GET /api/anime/latest-subindo  (rilis anime Jepang Sub Indo, per sumber)
  *   GET /api/anime/search?q=
  *   GET /api/anime/schedule          (jadwal rilis Sub Indo per hari, WIB — ditambahkan 22 Okt 2026)
  *   GET /api/anime/downloads/kusonime?title=<Romaji>
@@ -139,6 +140,7 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
             ...(result.provider ? { provider: result.provider } : {}),
             fallback: Boolean(result.fallback),
             stale: Boolean(result.stale),
+            ...(result.partial ? { partial: true } : {}),
             ...(result.errors?.length ? { errors: result.errors } : {}),
             ...(result.disabled ? { disabled: true } : {}),
             generatedAt: new Date().toISOString(),
@@ -147,6 +149,7 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
     };
 
     router.get('/latest', handle((req, ctx) => registry.latest(ctx)));
+    router.get('/latest-subindo', handle((req, ctx) => registry.latestSubIndo(ctx)));
     router.get('/search', handle((req, ctx) => registry.search(readQuery(req.query.q), ctx)));
     router.get('/downloads/kusonime', handle((req, ctx) => {
         const titles = readRomajiTitles(req.query.title);

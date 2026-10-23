@@ -6,12 +6,12 @@
  *
  * Alur:
  *  1. initLayout()  → navbar, footer, modal, autocomplete, status API, auth.
- *  2. Hero + 4 section diminta bersamaan. Di AniList semuanya berasal dari
+ *  2. Hero + section metadata diminta bersamaan. Di AniList semuanya berasal dari
  *     SATU query gabungan (request dipakai bersama, di-cache 15 menit).
  *     Jika AniList gagal → Kitsu → data cadangan statis (+ keterangan
  *     & tombol "Coba lagi").
- *     Donghua (Tahap D): rilis terbaru dari backend scraper (animexin) lebih dulu —
- *     kartunya langsung membuka episode terbaru — lalu AniList CN → data cadangan.
+ *     Donghua (Tahap D): rilis terbaru dari backend scraper lebih dulu.
+ *     Anime Jepang Sub Indo memakai feed backend terpisah per situs, tanpa merge.
  *  3. Jadwal dimuat hanya saat section-nya mendekati layar (lazy).
  *  4. Bookmark/login mengubah tombol & section Bookmark tanpa request jaringan.
  */
@@ -25,7 +25,7 @@ import { html, $, delegate } from './ui/dom.js';
 import { GENRES, SCHEDULE } from './config.js';
 import { genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
 import {
-    getHeroSlides, getHomeSection, getGenreAnime, getWeeklySchedule, getSubIndoHomeSection, wibWeekday, friendlyError, retrySourcesNow,
+    getHeroSlides, getHomeSection, getSubIndoHomeSources, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
@@ -55,6 +55,8 @@ const GRIDS = {
     recent: $('#newReleaseGrid'),
     donghua: $('#donghuaGrid'),
 };
+const subIndoRoot = $('#subindoSources');
+let subIndoLoadToken = 0;
 
 async function loadSection(kind) {
     const grid = GRIDS[kind];
@@ -76,50 +78,92 @@ async function loadSection(kind) {
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Anime Sub Indo — section mandiri; section homepage lain tidak diubah */
-/* ------------------------------------------------------------------ */
-const subIndoGrid = $('#subIndoGrid');
-const subIndoNote = $('#subIndoNote');
-let subIndoLoadToken = 0;
+const SUB_INDO_HOME_LIMIT = 12;
+
+function renderSubIndoSources(sources) {
+    const list = Array.isArray(sources) ? sources : [];
+    subIndoRoot.setAttribute('aria-busy', 'false');
+    if (!list.length) {
+        gridMessage(subIndoRoot, {
+            icon: 'inbox',
+            title: 'Belum ada sumber Sub Indo aktif',
+            text: 'Aktifkan sumber rilis Sub Indo di konfigurasi backend untuk menampilkan daftar per situs.',
+        });
+        return;
+    }
+
+    subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
+        const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
+        const status = source.error
+            ? 'Sumber bermasalah'
+            : source.stale
+                ? 'Data cache'
+                : source.failedChecks
+                    ? 'Sebagian dicek'
+                    : items.length ? `${items.length} terverifikasi` : 'Belum ada terverifikasi';
+        const warning = source.error
+            ? friendlyError(source.error)
+            : source.failedChecks
+                ? 'Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.'
+                : source.stale ? 'Menampilkan cache karena feed belum berhasil diperbarui.' : '';
+        return html`
+            <section class="subindo-source" aria-labelledby="subindo-source-title-${index}">
+                <div class="subindo-source-header">
+                    <h3 id="subindo-source-title-${index}">${source.name}</h3>
+                    <span class="subindo-source-count ${source.stale || source.error || source.failedChecks ? 'is-stale' : ''}">${status}</span>
+                </div>
+                ${warning ? html`<p class="subindo-source-warning">${warning}</p>` : ''}
+                <div class="anime-grid" data-subindo-source-grid="${source.id}" aria-busy="false"></div>
+            </section>`;
+    })}`);
+
+    list.forEach((source) => {
+        const grid = [...subIndoRoot.querySelectorAll('[data-subindo-source-grid]')]
+            .find((element) => element.dataset.subindoSourceGrid === source.id);
+        if (!grid) return;
+        const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
+        if (items.length) {
+            renderCards(grid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
+        } else if (source.error) {
+            gridMessage(grid, { icon: 'triangle-alert', title: 'Sumber belum dapat dimuat', text: friendlyError(source.error) });
+        } else if (source.failedChecks) {
+            gridMessage(grid, { icon: 'triangle-alert', title: 'Episode belum berhasil diverifikasi', text: 'Pemeriksaan server episode gagal; anime tanpa bukti subtitle Indonesia tidak ditampilkan.' });
+        } else {
+            gridMessage(grid, { icon: 'inbox', title: 'Belum ada Sub Indo terverifikasi', text: 'Tidak ada episode terbaru dari situs ini yang terkonfirmasi memiliki subtitle Indonesia.' });
+        }
+    });
+}
 
 async function loadSubIndoSection() {
     const token = ++subIndoLoadToken;
-    showSkeleton(subIndoGrid);
-    subIndoNote.textContent = 'Memeriksa episode terbaru untuk subtitle Indonesia...';
-
+    showSkeleton(subIndoRoot, 4);
+    setSectionNote(subIndoRoot);
     try {
-        const res = await getSubIndoHomeSection();
+        const result = await getSubIndoHomeSources();
         if (token !== subIndoLoadToken) return;
-
-        if (res.items.length) {
-            renderCards(subIndoGrid, res.items, { isBookmarked, episodeOf: latestEpisodeOf });
-            subIndoNote.textContent = 'Hanya judul dengan server Sub Indo yang terdeteksi pada episode terbaru yang ditampilkan.';
-            return;
+        renderSubIndoSources(result.sections);
+        const failed = result.sections.filter((source) => source.error || source.failedChecks).length;
+        if (failed) {
+            setSectionNote(subIndoRoot, {
+                text: `${failed} sumber belum berhasil diperbarui atau diperiksa. Judul tanpa bukti Sub Indo tidak ditampilkan.`,
+                onRetry: () => {
+                    retrySourcesNow();
+                    loadSubIndoSection();
+                },
+            });
         }
-
-        gridMessage(subIndoGrid, {
-            icon: 'captions',
-            title: res.unavailable ? 'Sumber Sub Indo belum dapat diperiksa' : 'Belum ada anime Sub Indo terverifikasi',
-            text: res.unavailable
-                ? 'Sumber sedang tidak merespons. Daftar lain di homepage tetap bisa digunakan.'
-                : 'Belum ada episode terbaru yang berhasil dikonfirmasi memiliki subtitle Indonesia. Coba lagi nanti.',
+    } catch (error) {
+        if (token !== subIndoLoadToken || error?.kind === 'abort') return;
+        gridMessage(subIndoRoot, {
+            icon: 'triangle-alert',
+            title: 'Daftar Sub Indo belum tersedia',
+            text: friendlyError(error),
             actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
         });
-        subIndoNote.textContent = 'Anime lain tidak disaring atau diubah oleh bagian ini.';
-    } catch (err) {
-        if (token !== subIndoLoadToken) return;
-        gridMessage(subIndoGrid, {
-            icon: 'captions',
-            title: 'Belum bisa memeriksa Sub Indo',
-            text: 'Katalog sumber sedang bermasalah. Bagian anime lainnya tetap berjalan seperti biasa.',
-            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-subindo">${icon('refresh-cw')} Coba Lagi</button>`,
-        });
-        subIndoNote.textContent = '';
     }
 }
 
-delegate(subIndoGrid, 'click', '[data-action="retry-subindo"]', () => {
+delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
     retrySourcesNow();
     loadSubIndoSection();
 });
@@ -292,8 +336,8 @@ function whenVisible(el, callback) {
 /* Mulai                                                               */
 /* ------------------------------------------------------------------ */
 renderBookmarkSection();
-loadSubIndoSection();
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
+loadSubIndoSection();
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
 

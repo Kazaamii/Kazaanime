@@ -22,6 +22,16 @@ const ICON_BOOKMARK = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="
 const SOURCE_BADGES = {
     anilist: { cls: 'src-anilist', label: 'AniList' },
     kitsu: { cls: 'src-kitsu', label: 'Kitsu' },
+    'backend:animexin': { cls: 'src-backend', label: 'AnimeXin' },
+    'backend:animeindo': { cls: 'src-backend', label: 'AnimeIndo' },
+    'backend:samehadaku': { cls: 'src-backend', label: 'Samehadaku' },
+    'backend:animeonsen': { cls: 'src-backend', label: 'AnimeOnsen' },
+    'backend:anoboy': { cls: 'src-backend', label: 'Anoboy' },
+    'backend:sakunime': { cls: 'src-backend', label: 'Sakunime' },
+    'backend:anichin': { cls: 'src-backend', label: 'Anichin' },
+    'backend:otakudesu': { cls: 'src-backend', label: 'Otakudesu' },
+    'backend:hianime': { cls: 'src-backend', label: 'HiAnime' },
+    'backend:kuramanime': { cls: 'src-backend', label: 'Kuramanime' },
 };
 const ratingHtml = (anime) => html`${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}`;
 
@@ -53,10 +63,13 @@ export function cardHTML(anime, { variant = 'default', bookmarked = false, episo
     let metaLeft = episodeText || episodeLabel(anime);
     let metaRight = ratingHtml(anime);
 
-    if (variant === 'search') {
+    if (variant === 'source' || variant === 'search') {
         const src = SOURCE_BADGES[anime.source];
         badge = src ? src.label : statusBadge(anime);
         badgeClass = src ? src.cls : '';
+    }
+    if (variant === 'source') quality = 'Sub Indo';
+    if (variant === 'search') {
         quality = anime.format || 'TV';
         metaLeft = `${anime.year ? `${anime.year} • ` : ''}${episodeLabel(anime)}`;
         metaRight = anime.score != null ? ratingHtml(anime) : 'N/A';

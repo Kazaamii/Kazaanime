@@ -44,8 +44,6 @@
    ========================================================================== */
 .subindo-section-header{flex-wrap:wrap}
 .subindo-label{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid rgba(var(--primary-rgb),.2);border-radius:999px;background:rgba(var(--primary-rgb),.08);color:var(--primary);font-size:11px;font-weight:600}
-.subindo-note{margin-top:12px;color:var(--text-secondary);font-size:12px;line-height:1.6}
-#subIndoGrid .empty-state{grid-column:1/-1}
 
 /* ==========================================================================
    GENRE

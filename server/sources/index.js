@@ -60,6 +60,11 @@ export const FACTORIES = Object.freeze({
 /** Prefix slug untuk anime dari API metadata (kitsu~123, mal~456, anilist~789). */
 const METADATA_KINDS = new Set(['kitsu', 'mal', 'anilist']);
 const NOT_FOUND = Symbol('notFound');
+// Latest feed dari sumber yang secara eksplisit berisi anime Jepang Sub Indo.
+// AnimeIndo masih lookup-only; Anoboy belum punya rute latest yang terverifikasi;
+// Anichin/AnimeXin tampil pada section Donghua yang terpisah.
+const SUB_INDO_LATEST_SOURCE_IDS = new Set(['samehadaku', 'sakunime', 'otakudesu', 'kuramanime']);
+const SUB_INDO_LATEST_LIMIT = 12;
 
 /**
  * Gabungkan beberapa daftar secara selang-seling + buang judul ganda.
@@ -277,6 +282,71 @@ export function createRegistry({
             }
             if (!r.active.length && !metadata) throw new AppError('Tidak ada sumber yang aktif.', { status: 503, code: 'NO_SOURCES' });
             throw combineErrors(r.raw, 'Daftar terbaru tidak tersedia: semua sumber sedang bermasalah.');
+        },
+
+        /**
+         * Feed Sub Indo untuk homepage, dikelompokkan per situs dan tidak digabung lintas sumber.
+         * Tidak memakai fallback metadata: tanpa bukti bahasa dari sumber, judul tidak boleh diklaim Sub Indo.
+         */
+        async latestSubIndo(ctx = {}) {
+            const candidates = usable().filter((a) => SUB_INDO_LATEST_SOURCE_IDS.has(a.id)
+                && a.supportsLatest !== false && typeof a.latest === 'function');
+            if (!candidates.length) {
+                throw new AppError('Tidak ada sumber latest Sub Indo yang aktif.', { status: 503, code: 'NO_SUBINDO_SOURCES' });
+            }
+
+            const settled = await Promise.allSettled(candidates.map((a) => wrap(
+                `latest:${a.id}`,
+                ttl.latestTtlMs,
+                () => a.latest(ctx),
+            )));
+            const sources = [];
+            const errors = [];
+            let stale = false;
+
+            settled.forEach((result, i) => {
+                const adapter = candidates[i];
+                if (result.status === 'rejected') {
+                    if (isAbort(result.reason)) throw result.reason;
+                    const error = describeError(result.reason);
+                    errors.push(error);
+                    sources.push({ id: adapter.id, name: adapter.name, items: [], stale: false, error });
+                    return;
+                }
+
+                const value = result.value.value;
+                const seen = new Set();
+                const items = (Array.isArray(value) ? value : [])
+                    .filter((item) => item && item.title)
+                    .map((item) => ({ ...item, source: adapter.id }))
+                    .filter((item) => {
+                        const key = titleKey(item.title) || item.slug;
+                        if (!key || seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    })
+                    .slice(0, SUB_INDO_LATEST_LIMIT);
+                const isStale = result.value.cache === 'stale';
+                const error = result.value.error ? describeError(result.value.error) : null;
+                if (isStale) stale = true;
+                if (error) errors.push(error);
+                sources.push({ id: adapter.id, name: adapter.name, items, stale: isStale, ...(error ? { error } : {}) });
+            });
+
+            const flat = await withSafeImages(sources.flatMap((source) => source.items));
+            let offset = 0;
+            for (const source of sources) {
+                source.items = flat.slice(offset, offset + source.items.length);
+                offset += source.items.length;
+            }
+            return {
+                source: candidates.map((a) => a.id).join(','),
+                data: sources,
+                fallback: false,
+                stale,
+                partial: stale || errors.length > 0 || Boolean(flat.partial),
+                errors,
+            };
         },
 
         async search(q, ctx = {}) {
