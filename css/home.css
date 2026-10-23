@@ -40,6 +40,12 @@
 .hero-skeleton .skeleton-line:nth-child(4){width:70%}
 
 /* ==========================================================================
+   DAFTAR ANIME SUB INDO (hanya section khusus homepage)
+   ========================================================================== */
+.subindo-section-header{flex-wrap:wrap}
+.subindo-label{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid rgba(var(--primary-rgb),.2);border-radius:999px;background:rgba(var(--primary-rgb),.08);color:var(--primary);font-size:11px;font-weight:600}
+
+/* ==========================================================================
    GENRE
    ========================================================================== */
 .genre-tags{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}

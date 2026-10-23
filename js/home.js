@@ -56,6 +56,7 @@ const GRIDS = {
     donghua: $('#donghuaGrid'),
 };
 const subIndoRoot = $('#subindoSources');
+let subIndoLoadToken = 0;
 
 async function loadSection(kind) {
     const grid = GRIDS[kind];
@@ -93,14 +94,25 @@ function renderSubIndoSources(sources) {
 
     subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
         const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
-        const status = source.error ? 'Perlu diperbarui' : source.stale ? 'Data cache' : items.length ? `${items.length} rilis` : 'Belum ada rilis';
+        const status = source.error
+            ? 'Sumber bermasalah'
+            : source.stale
+                ? 'Data cache'
+                : source.failedChecks
+                    ? 'Sebagian dicek'
+                    : items.length ? `${items.length} terverifikasi` : 'Belum ada terverifikasi';
+        const warning = source.error
+            ? friendlyError(source.error)
+            : source.failedChecks
+                ? 'Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.'
+                : source.stale ? 'Menampilkan cache karena feed belum berhasil diperbarui.' : '';
         return html`
             <section class="subindo-source" aria-labelledby="subindo-source-title-${index}">
                 <div class="subindo-source-header">
                     <h3 id="subindo-source-title-${index}">${source.name}</h3>
-                    <span class="subindo-source-count ${source.stale ? 'is-stale' : ''}">${status}</span>
+                    <span class="subindo-source-count ${source.stale || source.error || source.failedChecks ? 'is-stale' : ''}">${status}</span>
                 </div>
-                ${source.stale ? html`<p class="subindo-source-warning">${source.error ? friendlyError(source.error) : 'Menampilkan cache karena pembaruan sumber belum berhasil.'}</p>` : ''}
+                ${warning ? html`<p class="subindo-source-warning">${warning}</p>` : ''}
                 <div class="anime-grid" data-subindo-source-grid="${source.id}" aria-busy="false"></div>
             </section>`;
     })}`);
@@ -114,22 +126,26 @@ function renderSubIndoSources(sources) {
             renderCards(grid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
         } else if (source.error) {
             gridMessage(grid, { icon: 'triangle-alert', title: 'Sumber belum dapat dimuat', text: friendlyError(source.error) });
+        } else if (source.failedChecks) {
+            gridMessage(grid, { icon: 'triangle-alert', title: 'Episode belum berhasil diverifikasi', text: 'Pemeriksaan server episode gagal; anime tanpa bukti subtitle Indonesia tidak ditampilkan.' });
         } else {
-            gridMessage(grid, { icon: 'inbox', title: 'Belum ada rilis terdeteksi', text: 'Feed terbaru situs ini tidak mengembalikan anime saat ini.' });
+            gridMessage(grid, { icon: 'inbox', title: 'Belum ada Sub Indo terverifikasi', text: 'Tidak ada episode terbaru dari situs ini yang terkonfirmasi memiliki subtitle Indonesia.' });
         }
     });
 }
 
 async function loadSubIndoSection() {
+    const token = ++subIndoLoadToken;
     showSkeleton(subIndoRoot, 4);
     setSectionNote(subIndoRoot);
     try {
         const result = await getSubIndoHomeSources();
+        if (token !== subIndoLoadToken) return;
         renderSubIndoSources(result.sections);
-        const failed = result.sections.filter((source) => source.error).length;
+        const failed = result.sections.filter((source) => source.error || source.failedChecks).length;
         if (failed) {
             setSectionNote(subIndoRoot, {
-                text: `${failed} sumber belum berhasil diperbarui. Setiap sumber tetap ditampilkan pada panelnya sendiri.`,
+                text: `${failed} sumber belum berhasil diperbarui atau diperiksa. Judul tanpa bukti Sub Indo tidak ditampilkan.`,
                 onRetry: () => {
                     retrySourcesNow();
                     loadSubIndoSection();
@@ -137,7 +153,7 @@ async function loadSubIndoSection() {
             });
         }
     } catch (error) {
-        if (error?.kind === 'abort') return;
+        if (token !== subIndoLoadToken || error?.kind === 'abort') return;
         gridMessage(subIndoRoot, {
             icon: 'triangle-alert',
             title: 'Daftar Sub Indo belum tersedia',

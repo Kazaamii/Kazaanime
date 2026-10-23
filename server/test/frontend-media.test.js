@@ -22,6 +22,7 @@ globalThis.CustomEvent = class extends Event {
 };
 
 const { getBackendEpisode, getLatestSubIndoBySource } = await import('../../js/api/sources.js');
+const { getSubIndoHomeSources } = await import('../../js/api/index.js');
 const { getEpisodeExtras } = await import('../../js/api/streams.js');
 const { createAnime } = await import('../../js/api/normalize.js');
 const { cardHTML } = await import('../../js/ui/card.js');
@@ -67,6 +68,46 @@ test('Sub Indo homepage API preserves separate source groups and duplicate title
     assert.deepEqual(result.sections.map((source) => source.items[0].source), ['backend:samehadaku', 'backend:otakudesu']);
     assert.equal(result.sections[1].error.kind, 'blocked');
     assert.equal(result.sections[0].items[0].id, 'samehadaku:samehadaku~judul-sama');
+});
+
+test('homepage facade checks the latest episode and retains identical titles from different sources', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const requested = [];
+    globalThis.fetch = async (input) => {
+        const url = String(input);
+        requested.push(url);
+        if (url === '/api/anime/latest-subindo') {
+            return new Response(JSON.stringify({
+                ok: true,
+                source: 'samehadaku,otakudesu',
+                fallback: false,
+                data: [
+                    { id: 'samehadaku', name: 'Samehadaku', items: [{ title: 'Judul sama', slug: 'samehadaku~judul-sama', source: 'samehadaku', latestEpisode: 7 }] },
+                    { id: 'otakudesu', name: 'Otakudesu', items: [{ title: 'Judul sama', slug: 'otakudesu~judul-sama', source: 'otakudesu', latestEpisode: 8 }] },
+                ],
+            }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        assert.match(url, /^\/api\/anime\/(?:samehadaku|otakudesu)~judul-sama\/episode\/[78]$/i);
+        return new Response(JSON.stringify({
+            ok: true,
+            fallback: false,
+            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleType: 'hard' }], downloads: [] },
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    clearApiCache();
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+        clearApiCache();
+    });
+
+    const result = await getSubIndoHomeSources();
+    assert.deepEqual(result.sections.map((source) => source.id), ['samehadaku', 'otakudesu']);
+    assert.deepEqual(result.sections.map((source) => source.items.map((anime) => anime.title)), [
+        ['Judul sama'],
+        ['Judul sama'],
+    ]);
+    assert.deepEqual(result.sections.map((source) => source.items[0].latestEpisode), [7, 8]);
+    assert.equal(requested.length, 3, 'catalogue plus one latest-episode check per source');
 });
 
 test('frontend accepts only same-origin signed AnimeOnsen media proxy URLs', async (t) => {

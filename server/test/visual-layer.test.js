@@ -13,6 +13,10 @@ test('homepage keeps Japanese Sub Indo in a separate per-provider section', () =
     const subindoIndex = homeHtml.indexOf('id="subindo"');
     const donghuaIndex = homeHtml.indexOf('id="donghua"');
     assert.ok(subindoIndex >= 0 && donghuaIndex > subindoIndex, 'Sub Indo gets its own section before the Donghua section');
+    assert.equal((homeHtml.match(/id="subindo"/g) || []).length, 1, 'only one verified Sub Indo homepage section is rendered');
+    assert.doesNotMatch(homeHtml, /id="subIndoGrid"/, 'the old combined list is not rendered alongside the provider panels');
+    assert.match(homeHtml, /server atau track subtitle Indonesia ditemukan pada episode terbarunya/);
+    assert.match(homeHtml, /judul yang sama dari situs berbeda tetap tampil terpisah/);
     assert.match(homeHtml, /id="subindoSources"/);
     assert.match(homeJs, /getSubIndoHomeSources\(\)/);
     assert.match(homeJs, /data-subindo-source-grid/);

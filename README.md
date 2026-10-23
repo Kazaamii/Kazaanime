@@ -433,7 +433,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Endpoint | Isi `data` |
 |---|---|
 | `GET /api/anime/latest` | daftar anime (rilis terbaru semua sumber; animexin = episode terbaru tiap seri) |
-| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Feed terbaru hanya mencakup sumber Sub Indo yang terverifikasi: Samehadaku, Sakunime, Otakudesu, dan Kuramanime. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
+| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Feed terbaru hanya mencakup Samehadaku, Sakunime, Otakudesu, dan Kuramanime. Homepage memeriksa endpoint episode terbaru dan hanya menampilkan anime dengan metadata server/track subtitle Indonesia yang eksplisit; judul yang sama dari situs berbeda tetap menjadi kartu terpisah. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
 | `GET /api/anime/search?q=` | daftar anime (2–100 karakter) |
 | `GET /api/anime/downloads/kusonime?title=<romaji>` | paket unduhan Kusonime yang judul detailnya cocok persis setelah normalisasi (dapat mengirim beberapa `title`). Diakses hanya dari bagian unduhan; hasil bisa berupa satu season/seri, bukan episode tunggal. Mirror tidak di-fetch atau di-decode. |
 | `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
