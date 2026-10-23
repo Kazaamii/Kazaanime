@@ -13,7 +13,8 @@
     "start": "node server/index.js",
     "test": "node --test server/test/*.test.js",
     "check:sources": "node server/scripts/check-sources.js",
-    "check:reachability": "node server/scripts/check-source-reachability.js"
+    "check:reachability": "node server/scripts/check-source-reachability.js",
+    "inspect:animeindo": "node server/scripts/inspect-animeindo-page.js"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
