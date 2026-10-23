@@ -291,24 +291,54 @@ export function describeServer(label, url) {
 
 function iframeSrc(snippet) {
     const $f = load(snippet);
-    return $f('iframe').first().attr('src') || $f('source').first().attr('src') || '';
+    return $f('iframe[src]').first().attr('src')
+        || $f('source[src]').first().attr('src')
+        || $f('meta[itemprop="embedUrl"][content]').first().attr('content')
+        || '';
 }
 
 /**
- * Halaman episode: server streaming + link download + link ke seri.
+ * Nilai mirror bisa berupa HTML Base64 (iframe/source/meta) atau URL HTTP(S) langsung.
+ * URL eksternal tidak di-fetch atau di-resolve di sini; pemutar menerima link yang
+ * memang tercantum di markup AnimeXin dan tidak membuka request tambahan ke hoster.
+ */
+function mirrorUrl(value, base) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const decoded = decodeBase64(raw);
+    const payload = decoded || raw;
+    const direct = /^(?:https?:)?\/\//i.test(payload) ? absoluteUrl(payload, base) : '';
+    if (direct && !/[<>]/.test(payload)) return direct;
+    if (!/<(?:iframe|source|meta)\b/i.test(payload)) return '';
+    return absoluteUrl(iframeSrc(payload), base);
+}
+
+/**
+ * Halaman episode: mirror dari select.mirror / ul.mirror + server default,
+ * link download, dan tautan ke seri.
  */
 export function parseEpisodePage($, base) {
     const servers = [];
-    $('select.mirror option').each((_, el) => {
+    const seen = new Set();
+    const addServer = (label, value) => {
+        const url = mirrorUrl(value, base);
+        if (!url || seen.has(url)) return;
+        seen.add(url);
+        servers.push({ ...describeServer(cleanText(label), url), url });
+    };
+    $('select.mirror > option[data-index], select.mirror > option[value]').each((_, el) => {
         const o = $(el);
-        const decoded = decodeBase64(o.attr('value'));
-        if (!decoded || !/<(iframe|source)/i.test(decoded)) return;
-        const url = absoluteUrl(iframeSrc(decoded), base);
-        if (!url) return;
-        servers.push({ ...describeServer(cleanText(o.text()), url), url });
+        addServer(o.text(), o.attr('value'));
+    });
+    $('ul.mirror a[data-em]').each((_, el) => {
+        const a = $(el);
+        addServer(a.text(), a.attr('data-em'));
     });
     const def = absoluteUrl($('#pembed iframe, .player-embed iframe').first().attr('src'), base);
-    if (def && !servers.some((s) => s.url === def)) servers.unshift({ ...describeServer('', def), url: def });
+    if (def && !seen.has(def)) {
+        seen.add(def);
+        servers.unshift({ ...describeServer('', def), url: def });
+    }
 
     const downloads = [];
     $('.soraddlx').each((_, g) => {

@@ -1,0 +1,20 @@
+{
+  "hits": [
+    {
+      "content_id": "fixture-anime-01",
+      "content_title": "Kumo no Monogatari",
+      "content_title_en": "Cloud Story",
+      "content_title_jp": "雲の物語",
+      "content_image": "https://api.animeonsen.xyz/v4/image/210x300/fixture-anime-01"
+    },
+    {
+      "content_id": "fixture-anime-02",
+      "content_title_en": "The Forest Train",
+      "thumbnail": "https://api.animeonsen.xyz/v4/image/210x300/fixture-anime-02"
+    },
+    {
+      "content_id": "../not-a-safe-id",
+      "content_title": "Invalid route value"
+    }
+  ]
+}

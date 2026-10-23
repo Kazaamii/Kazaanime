@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SourceError } from '../lib/errors.js';
 import { isAllowed, parseRobots, rulesFor } from '../lib/robots.js';
 import {
-    animeSlugFromUrl, createSamehadaku, episodeFromUrl, parseAnimePage, parseEpisodePage, parseLatestList,
-    parseSchedulePage, parseSearchCards, POLICY,
+    animeSlugFromUrl, createSamehadaku, episodeFromUrl, parseAjaxEmbedResponse, parseAjaxServerOptions,
+    parseAnimePage, parseEpisodePage, parseLatestList, parseSchedulePage, parseSearchCards, POLICY,
 } from '../sources/samehadaku.js';
 import { fakeClientFactory, fixture, fixture$ } from './helpers.js';
 
@@ -16,6 +17,7 @@ test('samehadaku: robots.txt asli mengizinkan semua halaman yang dipakai (hanya 
         assert.equal(isAllowed(rules, path), true, path);
     }
     assert.equal(isAllowed(rules, '/wp-admin/options.php'), false);
+    assert.equal(isAllowed(rules, '/wp-admin/admin-ajax.php'), true, 'endpoint AJAX upstream harus eksplisit diizinkan');
     assert.equal(POLICY.tos.verdict, 'unknown', 'tanpa halaman ToS → robots.txt wajib terbaca & mengizinkan');
 });
 
@@ -111,6 +113,70 @@ test('samehadaku: halaman FX Senshi snapshot → server publik eksplisit; token/
         'www.blogger.com', 'mega.nz', 'mega.nz', 'mega.nz',
     ]);
     assert.equal(ep.downloads.length, 0, 'bagian download tidak disalin ke fixture minimal');
+});
+
+test('samehadaku: parser AJAX membaca hanya atribut lengkap dari markup dan URL src dari respons', () => {
+    const options = parseAjaxServerOptions(fixture$('samehadaku-ajax-episode.html'));
+    assert.deepEqual(options, [
+        { post: 'test-post-01', nume: '1', type: 'movie', label: 'Server A' },
+        { post: 'test-post-02', nume: '1', type: 'movie', label: 'Server B' },
+    ]);
+    assert.equal(parseAjaxEmbedResponse('<div><iframe src="https://player.example.test/embed/explicit"></iframe></div>', BASE), 'https://player.example.test/embed/explicit');
+    assert.equal(parseAjaxEmbedResponse('&lt;iframe src="https://player.example.test/embed/escaped"&gt;&lt;/iframe&gt;', BASE), 'https://player.example.test/embed/escaped');
+    assert.equal(parseAjaxEmbedResponse('<iframe src="javascript:alert(1)"></iframe>', BASE), '');
+});
+
+test('samehadaku adapter: player_ajax fallback sends only explicit data and never fetches hoster pages', async () => {
+    const pageUrl = `${BASE}/contoh-episode-1/`;
+    const ajaxUrl = `${BASE}/wp-admin/admin-ajax.php`;
+    const { createClient, calls, requests } = fakeClientFactory({
+        [pageUrl]: fixture('samehadaku-ajax-episode.html'),
+        [ajaxUrl]: (_url, options) => {
+            const values = new URLSearchParams(options.body);
+            return values.get('post') === 'test-post-01'
+                ? '<div><iframe src="https://player.example.test/embed/explicit-a"></iframe></div>'
+                : '<div><iframe src="https://player.example.test/embed/explicit-b"></iframe></div>';
+        },
+    });
+    const a = createSamehadaku({ network: {}, createClient, baseUrl: BASE });
+    const anime = { episodeList: [{ number: 1, title: 'Contoh Episode 1', released: '', url: pageUrl }] };
+    const episode = await a.getEpisode({ slug: 'contoh' }, 1, { anime });
+
+    assert.deepEqual(episode.servers.map((server) => [server.name, server.lang, server.subtitleType, server.url]), [
+        ['Server A', 'id', 'hard', 'https://player.example.test/embed/explicit-a'],
+        ['Server B', 'id', 'hard', 'https://player.example.test/embed/explicit-b'],
+    ]);
+    const posts = requests.filter((request) => request.method === 'POST');
+    assert.equal(posts.length, 2);
+    assert.ok(posts.every((request) => request.url === ajaxUrl));
+    assert.deepEqual(posts.map((request) => Object.fromEntries(new URLSearchParams(request.body))), [
+        { action: 'player_ajax', post: 'test-post-01', nume: '1', type: 'movie' },
+        { action: 'player_ajax', post: 'test-post-02', nume: '1', type: 'movie' },
+    ]);
+    assert.equal(calls.length, 3, 'satu halaman episode + hanya dua POST pada host sumber');
+    assert.ok(!calls.some((url) => url.includes('player.example.test')), 'embed hoster tidak di-fetch di backend');
+    assert.equal(a.policy.tos.verdict, 'unknown');
+});
+
+test('samehadaku adapter: embed publik tetap diprioritaskan dan challenge AJAX tidak diulang', async () => {
+    const pageUrl = `${BASE}/fx-senshi-kurumi-chan-episode-4/`;
+    const ajaxUrl = `${BASE}/wp-admin/admin-ajax.php`;
+    const direct = fakeClientFactory({ [pageUrl]: fixture('samehadaku-fx-senshi-episode.html') });
+    const adapterDirect = createSamehadaku({ network: {}, createClient: direct.createClient, baseUrl: BASE });
+    const anime = { episodeList: [{ number: 4, title: 'Episode 4', released: '', url: pageUrl }] };
+    const publicEpisode = await adapterDirect.getEpisode({ slug: 'fx-senshi-kurumi-chan' }, 4, { anime });
+    assert.equal(publicEpisode.servers.length, 4);
+    assert.deepEqual(direct.calls, [pageUrl], 'tidak POST bila HTML publik sudah berisi embed');
+
+    const ajaxPageUrl = `${BASE}/contoh-episode-1/`;
+    const blocked = fakeClientFactory({
+        [ajaxPageUrl]: fixture('samehadaku-ajax-episode.html'),
+        [ajaxUrl]: new SourceError('Samehadaku challenged', { kind: 'blocked', source: 'samehadaku' }),
+    });
+    const adapterBlocked = createSamehadaku({ network: {}, createClient: blocked.createClient, baseUrl: BASE });
+    const ajaxAnime = { episodeList: [{ number: 1, title: 'Contoh Episode 1', released: '', url: ajaxPageUrl }] };
+    await assert.rejects(adapterBlocked.getEpisode({ slug: 'contoh' }, 1, { anime: ajaxAnime }), (error) => error.kind === 'blocked');
+    assert.deepEqual(blocked.calls, [ajaxPageUrl, ajaxUrl], 'blocked request is not retried or followed by hoster requests');
 });
 
 test('samehadaku: jadwal rilis per hari (0 = Minggu) + jam WIB', () => {

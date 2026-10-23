@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createApp } from '../app.js';
 import { makeAnime, makeEpisode } from '../lib/anime.js';
 import { AppError, SourceError, badRequest, notFound } from '../lib/errors.js';
+import { createSigner, decodeTarget } from '../lib/stream-proxy.js';
 
 /** Registry tiruan: perilaku per slug/kueri. */
 function fakeRegistry() {
@@ -139,6 +140,29 @@ test('GET /api/anime/:slug & /episode/:ep: sukses, 400, 404, 500 (pesan aman), 5
     });
 });
 
+test('GET /api/anime/downloads/kusonime: hanya kandidat Romaji diproses dan payload paket dipertahankan', async () => {
+    const registry = fakeRegistry();
+    let receivedTitles = null;
+    registry.kusonimeDownloads = async (titles) => {
+        receivedTitles = titles;
+        return {
+            source: 'kusonime', fallback: false, stale: false, errors: [],
+            data: { query: titles[0], matchedTitle: 'Sousou no Frieren', downloads: [{ quality: '720p', links: [{ provider: 'Drive', url: 'https://drive.example.test/file' }] }] },
+        };
+    };
+    await withApp({ registry }, async (base) => {
+        const r = await get(`${base}/api/anime/downloads/kusonime?title=${encodeURIComponent('Sousou no Frieren')}&title=${encodeURIComponent('フリーレン')}`);
+        assert.equal(r.res.status, 200);
+        assert.match(r.res.headers.get('cache-control'), /private, no-store/);
+        assert.deepEqual(receivedTitles, ['Sousou no Frieren']);
+        assert.equal(r.json.source, 'kusonime');
+        assert.equal(r.json.data.matchedTitle, 'Sousou no Frieren');
+        assert.equal(r.json.data.downloads[0].links[0].url, 'https://drive.example.test/file');
+        const invalid = await get(`${base}/api/anime/downloads/kusonime?title=${encodeURIComponent('葬送のフリーレン')}`);
+        assert.equal(invalid.res.status, 400);
+    });
+});
+
 test('/api/health, /api/bot, /api/<tidak-ada>', async () => {
     await withApp({}, async (base) => {
         const h = await get(`${base}/api/health`);
@@ -153,6 +177,94 @@ test('/api/health, /api/bot, /api/<tidak-ada>', async () => {
         const none = await get(`${base}/api/tidak-ada`);
         assert.equal(none.res.status, 404);
         assert.equal(none.json.code, 'NOT_FOUND');
+    });
+});
+
+test('AnimeOnsen episode: media/subtitle memakai proxy bertanda tangan, header resmi, dan cache no-store', async () => {
+    const streamUrl = 'https://media.example.test/episode/master.m3u8';
+    const subtitleUrl = 'https://media.example.test/subtitles/id-ID.srt';
+    const signer = createSigner('route-test-secret-long-enough-123');
+    const registry = fakeRegistry();
+    registry.episode = async (_slug, ep) => ({
+        source: 'animeonsen',
+        data: makeEpisode({
+            episode: ep,
+            servers: [{
+                name: 'AnimeOnsen', url: streamUrl, kind: 'hls', lang: 'multi', subtitleType: 'soft',
+                subtitles: [{ label: 'Indonesia', lang: 'id-id', format: 'srt', url: subtitleUrl, default: true }],
+            }],
+        }),
+        fallback: false, stale: false, errors: [],
+    });
+    const mediaCalls = [];
+    const mediaClient = {
+        async stream(url, options = {}) {
+            mediaCalls.push({ url, headers: options.headers || {} });
+            if (url === streamUrl) {
+                return {
+                    status: 200,
+                    headers: new Headers({ 'content-type': 'application/vnd.apple.mpegurl' }),
+                    body: new Response('#EXTM3U\n#EXTINF:4,\nsegment.ts\n#EXT-X-ENDLIST\n').body,
+                    url,
+                };
+            }
+            if (url === subtitleUrl) {
+                return {
+                    status: 200,
+                    headers: new Headers({ 'content-type': 'text/plain' }),
+                    body: new Response('1\n00:00:01,000 --> 00:00:02,000\nHalo').body,
+                    url,
+                };
+            }
+            return { status: 404, headers: new Headers(), body: new Response('missing').body, url };
+        },
+    };
+    await withApp({ registry, signer, animeOnsenMediaClient: mediaClient, animeOnsenMediaHosts: ['media.example.test'] }, async (base) => {
+        const response = await get(`${base}/api/anime/animeonsen~fixture-anime-01/episode/2`);
+        assert.equal(response.res.status, 200);
+        assert.equal(response.res.headers.get('cache-control'), 'private, no-store');
+        const server = response.json.data.servers[0];
+        assert.equal(server.kind, 'hls');
+        assert.equal(server.direct, undefined, 'raw media URL tidak dikirim sebagai URL direct');
+        const hls = new URL(server.url, base);
+        const hlsTarget = decodeTarget(hls.searchParams.get('u'));
+        assert.equal(hls.pathname, '/api/stream/hls');
+        assert.equal(hls.searchParams.get('p'), 'animeonsen');
+        assert.equal(hlsTarget, streamUrl);
+        assert.ok(signer.verify(`${hlsTarget}|animeonsen`, hls.searchParams.get('s')));
+        assert.ok(!response.text.includes(streamUrl));
+        assert.ok(!response.text.includes(subtitleUrl));
+
+        const playlistResponse = await fetch(`${base}${server.url}`);
+        assert.equal(playlistResponse.status, 200);
+        assert.equal(playlistResponse.headers.get('cache-control'), 'private, no-store');
+        const playlist = await playlistResponse.text();
+        assert.match(playlist, /\/api\/stream\/hls\?u=/);
+        assert.match(playlist, /&p=animeonsen&s=/);
+        assert.equal(mediaCalls[0].headers.Origin, 'https://www.animeonsen.xyz');
+        assert.equal(mediaCalls[0].headers.Referer, 'https://www.animeonsen.xyz/');
+
+        const subtitleProxy = new URL(server.subtitles[0].url, base);
+        const subtitleTarget = decodeTarget(subtitleProxy.searchParams.get('u'));
+        assert.equal(subtitleProxy.pathname, '/api/stream/sub');
+        assert.equal(subtitleProxy.searchParams.get('f'), 'srt');
+        assert.equal(subtitleProxy.searchParams.get('p'), 'animeonsen');
+        assert.ok(signer.verify(`${subtitleTarget}|srt|animeonsen`, subtitleProxy.searchParams.get('s')));
+        const subtitleResponse = await fetch(`${base}${server.subtitles[0].url}`);
+        assert.equal(subtitleResponse.status, 200);
+        assert.equal(subtitleResponse.headers.get('cache-control'), 'private, no-store');
+        assert.match(await subtitleResponse.text(), /^WEBVTT\n/);
+        assert.deepEqual(mediaCalls.map((call) => call.url), [streamUrl, subtitleUrl]);
+
+        const unlistedTarget = 'https://sub.media.example.test/episode/other.m3u8';
+        const params = new URLSearchParams({
+            u: Buffer.from(unlistedTarget).toString('base64url'),
+            p: 'animeonsen',
+            s: signer.sign(`${unlistedTarget}|animeonsen`),
+        });
+        const denied = await get(`${base}/api/stream/hls?${params}`);
+        assert.equal(denied.res.status, 403, 'proxy scope mengizinkan exact CDN host, bukan subdomain turunan');
+        assert.equal(mediaCalls.length, 2, 'target di luar allowlist tidak pernah dikirim');
     });
 });
 

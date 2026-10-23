@@ -142,10 +142,17 @@ export const CACHE = Object.freeze({
     cdnStale: int('CDN_STALE_WHILE_REVALIDATE', 1800, { min: 0, max: 86400 }),
 });
 
+const animeOnsenClientId = String(env.ANIMEONSEN_CLIENT_ID || '').trim();
+const animeOnsenClientSecret = String(env.ANIMEONSEN_CLIENT_SECRET || '').trim();
+const animeOnsenMediaHosts = list('ANIMEONSEN_MEDIA_HOSTS', []).map((s) => s.toLowerCase().replace(/^\.+/, ''));
+const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime'];
+// AnimeOnsen is opt-in: authorized runtime credentials + an operator-confirmed media allowlist.
+if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length) defaultSources.push('animeonsen');
+
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // Anoboy/Sakunime aktif untuk menambah Sub Indo, tetapi ToS unknown dan fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime tetap opt-in (akses diblokir, tidak di-bypass).
-    enabled: list('SCRAPER_SOURCES', ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime']).map((s) => s.toLowerCase()),
+    // Anoboy/Sakunime aktif untuk menambah Sub Indo, tetapi ToS unknown dan fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime opt-in; base yang dipilih dibatasi ke satu host dan tidak ada failover.
+    enabled: list('SCRAPER_SOURCES', defaultSources).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
     samehadaku: Object.freeze({
         baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, ''),
@@ -166,6 +173,19 @@ export const SOURCES = Object.freeze({
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('KURAMANIME_COOKIES', true),
     }),
     hianime: Object.freeze({ baseUrl: (env.HIANIME_BASE_URL || 'https://hianime.ro').replace(/\/+$/, '') }),
+    animeonsen: Object.freeze({
+        baseUrl: 'https://www.animeonsen.xyz',
+        // Secrets are server-only; health output and request logs never serialize this object.
+        clientId: animeOnsenClientId,
+        clientSecret: animeOnsenClientSecret,
+        // Exact media CDN hostnames are not hard-coded; the operator must confirm and allowlist them.
+        mediaHosts: Object.freeze(animeOnsenMediaHosts),
+    }),
+    // Kusonime hanya dipanggil dari panel download; setiap halaman wajib lolos robots gate.
+    kusonimeDownloads: Object.freeze({
+        enabled: bool('KUSONIME_DOWNLOADS_ENABLED', true),
+        baseUrl: (env.KUSONIME_BASE_URL || 'https://kusonime.com').replace(/\/+$/, ''),
+    }),
 });
 
 /**

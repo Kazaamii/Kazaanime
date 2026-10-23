@@ -65,7 +65,8 @@ function requestLogger(req, res, next) {
 }
 
 function botInfo(req, res) {
-    const hosts = SOURCES.enabled.map((id) => {
+    const configuredSources = [...SOURCES.enabled, ...(SOURCES.kusonimeDownloads.enabled ? ['kusonimeDownloads'] : [])];
+    const hosts = configuredSources.map((id) => {
         try { return new URL(SOURCES[id]?.baseUrl).origin; } catch { return null; }
     }).filter(Boolean);
     res.set('Cache-Control', 'public, max-age=3600');
@@ -148,6 +149,8 @@ function errorHandler(err, req, res, next) {
  *   registry?: ReturnType<typeof createDefaultRegistry>,
  *   streams?: ReturnType<typeof createDefaultStreamProviders>,
  *   mediaClient?: {stream: Function},
+ *   animeOnsenMediaClient?: {stream: Function},
+ *   animeOnsenMediaHosts?: string[],
  *   signer?: ReturnType<typeof createSigner>,
  *   gemini?: ReturnType<typeof createGemini>|null,   undefined = dibuat dari AI_SUBS (bila GEMINI_API_KEY ada); null = AI mati
  *   aiConfig?: typeof AI_SUBS,
@@ -163,9 +166,11 @@ export function createApp({
     registry = createDefaultRegistry(),
     streams,
     mediaClient,
+    animeOnsenMediaClient,
     signer = createSigner(STREAMS.secret),
     gemini,
     aiConfig = AI_SUBS,
+    animeOnsenMediaHosts = SOURCES.animeonsen.mediaHosts,
     serveStatic = false,
     rateLimitPerMinute = SERVER.rateLimitPerMinute,
     proxyRateLimitPerMinute = STREAMS.proxyRateLimitPerMinute,
@@ -186,6 +191,17 @@ export function createApp({
         // CDN media tertentu memerlukan Origin/Referer AniZone sebagaimana pemutar sumbernya; ini kebutuhan
         // protokol media, bukan penyamaran browser atau cara melewati challenge pada halaman situs.
         headers: { Referer: `${STREAMS.anizone.baseUrl}/`, Origin: STREAMS.anizone.baseUrl },
+    });
+    const animeOnsenMedia = animeOnsenMediaClient || createClient(network, {
+        source: 'animeonsen-media',
+        allowedHosts: animeOnsenMediaHosts,
+        requireExplicitRobots: true,
+        blockedMs: 30 * 60 * 1000,
+        robots: true,
+        intervalMs: 0,
+        retries: 0,
+        timeoutMs: STREAMS.proxyTimeoutMs,
+        headers: { Origin: SOURCES.animeonsen.baseUrl, Referer: `${SOURCES.animeonsen.baseUrl}/` },
     });
     // Subtitle Indonesia (AI): klien Gemini hanya dibuat bila GEMINI_API_KEY ada (key tidak pernah keluar dari server).
     let geminiHost = '';
@@ -212,7 +228,15 @@ export function createApp({
             })
             : null)
         : gemini;
-    const streamApi = streamRouter({ providers, mediaClient: media, signer, budgetMs, ai: ai ? { gemini: ai, config: aiConfig } : null });
+    const streamApi = streamRouter({
+        providers,
+        mediaClient: media,
+        animeOnsenMediaClient: animeOnsenMedia,
+        animeOnsenMediaHosts,
+        signer,
+        budgetMs,
+        ai: ai ? { gemini: ai, config: aiConfig } : null,
+    });
     if (SERVER.isVercel && !STREAMS.secretFromEnv) {
         console.warn('[streams] STREAM_SECRET belum diatur — secret proxy diturunkan dari ID deployment (lihat README).');
     }
@@ -244,7 +268,7 @@ export function createApp({
         });
     });
     app.get('/api/bot', botInfo);
-    app.use('/api/anime', ipRateLimit({ limit: rateLimitPerMinute }), animeRouter(registry, { budgetMs }));
+    app.use('/api/anime', ipRateLimit({ limit: rateLimitPerMinute }), animeRouter(registry, { budgetMs, signer, animeOnsenMediaHosts }));
     const serversLimit = ipRateLimit({ limit: rateLimitPerMinute });
     const proxyLimit = ipRateLimit({ limit: proxyRateLimitPerMinute });
     // /subai yang lolos dari cache CDN memakai kuota Gemini pemilik situs → batas per IP jauh lebih ketat.

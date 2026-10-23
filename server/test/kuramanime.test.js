@@ -73,6 +73,24 @@ test('kuramanime: animeRefFromUrl', () => {
     assert.equal(animeRefFromUrl('/properties/genre/action', BASE), null);
 });
 
+test('Kuramanime v9 domains are manually selectable one at a time, with no fallback host', async () => {
+    for (const base of ['https://v9.kuramanime.blog', 'https://v9.kuramanime.work']) {
+        const listUrl = `${base}/anime?order_by=updated&page=1`;
+        const { createClient, calls } = fakeClientFactory({ [listUrl]: '<div id="animeList"></div>' });
+        let options;
+        const source = createKuramanime({
+            network: {},
+            baseUrl: base,
+            createClient: (network, opts) => { options = opts; return createClient(network, opts); },
+        });
+        assert.equal(source.baseUrl, base);
+        assert.deepEqual(options.allowedHosts, [new URL(base).hostname]);
+        assert.equal(options.requireExplicitRobots, true);
+        await source.latest();
+        assert.deepEqual(calls, [listUrl], 'only the configured domain is contacted; there is no automatic failover');
+    }
+});
+
 test('kuramanime adapter: rute URL, slug 2 bagian, notice player terlindungi, kebijakan robots ketat', async () => {
     const { createClient, calls } = fakeClientFactory({
         [`${BASE}/anime?order_by=updated&page=1`]: fixture('kuramanime-list.html'),

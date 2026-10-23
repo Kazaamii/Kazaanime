@@ -41,26 +41,39 @@ export async function startServer(handler) {
  */
 export function fakeClientFactory(routes) {
     const calls = [];
+    const requests = [];
+    const resolve = async (url, options, source) => {
+        calls.push(url);
+        requests.push({ url, method: String(options?.method || 'GET').toUpperCase(), ...options });
+        let value = routes[url];
+        if (typeof value === 'function') value = await value(url, options);
+        if (value instanceof Error) throw value;
+        if (value === undefined) throw new SourceError(`404 palsu untuk ${url}`, { kind: 'not_found', source });
+        return value;
+    };
+    const toText = (value) => (typeof value === 'string' ? value : JSON.stringify(value));
     const createClient = (_net, opts) => ({
         source: opts.source,
         opts,
-        async html(url) {
-            calls.push(url);
-            let v = routes[url];
-            if (typeof v === 'function') v = v(url);
-            if (v instanceof Error) throw v;
-            if (v === undefined) throw new SourceError(`404 palsu untuk ${url}`, { kind: 'not_found', source: opts.source });
-            return { $: load(v), url, status: 200 };
+        async html(url, options = {}) {
+            const value = await resolve(url, options, opts.source);
+            return { $: load(toText(value)), url, status: 200 };
         },
-        async json(url) {
-            calls.push(url);
-            const v = routes[url];
-            if (v instanceof Error) throw v;
-            if (v === undefined) throw new SourceError(`404 palsu untuk ${url}`, { kind: 'not_found', source: opts.source });
-            return typeof v === 'string' ? JSON.parse(v) : v;
+        async request(url, options = {}) {
+            const value = await resolve(url, options, opts.source);
+            return { status: 200, url, text: toText(value), headers: new Headers() };
+        },
+        async json(url, options = {}) {
+            const value = await resolve(url, options, opts.source);
+            if (typeof value !== 'string') return value;
+            try {
+                return JSON.parse(value);
+            } catch {
+                throw new SourceError(`${opts.source} menerima JSON palsu yang tidak valid.`, { kind: 'parse', source: opts.source });
+            }
         },
     });
-    return { createClient, calls };
+    return { createClient, calls, requests };
 }
 
 /** Promise yang selesai setelah ms. */

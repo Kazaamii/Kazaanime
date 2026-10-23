@@ -11,8 +11,9 @@
  *   3. Tambahkan nama ke SCRAPER_SOURCES (env) bila ingin diaktifkan.
  *
  * Alur & fallback:
- *   latest / search : semua scraper paralel → digabung (selang-seling) & dedupe judul.
- *                     latest: dedupe lintas sumber (kartu donghua AnimeXin & Anichin tidak dobel);
+ *   latest / search : scraper yang mendukung method dipanggil paralel → digabung (selang-seling) & dedupe judul.
+ *                     latest: adapter `supportsLatest: false` (mis. AnimeOnsen: popular, bukan latest) dilewati;
+ *                     dedupe lintas sumber (kartu donghua AnimeXin & Anichin tidak dobel);
  *                     search: dedupe PER SUMBER (22 Okt 2026) — judul yang sama dari Samehadaku &
  *                     Otakudesu tetap dikirim agar halaman nonton bisa menggabungkan server keduanya.
  *                     Semua gagal → API metadata publik (fallback: true).
@@ -31,9 +32,11 @@ import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
 import { createAnoboy } from './anoboy.js';
+import { createAnimeOnsen } from './animeonsen.js';
 import { createAnimexin } from './animexin.js';
 import { createHianime } from './hianime.js';
 import { createKuramanime } from './kuramanime.js';
+import { createKusonimeDownloader } from './kusonime.js';
 import { createMetadata, hasCjk } from './metadata.js';
 import { createOtakudesu } from './otakudesu.js';
 import { createSamehadaku } from './samehadaku.js';
@@ -43,6 +46,7 @@ import { createSakunime } from './sakunime.js';
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
     samehadaku: createSamehadaku,
+    animeonsen: createAnimeOnsen,
     anoboy: createAnoboy,
     sakunime: createSakunime,
     anichin: createAnichin,
@@ -82,6 +86,7 @@ export function mergeLists(groups, limit = 60, { perSource = false } = {}) {
 /**
  * @param {{
  *   adapters: any[],
+ *   downloaders?: any[],
  *   metadata?: ReturnType<typeof createMetadata>|null,
  *   cache?: TtlCache,
  *   network?: ReturnType<typeof createNetwork>|null,
@@ -93,6 +98,7 @@ export function mergeLists(groups, limit = 60, { perSource = false } = {}) {
  */
 export function createRegistry({
     adapters,
+    downloaders = [],
     metadata = null,
     cache = new TtlCache({ max: CACHE.maxEntries }),
     network = null,
@@ -102,7 +108,9 @@ export function createRegistry({
     enrichConcurrency = METADATA.enrichConcurrency,
 } = {}) {
     const list = (adapters || []).filter(Boolean);
+    const downloadList = (downloaders || []).filter(Boolean);
     const byId = new Map(list.map((a) => [a.id, a]));
+    const downloadById = new Map(downloadList.map((a) => [a.id, a]));
     const usable = () => list.filter((a) => a.policy?.tos?.verdict !== 'forbidden');
 
     const wrap = (key, ttlMs, producer, opts = {}) => {
@@ -194,8 +202,8 @@ export function createRegistry({
     }
 
     /** Jalankan fungsi di semua scraper aktif secara paralel. */
-    async function fanOut(keyOf, ttlMs, run) {
-        const active = usable();
+    async function fanOut(keyOf, ttlMs, run, candidates = usable()) {
+        const active = candidates;
         const settled = await Promise.allSettled(active.map((a) => wrap(keyOf(a), ttlMs, () => run(a))));
         const groups = [];
         const used = [];
@@ -221,11 +229,36 @@ export function createRegistry({
 
     return {
         adapters: list,
+        downloaders: downloadList,
         cache,
         network,
 
+        /** Lookup-only download provider; never participates in catalog/latest fan-out. */
+        async kusonimeDownloads(titles, ctx = {}) {
+            const provider = downloadById.get('kusonime-downloads');
+            const data = { query: '', matchedTitle: '', downloads: [] };
+            if (!provider || provider.policy?.tos?.verdict === 'forbidden') {
+                return { source: 'kusonime', data, fallback: false, stale: false, errors: [], disabled: true };
+            }
+            const candidates = [...new Set((Array.isArray(titles) ? titles : [titles])
+                .map((value) => String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100))
+                .filter((value) => value.length >= 2 && /\p{Script=Latin}/u.test(value)
+                    && !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(value) && titleKey(value)))].slice(0, 4);
+            if (!candidates.length) return { source: 'kusonime', data, fallback: false, stale: false, errors: [] };
+            const cacheKey = candidates.map(titleKey).join('|');
+            const r = await wrap(`downloads:kusonime:${cacheKey}`, ttl.searchTtlMs, () => provider.findDownloads(candidates, ctx), { stale: 0 });
+            return {
+                source: 'kusonime',
+                data: r.value,
+                fallback: false,
+                stale: r.cache === 'stale',
+                errors: r.error ? [describeError(r.error)] : [],
+            };
+        },
+
         async latest(ctx = {}) {
-            const r = await fanOut((a) => `latest:${a.id}`, ttl.latestTtlMs, (a) => a.latest(ctx));
+            const candidates = usable().filter((a) => a.supportsLatest !== false && typeof a.latest === 'function');
+            const r = await fanOut((a) => `latest:${a.id}`, ttl.latestTtlMs, (a) => a.latest(ctx), candidates);
             const items = mergeLists(r.groups);
             if (items.length) {
                 const data = await withSafeImages(items);
@@ -364,7 +397,7 @@ export function createRegistry({
             const robots = network?.robots.snapshot() || {};
             const circuits = network?.circuit.snapshot() || {};
             return {
-                sources: list.map((a) => {
+                sources: [...list, ...downloadList].map((a) => {
                     const origin = new URL(a.baseUrl).origin;
                     return {
                         id: a.id,
@@ -407,7 +440,10 @@ export function createDefaultRegistry() {
         })
         .filter(Boolean);
     const metadata = METADATA.enabled ? createMetadata({ network, createClient, cache }) : null;
-    return createRegistry({ adapters, metadata, cache, network });
+    const downloaders = SOURCES.kusonimeDownloads.enabled
+        ? [createKusonimeDownloader({ network, createClient, baseUrl: SOURCES.kusonimeDownloads.baseUrl })]
+        : [];
+    return createRegistry({ adapters, downloaders, metadata, cache, network });
 }
 
 export { SourceError };

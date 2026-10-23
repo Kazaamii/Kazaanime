@@ -117,8 +117,10 @@ kazanime/
     │   └── errors.js          error bertipe → status HTTP & pesan ramah
     ├── sources/
     │   ├── index.js           registry + aggregator + fallback (menambah sumber = 1 file + 1 baris)
-    │   ├── animexin.js        adapter AnimeXin — donghua (diverifikasi live) + jadwal rilis
-    │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Hardsub Indonesia (diverifikasi live) + jadwal rilis
+    │   ├── animexin.js        adapter AnimeXin — donghua + mirror HTML/Base64/URL/meta (tidak fetch hoster) + jadwal
+    │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Hardsub Indonesia; embed publik + fallback player_ajax yang eksplisit
+    │   ├── animeonsen.js      adapter API AnimeOnsen — OAuth/search token/episode + HLS/native video dan subtitle soft; opt-in fail-closed
+    │   ├── kusonime.js        pencarian paket download terpisah — kandidat Romaji + cocok judul exact; hanya halaman lewat robots gate
     │   ├── anoboy.js          adapter Anoboy — anime Jepang, server Sub Indo dari `data-url`; aktif default dengan robots gate
     │   ├── sakunime.js        adapter Sakunime — anime Jepang, `data-default` eksplisit Sub Indo; `serverId` opaque diabaikan; robots gate
     │   ├── anichin.js         🅔 adapter Anichin — donghua Sub Indo (tema AnimeStream, parser bersama AnimeXin) + jadwal berjam
@@ -155,7 +157,7 @@ npm run dev        # → http://localhost:3000  (auto-restart saat file server/ 
 ```
 
 Satu server melayani halaman (`index.html`, `watch.html`, `search.html`, `css/`, `js/`) **dan** `/api/*`.
-Tidak ada API key; semua env var opsional (lihat `.env.example`).
+Sumber default tidak membutuhkan API key. AnimeOnsen opsional memerlukan kredensial resmi dan allowlist host media yang dikonfirmasi operator; lihat `.env.example`.
 
 **Frontend saja (tanpa Node)** — tetap berjalan normal, fitur backend mati otomatis:
 
@@ -431,12 +433,13 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 |---|---|
 | `GET /api/anime/latest` | daftar anime (rilis terbaru semua sumber; animexin = episode terbaru tiap seri) |
 | `GET /api/anime/search?q=` | daftar anime (2–100 karakter) |
+| `GET /api/anime/downloads/kusonime?title=<romaji>` | paket unduhan Kusonime yang judul detailnya cocok persis setelah normalisasi (dapat mengirim beberapa `title`). Diakses hanya dari bagian unduhan; hasil bisa berupa satu season/seri, bukan episode tunggal. Mirror tidak di-fetch atau di-decode. |
 | `GET /api/anime/schedule` | **(baru, 22 Okt 2026)** `{ timezone: "Asia/Jakarta", days: { 0..6: [{ title, time, slug, source, url, image, country }] } }` — 0 = Minggu; `time` = jam rilis WIB atau `null` (donghua). Didaftarkan **sebelum** `/:slug` |
 | `GET /api/anime/:slug` | satu anime + `episodeList: [{ number, title, released, url }]` |
-| `GET /api/anime/:slug/episode/:ep` | `{ episode, title, released, url, servers: [{ name, url, lang }], downloads: [{ quality, size, format, subtitle, links: [{ provider, url }] }] }` |
+| `GET /api/anime/:slug/episode/:ep` | `{ episode, title, released, url, servers: [{ name, url, lang, subtitleType?, kind?: 'hls'|'video', subtitles? }], downloads: [...] }`. AnimeOnsen media memakai URL proxy same-origin bertanda tangan; respons episode `no-store`. |
 | `GET /api/stream/servers?ep=&anilist=&title=&title=&year=` | **(baru, 22 Okt 2026)** `{ episode, servers: [{ provider, kind: 'embed', name, label, lang, url } \| { provider, kind: 'hls', name, lang: 'multi', url: '/api/stream/hls?…', direct, poster, subtitles: [{ label, lang, default, url: '/api/stream/sub?…' }], ai: { url: '/api/stream/subai?…', from, sourceLabel, label } \| null }], status: { reanime, anizone } }` — status: `ok` / `not_found` / `blocked` / `error` / `stale`. `ai` (Tahap F) hanya ada bila episode **tidak** punya subtitle Indonesia dan `GEMINI_API_KEY` diisi |
-| `GET /api/stream/hls?u=&s=` | proxy HLS AniZone (hanya URL bertanda tangan dari `/servers`): m3u8 ditulis ulang, segmen/key apa adanya |
-| `GET /api/stream/sub?u=&f=&s=` | subtitle AniZone (ASS/SRT) dikonversi ke WebVTT untuk `<track>` |
+| `GET /api/stream/hls?u=&s=&p=` | proxy media bertanda tangan (HLS, MP4/WebM). Tanpa `p` = provider AniZone; `p=animeonsen` hanya untuk URL yang ditandatangani adapter dan exact hostname dalam `ANIMEONSEN_MEDIA_HOSTS`. Playlist ditulis ulang, segmen/key diteruskan; AnimeOnsen memakai `private, no-store` dan robots gate per URL. |
+| `GET /api/stream/sub?u=&f=&s=&p=` | ASS/SSA/SRT/VTT dikonversi ke WebVTT. `p=animeonsen` diverifikasi dalam tanda tangan, hostname exact + robots gate; respons no-store. |
 | `GET /api/stream/subai?u=&f=&l=&v=&s=&p=` | **(Tahap F)** `{ part, parts, ranges: [[mulai, akhir]…], lang: 'id', label: 'Indonesia (AI)', model, untranslated, cues: [[mulai, akhir, teks, pengaturan]…] }` — hanya URL bertanda tangan dari `ai.url`; parameter lain ditolak. Error: `503 AI_DISABLED` / `AI_QUOTA` (+ `Retry-After`) / `AI_CONFIG`, `504 AI_TIMEOUT`, `502 AI_UPSTREAM` / `AI_BAD_OUTPUT` / `AI_BLOCKED`, `409 AI_STALE` |
 | `GET /api/health` | status backend, User-Agent, TTL/cache, robots/circuit, concurrency, status proxy (tanpa host/kredensial), ringkasan cookie (tanpa nilai), status browser & `aiSubtitles` (key tidak ditampilkan) |
 | `GET /api/bot` | penjelasan bot + cara menolak lewat robots.txt (tercantum di User-Agent) |
@@ -472,10 +475,10 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Cache | memori per instance: latest 10 mnt, search/detail/episode 15 mnt, dedupe request identik, stale-if-error 1 jam; CDN Vercel `s-maxage` |
 | Timeout & retry | 6 dtk per request; retry exponential-backoff terbatas hanya untuk error jaringan & 5xx; timeout tidak diulang. 403/429/CAPTCHA/challenge langsung berhenti; 429 memakai `Retry-After` terbatas dan circuit/cooldown |
 | Circuit breaker | 2 gagal beruntun → sumber diistirahatkan 60 dtk; semua 403/challenge membuka cooldown tanpa retry; 429 dihentikan dengan cooldown dari `Retry-After` yang dibatasi |
-| Anti-SSRF | hanya host allowlist (+ sufiks CDN media AniZone `xin-cdn.xyz`); setiap redirect divalidasi sebelum diikuti, redirect robots harus tetap satu origin, header rahasia/cookie tidak diteruskan lintas origin; respons > 3 MB ditolak (segmen maks 40 MB) |
+| Anti-SSRF | hanya host allowlist (+ CDN AniZone `xin-cdn.xyz` dan exact hostname AnimeOnsen yang diisi operator); setiap redirect divalidasi sebelum diikuti, redirect robots harus tetap satu origin, header rahasia/cookie tidak diteruskan lintas origin; respons > 3 MB ditolak (segmen maks 40 MB) |
 | Proteksi bot | Profil BrowserContext stabil/transparan dengan User-Agent bot; tidak ada stealth/solver. Cookie/proxy hanya untuk request normal sesuai konfigurasi sumber/operator. Challenge tidak memicu retry, rotasi proxy, refresh cookie, atau fallback Playwright; circuit dibuka dan fallback dipakai. Proxy media tetap bertanda tangan + allowlist host |
 | Gemini (subtitle AI) | API resmi ber-key (header `x-goog-api-key`, bukan di URL); robots.txt tidak berlaku. Hanya subtitle yang ditawarkan `/servers` (URL bertanda tangan) yang bisa diterjemahkan → key tidak bisa dipakai pihak lain sebagai penerjemah gratis. Rate limit 20/menit/IP untuk request yang lolos cache CDN |
-| Proxy stream | `/api/stream/hls` hanya meneruskan URL yang ditandatangani server ini (HMAC, `STREAM_SECRET`) dan host media di allowlist → bukan open proxy. Rate limit terpisah 900/menit/IP. **Memakai bandwidth Vercel** (±300–700 MB per episode 720p di Chrome/Firefox; Safari/iOS memutar langsung dari CDN) |
+| Proxy stream | `/api/stream/hls` dan `/api/stream/sub` hanya menerima URL bertanda tangan (HMAC, `STREAM_SECRET`) serta host media allowlisted → bukan open proxy. Respons proxy media AnimeOnsen `private, no-store` dan client credentials tidak dikirim ke browser; CDN media tetap memerlukan `ANIMEONSEN_MEDIA_HOSTS` + robots allow. Rate limit terpisah 900/menit/IP. **Memakai bandwidth Vercel** |
 | Gambar | poster animexin dilindungi hotlink (403 + `Cross-Origin-Resource-Policy: same-origin`) → diganti poster **Kitsu** → **Bangumi** (judul Mandarin) → **MangaBaka**, hanya bila judul cocok persis (maks 2,5 dtk; sisanya dicari di belakang & respons diberi cache CDN 60 dtk). Poster Samehadaku boleh ditampilkan langsung. Tidak ada proxy gambar |
 
 `npm run check:sources` mencetak laporan ini untuk setiap sumber (tambahkan `-- --live` untuk uji ambil data).
@@ -485,7 +488,8 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Sumber | Status | Catatan |
 |---|---|---|
 | **AnimeXin** | ✅ aktif, diverifikasi live | robots.txt mengizinkan semua; tidak ada ToS (DMCA & Privacy Policy tanpa larangan bot). Latest = beranda + `/anime/?order=update` (2 request, slug asli digabung lewat ID seri). 16 server per episode (Dailymotion, OK.ru, Odysee, Rumble, Mega, …) + link download Sub Indo/English |
-| **Samehadaku** | 🟡 adapter & fixture teruji; baseline terbaru homepage di-challenge | robots.txt hanya melarang `/wp-admin/`; ToS tidak tertaut → `unknown` (konten hanya diakses bila robots.txt terbaca & mengizinkan). Adapter menyediakan anime terbaru, pencarian, detail, server Hardsub Indonesia, unduhan, dan jadwal; bila challenge, cooldown 30 mnt dan fallback dipakai |
+| **Samehadaku** | 🟡 adapter & fixture teruji; baseline terbaru homepage di-challenge | robots.txt hanya melarang `/wp-admin/`; ToS tidak tertaut → `unknown` (konten hanya diakses bila robots.txt terbaca & mengizinkan). Adapter menyediakan anime terbaru, pencarian, detail, server Hardsub Indonesia, unduhan, dan jadwal; fallback `player_ajax` hanya memakai data-post/data-nume/data-type yang ada di markup dan berhenti pada challenge |
+| **AnimeOnsen** | ⚪ opt-in, belum live-tested | Implementasi berdasarkan source extension upstream (Apache-2.0); `supportsLatest=false` (katalog popular tidak dilabeli latest). API/auth/search/robots/ToS dan host CDN belum diverifikasi live. Harus diberi `ANIMEONSEN_CLIENT_ID` + `ANIMEONSEN_CLIENT_SECRET` dari akses resmi, `ANIMEONSEN_MEDIA_HOSTS` berisi hostname CDN yang dikonfirmasi (exact match), serta robots.txt yang terbaca dan mengizinkan host/path site/API/auth/search/CDN media. Tidak ada secret OAuth upstream yang disalin; media di-proxy melalui URL bertanda tangan + `no-store`, tanpa field URL CDN mentah di payload. |
 | **Anoboy** | 🟡 default-enabled, robots fail-closed | Adapter dan fixture offline dari snapshot pengguna (22 Okt 2026). ToS/robots belum diverifikasi → `unknown`; request konten hanya jika robots.txt terbaca & mengizinkan. Server diambil dari `.aspd-server[data-url]`, dilabeli Sub Indo; belum live-tested |
 | **Sakunime** | 🟡 default-enabled, robots fail-closed | Adapter dan fixture offline dari snapshot pengguna (22 Okt 2026). ToS/robots belum diverifikasi → `unknown`; request konten hanya jika robots.txt terbaca & mengizinkan. Hanya `#playerShell[data-default]` eksplisit (Sub Indo); `serverId` opaque tidak di-resolve; belum live-tested |
 | **Anichin** | 🟡 aktif, parser diverifikasi dgn HTML asli | (22 Okt 2026) robots.txt mengizinkan (kecuali /wp-admin/); tema AnimeStream (parser AnimeXin). Dari IP pusat data: request kadang lolos, kadang challenge Cloudflare (beranda & halaman episode paling sering) |
@@ -493,7 +497,8 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Adapter mengklasifikasikan server Sub Indo sebagai Hardsub sesuai konfirmasi pemilik proyek; sumber tetap ditandai *blocked*, tanpa data palsu. Gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
 | **ReAnime** (penyedia stream) | 🟡 parser diverifikasi dgn JSON asli | (22 Okt 2026) robots.txt mengizinkan semua; `/api/flix/<id AniList>/<ep>` publik. Dari IP pusat data sering di-challenge Cloudflare |
 | **AniZone** (penyedia stream) | 🟡 parser & proxy diverifikasi dgn data asli | (22 Okt 2026) robots.txt mengizinkan semua. Halaman episode → HLS + 17 subtitle (termasuk Indonesia). CDN video 200/206 tanpa Referer; halaman & berkas subtitle sering di-challenge dari IP pusat data |
-| **Kuramanime** | ⚪ opt-in, nonaktif default | Stream player diklasifikasikan Hardsub Indonesia; grup unduhan tetap membedakan Hardsub/Softsub. Baseline sebelumnya: Cloudflare 403 termasuk `robots.txt`; adapter hanya aktif bila ditambahkan ke `SCRAPER_SOURCES` dan robots mengizinkan. Token player tidak dipecahkan |
+| **Kuramanime** | ⚪ opt-in, nonaktif default | Stream player diklasifikasikan Hardsub Indonesia; grup unduhan tetap membedakan Hardsub/Softsub. Baseline v20 sebelumnya: Cloudflare 403 termasuk `robots.txt`; adapter hanya aktif bila ditambahkan ke `SCRAPER_SOURCES` dan robots mengizinkan. Pengguna memberi `v9.kuramanime.blog` dan `v9.kuramanime.work` sebagai pilihan manual; keduanya belum live-verified. Pilih satu via `KURAMANIME_BASE_URL`; tidak ada auto-failover/rotasi setelah blokir. Token player tidak dipecahkan |
+| **Kusonime (download saja)** | 🟡 aktif, robots fail-closed | Cari paket saat membuka halaman nonton dengan kandidat judul Latin/Romaji; detail harus cocok persis setelah normalisasi. Struktur parser diamati dari [scraper MIT publik](https://github.com/Zmy71/Kusonime-Scraper/tree/8f8e7098f1161d6451471f5c28bdf32fa29aad49), bukan dari live check. ToS/robots/markup belum diverifikasi live; setiap halaman wajib robots.txt terbaca & mengizinkan. Link mirror tidak di-fetch, di-decode, atau ditebak; dapat berupa paket satu season/seri. Matikan dengan `KUSONIME_DOWNLOADS_ENABLED=0` |
 | Bangumi · MangaBaka | ✅ poster pengganti | `api.bgm.tv` (robots hanya melarang /pic/ /img/ /js/) & `api.mangabaka.org/v1` (robots mengizinkan /v1/) |
 | Kitsu | ✅ fallback utama | bisa dijangkau server; mapping id MAL/AniList; poster pengganti |
 | AniList | ⚠️ fallback berikutnya | dari sandbox: AniList 403 "temporarily disabled" (juga dengan Referer) — di Vercel bisa berbeda; circuit breaker membuatnya cepat dilewati |
@@ -501,8 +506,9 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 
 ### Environment variable (semua opsional)
 Lihat `.env.example`. Yang paling berguna: `BOT_CONTACT` (email/URL kontak di User-Agent),
-`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anoboy,sakunime,anichin,otakudesu,hianime`; `kuramanime` opt-in),
-`SAMEHADAKU_BASE_URL` / `ANOBOY_BASE_URL` / `SAKUNIME_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti),
+`SCRAPER_SOURCES` (urutan/aktifkan sumber, default `animexin,samehadaku,anoboy,sakunime,anichin,otakudesu,hianime`; `kuramanime` opt-in; `animeonsen` auto-enabled hanya bila kredensial + allowlist media disediakan),
+`SAMEHADAKU_BASE_URL` / `ANOBOY_BASE_URL` / `SAKUNIME_BASE_URL` / `ANICHIN_BASE_URL` / `OTAKUDESU_BASE_URL` / `KURAMANIME_BASE_URL` / `HIANIME_BASE_URL` (domain sering berganti; Kuramanime hanya satu domain manual per deployment, tanpa failover otomatis), `KUSONIME_BASE_URL` / `KUSONIME_DOWNLOADS_ENABLED` (lookup paket Romaji; terpisah dari `SCRAPER_SOURCES`, robots wajib mengizinkan),
+`ANIMEONSEN_CLIENT_ID` / `ANIMEONSEN_CLIENT_SECRET` (authorized credentials, server-side only) dan `ANIMEONSEN_MEDIA_HOSTS` (allowlist operator-confirmed; kosong = no playback),
 `CACHE_*_SEC` (termasuk `CACHE_SCHEDULE_SEC`), `RATE_LIMIT_PER_MIN`, `METADATA_ORDER`, `METADATA_POSTER_SOURCES`.
 Penyedia stream: `STREAM_PROVIDERS` (default `reanime,anizone`), **`STREAM_SECRET`** (≥ 16 karakter acak — isi di
 Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RATE_LIMIT_PER_MIN`,
@@ -526,8 +532,8 @@ Lokal: `node --env-file=.env server/index.js`.
    mengembalikan `{ id, name, baseUrl, policy, parseRef, titleHint, latest, search, getAnime, getEpisode }`
    (+ opsional `schedule()` untuk Jadwal Rilis),
    semua hasil lewat `makeAnime()` / `makeEpisode()`. Isi `policy.tos` setelah membaca ToS situsnya.
-2. Daftarkan di `FACTORIES` (`server/sources/index.js`) + base URL di `server/config.js`.
-3. Tambahkan nama ke `SCRAPER_SOURCES`. **Frontend tidak perlu diubah sama sekali.**
+2. Daftarkan di `FACTORIES` (`server/sources/index.js`) + konfigurasi server-only di `server/config.js`.
+3. Tambahkan nama ke `SCRAPER_SOURCES`. Adapter embed biasa tidak perlu mengubah UI; stream langsung/HLS memerlukan kontrak player/proxy yang tervalidasi seperti AnimeOnsen.
 
 ### Tes
 ```bash
@@ -808,10 +814,11 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   membalas 403 + `Cross-Origin-Resource-Policy: same-origin` (tidak bisa ditampilkan di situs lain →
   diganti poster Kitsu). Beberapa slug situs berbeda dari judulnya (mis. `shrounding-the-heavens`) →
   slug selalu diambil dari URL, bukan ditebak dari judul.
-- **v20.kuramanime.ing**: Cloudflare memblokir bot ini ("Sorry, you have been blocked"), bahkan untuk
-  `robots.txt` dan juga saat diuji dengan User-Agent browser (blokir IP/WAF). Sesuai aturan proyek
-  (hormati robots/ToS, UA jelas), adapter **tidak** akan mem-bypass Cloudflare; sumber ditandai
-  "blocked" (istirahat 30 menit) dan otomatis jatuh ke sumber lain / metadata.
+- **v20.kuramanime.ing**: Baseline lama membalas Cloudflare 403 ("Sorry, you have been blocked"), bahkan untuk
+  `robots.txt` (blokir IP/WAF). Sesuai aturan proyek, adapter **tidak** mem-bypass Cloudflare; akses baru
+  dilakukan hanya jika robots terbaca & mengizinkan. Pengguna memberi `https://v9.kuramanime.blog/` dan
+  `https://v9.kuramanime.work/` sebagai alternatif; belum ada live check. Pilih satu lewat `KURAMANIME_BASE_URL`;
+  tidak ada rotasi atau failover antar-domain, terutama setelah blokir.
 - **v2.samehadaku.how** (22 Okt 2026): robots.txt `Disallow: /wp-admin/` saja, bot tidak diblokir, server video di
   atribut `data-embed` (HTML publik), poster bisa ditampilkan dari situs lain. Jam di `/jadwal-rilis/` = jam rilis
   Sub Indo (WIB). Pencarian WordPress = semua kata wajib ada.

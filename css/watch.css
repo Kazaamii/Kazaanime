@@ -16,7 +16,8 @@
 /* ==========================================================================
    PLAYER
    ========================================================================== */
-.streaming-player-wrapper{position:relative;width:100%;padding-top:56.25%;background:#000}
+/* Stacking context di atas visual-effects agar kelopak/salju tidak menimpa video atau kontrol player. */
+.streaming-player-wrapper{position:relative;z-index:2;isolation:isolate;width:100%;padding-top:56.25%;background:#000}
 .streaming-player-wrapper iframe,.streaming-player-wrapper>div{position:absolute;top:0;left:0;width:100%;height:100%;border:none}
 
 /* Pesan di dalam player: loading / error / info (dulu inline style berulang) */
@@ -96,6 +97,9 @@
 .download-section{margin-top:20px;padding:20px;background:rgba(var(--primary-rgb),.04);border:1px solid rgba(var(--primary-rgb),.1);border-radius:16px}
 .download-section h4{font-size:16px;font-weight:600;margin-bottom:15px;display:flex;align-items:center;gap:8px}
 .download-list{display:flex;flex-direction:column;gap:8px}
+.download-subsection{margin-top:20px;padding-top:18px;border-top:1px solid rgba(255,255,255,.07)}
+.download-subsection h5{font-size:14px;font-weight:700;margin-bottom:5px;color:var(--text-primary)}
+.download-source-note{font-size:12px;line-height:1.55;color:var(--text-secondary);margin-bottom:12px}
 .download-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:12px;transition:all .3s;gap:10px}
 .download-item:hover{border-color:rgba(var(--primary-rgb),.3);background:var(--bg-card-hover)}
 .download-info{display:flex;align-items:center;gap:12px}

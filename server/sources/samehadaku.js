@@ -11,8 +11,10 @@
  *     README mencatat Cloudflare dapat men-challenge request dari IP pusat data secara intermiten; status live
  *     harus dianggap belum pasti tanpa pemeriksaan baru. Backend tidak mengulang halaman konten yang di-challenge
  *     dan membuka circuit 30 menit agar fallback lain dipakai.
- *   - Server video ada di HTML publik: atribut data-embed pada .east_player_option berisi iframe
- *     siap pakai (Blogspot, Mega 480p/720p/1080p). Tidak ada AJAX/token yang perlu ditiru.
+ *   - Server video publik pada snapshot ini ada di .east_player_option[data-embed]. Upstream juga
+ *     menyediakan fallback `#server > ul > li > div` → POST `action=player_ajax` dengan tiga atribut
+ *     data-post/data-nume/data-type yang memang hadir di markup. Fallback hanya dipakai bila embed
+ *     publik tidak tersedia; nilai opaque tidak ditebak dan tidak ada halaman hoster yang di-fetch.
  *     Opsi "VIP" (berbayar, disabled) dilewati.
  *   - Gambar /wp-content/uploads bisa ditampilkan dari situs lain (200 tanpa/dengan Referer asing).
  *   - Jam di /jadwal-rilis/ = jam rilis Sub Indo di Samehadaku (WIB), bukan jam tayang Jepang
@@ -241,8 +243,43 @@ function embedSrc(snippet, base) {
     return m ? absoluteUrl(m[1], base) : '';
 }
 
+/** Explicit AJAX values rendered by Samehadaku; do not infer or synthesize these IDs. */
+export function parseAjaxServerOptions($) {
+    const out = [];
+    $('#server > ul > li > div').each((_, el) => {
+        const item = $(el);
+        if (item.hasClass('disabled') || item.closest('li').hasClass('disabled') || item.attr('aria-disabled') === 'true') return;
+        const post = cleanText(item.attr('data-post'));
+        const nume = cleanText(item.attr('data-nume'));
+        const type = cleanText(item.attr('data-type'));
+        if (!post || !nume || !type) return;
+        out.push({ post, nume, type, label: cleanText(item.find('span').first().text()) });
+    });
+    return out;
+}
+
+/** Response dari player_ajax berupa HTML iframe; parse src saja, tanpa membuka link embed. */
+export function parseAjaxEmbedResponse(body, base) {
+    const raw = String(body || '');
+    if (!raw) return '';
+    const candidates = [raw];
+    if (/&lt;\s*(?:iframe|video|source)\b/i.test(raw)) {
+        candidates.push(load(`<textarea>${raw}</textarea>`)('textarea').text());
+    }
+    for (const html of candidates) {
+        const $ = load(html);
+        const src = $('iframe[src], video[src], video source[src], source[src]').first().attr('src')
+            || /<iframe\b[^>]*\s+src\s*=\s*(["'])(.*?)\1/i.exec(html)?.[2]
+            || /<source\b[^>]*\s+src\s*=\s*(["'])(.*?)\1/i.exec(html)?.[2]
+            || '';
+        const url = absoluteUrl(src, base);
+        if (url) return url;
+    }
+    return '';
+}
+
 /**
- * Halaman episode: server dari .east_player_option[data-embed] + link download (.download-eps).
+ * Episode HTML: prefer public .east_player_option[data-embed]; retain explicit player_ajax metadata as fallback.
  * @param {import('cheerio').CheerioAPI} $
  */
 export function parseEpisodePage($, base) {
@@ -256,6 +293,7 @@ export function parseEpisodePage($, base) {
         seen.add(url);
         servers.push({ name: cleanText(opt.find('span').first().text()) || `Server ${servers.length + 1}`, url, lang: 'id', subtitleType: 'hard' });
     });
+    const ajaxServers = parseAjaxServerOptions($);
 
     const downloads = [];
     $('.download-eps').each((_, box) => {
@@ -279,7 +317,7 @@ export function parseEpisodePage($, base) {
 
     const title = stripSubLabel($('main h1').first().text());
     const animeLink = $('main a[href*="/anime/"]').filter((_, a) => Boolean(animeSlugFromUrl($(a).attr('href'), base))).first().attr('href');
-    return { title, servers, downloads, animeUrl: animeLink ? absoluteUrl(animeLink, base) : null };
+    return { title, servers, ajaxServers, downloads, animeUrl: animeLink ? absoluteUrl(animeLink, base) : null };
 }
 
 /**
@@ -400,12 +438,48 @@ export function createSamehadaku({ network, createClient, baseUrl, sourceConfig 
             if (!entry?.url) throw notFound(`Episode ${ep} belum tersedia di ${NAME}.`, ID);
             const page = await client.html(entry.url, ctx);
             const parsed = parseEpisodePage(page.$, base);
+            let servers = parsed.servers;
+
+            // Versi upstream tertentu merender server hanya sebagai atribut #server. Pakai POST
+            // hanya bila embed publik tidak ditemukan; kirim tepat nilai yang ditulis markup, batasi
+            // jumlah mirror, dan jangan fetch halaman hoster atau mengulang request yang diblokir.
+            if (!servers.length && parsed.ajaxServers.length) {
+                const ajaxUrl = new URL('/wp-admin/admin-ajax.php', base).href;
+                for (const item of parsed.ajaxServers.slice(0, 6)) {
+                    const body = new URLSearchParams({
+                        action: 'player_ajax',
+                        post: item.post,
+                        nume: item.nume,
+                        type: item.type,
+                    }).toString();
+                    const response = await client.request(ajaxUrl, {
+                        ...ctx,
+                        method: 'POST',
+                        body,
+                        accept: 'text/html,application/json,*/*;q=0.8',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            Origin: new URL(base).origin,
+                            Referer: entry.url,
+                        },
+                    });
+                    const url = parseAjaxEmbedResponse(response.text, base);
+                    if (!url || servers.some((server) => server.url === url)) continue;
+                    servers.push({
+                        name: item.label || `Server ${servers.length + 1}`,
+                        url,
+                        lang: 'id',
+                        subtitleType: 'hard',
+                    });
+                }
+            }
+
             return makeEpisode({
                 episode: ep,
                 title: parsed.title || entry.title,
                 released: entry.released,
                 url: page.url,
-                servers: parsed.servers,
+                servers,
                 downloads: parsed.downloads,
             });
         },
