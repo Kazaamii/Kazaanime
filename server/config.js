@@ -151,7 +151,7 @@ if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length)
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // Anoboy/Sakunime aktif untuk menambah Sub Indo, tetapi ToS unknown dan fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime opt-in; base yang dipilih dibatasi ke satu host dan tidak ada failover.
+    // Anoboy/Sakunime/Kuramanime: ToS unknown → fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime memakai satu base URL tanpa failover.
     enabled: list('SCRAPER_SOURCES', defaultSources).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
     // AnimeIndo opt-in only: add "animeindo" to SCRAPER_SOURCES after verifying robots.txt/terms.
