@@ -47,24 +47,20 @@ jobs:
             sleep 2
           }
 
-          # --- AnimeKu: cari halaman populer/upcoming/genre (kalau ada) ---
-          fetch animeku-home      'https://ww2.animeku.lol/'
-          fetch animeku-populer   'https://ww2.animeku.lol/populer/'
-          fetch animeku-popular   'https://ww2.animeku.lol/popular/'
-          fetch animeku-upcoming  'https://ww2.animeku.lol/upcoming/'
-          fetch animeku-jadwal    'https://ww2.animeku.lol/jadwal/'
-          fetch animeku-genres    'https://ww2.animeku.lol/genres/'
-          fetch animeku-abjad     'https://ww2.animeku.lol/abjad/'
-          fetch animeku-anime     'https://ww2.animeku.lol/anime/'
-          fetch animeku-favorit-2 'https://ww2.animeku.lol/favorit-sixkqhv/page/2/'
-          fetch animeku-ongoing-2 'https://ww2.animeku.lol/jalan-uf5ms8g/page/2/'
-          fetch animeku-cari      'https://ww2.animeku.lol/?s=one+piece'
+          # --- AnimeKu: sitemap + kandidat halaman genre/jadwal ---
+          fetch animeku-sitemap        'https://ww2.animeku.lol/sitemap.xml'
+          fetch animeku-wp-sitemap     'https://ww2.animeku.lol/wp-sitemap.xml'
+          fetch animeku-sitemap-index  'https://ww2.animeku.lol/sitemap_index.xml'
+          fetch animeku-genre-action   'https://ww2.animeku.lol/genre/action/'
+          fetch animeku-jadwal-rilis   'https://ww2.animeku.lol/jadwal-rilis/'
+          fetch animeku-schedule       'https://ww2.animeku.lol/schedule/'
+          fetch animeku-abjad-a        'https://ww2.animeku.lol/abjad/a/'
+          fetch animeku-page-2         'https://ww2.animeku.lol/page/2/'
 
-          # --- Oploverz: cek kategori donghua + urutan latest ---
-          fetch oploverz-donghua-type   'https://oploverz.ch/series/?type=donghua'
-          fetch oploverz-donghua-genre  'https://oploverz.ch/series/?genre%5B%5D=donghua'
-          fetch oploverz-latest         'https://oploverz.ch/series/?order=latest'
-          fetch oploverz-donghua-path   'https://oploverz.ch/donghua/'
+          # --- Oploverz: isi tiap tipe (apa ada donghua di drama?) ---
+          fetch oploverz-type-special  'https://oploverz.ch/series/?type=special'
+          fetch oploverz-status-ongoing 'https://oploverz.ch/series/?status=ongoing'
+          fetch oploverz-status-completed 'https://oploverz.ch/series/?status=completed'
 
       - name: Simpan ke branch
         shell: bash
