@@ -6,10 +6,10 @@
  *   Oploverz : Terbaru → Populer → Rating Tertinggi → Ongoing → Completed → Movie (+ genre)
  *   Donghua  : donghua baru upload (feed Donghua Kazanime; situs tidak punya kategori ini)
  *
- * Setiap bagian adalah baris kartu ringkas (6 judul) dengan tautan **Lihat Semua** —
- * sama seperti section beranda (Ongoing/Populer) — yang membuka daftar lengkap bagian itu
- * di halaman yang sama (`?filter=<id>`, dengan **Muat Lagi** untuk halaman berikutnya).
- * Tidak ada tombol Expand/Ringkas: satu bagian tidak mekar di dalam halaman.
+ * Setiap bagian adalah baris kartu ringkas (6 judul) dengan tombol
+ * **Tampilkan lebih banyak** — membuka sisa judul yang sudah dimuat di tempat, lalu
+ * **Muat Lagi** mengambil halaman berikutnya — plus tautan **Lihat Semua** yang membuka
+ * daftar penuh bagian itu di halaman yang sama (`?filter=<id>`).
  * Bagian dimuat saat mendekati layar (IntersectionObserver) supaya satu kunjungan tidak
  * menembak enam halaman situs sekaligus — fetcher tetap menghormati jeda 1 detik/host.
  *
@@ -123,6 +123,7 @@ function makeRuntime(def) {
         hasNext: false,
         loaded: false,
         loading: false,
+        expanded: false,
         error: '',
         token: 0,
     };
@@ -220,6 +221,7 @@ function sectionHTML(runtime, index) {
                     <a class="see-all" data-see-all href="${katalogUrl({ source: state.source, filter: def.id, genre: state.genre })}" hidden>
                         Lihat Semua ${icon('chevron-right')}
                     </a>
+                    <button type="button" class="katalog-expand" data-expand aria-expanded="false" hidden>Tampilkan lebih banyak</button>
                 </div>
             </div>
             <div class="anime-grid katalog-block-grid" data-grid aria-busy="false"></div>
@@ -239,13 +241,15 @@ function paintSection(runtime) {
     if (!node) return;
     const grid = node.querySelector('[data-grid]');
     const seeAll = node.querySelector('[data-see-all]');
+    const expandBtn = node.querySelector('[data-expand]');
     const countEl = node.querySelector('[data-count]');
     const foot = node.querySelector('[data-foot]');
     const moreBtn = node.querySelector('[data-more]');
 
-    // "Lihat Semua" membuka halaman daftar penuh (state.filter), bukan mekar di tempat.
+    // Halaman `?filter=` = daftar penuh; di tampilan biasa tombol Expand membuka sisa judul.
     const focused = Boolean(state.filter);
-    const visible = focused ? runtime.items : runtime.items.slice(0, PREVIEW);
+    const expanded = focused || runtime.expanded;
+    const visible = expanded ? runtime.items : runtime.items.slice(0, PREVIEW);
     const hasMore = runtime.items.length > PREVIEW || runtime.hasNext;
 
     if (countEl) {
@@ -256,8 +260,15 @@ function paintSection(runtime) {
         seeAll.hidden = focused || !runtime.loaded || !hasMore;
         seeAll.setAttribute('aria-label', `Lihat semua ${runtime.def.label}`);
     }
-    // Muat Lagi hanya di daftar penuh; cuplikan beranda cukup 6 kartu.
-    if (foot) foot.hidden = !focused || !runtime.hasNext;
+    if (expandBtn) {
+        expandBtn.hidden = focused || !runtime.loaded || !hasMore;
+        expandBtn.textContent = runtime.expanded
+            ? 'Tampilkan lebih sedikit'
+            : `Tampilkan lebih banyak (${runtime.items.length}${runtime.hasNext ? '+' : ''})`;
+        expandBtn.setAttribute('aria-expanded', runtime.expanded ? 'true' : 'false');
+    }
+    // Muat Lagi muncul saat daftar sudah dibuka penuh (expand atau ?filter=).
+    if (foot) foot.hidden = !expanded || !runtime.hasNext;
 
     if (!grid) return;
     if (runtime.loading && !runtime.items.length) {
@@ -301,6 +312,7 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
         runtime.hasNext = false;
         runtime.loaded = false;
         runtime.error = '';
+        runtime.expanded = false;
     }
     runtime.loading = true;
     const token = ++runtime.token;
@@ -420,6 +432,14 @@ if (genreSelect) {
 }
 
 if (sectionsEl) {
+    delegate(sectionsEl, 'click', '[data-expand]', (event, button) => {
+        event.preventDefault();
+        const runtime = state.sections.find((item) => sectionNode(item)?.contains(button));
+        if (!runtime) return;
+        runtime.expanded = !runtime.expanded;
+        paintSection(runtime);
+        updateNote();
+    });
     delegate(sectionsEl, 'click', '[data-more]', (event, button) => {
         event.preventDefault();
         const runtime = state.sections.find((item) => sectionNode(item)?.contains(button));

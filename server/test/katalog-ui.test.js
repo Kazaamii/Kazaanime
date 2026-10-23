@@ -96,13 +96,18 @@ test('katalog.js: Coming Soon memakai metadata, bukan halaman karangan', () => {
     assert.match(indexJs, /status: 'upcoming'/);
 });
 
-test('katalog.js: ringkas 6 kartu + tautan "Lihat Semua", bukan Expand/Ringkas', () => {
+test('katalog.js: ringkas 6 kartu + tombol Tampilkan lebih banyak + Lihat Semua', () => {
     assert.match(pageJs, /const PREVIEW = 6;/);
-    assert.match(pageJs, /const visible = focused \? runtime\.items : runtime\.items\.slice\(0, PREVIEW\)/);
-    // Tautan bergaya section beranda (screenshot 3/4), bukan tombol yang mekar di tempat.
+    assert.match(pageJs, /const visible = expanded \? runtime\.items : runtime\.items\.slice\(0, PREVIEW\)/);
+    assert.match(pageJs, /const expanded = focused \|\| runtime\.expanded;/);
+    // Tombol expand membuka sisa judul yang sudah dimuat, di dalam bagian itu.
+    assert.match(pageJs, /data-expand aria-expanded="false" hidden>Tampilkan lebih banyak</);
+    assert.match(pageJs, /\? 'Tampilkan lebih sedikit'/);
+    assert.match(pageJs, /: `Tampilkan lebih banyak \(\$\{runtime\.items\.length\}\$\{runtime\.hasNext \? '\+' : ''\}\)`/);
+    assert.match(pageJs, /runtime\.expanded = !runtime\.expanded;/);
+    // Tautan bergaya section beranda tetap ada untuk daftar penuh.
     assert.match(pageJs, /class="see-all" data-see-all href="\$\{katalogUrl\(\{ source: state\.source, filter: def\.id, genre: state\.genre \}\)\}"/);
     assert.match(pageJs, /Lihat Semua \$\{icon\('chevron-right'\)\}/);
-    assert.doesNotMatch(pageJs, /data-expand|katalog-expand|'Ringkas'/, 'Expand/Ringkas sudah dihapus');
     assert.match(pageJs, /filter: runtime\.def\.id/);
     assert.match(pageJs, /refresh,/, 'Coba Lagi melewati cache/circuit frontend');
     assert.match(pageJs, /loadSection\(runtime, \{ reset: true, refresh: true \}\)/);
@@ -112,8 +117,8 @@ test('katalog.js: "Lihat Semua" membuka daftar penuh satu bagian (?filter=) deng
     assert.match(pageJs, /const filter = known\.has\(q\.get\('filter'\)\) \? q\.get\('filter'\) : ''/);
     assert.match(pageJs, /if \(state\.filter\) q\.set\('filter', state\.filter\)/);
     assert.match(pageJs, /const focused = state\.filter \? defs\.filter\(\(section\) => section\.id === state\.filter\) : defs/);
-    // Daftar penuh menampilkan semua item yang sudah dimuat + Muat Lagi untuk halaman berikutnya.
-    assert.match(pageJs, /if \(foot\) foot\.hidden = !focused \|\| !runtime\.hasNext;/);
+    // Daftar penuh/expanded menampilkan semua item + Muat Lagi untuk halaman berikutnya.
+    assert.match(pageJs, /if \(foot\) foot\.hidden = !expanded \|\| !runtime\.hasNext;/);
     // Ada jalan kembali ke tampilan seluruh bagian tanpa kehilangan genre.
     assert.match(pageJs, /katalogUrl\(\{ source: state\.source, genre: state\.genre \}\)/);
     assert.match(pageJs, /Semua bagian/);
@@ -179,7 +184,8 @@ test('panel Sub Indo menautkan "Lihat semua" hanya untuk sumber berhalaman dafta
 test('css/katalog.css: blok bagian + pemilih genre memakai variabel tema', () => {
     assert.match(css, /\.katalog-sections\{/);
     assert.match(css, /\.katalog-block-actions \.see-all\[hidden\]\{display:none\}/);
-    assert.doesNotMatch(css, /\.katalog-expand\{/, 'gaya tombol Expand sudah dihapus');
+    assert.match(css, /\.katalog-expand\{/);
+    assert.match(css, /\.katalog-expand\[hidden\]\{display:none\}/);
     assert.match(css, /\.katalog-genre-select\{/);
     assert.match(css, /background:var\(--bg-card\)/);
     assert.match(css, /\.katalog-note\.is-error\{/);

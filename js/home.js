@@ -29,7 +29,7 @@ import {
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
-import { evidenceSummary, isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
+import { isPolicyStop, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 import { panelSections } from './api/subindo.js';
 
 const ctx = initLayout();
@@ -82,14 +82,16 @@ async function loadSection(kind) {
     }
 }
 
-// Panel = cuplikan ringkas (6 kartu) seperti section lain; daftar lengkap ada di halaman Jelajah.
+// Panel Sub Indo: katalog langsung dari situs, tanpa verifikasi episode (24 Okt 2026).
+// Cuplikan 6 kartu dulu; tombol "Tampilkan lebih banyak" membuka sisa judul dari situs itu.
 const SUB_INDO_HOME_LIMIT = SUB_INDO.previewLimit;
-
 const subIndoStatus = $('#subIndoStatus');
 const subIndoFeedList = $('#subIndoFeedList');
+/** Panel yang sedang dibuka penuh. */
+const subIndoExpanded = new Set();
 
-/** Ringkasan kecil di bawah intro: situs, judul terverifikasi, episode diperiksa. */
-function renderSubIndoSummary(sources, result = {}) {
+/** Ringkasan kecil di bawah intro: situs dan jumlah judul yang tampil. */
+function renderSubIndoSummary(sources) {
     const list = Array.isArray(sources) ? sources : [];
     if (!subIndoStatus) return;
     if (!list.length) {
@@ -98,89 +100,36 @@ function renderSubIndoSummary(sources, result = {}) {
         return;
     }
     const total = list.reduce((sum, source) => sum + (Array.isArray(source.items) ? source.items.length : 0), 0);
-    const checked = list.reduce((sum, source) => sum + (Number(source.checked) || 0), 0);
-    const failed = list.filter((source) => source.timedOut || source.error || source.failedChecks).length;
-    const incomplete = Boolean(result.timedOut) || failed > 0;
-    const incompleteText = incomplete
-        ? (failed >= list.length ? 'semua sumber belum lengkap' : 'sebagian belum lengkap')
-        : '';
-    subIndoStatus.textContent = [
-        `${list.length} situs`,
-        `${total} judul terverifikasi`,
-        checked ? `${checked} episode diperiksa` : '',
-        incompleteText,
-    ].filter(Boolean).join(' · ');
-    if (subIndoFeedList) {
-        subIndoFeedList.textContent = `Feed: ${list.map((source) => source.name).join(', ')}.`;
-    }
-}
-
-/** Baris status per sumber: episode diperiksa, kegagalan, dan yang tanpa bukti Sub Indo. */
-function subIndoSourceMeta(source) {
-    const bits = [];
-    if (Number(source.checked) > 0) bits.push(`${source.checked} episode diperiksa`);
-    if (Number(source.failedChecks) > 0) bits.push(`${source.failedChecks} gagal`);
-    if (Number(source.unproven) > 0) bits.push(`${source.unproven} tanpa bukti`);
-    if (source.timedOut) bits.push('batas waktu');
-    if (source.stale) bits.push('data cache');
-    const proof = evidenceSummary(source.items);
-    if (proof) bits.push(`bukti: ${proof}`);
-    return bits.join(' · ');
+    subIndoStatus.textContent = `${list.length} situs · ${total} judul`;
+    if (subIndoFeedList) subIndoFeedList.textContent = `Feed: ${list.map((source) => source.name).join(', ')}.`;
 }
 
 /**
- * Keterangan global di bawah panel: sebab kegagalan yang sama digabung sekali
- * (mis. "challenge keamanan" untuk dua situs) supaya tidak diulang per panel.
- */
-function updateSubIndoNote(sections) {
-    const summary = issuesSummary(sections);
-    if (!summary.count) {
-        setSectionNote(subIndoRoot);
-        return;
-    }
-    setSectionNote(subIndoRoot, {
-        text: summary.text,
-        onRetry: () => {
-            retrySourcesNow();
-            loadSubIndoSection({ refresh: true });
-        },
-    });
-}
-
-/**
- * Panel tanpa judul terverifikasi: satu baris ringkas (ikon + diagnosis +
- * tindakan) menggantikan kotak kosong besar yang isinya mengulang kepala panel.
- * Tautan "Buka situs" hanya membuka situs di tab baru — tidak ada upaya
- * menembus pembatasan otomatis.
+ * Panel tanpa judul: satu baris ringkas (ikon + diagnosis + tindakan) menggantikan
+ * kotak kosong besar. Tautan "Buka situs" hanya membuka situs di tab baru — tidak ada
+ * upaya menembus pembatasan otomatis.
  */
 function renderSubIndoEmpty(grid, source) {
     const policyStop = isPolicyStop(source);
-    // "Tanpa bukti" bukan kegagalan teknis: tidak perlu tombol coba lagi, cukup dijelaskan.
-    const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
     const homeUrl = safeHomeUrl(source.homeUrl);
-    const iconName = policyStop
-        ? 'lock'
-        : source.error
-            ? 'triangle-alert'
-            : source.timedOut
-                ? 'hourglass'
-                : 'inbox';
+    const iconName = policyStop ? 'lock' : source.error ? 'triangle-alert' : 'inbox';
     grid.innerHTML = String(html`
         <p class="subindo-empty${policyStop ? ' is-policy' : ''}">
             <span class="subindo-empty-icon" aria-hidden="true">${icon(iconName)}</span>
             <span class="subindo-empty-text">${sourceDiagnosis(source)}</span>
             <span class="subindo-empty-actions">
                 ${homeUrl ? html`<a class="subindo-empty-link" href="${homeUrl}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Buka situs</a>` : ''}
-                ${trouble ? html`<button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>` : ''}
+                ${source.error ? html`<button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>` : ''}
             </span>
         </p>`);
     grid.setAttribute('aria-busy', 'false');
 }
 
-function renderSubIndoSources(sources, result = {}) {
+/** Render semua panel sumber + kartu di dalamnya. */
+function renderSubIndoSources(sources) {
     const list = Array.isArray(sources) ? sources : [];
     subIndoRoot.setAttribute('aria-busy', 'false');
-    renderSubIndoSummary(list, result);
+    renderSubIndoSummary(list);
     if (!list.length) {
         gridMessage(subIndoRoot, {
             icon: 'inbox',
@@ -191,32 +140,27 @@ function renderSubIndoSources(sources, result = {}) {
     }
 
     subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
-        const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
-        const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
-        // Chip menghitung SEMUA judul terverifikasi (bukan hanya 6 yang tampil).
-        const status = sourceStatusLabel(source, Array.isArray(source.items) ? source.items.length : 0);
-        // Tanpa judul, diagnosis tampil sekali di baris ringkas (renderSubIndoEmpty);
-        // jangan ulangi kalimat yang sama di kepala panel.
-        const warnings = [];
-        if (items.length) {
-            if (source.error) warnings.push(friendlyError(source.error));
-            if (source.timedOut) warnings.push('Pemeriksaan dihentikan karena batas waktu. Hasil yang tampil sudah terverifikasi.');
-            if (source.failedChecks) warnings.push('Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.');
-            if (source.stale) warnings.push('Menampilkan cache karena feed belum berhasil diperbarui.');
-        }
-        const meta = subIndoSourceMeta(source);
+        const all = Array.isArray(source.items) ? source.items : [];
+        const expanded = subIndoExpanded.has(source.id);
+        const canExpand = all.length > SUB_INDO_HOME_LIMIT;
+        const trouble = Boolean(source.error);
+        const status = sourceStatusLabel(source, all.length);
         return html`
-            <section class="subindo-source${items.length ? '' : ' is-empty'}" aria-labelledby="subindo-source-title-${index}">
+            <section class="subindo-source${all.length ? '' : ' is-empty'}" data-subindo-source="${source.id}" aria-labelledby="subindo-source-title-${index}">
                 <div class="subindo-source-header">
                     <h3 id="subindo-source-title-${index}">${source.name}</h3>
                     <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
                     ${source.browse ? html`<a class="see-all subindo-source-more" href="${katalogUrl({ source: source.id })}">Lihat Semua ${icon('chevron-right')}</a>` : ''}
                 </div>
-                ${meta ? html`<p class="subindo-source-meta">${meta}</p>` : ''}
-                ${warnings.length ? html`<p class="subindo-source-warning">${warnings.join(' ')}
-                    ${trouble ? html`<button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>` : ''}
+                ${trouble && all.length ? html`<p class="subindo-source-warning">${friendlyError(source.error)}${source.stale ? ' Menampilkan cache.' : ''}
+                    <button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>
                 </p>` : ''}
                 <div class="anime-grid" data-subindo-source-grid="${source.id}" aria-busy="false"></div>
+                ${canExpand ? html`<div class="subindo-source-foot">
+                    <button type="button" class="btn-load-more subindo-expand" data-action="expand-subindo-source" data-source="${source.id}" aria-expanded="${expanded ? 'true' : 'false'}">
+                        ${expanded ? 'Tampilkan lebih sedikit' : `Tampilkan lebih banyak (${all.length})`}
+                    </button>
+                </div>` : ''}
             </section>`;
     })}`);
 
@@ -224,7 +168,8 @@ function renderSubIndoSources(sources, result = {}) {
         const grid = [...subIndoRoot.querySelectorAll('[data-subindo-source-grid]')]
             .find((element) => element.dataset.subindoSourceGrid === source.id);
         if (!grid) return;
-        const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
+        const all = Array.isArray(source.items) ? source.items : [];
+        const items = subIndoExpanded.has(source.id) ? all : all.slice(0, SUB_INDO_HOME_LIMIT);
         if (items.length) {
             renderCards(grid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
         } else {
@@ -240,10 +185,9 @@ async function loadSubIndoSection({ refresh = false } = {}) {
     try {
         const result = await getSubIndoHomeSources({ refresh });
         if (token !== subIndoLoadToken) return;
-        const sections = panelSections(result.sections);
-        subIndoState = { ...result, sections };
-        renderSubIndoSources(sections, subIndoState);
-        updateSubIndoNote(sections);
+        subIndoState = { sections: panelSections(result.sections) };
+        renderSubIndoSources(subIndoState.sections);
+        updateSubIndoNote(subIndoState.sections);
     } catch (error) {
         if (token !== subIndoLoadToken || error?.kind === 'abort') return;
         subIndoState = null;
@@ -258,15 +202,50 @@ async function loadSubIndoSection({ refresh = false } = {}) {
     }
 }
 
+/**
+ * Catatan global di bawah panel: sebab kegagalan jaringan/kebijakan yang sama
+ * digabung sekali (mis. "challenge keamanan" untuk dua situs).
+ */
+function updateSubIndoNote(sections) {
+    const groups = new Map();
+    (Array.isArray(sections) ? sections : []).forEach((source) => {
+        if (!source?.error) return;
+        const message = friendlyError(source.error);
+        const names = groups.get(message) || [];
+        names.push(String(source.name || source.id || 'sumber'));
+        groups.set(message, names);
+    });
+    if (!groups.size) {
+        setSectionNote(subIndoRoot);
+        return;
+    }
+    const text = `Penyebab: ${[...groups].map(([message, names]) => `${message} (${names.join(', ')})`).join(' · ')}`;
+    setSectionNote(subIndoRoot, {
+        text,
+        onRetry: () => {
+            retrySourcesNow();
+            loadSubIndoSection({ refresh: true });
+        },
+    });
+}
+
 delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
     retrySourcesNow();
     loadSubIndoSection({ refresh: true });
 });
 
+/** Buka/tutup sisa judul satu panel (tanpa request baru: semua sudah dimuat). */
+delegate(subIndoRoot, 'click', '[data-action="expand-subindo-source"]', (event, button) => {
+    const id = String(button.dataset.source || '').toLowerCase();
+    if (!id || !subIndoState) return;
+    if (subIndoExpanded.has(id)) subIndoExpanded.delete(id);
+    else subIndoExpanded.add(id);
+    renderSubIndoSources(subIndoState.sections);
+});
+
 /**
- * Coba lagi SATU panel sumber: katalog diambil ulang tanpa cache (refresh),
- * lalu hanya episode situs itu yang diperiksa; panel lain tetap memakai hasil
- * yang sudah ada.
+ * Coba lagi SATU panel sumber: katalog situs itu diambil ulang tanpa cache;
+ * panel lain tetap memakai hasil yang sudah ada.
  */
 async function retrySubIndoSource(sourceId) {
     const id = String(sourceId || '').trim().toLowerCase();
@@ -280,23 +259,20 @@ async function retrySubIndoSource(sourceId) {
     if (grid) showSkeleton(grid, 4);
     retrySourcesNow();
     try {
-        // refresh: katalog diambil ulang karena sumber yang gagal tidak punya item di cache lama.
         const result = await getSubIndoHomeSources({ sourceIds: [id], refresh: true });
         const updated = panelSections(result.sections).find((source) => source.id === id);
         if (!updated) {
             // Sumber tidak lagi ada di feed backend: kembalikan panel lama, jangan biarkan skeleton.
-            if (subIndoState) renderSubIndoSources(subIndoState.sections, subIndoState);
+            if (subIndoState) renderSubIndoSources(subIndoState.sections);
             return;
         }
         if (!subIndoState) return;
-        const sections = subIndoState.sections.map((source) => (source.id === id ? updated : source));
         subIndoState = {
             ...subIndoState,
-            sections,
-            timedOut: sections.some((source) => source.timedOut),
+            sections: subIndoState.sections.map((source) => (source.id === id ? updated : source)),
         };
-        renderSubIndoSources(sections, subIndoState);
-        updateSubIndoNote(sections);
+        renderSubIndoSources(subIndoState.sections);
+        updateSubIndoNote(subIndoState.sections);
     } catch (error) {
         if (error?.kind === 'abort') return;
         if (grid) {
