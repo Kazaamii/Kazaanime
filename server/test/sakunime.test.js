@@ -88,7 +88,9 @@ test('sakunime adapter: search → detail → episode; robots must be explicitly
     const found = await source.search('Saijo no Osewa');
     assert.equal(found.length, 1);
     assert.equal(found[0].title, 'Saijo no Osewa');
-    assert.equal((await source.latest()).length, 1);
+    const latest = await source.latest();
+    assert.equal(latest.length, 2);
+    assert.deepEqual(latest.map((item) => item.latestEpisode), [12, 3]);
     const anime = await source.getAnime({ slug: SERIES });
     const episode = await source.getEpisode({ slug: SERIES }, 1, { anime });
     assert.equal(episode.episode, 1);
