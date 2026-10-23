@@ -114,6 +114,22 @@ test('browse: diteruskan ke adapter yang mendukung daftar + hasil di-cache', asy
     await assert.rejects(() => registry.browse({ source: 'tidak-ada' }), (err) => err.kind === 'not_found');
 });
 
+test('browse dengan q memakai pencarian adapter (bukan halaman daftar)', async () => {
+    const payload = { items: [anime('animeku', 'x', 'Douluo Dalu')], page: 1, hasNext: false, filters: [], genres: [], filter: '', genre: '' };
+    const A = stub('animeku', {
+        browse: async () => payload,
+        search: async () => [anime('animeku', 'y', 'Douluo Dalu II'), anime('animeku', 'z', 'Douluo Continent')],
+    });
+    const registry = reg([A], null, { enrichImages: false });
+
+    const found = await registry.browse({ source: 'animeku', q: 'douluo' });
+    assert.equal(found.source, 'animeku');
+    assert.deepEqual(found.data.items.map((item) => item.title), ['Douluo Dalu II', 'Douluo Continent']);
+    assert.equal(found.data.query, 'douluo');
+    assert.equal(found.data.hasNext, false, 'hasil pencarian tidak berhalaman');
+    assert.deepEqual(A.calls, ['search'], 'tidak memanggil halaman daftar');
+});
+
 test('health melaporkan mode gerbang robots.txt yang aktif', () => {
     const A = stub('samehadaku', {});
     const registry = createRegistry({

@@ -71,6 +71,21 @@ export function readSourceId(value) {
     return raw.toLowerCase();
 }
 
+/**
+ * Kata kunci pencarian katalog (opsional, 2–100 karakter, tanpa karakter kontrol).
+ * Dipakai `/api/anime/browse?q=` untuk mencari di dalam satu sumber.
+ */
+export function readCatalogQuery(value) {
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (raw === undefined || raw === null || raw === '') return '';
+    if (typeof raw !== 'string') throw badRequest('Parameter q tidak valid.');
+    // eslint-disable-next-line no-control-regex
+    const q = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (q.length < 2) throw badRequest('Kata kunci minimal 2 karakter.');
+    if (q.length > 100) throw badRequest('Kata kunci maksimal 100 karakter.');
+    return q;
+}
+
 /** Halaman katalog 1–500. */
 export function readPageNumber(value) {
     if (value === undefined || value === null || value === '') return 1;
@@ -193,6 +208,7 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
         filter: readFilterToken(req.query.filter, 'filter'),
         genre: readFilterToken(req.query.genre, 'genre'),
         page: readPageNumber(req.query.page),
+        q: readCatalogQuery(req.query.q),
     }, ctx)));
     router.get('/schedule', handle((req, ctx) => registry.schedule(ctx)));
     router.get('/:slug/episode/:ep', handle((req, ctx) => registry.episode(req.params.slug, readEpisode(req.params.ep), ctx)));

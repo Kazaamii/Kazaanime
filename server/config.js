@@ -159,8 +159,11 @@ export const CACHE = Object.freeze({
 const animeOnsenClientId = String(env.ANIMEONSEN_CLIENT_ID || '').trim();
 const animeOnsenClientSecret = String(env.ANIMEONSEN_CLIENT_SECRET || '').trim();
 const animeOnsenMediaHosts = list('ANIMEONSEN_MEDIA_HOSTS', []).map((s) => s.toLowerCase().replace(/^\.+/, ''));
-const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime', 'kuramanime',
-    'animeku', 'oploverz'];
+// 24 Okt 2026 (permintaan pengguna): Samehadaku, Sakunime, Otakudesu, dan Kuramanime
+// dimatikan sebagai default — situsnya memblokir IP pusat data dan panel Sub Indo kini
+// hanya AnimeKu + Oploverz. Adapter-nya TETAP ada; aktifkan lagi lewat SCRAPER_SOURCES
+// bila akses situsnya sudah tersedia.
+const defaultSources = ['animexin', 'anichin', 'anoboy', 'hianime', 'animeku', 'oploverz'];
 // AnimeOnsen is opt-in: authorized runtime credentials + an operator-confirmed media allowlist.
 if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length) defaultSources.push('animeonsen');
 

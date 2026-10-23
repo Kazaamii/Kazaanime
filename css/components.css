@@ -192,6 +192,16 @@
 /* Tombol "Tampilkan lebih banyak" per panel (gaya .btn-load-more, ukuran lebih ringkas). */
 .subindo-source-foot{margin-top:14px;text-align:center}
 .subindo-expand{padding:10px 22px;font-size:13px}
+/* Kolom cari di dalam panel sumber (24 Okt 2026) → membuka Jelajah dengan kata kunci. */
+.subindo-search{display:flex;align-items:center;gap:6px;margin:-4px 0 12px;padding:4px 4px 4px 12px;border:1px solid rgba(255,255,255,.08);border-radius:22px;background:var(--bg-card);max-width:360px;transition:border-color .2s}
+.subindo-search:focus-within{border-color:rgba(var(--primary-rgb),.5)}
+.subindo-search-input{flex:1;min-width:0;border:0;background:transparent;color:var(--text-primary);font-family:inherit;font-size:12px;padding:7px 0;outline:none}
+.subindo-search-input::placeholder{color:var(--text-muted)}
+.subindo-search-input::-webkit-search-cancel-button{display:none}
+.subindo-search-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:50%;background:rgba(var(--primary-rgb),.14);color:var(--primary);cursor:pointer;transition:background .2s}
+.subindo-search-btn:hover{background:rgba(var(--primary-rgb),.24)}
+.subindo-search-btn .ic{width:14px;height:14px}
+.subindo-search-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .subindo-source-meta{margin:-8px 0 8px;color:var(--text-secondary);font-size:11px;line-height:1.5}
 .subindo-source-warning{margin:-5px 0 10px;color:var(--text-secondary);font-size:12px;line-height:1.5}
 .subindo-retry{display:inline-flex;align-items:center;gap:6px;margin-left:6px;padding:4px 10px;border:1px solid rgba(var(--primary-rgb),.25);border-radius:999px;background:rgba(var(--primary-rgb),.08);color:var(--primary);font:inherit;font-size:11px;font-weight:600;cursor:pointer;vertical-align:baseline;transition:background .2s}

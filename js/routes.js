@@ -23,11 +23,12 @@ export const PAGES = Object.freeze({
  * URL halaman Jelajah (katalog situs sumber).
  * @param {{source?: string, filter?: string, genre?: string, page?: number}} [state]
  */
-export function katalogUrl({ source = 'animeku', filter = '', genre = '', page = 1 } = {}) {
+export function katalogUrl({ source = 'animeku', filter = '', genre = '', q = '', page = 1 } = {}) {
     const p = new URLSearchParams();
     p.set('source', source);
     if (filter) p.set('filter', filter);
     if (genre) p.set('genre', genre);
+    if (q) p.set('q', String(q).slice(0, 100));
     if (page > 1) p.set('page', String(page));
     return `${PAGES.katalog}?${p.toString()}`;
 }

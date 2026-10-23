@@ -29,8 +29,8 @@ function fakeRegistry() {
                 errors: [{ source: 'kuramanime', kind: 'blocked', message: 'diblokir' }],
             };
         },
-        async browse({ source, filter = '', genre = '', page = 1 }) {
-            seen.push(`browse:${source}:${filter}:${genre}:${page}`);
+        async browse({ source, filter = '', genre = '', page = 1, q = '' }) {
+            seen.push(`browse:${source}:${filter}:${genre}:${page}:${q}`);
             if (source === 'kusonime') throw badRequest('Sumber Kusonime downloads tidak menyediakan halaman daftar.');
             return {
                 source,
@@ -121,7 +121,18 @@ test('GET /api/anime/browse: sumber, filter, genre, dan halaman diteruskan', asy
         assert.equal(json.data.genre, 'action');
         assert.equal(json.data.page, 3);
         assert.equal(json.data.hasNext, true);
-        assert.ok(registry.seen.includes('browse:oploverz:popular:action:3'));
+        assert.ok(registry.seen.includes('browse:oploverz:popular:action:3:'));
+    });
+});
+
+test('GET /api/anime/browse?q=: kata kunci diteruskan untuk pencarian per sumber', async () => {
+    await withApp({}, async (base, registry) => {
+        const { res, json } = await get(`${base}/api/anime/browse?source=animeku&q=${encodeURIComponent('douluo dalu')}`);
+        assert.equal(res.status, 200);
+        assert.equal(json.source, 'animeku');
+        assert.ok(registry.seen.includes('browse:animeku:::1:douluo dalu'));
+        assert.equal((await get(`${base}/api/anime/browse?source=animeku&q=a`)).res.status, 400,
+            'kata kunci 1 karakter ditolak');
     });
 });
 

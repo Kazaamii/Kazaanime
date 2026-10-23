@@ -376,10 +376,37 @@ export function createRegistry({
          * per episode (aturan bukti tetap berlaku di `latestSubIndo`).
          * @param {{source: string, filter?: string, genre?: string, page?: number}} opts
          */
-        async browse({ source, filter = '', genre = '', page = 1 } = {}, ctx = {}) {
+        async browse({ source, filter = '', genre = '', page = 1, q = '' } = {}, ctx = {}) {
             const adapter = byId.get(String(source || '').toLowerCase());
             if (!adapter) throw notFound(`Sumber "${source}" tidak dikenal atau sedang dimatikan.`);
             if (adapter.policy?.tos?.verdict === 'forbidden') throw notFound(`Sumber "${source}" tidak diizinkan.`);
+            const query = String(q || '').trim();
+            if (query) {
+                // Pencarian di dalam satu sumber (24 Okt 2026). Hasil satu halaman, tanpa paginasi.
+                if (typeof adapter.search !== 'function' || adapter.supportsSearch === false) {
+                    throw badRequest(`Sumber ${adapter.name} tidak menyediakan pencarian.`);
+                }
+                const searchKey = `browse-search:${adapter.id}:${query.toLowerCase()}`;
+                const found = await wrap(searchKey, ttl.searchTtlMs, () => adapter.search(query, ctx));
+                const items = (Array.isArray(found.value) ? found.value : []).slice(0, 60);
+                const options = typeof adapter.browseOptions === 'function' ? adapter.browseOptions() : { filters: [], genres: [] };
+                return {
+                    source: adapter.id,
+                    data: {
+                        items,
+                        page: 1,
+                        hasNext: false,
+                        filters: options.filters || [],
+                        genres: options.genres || [],
+                        filter,
+                        genre,
+                        query,
+                    },
+                    fallback: false,
+                    stale: found.cache === 'stale',
+                    errors: found.error ? [describeError(found.error)] : [],
+                };
+            }
             if (adapter.supportsBrowse !== true || typeof adapter.browse !== 'function') {
                 throw badRequest(`Sumber ${adapter.name} tidak menyediakan halaman daftar.`);
             }

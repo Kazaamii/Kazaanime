@@ -152,6 +152,12 @@ function renderSubIndoSources(sources) {
                     <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
                     ${source.browse ? html`<a class="see-all subindo-source-more" href="${katalogUrl({ source: source.id })}">Lihat Semua ${icon('chevron-right')}</a>` : ''}
                 </div>
+                ${source.browse ? html`<form class="subindo-search" data-subindo-search="${source.id}" role="search" autocomplete="off">
+                    <label class="sr-only" for="subindo-search-${index}">Cari di ${source.name}</label>
+                    <input id="subindo-search-${index}" type="search" name="q" class="subindo-search-input"
+                        placeholder="Cari di ${source.name}…" minlength="2" maxlength="100" enterkeyhint="search">
+                    <button type="submit" class="subindo-search-btn" aria-label="Cari di ${source.name}">${icon('search')}</button>
+                </form>` : ''}
                 ${trouble && all.length ? html`<p class="subindo-source-warning">${friendlyError(source.error)}${source.stale ? ' Menampilkan cache.' : ''}
                     <button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>
                 </p>` : ''}
@@ -235,6 +241,28 @@ delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
 });
 
 /** Buka/tutup sisa judul satu panel (tanpa request baru: semua sudah dimuat). */
+/**
+ * Pencarian di dalam satu situs (24 Okt 2026): panel beranda hanya mengirim kata kunci
+ * ke halaman Jelajah dengan tab sumber itu — hasil lengkap dirender di sana.
+ */
+delegate(subIndoRoot, 'submit', '[data-subindo-search]', (event, form) => {
+    event.preventDefault();
+    const id = String(form.dataset.subindoSearch || '').toLowerCase();
+    const input = form.querySelector('input[name="q"]');
+    const value = String(input?.value || '').replace(/\s+/g, ' ').trim();
+    if (!id || value.length < 2) {
+        if (input) {
+            input.setCustomValidity('Kata kunci minimal 2 karakter.');
+            input.reportValidity();
+        }
+        return;
+    }
+    if (input) input.setCustomValidity('');
+    window.location.href = katalogUrl({ source: id, q: value });
+});
+
+delegate(subIndoRoot, 'input', 'input[name="q"]', (event, input) => input.setCustomValidity(''));
+
 delegate(subIndoRoot, 'click', '[data-action="expand-subindo-source"]', (event, button) => {
     const id = String(button.dataset.source || '').toLowerCase();
     if (!id || !subIndoState) return;

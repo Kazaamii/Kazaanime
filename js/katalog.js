@@ -13,9 +13,15 @@
  * Bagian dimuat saat mendekati layar (IntersectionObserver) supaya satu kunjungan tidak
  * menembak enam halaman situs sekaligus — fetcher tetap menghormati jeda 1 detik/host.
  *
+ * Kolom pencarian (24 Okt 2026, permintaan pengguna) mencari DI DALAM satu sumber:
+ * AnimeKu lewat `/?s=`, Oploverz lewat `/?s=` juga — hasilnya satu blok "Hasil" tanpa
+ * paginasi. Pencarian ini memakai endpoint yang sama dengan tombol cari situs, jadi tidak
+ * ada klaim Sub Indo per judul.
+ *
  * Halaman ini TIDAK mengklaim Sub Indo per judul: itu hanya dinyatakan panel beranda
  * setelah halaman episode diperiksa. State URL:
  * katalog.html?source=animeku&genre=action&filter=baru
+ * katalog.html?source=oploverz&q=one+piece
  */
 import { initLayout } from './ui/layout.js';
 import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
@@ -41,7 +47,7 @@ const SOURCES = Object.freeze([
     {
         id: 'animeku',
         label: 'AnimeKu',
-        hint: 'AnimeKu tidak menyediakan halaman genre (dicek: 404); filter genre tersedia di tab Oploverz.',
+        hint: 'Cari di dalam katalog AnimeKu lewat kolom pencarian di atas. AnimeKu tidak menyediakan halaman genre (dicek 404); filter genre tersedia di tab Oploverz.',
         sections: [
             { id: 'baru', label: 'Terbaru', hint: 'Rilis paling baru dari halaman Baru.' },
             { id: 'populer', label: 'New Anime Populer', hint: 'Halaman Baru diurutkan skor tertinggi — rilis baru yang paling populer.' },
@@ -58,7 +64,7 @@ const SOURCES = Object.freeze([
     {
         id: 'oploverz',
         label: 'Oploverz (Animeloverz)',
-        hint: 'Genre tersedia (80 genre dari form situs). Situs tidak punya kategori Donghua — donghua ada di tab Donghua.',
+        hint: 'Kolom pencarian di atas mencari langsung di Oploverz. Genre tersedia (80 genre dari form situs). Situs tidak punya kategori Donghua — donghua ada di tab Donghua.',
         sections: [
             { id: 'update', label: 'Terbaru', hint: 'Update terakhir dari situs.' },
             { id: 'popular', label: 'Populer', hint: 'Urutan populer situs.' },
@@ -86,6 +92,9 @@ const SOURCES = Object.freeze([
 const sectionsEl = $('#katalogSections');
 const noteEl = $('#katalogNote');
 const tabsEl = $('#katalogSourceTabs');
+const searchForm = $('#katalogSearch');
+const searchInput = $('#katalogSearchInput');
+const searchClear = $('#katalogSearchClear');
 const genreWrap = $('#katalogGenreWrap');
 const genreSelect = $('#katalogGenre');
 const titleEl = $('#katalogTitle');
@@ -100,7 +109,10 @@ const readParams = () => {
     // `filter` = "Lihat Semua" untuk satu bagian; hanya bagian yang memang ada di sumber itu.
     const known = new Set(sourceDef(source).sections.map((section) => section.id));
     const filter = known.has(q.get('filter')) ? q.get('filter') : '';
-    return { source, genre: (q.get('genre') || '').toLowerCase(), filter };
+    // `q` = pencarian di dalam sumber (min. 2 karakter, sama seperti validasi backend).
+    const keyword = (q.get('q') || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    const query = keyword.length >= 2 ? keyword : '';
+    return { source, genre: (q.get('genre') || '').toLowerCase(), filter, query };
 };
 
 const initial = readParams();
@@ -109,6 +121,8 @@ const state = {
     genre: initial.genre,
     /** Bagian yang dibuka lewat "Lihat Semua" (kosong = semua bagian). */
     filter: initial.filter,
+    /** Kata kunci pencarian di dalam sumber (kosong = tampilan bagian biasa). */
+    query: initial.query,
     genres: [],
     sections: [],
     loadToken: 0,
@@ -135,8 +149,9 @@ const dedupeKey = (anime) => String(anime?.slug || anime?.title || '');
 function syncUrl() {
     const q = new URLSearchParams();
     q.set('source', state.source);
+    if (state.query) q.set('q', state.query);
+    else if (state.filter) q.set('filter', state.filter);
     if (state.genre) q.set('genre', state.genre);
-    if (state.filter) q.set('filter', state.filter);
     const next = `${window.location.pathname}?${q.toString()}`;
     if (next !== `${window.location.pathname}${window.location.search}`) {
         window.history.replaceState({ page: currentPage() }, '', next);
@@ -150,6 +165,20 @@ function setNote(text, isError = false) {
 }
 
 function updateNote() {
+    if (state.query) {
+        const runtime = state.sections[0];
+        if (!runtime) return;
+        if (!runtime.loaded || (runtime.loading && !runtime.items.length)) {
+            setNote(`Mencari “${state.query}” di ${sourceLabel(state.source)}…`);
+            return;
+        }
+        if (runtime.error && !runtime.items.length) {
+            setNote(`Pencarian di ${sourceLabel(state.source)} belum bisa dimuat.`, true);
+            return;
+        }
+        setNote(`${runtime.items.length} hasil untuk “${state.query}” di ${sourceLabel(state.source)}`);
+        return;
+    }
     const loaded = state.sections.filter((item) => item.loaded);
     const total = state.sections.reduce((sum, item) => sum + item.items.length, 0);
     const failed = state.sections.filter((item) => item.error).length;
@@ -180,7 +209,7 @@ function renderTabs() {
 /** Pemilih genre: hanya sumber yang mengirim `genres` (Oploverz) yang menampilkannya. */
 function renderGenre() {
     if (!genreWrap || !genreSelect) return;
-    if (!state.genres.length) {
+    if (!state.genres.length || state.query) {
         genreWrap.hidden = true;
         genreSelect.innerHTML = '';
         return;
@@ -194,6 +223,19 @@ function renderGenre() {
 /** Judul halaman; mode "Lihat Semua" menampilkan satu bagian + tautan kembali. */
 function renderHeader() {
     const def = sourceDef(state.source);
+    if (searchInput) {
+        searchInput.placeholder = `Cari di ${def.label}…`;
+        if (document.activeElement !== searchInput) searchInput.value = state.query;
+    }
+    if (searchClear) searchClear.hidden = !state.query;
+    if (state.query) {
+        if (titleEl) titleEl.textContent = `Cari “${state.query}” di ${def.label}`;
+        if (subtitleEl) {
+            subtitleEl.innerHTML = String(html`<a class="see-all katalog-back" href="${katalogUrl({ source: state.source, genre: state.genre })}">${icon('chevron-left')} Semua bagian</a>
+                <span>Hasil pencarian langsung dari halaman cari ${def.label}. Tidak ada klaim Sub Indo sampai episodenya diperiksa.</span>`);
+        }
+        return;
+    }
     const focus = state.filter ? def.sections.find((section) => section.id === state.filter) : null;
     if (titleEl) titleEl.textContent = focus ? `${focus.label} — ${def.label}` : `Jelajah ${def.label}`;
     if (!subtitleEl) return;
@@ -247,7 +289,9 @@ function paintSection(runtime) {
     const moreBtn = node.querySelector('[data-more]');
 
     // Halaman `?filter=` = daftar penuh; di tampilan biasa tombol Expand membuka sisa judul.
-    const focused = Boolean(state.filter);
+    // Mode pencarian tidak punya halaman berikutnya, jadi tautan "Lihat Semua" disembunyikan.
+    const searching = Boolean(state.query);
+    const focused = !searching && Boolean(state.filter);
     const expanded = focused || runtime.expanded;
     const visible = expanded ? runtime.items : runtime.items.slice(0, PREVIEW);
     const hasMore = runtime.items.length > PREVIEW || runtime.hasNext;
@@ -257,7 +301,7 @@ function paintSection(runtime) {
         countEl.textContent = runtime.loaded ? `${runtime.items.length}${runtime.hasNext ? '+' : ''} judul` : '';
     }
     if (seeAll) {
-        seeAll.hidden = focused || !runtime.loaded || !hasMore;
+        seeAll.hidden = focused || searching || !runtime.loaded || !hasMore;
         seeAll.setAttribute('aria-label', `Lihat semua ${runtime.def.label}`);
     }
     if (expandBtn) {
@@ -286,11 +330,17 @@ function paintSection(runtime) {
         return;
     }
     if (!runtime.items.length) {
-        gridMessage(grid, {
-            icon: 'inbox',
-            title: `Belum ada judul di bagian ${runtime.def.label}`,
-            text: 'Situs tidak mengembalikan judul untuk bagian ini saat halaman diperiksa.',
-        });
+        gridMessage(grid, searching
+            ? {
+                icon: 'search',
+                title: `Tidak ada hasil untuk “${state.query}”`,
+                text: `Halaman cari ${sourceLabel(state.source)} tidak mengembalikan judul. Coba kata kunci lain (judul Romaji/Inggris) atau ejaan yang lebih singkat.`,
+            }
+            : {
+                icon: 'inbox',
+                title: `Belum ada judul di bagian ${runtime.def.label}`,
+                text: 'Situs tidak mengembalikan judul untuk bagian ini saat halaman diperiksa.',
+            });
         return;
     }
     renderCards(grid, visible, { variant: 'catalog', isBookmarked, episodeOf: () => 'latest' });
@@ -333,6 +383,7 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
                 : await getSourceBrowse(state.source, {
                     filter: runtime.def.id,
                     genre: state.genre,
+                    q: state.query,
                     page: runtime.page + 1,
                     // "Coba Lagi" melewati cache + circuit breaker frontend, sama seperti panel beranda.
                     refresh,
@@ -381,8 +432,15 @@ const observer = typeof window !== 'undefined' && 'IntersectionObserver' in wind
 
 function buildSections() {
     if (!sectionsEl) return;
-    const defs = sourceDef(state.source).sections;
-    const focused = state.filter ? defs.filter((section) => section.id === state.filter) : defs;
+    const source = sourceDef(state.source);
+    const defs = state.query
+        ? [{
+            id: 'hasil',
+            label: `Hasil untuk “${state.query}”`,
+            hint: `Ditemukan lewat pencarian ${source.label}. Klik kartu untuk membuka detail; tidak ada klaim Sub Indo di sini.`,
+        }]
+        : source.sections;
+    const focused = !state.query && state.filter ? defs.filter((section) => section.id === state.filter) : defs;
     state.sections = (focused.length ? focused : defs).map(makeRuntime);
     sectionsEl.innerHTML = String(html`${state.sections.map((runtime, index) => sectionHTML(runtime, index))}`);
     sectionsEl.setAttribute('aria-busy', 'false');
@@ -399,6 +457,7 @@ function switchSource(id) {
     state.genre = '';
     state.filter = '';
     state.genres = [];
+    // Kata kunci dipertahankan: mengganti tab = mencari kata yang sama di sumber lain.
     state.loadToken += 1;
     renderTabs();
     renderHeader();
@@ -410,7 +469,24 @@ function switchSource(id) {
 function switchGenre(genre) {
     if (genre === state.genre) return;
     state.genre = genre;
+    state.query = '';
     state.loadToken += 1;
+    syncUrl();
+    buildSections();
+}
+
+/**
+ * Terapkan kata kunci pencarian: URL + header + blok hasil. `q` kosong = kembali
+ * ke tampilan bagian biasa. Dipakai form, tombol hapus, dan tombol Enter.
+ */
+function applyQuery(value) {
+    const next = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (next === state.query) return;
+    state.query = next.length >= 2 ? next : '';
+    state.filter = '';
+    state.loadToken += 1;
+    renderHeader();
+    renderGenre();
     syncUrl();
     buildSections();
 }
@@ -425,6 +501,28 @@ if (tabsEl) {
         event.preventDefault();
         switchSource(button.dataset.source);
     });
+}
+
+if (searchForm && searchInput) {
+    searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const value = searchInput.value.trim();
+        if (value.length < 2) {
+            searchInput.setCustomValidity('Kata kunci minimal 2 karakter.');
+            searchInput.reportValidity();
+            return;
+        }
+        searchInput.setCustomValidity('');
+        applyQuery(value);
+    });
+    searchInput.addEventListener('input', () => searchInput.setCustomValidity(''));
+    if (searchClear) {
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            applyQuery('');
+            searchInput.focus();
+        });
+    }
 }
 
 if (genreSelect) {
