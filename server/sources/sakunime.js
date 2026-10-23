@@ -78,7 +78,7 @@ function animeTitleFromEpisode(value) {
  * Cari nomor episode terbaru dalam kartu yang juga memuat tautan seri.
  * Hanya menggunakan tautan watch publik yang tertulis dalam HTML; tidak menebak ID player.
  */
-function latestEpisodeInCard(anchor, base) {
+function latestEpisodeInCard($, anchor, base) {
     let node = anchor;
     for (let depth = 0; depth < 6 && node.length; depth++) {
         const links = node.find('a[href]').toArray();
@@ -143,7 +143,7 @@ export function parseAnimeLinks($, base) {
             url,
             title: animeTitleFromEpisode(title),
             image: absoluteUrl(image, base) || null,
-            latestEpisode: latestEpisodeInCard(anchor, base),
+            latestEpisode: latestEpisodeInCard($, anchor, base),
         });
     });
     return out;
