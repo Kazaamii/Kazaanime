@@ -44,7 +44,7 @@
  *
  * Tidak ada fetch di sini. Daftar server (StreamServer[]) datang dari js/api.
  */
-import { PLAYER, LEGAL_PLATFORMS } from '../config.js';
+import { PLAYER, LEGAL_PLATFORMS, STORAGE_KEYS } from '../config.js';
 import { html, delegate } from './dom.js';
 import { showToast } from './toast.js';
 import { icon, hasIcon } from './icons.js';
@@ -65,6 +65,30 @@ const LANG_LABELS = { id: 'Sub Indo', en: 'Sub English', multi: 'Multi Sub' };
 const SUBTITLE_TYPE_LABELS = { hard: 'Hardsub', soft: 'Softsub' };
 const HLS_MIME = 'application/vnd.apple.mpegurl';
 const ICON_LOCK = icon('lock');
+
+/* ------------------------------------------------------------------ */
+/* Proteksi pop-up (sandbox iframe)                                    */
+/* ------------------------------------------------------------------ */
+/**
+ * Pengguna bisa mematikan proteksi (mis. player menolak diputar) — pilihan disimpan
+ * di localStorage. Default = proteksi AKTIF (lihat PLAYER.sandbox).
+ */
+function popupGuardDisabled() {
+    try {
+        return window.localStorage.getItem(STORAGE_KEYS.popupGuard) === 'off';
+    } catch {
+        return false; // mode privat / storage diblokir → tetap proteksi
+    }
+}
+
+function storePopupGuard(enabled) {
+    try {
+        if (enabled) window.localStorage.removeItem(STORAGE_KEYS.popupGuard);
+        else window.localStorage.setItem(STORAGE_KEYS.popupGuard, 'off');
+    } catch {
+        // Tidak bisa menyimpan preferensi: efeknya hanya untuk sesi ini.
+    }
+}
 
 /** hls.js (Apache-2.0) disimpan lokal; dimuat sekali saat server HLS pertama diputar. */
 let hlsLoader = null;
@@ -162,7 +186,7 @@ export function createPlayer({
     localSubtitleInput = null,
 }) {
     /** @type {Record<string, Set<Function>>} */
-    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set() };
+    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), guard: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
         try { fn(detail); } catch (err) { console.error(`[player] handler "${name}" error:`, err); }
     });
@@ -400,7 +424,10 @@ export function createPlayer({
         iframe.allow = PLAYER.allow;
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
-        if (PLAYER.sandbox) iframe.setAttribute('sandbox', PLAYER.sandbox);
+        // Tanpa allow-popups/allow-top-navigation: iklan di dalam embed tidak bisa
+        // membuka tab baru atau mengalihkan tab Kazanime.
+        if (!popupGuardDisabled() && PLAYER.sandbox) iframe.setAttribute('sandbox', PLAYER.sandbox);
+        iframe.dataset.popupGuard = popupGuardDisabled() ? 'off' : 'on';
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
@@ -719,6 +746,23 @@ export function createPlayer({
         get serverId() { return currentId; },
         get episode() { return ep; },
         hasServers: () => available().length > 0,
+
+        /** Proteksi pop-up/tab baru aktif? (default true) */
+        popupGuard: () => !popupGuardDisabled(),
+
+        /**
+         * Nyalakan/matikan proteksi pop-up lalu muat ulang server yang sedang dipakai
+         * supaya atribut sandbox iframe ikut berubah.
+         * @param {boolean} enabled
+         * @returns {boolean} status baru
+         */
+        setPopupGuard(enabled) {
+            storePopupGuard(Boolean(enabled));
+            const active = current();
+            if (active && (state === 'loading' || state === 'playing')) play(active);
+            emit('guard', { enabled: Boolean(enabled) });
+            return Boolean(enabled);
+        },
 
         /**
          * Putar episode dengan daftar server baru. Server pilihan user sebelumnya

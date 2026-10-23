@@ -50,6 +50,8 @@
 .player-ctrl-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:6px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit;transition:all .3s;white-space:nowrap}
 .player-ctrl-btn:hover:not(:disabled){background:rgba(var(--primary-rgb),.12);border-color:var(--primary);color:var(--primary)}
 .player-ctrl-btn:disabled{opacity:.4;cursor:not-allowed}
+/* Status proteksi pop-up (24 Okt 2026): kuning = pengguna mengizinkan pop-up player. */
+.player-ctrl-btn.is-off{color:#fbbf24;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
 .player-ctrl-btn[hidden],.player-local-subtitle-tools[hidden]{display:none}
 .player-local-subtitle-tools{display:inline-flex;align-items:center;gap:6px}
 .player-ctrl-btn--clear-subtitle{min-width:32px;padding:6px 9px;font-size:17px;line-height:1}

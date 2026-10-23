@@ -89,14 +89,21 @@ function cookieHeaders() {
     return headers;
 }
 
-test('config runtime: sumber Sub Indo aktif dengan mode robots yang eksplisit', () => {
-    assert.ok(SOURCES.enabled.includes('samehadaku'));
-    assert.ok(SOURCES.enabled.includes('otakudesu'));
+test('config runtime: sumber default & mode robots yang eksplisit', () => {
+    // 24 Okt 2026: Samehadaku/Otakudesu/Sakunime/Kuramanime tidak lagi aktif default,
+    // tetapi factory-nya tetap tersedia untuk diaktifkan lewat SCRAPER_SOURCES.
+    assert.equal(SOURCES.enabled.includes('samehadaku'), false);
+    assert.equal(SOURCES.enabled.includes('otakudesu'), false);
+    assert.equal(SOURCES.enabled.includes('sakunime'), false);
+    assert.equal(SOURCES.enabled.includes('kuramanime'), false);
+    assert.ok(SOURCES.enabled.includes('anoboy'));
+    assert.ok(SOURCES.enabled.includes('animeku'));
+    assert.ok(SOURCES.enabled.includes('oploverz'));
     assert.ok(FACTORIES.anoboy);
     assert.ok(FACTORIES.sakunime);
-    assert.ok(SOURCES.enabled.includes('anoboy'));
-    assert.ok(SOURCES.enabled.includes('sakunime'));
-    assert.ok(SOURCES.enabled.includes('kuramanime'));
+    assert.ok(FACTORIES.samehadaku);
+    assert.ok(FACTORIES.otakudesu);
+    assert.ok(FACTORIES.kuramanime);
     assert.equal(SOURCES.samehadaku.renderJavaScript, false);
     assert.equal(SOURCES.otakudesu.renderJavaScript, false);
     assert.equal(SOURCES.kuramanime.renderJavaScript, false);

@@ -52,8 +52,8 @@ test('Kusonime downloads default on, can be disabled, and keeps a normalized con
 });
 
 
-test('Kuramanime v9 is part of the default source list and remains configurable', () => {
-    assert.ok(enabledSources().includes('kuramanime'));
+test('Kuramanime v9 is disabled by default but remains configurable', () => {
+    assert.equal(enabledSources().includes('kuramanime'), false, 'dimatikan default sejak 24 Okt 2026');
 
     const configScript = "import { SOURCES } from './server/config.js'; console.log(JSON.stringify(SOURCES.kuramanime));";
     const readConfig = (overrides = {}) => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', configScript], {

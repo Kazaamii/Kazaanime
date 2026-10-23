@@ -33,6 +33,7 @@ function stub(id, impl = {}, policy = {}) {
         getEpisode: track('getEpisode', impl.getEpisode || (async () => { throw fail('not_found', id); })),
         ...(impl.schedule ? { schedule: track('schedule', impl.schedule) } : {}),
         ...(impl.browse ? { browse: track('browse', impl.browse), supportsBrowse: true } : {}),
+        ...(impl.browseDonghua ? { browseDonghua: track('browseDonghua', impl.browseDonghua) } : {}),
         calls,
     };
 }
@@ -112,6 +113,48 @@ test('browse: diteruskan ke adapter yang mendukung daftar + hasil di-cache', asy
 
     await assert.rejects(() => registry.browse({ source: 'animexin' }), (err) => err.status === 400);
     await assert.rejects(() => registry.browse({ source: 'tidak-ada' }), (err) => err.kind === 'not_found');
+});
+
+test('browse filter donghua: judul donghua metadata dicari lewat adapter.browseDonghua', async () => {
+    const A = stub('animeku', {
+        browse: async () => ({ items: [], page: 1, hasNext: true, filters: [], genres: [], filter: 'baru', genre: '' }),
+        browseDonghua: async () => [anime('animeku', 'd', 'Meta Donghua')],
+    });
+    const registry = reg([A], metaStub(), { enrichImages: false });
+
+    const res = await registry.browse({ source: 'animeku', filter: 'donghua' });
+    assert.equal(res.source, 'animeku');
+    assert.deepEqual(res.data.items.map((item) => item.title), ['Meta Donghua']);
+    assert.equal(res.data.filter, 'donghua');
+    assert.equal(res.data.hasNext, false, 'deteksi donghua tidak berhalaman');
+    assert.deepEqual(A.calls, ['browseDonghua'], 'halaman daftar biasa tidak dipanggil');
+    assert.ok(A.calls.includes('browseDonghua'));
+    assert.equal(A.calls.includes('browse'), false);
+});
+
+test('browse filter donghua: adapter tanpa donghua memakai halaman daftar biasa', async () => {
+    const O = stub('oploverz', { browse: async ({ filter }) => ({ items: [anime('oploverz', 'x', 'Biasa')], page: 1, hasNext: false, filters: [], genres: [], filter, genre: '' }) });
+    const registry = reg([O], metaStub(), { enrichImages: false });
+
+    const res = await registry.browse({ source: 'oploverz', filter: 'donghua' });
+    assert.deepEqual(res.data.items.map((item) => item.title), ['Biasa']);
+    assert.deepEqual(O.calls, ['browse']);
+});
+
+test('browse dengan q memakai pencarian adapter (bukan halaman daftar)', async () => {
+    const payload = { items: [anime('animeku', 'x', 'Douluo Dalu')], page: 1, hasNext: false, filters: [], genres: [], filter: '', genre: '' };
+    const A = stub('animeku', {
+        browse: async () => payload,
+        search: async () => [anime('animeku', 'y', 'Douluo Dalu II'), anime('animeku', 'z', 'Douluo Continent')],
+    });
+    const registry = reg([A], null, { enrichImages: false });
+
+    const found = await registry.browse({ source: 'animeku', q: 'douluo' });
+    assert.equal(found.source, 'animeku');
+    assert.deepEqual(found.data.items.map((item) => item.title), ['Douluo Dalu II', 'Douluo Continent']);
+    assert.equal(found.data.query, 'douluo');
+    assert.equal(found.data.hasNext, false, 'hasil pencarian tidak berhalaman');
+    assert.deepEqual(A.calls, ['search'], 'tidak memanggil halaman daftar');
 });
 
 test('health melaporkan mode gerbang robots.txt yang aktif', () => {

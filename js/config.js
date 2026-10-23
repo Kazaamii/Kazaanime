@@ -43,6 +43,7 @@ export const STORAGE_KEYS = Object.freeze({
     anilistNoBatch: 'kz:anilist-nobatch',   // localStorage  — waktu saat query gabungan AniList ditolak
     history: 'kz:history',                  // localStorage  — episode yang sudah dibuka per anime (Tahap C)
     autoNext: 'kz:autonext',                // localStorage  — preferensi auto-next ('1' / '0') (Tahap C)
+    popupGuard: 'kz:popup-guard',           // localStorage  — 'off' = pengguna mengizinkan pop-up player (24 Okt 2026)
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */
@@ -62,12 +63,14 @@ export const THEME_PARTICLE_COUNT = 20;
  * Link navbar. `section` = id elemen di index.html.
  * Di halaman lain link otomatis menjadi index.html#section.
  */
+/* 24 Okt 2026 (permintaan pengguna): Bookmark keluar dari daftar navbar yang sempit.
+ * Aksesnya lewat menu profil (Bookmark Saya) + footer, dan isinya kini halaman sendiri
+ * (bookmark.html) — bukan section di beranda. */
 export const NAV_LINKS = Object.freeze([
     { label: 'Beranda',  section: null },
     { label: 'Ongoing',  section: 'ongoing' },
     { label: 'Populer',  section: 'popular' },
     { label: 'Donghua',  section: 'donghua' },
-    { label: 'Bookmark', section: 'bookmarks', authOnly: true },
     { label: 'Genre',    section: 'genre' },
     { label: 'Jelajah',  page: 'katalog.html' },
     { label: 'Jadwal',   section: 'jadwal' },
@@ -79,17 +82,34 @@ export const NAV_LINKS = Object.freeze([
  *                 Di file asli Isekai dikirim sebagai genre → hasil selalu kosong.
  *  - kitsu      : slug kategori Kitsu (filter[categories], sudah dicek valid).
  */
+/**
+ * Genre yang ditampilkan di beranda & search.html.
+ *
+ * 24 Okt 2026 (permintaan pengguna): daftar lama hanya 10 genre (subset). Sekarang
+ * memuat SELURUH genre AniList (18) + tag Isekai, dengan padanan slug Kitsu.
+ * `label` harus sama persis dengan nama genre AniList (mis. "Sci-Fi", "Slice of Life");
+ * `anilistTag` dipakai untuk Isekai karena di AniList ia tag, bukan genre.
+ */
 export const GENRES = Object.freeze([
     { label: 'Action',        kitsu: 'action' },
-    { label: 'Romance',       kitsu: 'romance' },
+    { label: 'Adventure',     kitsu: 'adventure' },
     { label: 'Comedy',        kitsu: 'comedy' },
+    { label: 'Drama',         kitsu: 'drama' },
+    { label: 'Ecchi',         kitsu: 'ecchi' },
     { label: 'Fantasy',       kitsu: 'fantasy' },
-    { label: 'Slice of Life', kitsu: 'slice-of-life' },
     { label: 'Horror',        kitsu: 'horror' },
+    { label: 'Mahou Shoujo',  kitsu: 'mahou-shoujo' },
     { label: 'Mecha',         kitsu: 'mecha' },
-    { label: 'Sports',        kitsu: 'sports' },
-    { label: 'Isekai',        kitsu: 'isekai', anilistTag: 'Isekai' },
+    { label: 'Music',         kitsu: 'music' },
     { label: 'Mystery',       kitsu: 'mystery' },
+    { label: 'Psychological', kitsu: 'psychological' },
+    { label: 'Romance',       kitsu: 'romance' },
+    { label: 'Sci-Fi',        kitsu: 'sci-fi' },
+    { label: 'Slice of Life', kitsu: 'slice-of-life' },
+    { label: 'Sports',        kitsu: 'sports' },
+    { label: 'Supernatural',  kitsu: 'supernatural' },
+    { label: 'Thriller',      kitsu: 'thriller' },
+    { label: 'Isekai',        kitsu: 'isekai', anilistTag: 'Isekai' },
 ]);
 
 /** Nama hari (index = Date#getDay(): 0 = Minggu). */
@@ -362,11 +382,19 @@ export const PLAYER = Object.freeze({
     /** Sebagian penyedia embed memeriksa Referer (cukup origin) — MegaPlay WAJIB ada Referer. */
     referrerPolicy: 'origin',
     /**
-     * Atribut sandbox iframe. Kosong = tanpa sandbox (sama seperti asli).
-     * Contoh pemblokir pop-up: 'allow-scripts allow-same-origin allow-presentation allow-forms'
-     * — tetapi banyak player embed (termasuk MegaPlay) menolak diputar bila di-sandbox.
+     * Atribut sandbox iframe — 24 Okt 2026 (permintaan adblock, "bila memungkinkan").
+     *
+     * Nilai ini TIDAK memuat `allow-popups`, `allow-popups-to-escape-sandbox`, maupun
+     * `allow-top-navigation`, jadi skrip iklan di dalam player tidak bisa membuka tab
+     * baru atau membajak tab Kazanime. `allow-scripts allow-same-origin` tetap ada supaya
+     * player (MegaPlay dkk.) bisa memutar video.
+     *
+     * Sebagian embed bisa menolak diputar saat di-sandbox. Untuk itu pengguna punya
+     * tombol "Pop-up diblokir / Izinkan pop-up" di bawah player; pilihannya disimpan di
+     * localStorage (STORAGE_KEYS.popupGuard) dan hanya melepas sandbox untuk browser itu.
+     * Server `kind: 'hls' | 'video'` memakai <video> sendiri — tanpa iframe, tanpa pop-up.
      */
-    sandbox: '',
+    sandbox: 'allow-scripts allow-same-origin allow-forms allow-presentation',
     /** Jumlah kartu rekomendasi. */
     recommendationCount: 12,
     /**

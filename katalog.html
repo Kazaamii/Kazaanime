@@ -43,6 +43,17 @@
             </button>
         </div>
 
+        <form class="katalog-search" id="katalogSearch" role="search" autocomplete="off">
+            <label class="sr-only" for="katalogSearchInput">Cari judul di sumber katalog</label>
+            <span class="katalog-search-icon" aria-hidden="true"><span class="ic-slot" data-icon="search"></span></span>
+            <input id="katalogSearchInput" name="q" type="search" class="katalog-search-input"
+                placeholder="Cari di AnimeKu…" minlength="2" maxlength="100" enterkeyhint="search">
+            <button type="submit" class="katalog-search-submit">Cari</button>
+            <button type="button" class="katalog-search-clear" id="katalogSearchClear" aria-label="Hapus kata kunci" hidden>
+                <span class="ic-slot" data-icon="x"></span>
+            </button>
+        </form>
+
         <div class="katalog-genre" id="katalogGenreWrap" hidden>
             <label for="katalogGenre">Genre</label>
             <select id="katalogGenre" class="katalog-genre-select"></select>

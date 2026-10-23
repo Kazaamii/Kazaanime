@@ -27,7 +27,7 @@ import { genreUrl, watchUrl, latestEpisodeOf, katalogUrl } from './routes.js';
 import {
     getHeroSlides, getHomeSection, getSubIndoHomeSources, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
-import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
+import { onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
 import { isPolicyStop, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 import { panelSections } from './api/subindo.js';
@@ -152,6 +152,12 @@ function renderSubIndoSources(sources) {
                     <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
                     ${source.browse ? html`<a class="see-all subindo-source-more" href="${katalogUrl({ source: source.id })}">Lihat Semua ${icon('chevron-right')}</a>` : ''}
                 </div>
+                ${source.browse ? html`<form class="subindo-search" data-subindo-search="${source.id}" role="search" autocomplete="off">
+                    <label class="sr-only" for="subindo-search-${index}">Cari di ${source.name}</label>
+                    <input id="subindo-search-${index}" type="search" name="q" class="subindo-search-input"
+                        placeholder="Cari di ${source.name}…" minlength="2" maxlength="100" enterkeyhint="search">
+                    <button type="submit" class="subindo-search-btn" aria-label="Cari di ${source.name}">${icon('search')}</button>
+                </form>` : ''}
                 ${trouble && all.length ? html`<p class="subindo-source-warning">${friendlyError(source.error)}${source.stale ? ' Menampilkan cache.' : ''}
                     <button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>
                 </p>` : ''}
@@ -235,6 +241,28 @@ delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
 });
 
 /** Buka/tutup sisa judul satu panel (tanpa request baru: semua sudah dimuat). */
+/**
+ * Pencarian di dalam satu situs (24 Okt 2026): panel beranda hanya mengirim kata kunci
+ * ke halaman Jelajah dengan tab sumber itu — hasil lengkap dirender di sana.
+ */
+delegate(subIndoRoot, 'submit', '[data-subindo-search]', (event, form) => {
+    event.preventDefault();
+    const id = String(form.dataset.subindoSearch || '').toLowerCase();
+    const input = form.querySelector('input[name="q"]');
+    const value = String(input?.value || '').replace(/\s+/g, ' ').trim();
+    if (!id || value.length < 2) {
+        if (input) {
+            input.setCustomValidity('Kata kunci minimal 2 karakter.');
+            input.reportValidity();
+        }
+        return;
+    }
+    if (input) input.setCustomValidity('');
+    window.location.href = katalogUrl({ source: id, q: value });
+});
+
+delegate(subIndoRoot, 'input', 'input[name="q"]', (event, input) => input.setCustomValidity(''));
+
 delegate(subIndoRoot, 'click', '[data-action="expand-subindo-source"]', (event, button) => {
     const id = String(button.dataset.source || '').toLowerCase();
     if (!id || !subIndoState) return;
@@ -367,34 +395,12 @@ delegate(genreGrid, 'click', '[data-action="retry-genre"]', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Bookmark                                                            */
+/* Bookmark: pindah ke bookmark.html (24 Okt 2026)                      */
 /* ------------------------------------------------------------------ */
-const bookmarkSection = $('#bookmarks');
-const bookmarkGrid = $('#bookmarkGrid');
-
-function renderBookmarkSection() {
-    const user = ctx.getUser();
-    bookmarkSection.hidden = !user;
-    if (!user) {
-        bookmarkGrid.innerHTML = '';
-        return;
-    }
-    const list = getBookmarks();
-    if (!list.length) {
-        bookmarkGrid.innerHTML = String(html`
-            <div class="bookmark-empty">
-                <p class="bookmark-empty-icon" aria-hidden="true">${icon('bookmark')}</p>
-                <h3>Belum ada bookmark</h3>
-                <p>Klik ikon bookmark di pojok kartu anime untuk menambahkannya ke sini.</p>
-            </div>`);
-        return;
-    }
-    renderCards(bookmarkGrid, list, { variant: 'bookmark', isBookmarked: () => true });
-}
-
+/* Daftar bookmark tidak lagi dirender di beranda; halaman bookmark.html yang mengurus
+ * pencarian/urutan. Beranda hanya menyinkronkan status tombol bookmark di kartu. */
 bindCardActions(main, (anime) => ctx.toggleBookmark(anime));
 onBookmarksChange(() => {
-    renderBookmarkSection();
     syncBookmarkButtons(isBookmarked, main);
     hero.refresh();
 });
@@ -456,15 +462,10 @@ function whenVisible(el, callback) {
 /* ------------------------------------------------------------------ */
 /* Mulai                                                               */
 /* ------------------------------------------------------------------ */
-renderBookmarkSection();
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
 loadSubIndoSection();
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
 
-// Datang dari halaman lain lewat index.html#bookmarks: section ini baru tampil setelah JS jalan
-if (window.location.hash === '#bookmarks' && !bookmarkSection.hidden) {
-    requestAnimationFrame(() => bookmarkSection.scrollIntoView({ block: 'start' }));
-}
 
 console.info('%cKazanime — data live: AniList → Kitsu → cadangan; donghua & jadwal dari backend scraper', 'color:#ff6b9d;font-weight:bold');

@@ -4,6 +4,19 @@
  * .anime-grid, .btn-load-more). Di sini: pemilih genre, catatan status, dan blok bagian
  * (kepala + tombol "Tampilkan lebih banyak" + tautan "Lihat Semua" bergaya .see-all).
  */
+/* Kolom pencarian di dalam satu sumber (24 Okt 2026). */
+.katalog-search{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:6px 6px 6px 14px;border-radius:26px;border:1px solid rgba(255,255,255,.08);background:var(--bg-card);max-width:560px;transition:border-color .2s,box-shadow .2s}
+.katalog-search:focus-within{border-color:rgba(var(--primary-rgb),.55);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.14)}
+.katalog-search-icon{display:inline-flex;color:var(--text-muted);flex-shrink:0}
+.katalog-search-input{flex:1;min-width:0;border:0;background:transparent;color:var(--text-primary);font-family:inherit;font-size:13px;padding:8px 0;outline:none}
+.katalog-search-input::placeholder{color:var(--text-muted)}
+.katalog-search-input::-webkit-search-cancel-button{display:none}
+.katalog-search-submit{padding:9px 18px;border-radius:20px;border:0;background:var(--primary);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:filter .2s}
+.katalog-search-submit:hover{filter:brightness(1.1)}
+.katalog-search-submit:focus-visible,.katalog-search-clear:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.katalog-search-clear{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.06);color:var(--text-secondary);cursor:pointer}
+.katalog-search-clear[hidden]{display:none}
+.katalog-search-clear:hover{background:rgba(255,255,255,.12);color:var(--text-primary)}
 .katalog-genre{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 18px;font-size:12px;color:var(--text-secondary)}
 .katalog-genre label{font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:11px;color:var(--text-muted)}
 .katalog-genre-select{appearance:none;padding:9px 34px 9px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.08);background:var(--bg-card) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 13px center;color:var(--text-primary);font-family:inherit;font-size:12px;cursor:pointer;max-width:220px}
@@ -34,6 +47,7 @@
 .katalog-block-foot{text-align:center;margin-top:18px}
 
 @media (max-width:768px){
+    .katalog-search{max-width:100%}
     .katalog-genre-select{max-width:100%}
     .katalog-block-head{flex-direction:column;gap:10px}
     .katalog-sections{gap:28px}

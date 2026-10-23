@@ -103,8 +103,8 @@ test('animeku: katalog memakai menu untuk menemukan path berurutan, bukan path h
     assert.equal(page.items[0].latestEpisode, 4);
     assert.equal(page.hasNext, true);
     assert.deepEqual(page.filters.map((f) => f.id),
-        ['baru', 'populer', 'favorit', 'selesai', 'ongoing', 'film'],
-        'urutan bagian: Terbaru → New Anime Populer → Top Favorit → Complete (+ Ongoing/Movie)');
+        ['baru', 'populer', 'favorit', 'selesai', 'ongoing', 'film', 'donghua'],
+        'urutan bagian: Terbaru → New Anime Populer → Top Favorit → Complete (+ Ongoing/Movie/Donghua)');
     assert.deepEqual(page.genres, [], 'AnimeKu tidak punya arsip genre');
     assert.deepEqual(calls, [`${BASE}/`, `${BASE}/baru-utnwb9y/`]);
 });
@@ -125,10 +125,41 @@ test('animeku: New Anime Populer = daftar Baru diurutkan skor tertinggi', async 
         'token populer memakai halaman Baru, bukan Favorit');
 });
 
+/**
+ * Donghua: situs tidak punya kategori donghua (halaman /negara/china/ kosong), jadi adapter
+ * mencari judul donghua tayang di halaman pencarian dan hanya memakai kartu yang cocok.
+ */
+test('animeku: donghua dicari per judul, kartu lain dibuang, negara CN', async () => {
+    const searchHtml = `
+        <article class="aku-sel"><a class="aku-bing" href="https://ww2.animeku.lol/douluo-dalu-cq4dfat/"><img src="https://static.anipop.xyz/poster/anime/douluo.jpg" alt="Douluo Dalu"><span class="aku-eps">Eps 267.5</span><span class="aku-nilai">7.5</span></a><h3><a href="https://ww2.animeku.lol/douluo-dalu-cq4dfat/">Douluo Dalu</a></h3></article>
+        <article class="aku-sel"><a class="aku-bing" href="https://ww2.animeku.lol/douluo-dalu-hanhai-qian-kun-9evm7ny/"><img src="https://static.anipop.xyz/poster/anime/douluo2.jpg" alt="Douluo Dalu: Hanhai Qian Kun"><span class="aku-eps">Eps 9</span></a><h3><a href="https://ww2.animeku.lol/douluo-dalu-hanhai-qian-kun-9evm7ny/">Douluo Dalu: Hanhai Qian Kun</a></h3></article>
+        <article class="aku-sel"><a class="aku-bing" href="https://ww2.animeku.lol/one-piece-x7k4n6u/"><img src="https://static.anipop.xyz/poster/anime/onepiece.jpg" alt="One Piece"><span class="aku-eps">Eps 1100</span></a><h3><a href="https://ww2.animeku.lol/one-piece-x7k4n6u/">One Piece</a></h3></article>`;
+    const { createClient, calls } = fakeClientFactory({
+        [`${BASE}/?s=Douluo+Dalu`]: searchHtml,
+        [`${BASE}/?s=Douluo+Dalu%3A+Hanhai+Qian+Kun`]: searchHtml,
+    });
+    const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
+    const items = await adapter.browseDonghua(['Douluo Dalu', 'Douluo Dalu: Hanhai Qian Kun'], {});
+    assert.deepEqual(items.map((item) => item.title), ['Douluo Dalu', 'Douluo Dalu: Hanhai Qian Kun'],
+        'kartu non-donghua (One Piece) tidak ikut, duplikat dibuang');
+    assert.equal(items.every((item) => item.country === 'CN'), true, 'ditandai CN karena berasal dari daftar donghua metadata');
+    assert.equal(items[0].slug, 'animeku~douluo-dalu-cq4dfat');
+    assert.equal(calls.length, 2, 'satu request pencarian per judul');
+});
+
+test('animeku: donghua tanpa judul → daftar kosong tanpa request', async () => {
+    const { createClient, calls } = fakeClientFactory({});
+    const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
+    assert.deepEqual(await adapter.browseDonghua([], {}), []);
+    assert.deepEqual(await adapter.browseDonghua(['  '], {}), []);
+    assert.deepEqual(calls, []);
+});
+
 test('animeku: tidak mengarang halaman genre/coming soon', async () => {
     const { createClient } = fakeClientFactory({});
     const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
     const ids = adapter.browseOptions().filters.map((f) => f.id);
+    assert.equal(ids.includes('donghua'), true, 'donghua memang ditawarkan (deteksi lewat metadata)');
     for (const missing of ['coming', 'genre', 'jadwal', 'upcoming']) {
         assert.equal(ids.includes(missing), false, `${missing} tidak boleh ada di daftar filter`);
     }

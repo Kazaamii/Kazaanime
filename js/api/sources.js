@@ -161,13 +161,16 @@ export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
  * Katalog satu sumber untuk halaman Jelajah (`katalog.html`).
  * `filter` = urutan/status dari sumber (mis. "popular", "selesai"), `genre` = id genre.
  * @param {string} source id sumber backend ("animeku" | "oploverz" | ...)
- * @param {{filter?: string, genre?: string, page?: number, signal?: AbortSignal, refresh?: boolean}} [opts]
+ * `q` = cari di dalam satu sumber (min. 2 karakter) — hasil satu halaman tanpa paginasi.
+ * @param {{filter?: string, genre?: string, page?: number, q?: string, signal?: AbortSignal, refresh?: boolean}} [opts]
  */
-export function getSourceBrowse(source, { filter = '', genre = '', page = 1, signal, refresh = false } = {}) {
+export function getSourceBrowse(source, { filter = '', genre = '', page = 1, q: query = '', signal, refresh = false } = {}) {
     const q = new URLSearchParams({ source: String(source || '') });
     if (filter) q.set('filter', filter);
     if (genre) q.set('genre', genre);
     if (page > 1) q.set('page', String(page));
+    const keyword = String(query || '').trim().slice(0, 100);
+    if (keyword) q.set('q', keyword);
     return call(`/browse?${q.toString()}`, {
         signal,
         force: refresh,
@@ -187,6 +190,7 @@ export function getSourceBrowse(source, { filter = '', genre = '', page = 1, sig
                 genres: options(data.genres),
                 filter: String(data.filter || ''),
                 genre: String(data.genre || ''),
+                query: String(data.query || ''),
             };
         },
     });
