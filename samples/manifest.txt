@@ -22,3 +22,15 @@ animeku-anime	200	40093	https://ww2.animeku.lol/anime/
 animeku-ongoing	404	35586	https://ww2.animeku.lol/ongoing/
 animeku-robots	200	0	https://ww2.animeku.lol/robots.txt
 oploverz-robots	200	169	https://oploverz.ch/robots.txt
+oploverz-home	200	119167	https://oploverz.ch/
+oploverz-series-list	200	131693	https://oploverz.ch/series/?status=&type=&order=update
+oploverz-episode	200	96245	https://oploverz.ch/toaru-anbu-no-item-episode-3-subtitle-indonesia/
+oploverz-series	200	84774	https://oploverz.ch/series/toaru-anbu-no-item/
+animeku-home	200	67097	https://ww2.animeku.lol/
+animeku-anime	200	40093	https://ww2.animeku.lol/anime/
+animeku-ongoing	404	35586	https://ww2.animeku.lol/ongoing/
+animeku-robots	200	0	https://ww2.animeku.lol/robots.txt
+animeku-episode	200	41014	https://ww2.animeku.lol/play/steel-ball-run-jojo-no-kimyou-na-bouken-episode-6-6mzizy9/
+animeku-series	200	41376	https://ww2.animeku.lol/steel-ball-run-jojo-no-kimyou-na-bouken-ecxqye3/
+animeku-series-2	200	41893	https://ww2.animeku.lol/sousou-no-frieren/
+oploverz-robots	200	169	https://oploverz.ch/robots.txt
