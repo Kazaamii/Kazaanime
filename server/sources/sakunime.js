@@ -74,6 +74,35 @@ function animeTitleFromEpisode(value) {
         .trim();
 }
 
+/**
+ * Cari nomor episode terbaru dalam kartu yang juga memuat tautan seri.
+ * Hanya menggunakan tautan watch publik yang tertulis dalam HTML; tidak menebak ID player.
+ */
+function latestEpisodeInCard($, anchor, base) {
+    let node = anchor;
+    for (let depth = 0; depth < 6 && node.length; depth++) {
+        const links = node.find('a[href]').toArray();
+        if (node.is('a[href]')) links.unshift(node[0]);
+
+        const seriesCount = links.filter((el) => Boolean(animeSlugFromUrl($(el).attr('href'), base))).length;
+        const episodeNumbers = links.map((el) => {
+            const href = siteUrl($(el).attr('href'), base);
+            const watchSlug = href ? watchSlugFromUrl(href, base) : null;
+            if (!watchSlug) return null;
+            return parseEpisodeNumber(watchSlug)
+                || parseEpisodeNumber($(el).attr('title'))
+                || parseEpisodeNumber($(el).text());
+        }).filter((number) => Number.isInteger(number) && number > 0);
+
+        // Tetap pada konteks kartu; jangan membaca seluruh halaman lalu salah memasangkan judul.
+        if (seriesCount >= 1 && seriesCount <= 3 && episodeNumbers.length) {
+            return Math.max(...episodeNumbers);
+        }
+        node = node.parent();
+    }
+    return null;
+}
+
 function episodeRows($, base, animeTitle = '') {
     const rows = [];
     $('a.watch-eprow[href]').each((_, el) => {
@@ -109,7 +138,13 @@ export function parseAnimeLinks($, base) {
             || cleanText(anchor.find('img').first().attr('alt'));
         if (!title) return;
         seen.add(slug);
-        out.push({ slug, url, title: animeTitleFromEpisode(title), image: absoluteUrl(image, base) || null });
+        out.push({
+            slug,
+            url,
+            title: animeTitleFromEpisode(title),
+            image: absoluteUrl(image, base) || null,
+            latestEpisode: latestEpisodeInCard($, anchor, base),
+        });
     });
     return out;
 }
@@ -175,6 +210,8 @@ export function createSakunime({ network, createClient, baseUrl }) {
     const toAnime = (item) => makeAnime({
         title: item.title,
         image: item.image,
+        latestEpisode: item.latestEpisode,
+        status: item.latestEpisode ? 'ONGOING' : 'UNKNOWN',
         country: 'JP',
         slug: encodeSlug(ID, item.slug),
         source: ID,
@@ -198,8 +235,16 @@ export function createSakunime({ network, createClient, baseUrl }) {
         },
 
         async latest(ctx = {}) {
-            const page = await client.html(`${base}/anime/ongoing/`, ctx);
-            return parseAnimeLinks(page.$, base).map(toAnime);
+            // Halaman publik /anime/ memuat bagian "Episode Terbaru". Ambil dari feed ini
+            // agar nomor episode yang benar ikut terbawa ke verifikasi Sub Indo homepage.
+            const page = await client.html(`${base}/anime/`, ctx);
+            const items = parseAnimeLinks(page.$, base).map(toAnime);
+            if (!items.length) {
+                throw new SourceError('Feed Anime Terbaru Sakunime tidak berisi tautan seri yang dikenali.', {
+                    kind: 'parse', source: ID,
+                });
+            }
+            return items;
         },
 
         async search(query, ctx = {}) {

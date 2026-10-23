@@ -179,7 +179,7 @@ Yang bisa dicoba (Tahap D):
 - `/api/anime/latest` · `/api/anime/search?q=soul%20land` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan/episode/175`
 - `/api/health` (status sumber, robots, circuit, cache) · `/api/bot` (info bot untuk admin situs sumber)
 - `npm run check:sources -- --live` → laporan robots.txt/ToS + uji ambil data tiap sumber
-- `npm test` → 275 unit test backend + helper UI frontend (tanpa internet)
+- `npm test` → 268 unit test backend + helper UI frontend (tanpa internet)
 
 Yang bisa dicoba (Tahap C):
 - klik kartu mana pun → `watch.html`: player, daftar episode asli, info + sinopsis, rekomendasi

@@ -28,18 +28,22 @@ const { createAnime } = await import('../../js/api/normalize.js');
 const { cardHTML } = await import('../../js/ui/card.js');
 const { clearApiCache, friendlyError, ApiError } = await import('../../js/api/http.js');
 
-test('friendlyError keeps specific source-policy messages from the backend', () => {
+test('friendlyError explains source-policy diagnostics from the backend', () => {
     assert.equal(
-        friendlyError(new ApiError('robots.txt samehadaku tidak bisa dibaca — akses ditunda.', { kind: 'robots', source: 'samehadaku' })),
-        'robots.txt samehadaku tidak bisa dibaca — akses ditunda.',
+        friendlyError(new ApiError('robots.txt tidak terbaca', { kind: 'robots', status: 500, stage: 'robots' })),
+        'robots.txt tidak dapat diverifikasi (HTTP 500); sumber dilewati sementara.',
     );
     assert.equal(
-        friendlyError(new ApiError('Diblokir Cloudflare untuk IP pusat data.', { kind: 'blocked', source: 'otakudesu' })),
-        'Diblokir Cloudflare untuk IP pusat data.',
+        friendlyError(new ApiError('403 saat robots', { kind: 'blocked', status: 403, stage: 'robots' })),
+        'Akses dibatasi pada pemeriksaan robots.txt (HTTP 403); sumber dilewati.',
     );
     assert.equal(
-        friendlyError(new ApiError('robots', { kind: 'robots' })),
-        'robots',
+        friendlyError(new ApiError('challenge', { kind: 'blocked' })),
+        'Sumber mengirim challenge keamanan; permintaan dihentikan.',
+    );
+    assert.equal(
+        friendlyError(new ApiError('robots 404', { kind: 'policy', status: 404, stage: 'robots' })),
+        'robots.txt tidak tersedia dan izin sumber belum dapat diverifikasi; sumber dilewati.',
     );
 });
 

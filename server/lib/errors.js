@@ -57,11 +57,19 @@ export const notFound = (message, source = '') => new SourceError(message, { kin
 
 /** Ringkasan error yang aman dikirim ke klien (tanpa stack trace). */
 export function describeError(err) {
-    return {
+    const summary = {
         source: err?.source || '',
         kind: err?.kind || (err instanceof AppError ? err.code.toLowerCase() : 'internal'),
         message: String(err?.message || 'Kesalahan tidak diketahui').slice(0, 200),
     };
+    // Simpan status upstream, bukan hanya status 502/503 internal, agar tiap panel
+    // bisa membedakan 403, 429, kegagalan robots.txt, dan perubahan parser.
+    const httpStatus = Number(err?.httpStatus) || 0;
+    const retryAfter = Number(err?.retryAfter) || 0;
+    if (httpStatus > 0) summary.httpStatus = httpStatus;
+    if (retryAfter > 0) summary.retryAfter = Math.min(retryAfter, 3600);
+    if (typeof err?.stage === 'string' && err.stage) summary.stage = err.stage;
+    return summary;
 }
 
 /** Error karena klien membatalkan / batas waktu request habis. */
