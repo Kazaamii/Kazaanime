@@ -81,7 +81,7 @@ function cleanAnimeTitle(value) {
 
 function labelMap($) {
     const out = {};
-    $('li, p, tr, dd, .info-item, .detail-item, .anime-info, .anime-detail, .meta-item').each((_, element) => {
+    $('li, p, tr, dd, .info-item, .detail-item, .meta-item').each((_, element) => {
         const node = $(element);
         const text = cleanText(node.text());
         if (!text || text.length > 260) return;
