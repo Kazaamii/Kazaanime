@@ -1,0 +1,81 @@
+name: sample-upstream (sementara)
+
+# SEMENTARA — mengambil HTML asli upstream lewat runner GitHub karena sandbox
+# pengembangan tidak punya jalur keluar ke situs ini. Dihapus sebelum PR.
+
+on:
+  push:
+    branches: [arena/e0eda340-kazaanime]
+    paths:
+      - '.github/workflows/sample-upstream.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/e0eda340-kazaanime
+
+      - name: Ambil halaman daftar
+        shell: bash
+        run: |
+          set -u
+          UA='KazanimeBot/1.0 (+https://github.com/Kazaamii/Kazaanime)'
+          mkdir -p samples2
+          : > samples2/manifest.txt
+
+          fetch() {
+            name="$1"; url="$2"
+            code=$(curl -sS -L --compressed --max-time 45 \
+              -A "$UA" \
+              -H 'Accept: text/html,application/xhtml+xml' \
+              -o "samples2/$name.html" -w '%{http_code}' "$url" || echo 000)
+            bytes=$(wc -c < "samples2/$name.html" 2>/dev/null || echo 0)
+            if [ "${bytes:-0}" -gt 500000 ]; then
+              head -c 500000 "samples2/$name.html" > "samples2/$name.tmp"
+              mv "samples2/$name.tmp" "samples2/$name.html"
+              bytes=500000
+            fi
+            printf '%s\t%s\t%s\t%s\n' "$name" "$code" "$bytes" "$url" >> samples2/manifest.txt
+            echo "$name -> $code ($bytes bytes)"
+            sleep 2
+          }
+
+          # --- AnimeKu (UA bot jujur; UA browser dari IP pusat data = 403) ---
+          fetch animeku-home      'https://ww2.animeku.lol/'
+          fetch animeku-baru      'https://ww2.animeku.lol/baru-utnwb9y/'
+          fetch animeku-baru-2    'https://ww2.animeku.lol/baru-utnwb9y/page/2/'
+          fetch animeku-ongoing   'https://ww2.animeku.lol/jalan-uf5ms8g/'
+          fetch animeku-selesai   'https://ww2.animeku.lol/selesai-bjyzaqn/'
+          fetch animeku-favorit   'https://ww2.animeku.lol/favorit-sixkqhv/'
+          fetch animeku-film      'https://ww2.animeku.lol/film-anime-6d23pb8/'
+          fetch animeku-genre     'https://ww2.animeku.lol/genre/'
+
+          # --- Oploverz ---
+          fetch oploverz-update     'https://oploverz.ch/series/?order=update'
+          fetch oploverz-popular    'https://oploverz.ch/series/?order=popular'
+          fetch oploverz-rating     'https://oploverz.ch/series/?order=rating'
+          fetch oploverz-upcoming   'https://oploverz.ch/series/?status=upcoming'
+          fetch oploverz-movie      'https://oploverz.ch/series/?type=movie'
+          fetch oploverz-drama      'https://oploverz.ch/series/?type=drama'
+          fetch oploverz-genre      'https://oploverz.ch/series/?genre%5B%5D=action'
+          fetch oploverz-page2      'https://oploverz.ch/series/page/2/'
+
+      - name: Simpan ke branch
+        shell: bash
+        run: |
+          git config user.name 'Kazaanime sampler'
+          git config user.email 'noreply@github.com'
+          git add samples2
+          if git diff --cached --quiet; then
+            echo 'Tidak ada perubahan.'
+            exit 0
+          fi
+          git commit -m 'chore(sample): halaman daftar Animeku & Oploverz [skip ci]'
+          git push origin HEAD:arena/e0eda340-kazaanime
