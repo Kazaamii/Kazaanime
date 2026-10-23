@@ -205,29 +205,15 @@ export const SCHEDULE = Object.freeze({
 /**
  * Feed "Anime Jepang Sub Indo" di beranda (dipisah per situs sumber).
  *
- * Verifikasi berjalan di browser memakai endpoint episode backend: satu judul
- * hanya ditampilkan bila server/track subtitle Indonesia benar-benar ditemukan.
- * Batas di bawah mengendalikan biaya pemeriksaan (jumlah request sementara:
- * katalog + maks. `maxChecks` episode) dan memastikan satu situs yang lambat
- * tidak menahan panel situs lain.
+ * 24 Okt 2026: verifikasi per episode dihapus. AnimeKu & Oploverz sudah situs Sub Indo,
+ * jadi katalognya ditampilkan apa adanya — beranda tidak memeriksa episode, tidak
+ * menunggu batas waktu, dan tidak menyembunyikan judul.
  */
 export const SUB_INDO = Object.freeze({
-    /** Maks. hasil terverifikasi yang disimpan per panel (dipakai status "N terverifikasi"). */
+    /** Maks. judul yang dipakai per panel (backend mengirim 24 per situs). */
     resultLimit: 24,
-    /** Kartu yang benar-benar dirender per panel — ringkas seperti section lain, sisanya di "Lihat Semua". */
+    /** Kartu yang dirender sebelum tombol "Tampilkan lebih banyak" ditekan. */
     previewLimit: 6,
-    /** Maks. total pemeriksaan episode per pemuatan homepage. */
-    maxChecks: 24,
-    /** Maks. kandidat per sumber per pemuatan (keadilan antar-situs). */
-    perSourceChecks: 12,
-    /** Pemeriksaan paralel; backend tetap membatasi laju per host. */
-    concurrency: 4,
-    /** Batas waktu total verifikasi (ms). Hasil yang sudah terverifikasi tetap tampil. */
-    timeBudgetMs: 15000,
-    /** Bila episode terbaru belum punya bukti Sub Indo, periksa episode sebelumnya. */
-    retryPreviousEpisode: true,
-    /** Maks. pemeriksaan episode sebelumnya per pemuatan (di luar `maxChecks`). */
-    previousEpisodeChecks: 6,
 });
 
 /** Pengaturan UI umum. */

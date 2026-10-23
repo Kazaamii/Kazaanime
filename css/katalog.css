@@ -2,7 +2,7 @@
  * Kazanime — katalog.css (katalog.html / "Jelajah")
  * Memakai kelas bersama dari search.css (.search-results-section, .search-source-tab,
  * .anime-grid, .btn-load-more). Di sini: pemilih genre, catatan status, dan blok bagian
- * (kepala + tautan "Lihat Semua" bergaya .see-all + Muat Lagi pada daftar penuh).
+ * (kepala + tombol "Tampilkan lebih banyak" + tautan "Lihat Semua" bergaya .see-all).
  */
 .katalog-genre{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 18px;font-size:12px;color:var(--text-secondary)}
 .katalog-genre label{font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:11px;color:var(--text-muted)}
@@ -21,6 +21,12 @@
 .katalog-block-count{font-size:11px;font-weight:600;color:var(--text-muted);white-space:nowrap}
 /* "Lihat Semua" memakai .see-all (css/components.css) seperti section beranda. */
 .katalog-block-actions .see-all[hidden]{display:none}
+/* Tombol expand: buka sisa judul yang sudah dimuat tanpa memuat ulang bagian. */
+.katalog-expand{padding:8px 16px;border-radius:20px;border:1px solid rgba(var(--primary-rgb),.35);background:rgba(var(--primary-rgb),.1);color:var(--primary);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .25s;white-space:nowrap}
+.katalog-expand[hidden]{display:none}
+.katalog-expand:hover{background:rgba(var(--primary-rgb),.18);border-color:var(--primary)}
+.katalog-expand:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.katalog-block-head{flex-wrap:wrap}
 .katalog-back{display:inline-flex;align-items:center;gap:4px;margin-right:8px}
 .katalog-back .ic{transition:transform .25s}
 .katalog-back:hover .ic{transform:translateX(-3px)}

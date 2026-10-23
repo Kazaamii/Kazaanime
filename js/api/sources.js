@@ -144,6 +144,7 @@ export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
                         .map((item) => fromBackend(item, id))
                         .filter(Boolean),
                     stale: Boolean(entry?.stale),
+                    browse: Boolean(entry?.browse),
                     error: fromBackendError(entry?.error, id),
                 };
             }),

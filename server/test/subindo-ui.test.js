@@ -4,10 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const homeHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const homeJs = fs.readFileSync(path.join(root, 'js/home.js'), 'utf8');
-const componentsCss = fs.readFileSync(path.join(root, 'css/components.css'), 'utf8');
-const configJs = fs.readFileSync(path.join(root, 'js/config.js'), 'utf8');
+const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
+const homeHtml = read('index.html');
+const homeJs = read('js/home.js');
+const subindoJs = read('js/api/subindo.js');
+const subindoStateJs = read('js/ui/subindo-state.js');
+const componentsCss = read('css/components.css');
+const configJs = read('js/config.js');
+const cardJs = read('js/ui/card.js');
 
 test('Sub Indo homepage exposes a live summary and a dynamic feed list', () => {
     assert.match(homeHtml, /id="subIndoStatus"[^>]*role="status"[^>]*aria-live="polite"/);
@@ -18,88 +22,81 @@ test('Sub Indo homepage exposes a live summary and a dynamic feed list', () => {
         /Feed: Samehadaku, Sakunime, Otakudesu, dan Kuramanime/,
         'the intro must not promise providers that may be disabled in the backend',
     );
+    // 24 Okt 2026: tidak ada lagi janji verifikasi per episode di pengantar.
+    assert.doesNotMatch(homeHtml, /server atau track subtitle Indonesia ditemukan/);
+    assert.doesNotMatch(homeHtml, /Diverifikasi dari episode terbaru/);
+    assert.match(homeHtml, /Tampilkan lebih banyak/);
+    assert.match(homeHtml, /Lihat Semua/);
 });
 
-test('homepage renders per-source counts, timeout state, and a per-source retry', () => {
+test('homepage merender panel per situs tanpa pemeriksaan episode', () => {
     assert.match(homeJs, /renderSubIndoSummary\(/);
     assert.match(homeJs, /\$\('#subIndoStatus'\)/);
     assert.match(homeJs, /\$\('#subIndoFeedList'\)/);
-    assert.match(homeJs, /subIndoSourceMeta/);
-    assert.match(homeJs, /source\.timedOut/);
-    assert.match(homeJs, /data-action="retry-subindo-source" data-source="\$\{source\.id\}"/);
+    assert.match(homeJs, /getSubIndoHomeSources\(\{ refresh \}\)/);
     assert.match(homeJs, /getSubIndoHomeSources\(\{ sourceIds: \[id\], refresh: true \}\)/);
     assert.match(homeJs, /const SUB_INDO_HOME_LIMIT = SUB_INDO\.previewLimit/);
-});
-
-test('Sub Indo verification limits are centralised in config.js', () => {
-    assert.match(configJs, /export const SUB_INDO = Object\.freeze\(\{/);
-    for (const entry of [
-        'resultLimit: 24',
-        'previewLimit: 6',
-        'maxChecks: 24',
-        'perSourceChecks: 12',
-        'concurrency: 4',
-        'timeBudgetMs: 15000',
-        'retryPreviousEpisode: true',
-        'previousEpisodeChecks: 6',
-    ]) {
-        assert.ok(configJs.includes(entry), `config.js must define ${entry}`);
+    assert.match(homeJs, /source\.items\) \? source\.items : \[\]/);
+    assert.doesNotMatch(homeJs, /getBackendEpisode|hasIndonesianSubtitle|subtitleEvidence/,
+        'beranda tidak boleh memeriksa episode lagi');
+    for (const removed of ['timedOut', 'failedChecks', 'unproven', 'episode diperiksa', 'terverifikasi', 'Batas waktu']) {
+        assert.doesNotMatch(homeJs, new RegExp(removed), `home.js masih memuat "${removed}"`);
     }
 });
 
-test('panel beranda hanya AnimeKu & Oploverz, ringkas 6 kartu + tautan Lihat Semua', () => {
-    // Jaring pengaman untuk respons API lama (cache CDN/browser) yang masih memuat
-    // Samehadaku/Sakunime/Otakudesu/Kuramanime.
-    assert.match(homeJs, /import \{ panelSections \} from '\.\/api\/subindo\.js'/);
-    assert.match(homeJs, /const sections = panelSections\(result\.sections\);/);
-    assert.match(homeJs, /const sections = panelSections\(result\.sections\);/);
-    assert.match(homeJs, /panelSections\(result\.sections\)\.find/);
-    // Cuplikan ringkas: 6 kartu, bukan seluruh hasil verifikasi.
-    assert.match(homeJs, /source\.items\.slice\(0, SUB_INDO_HOME_LIMIT\)/);
-    assert.match(configJs, /previewLimit: 6/);
-    // Tautan seperti section lain (Ongoing/Populer).
+test('panel bisa dibuka lebih banyak dan menautkan Lihat Semua', () => {
+    assert.match(homeJs, /const subIndoExpanded = new Set\(\)/);
+    assert.match(homeJs, /data-action="expand-subindo-source" data-source="\$\{source\.id\}"/);
+    assert.match(homeJs, /Tampilkan lebih banyak \(\$\{all\.length\}\)/);
+    assert.match(homeJs, /Tampilkan lebih sedikit/);
     assert.match(homeJs, /class="see-all subindo-source-more"/);
     assert.match(homeJs, /Lihat Semua/);
-    assert.doesNotMatch(componentsCss, /\.subindo-source-more\{[^}]*font-size:11px/,
-        'gaya tautan mengikuti .see-all, bukan chip kecil');
+    assert.match(componentsCss, /\.subindo-source-foot\{/);
+    assert.match(componentsCss, /\.subindo-expand\{/);
 });
 
-test('panel tanpa judul terverifikasi memakai satu baris ringkas, bukan kotak kosong besar', () => {
-    assert.match(homeJs, /function renderSubIndoEmpty\(grid, source\)/);
-    assert.match(homeJs, /renderSubIndoEmpty\(grid, source\)/);
-    assert.match(homeJs, /const status = sourceStatusLabel\(source, Array\.isArray\(source\.items\) \? source\.items\.length : 0\)/);
-    assert.match(homeJs, /const summary = issuesSummary\(sections\)/);
-    assert.match(homeJs, /class="subindo-empty/);
-    assert.match(homeJs, /const homeUrl = safeHomeUrl\(source\.homeUrl\)/);
-    assert.match(homeJs, /source\.unproven/);
-    assert.match(homeJs, /if \(source\.stale\) bits\.push\('data cache'\)/);
-    assert.match(homeJs, /const proof = evidenceSummary\(source\.items\)/);
-    assert.match(homeJs, /bukti: \$\{proof\}/);
-    assert.match(homeJs, /rel="noopener noreferrer"/);
-    assert.match(homeJs, /class="subindo-source\$\{items\.length \? '' : ' is-empty'\}"/);
-    assert.match(homeHtml, /Bila situs membatasi akses otomatis, panel menampilkan tautan untuk membuka situsnya sendiri\./);
-});
+test('Sub Indo hanya AnimeKu & Oploverz, tanpa batas verifikasi di config', () => {
+    assert.match(subindoJs, /export const PANEL_SOURCE_IDS = Object\.freeze\(\['animeku', 'oploverz'\]\)/);
+    assert.match(subindoJs, /export function panelSections\(/);
+    assert.match(subindoJs, /export function groupSubIndoSources\(/);
+    assert.match(subindoJs, /export async function loadSubIndoSources\(/);
+    assert.match(homeJs, /import \{ panelSections \} from '\.\/api\/subindo\.js'/);
+    assert.match(homeJs, /sections: panelSections\(result\.sections\)/);
 
-test('sumber pengganti AnimeKu & Oploverz dikenal frontend', () => {
-    const subindoJs = fs.readFileSync(path.join(root, 'js/api/subindo.js'), 'utf8');
-    const cardJs = fs.readFileSync(path.join(root, 'js/ui/card.js'), 'utf8');
-    const sourceIds = subindoJs.match(/const SUB_INDO_SOURCE_IDS = new Set\(\[([^\]]+)\]\)/);
-    assert.ok(sourceIds, 'SUB_INDO_SOURCE_IDS harus berupa Set literal');
-    for (const id of ['animeku', 'oploverz']) {
-        assert.ok(sourceIds[1].includes(`'${id}'`), `SUB_INDO_SOURCE_IDS harus memuat ${id}`);
-        assert.ok(subindoJs.includes(`'${id}'`), `feed terbaru harus memuat ${id}`);
-        assert.match(cardJs, new RegExp(`backend:${id}'?: \\{ cls: 'src-backend', label: `), `badge ${id}`);
+    assert.match(configJs, /export const SUB_INDO = Object\.freeze\(\{/);
+    for (const entry of ['resultLimit: 24', 'previewLimit: 6']) {
+        assert.ok(configJs.includes(entry), `config.js must define ${entry}`);
+    }
+    for (const removed of ['maxChecks', 'perSourceChecks', 'timeBudgetMs', 'previousEpisodeChecks']) {
+        assert.equal(configJs.includes(removed), false, `${removed} sudah tidak dipakai`);
     }
 });
 
-test('styles for the summary, per-source meta, and retry button exist', () => {
-    assert.match(componentsCss, /\.subindo-status\{/);
-    assert.match(componentsCss, /\.subindo-status:empty\{display:none\}/);
-    assert.match(componentsCss, /\.subindo-source-meta\{/);
-    assert.match(componentsCss, /\.subindo-retry\{/);
-    assert.match(componentsCss, /\.subindo-retry \.ic\{/);
+test('panel kosong tetap memakai satu baris ringkas + tautan buka situs', () => {
+    assert.match(homeJs, /function renderSubIndoEmpty\(grid, source\)/);
+    assert.match(homeJs, /renderSubIndoEmpty\(grid, source\)/);
+    assert.match(homeJs, /class="subindo-empty/);
+    assert.match(homeJs, /const homeUrl = safeHomeUrl\(source\.homeUrl\)/);
+    assert.match(homeJs, /rel="noopener noreferrer"/);
+    assert.match(homeJs, /const status = sourceStatusLabel\(source, all\.length\)/);
+    assert.match(subindoStateJs, /export function sourceStatusLabel\(/);
     assert.match(componentsCss, /\.subindo-empty\{/);
     assert.match(componentsCss, /\.subindo-empty\.is-policy\{/);
     assert.match(componentsCss, /\.subindo-empty-link\{/);
     assert.match(componentsCss, /\.subindo-source\.is-empty\{/);
+});
+
+test('badge kartu AnimeKu & Oploverz tetap dikenali', () => {
+    for (const id of ['animeku', 'oploverz']) {
+        assert.ok(subindoJs.includes(`'${id}'`), `panel harus memuat ${id}`);
+        assert.match(cardJs, new RegExp(`backend:${id}'?: \\{ cls: 'src-backend', label: `), `badge ${id}`);
+    }
+});
+
+test('styles for the summary, expand button, and retry button exist', () => {
+    assert.match(componentsCss, /\.subindo-status\{/);
+    assert.match(componentsCss, /\.subindo-status:empty\{display:none\}/);
+    assert.match(componentsCss, /\.subindo-retry\{/);
+    assert.match(componentsCss, /\.subindo-retry \.ic\{/);
+    assert.match(componentsCss, /\.subindo-source-more\{/);
 });

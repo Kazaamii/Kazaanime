@@ -17,7 +17,8 @@ beradapter.
 | **F+** | Subtitle lokal untuk pemutar HLS: pilih `.srt` / `.vtt` di browser, konversi SRT→WebVTT, ganti/hapus track; tidak diunggah | ✅ Selesai |
 | **G** | Penguatan feed Sub Indo 23 Okt 2026: verifikasi beranggaran waktu, batas kandidat per situs, fallback episode sebelumnya, ringkasan & tombol coba lagi per panel, panel gagal ringkas dengan diagnosis tergabung dan tautan "Buka situs" (tanpa bypass) | ✅ Selesai |
 | **H** | Pengganti saat sumber gagal 23 Okt 2026: **AnimeKu** (`ww2.animeku.lol`) dan **Oploverz** (`oploverz.ch`, dikenal juga sebagai Animeloverz) sebagai adapter penuh + panel Sub Indo cadangan; bukti Sub Indo tetap per episode | ✅ Selesai |
-| **I** | Katalog 23 Okt 2026: panel Sub Indo tinggal **AnimeKu** + **Oploverz** (Samehadaku, Sakunime, Otakudesu, Kuramanime tidak lagi jadi panel); endpoint **`/api/anime/browse`**; halaman baru **Jelajah** (`katalog.html`) dengan tiga tab (AnimeKu / Oploverz / Donghua), bagian berurutan, tautan **Lihat Semua** (gaya section beranda), filter genre, dan Coming Soon dari metadata | ✅ Selesai |
+| **I** | Katalog 23 Okt 2026: panel Sub Indo tinggal **AnimeKu** + **Oploverz** (Samehadaku, Sakunime, Otakudesu, Kuramanime tidak lagi jadi panel); endpoint **`/api/anime/browse`**; halaman baru **Jelajah** (`katalog.html`) dengan tiga tab (AnimeKu / Oploverz / Donghua), bagian berurutan, filter genre, dan Coming Soon dari metadata | ✅ Selesai |
+| **J** | 24 Okt 2026: **verifikasi per episode dihapus** — panel beranda menampilkan katalog AnimeKu & Oploverz apa adanya (tanpa batas waktu, tanpa "tanpa bukti"), plus tombol **Tampilkan lebih banyak** di tiap panel; **Jelajah** kembali punya tombol expand per bagian (tetap dengan **Lihat Semua** → `?filter=<bagian>`) | ✅ Selesai |
 
 ---
 
@@ -25,14 +26,14 @@ beradapter.
 
 Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diubah di Tahap D · 🅔 baru/diubah di Tahap E (22 Okt 2026) ·
 🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) · 🅖 subtitle lokal browser (22 Okt 2026) ·
-🅗 penguatan feed Sub Indo (23 Okt 2026) · 🅘 katalog Jelajah (23 Okt 2026)
+🅗 feed Sub Indo per sumber (23 Okt 2026, verifikasi dihapus 24 Okt 2026) · 🅘 katalog Jelajah (23 Okt 2026)
 
 ```
 kazanime/
 ├── index.html                 ✅🅔 homepage: hero, SUB INDO (per sumber), GENRE (+hasil), JADWAL, ongoing, populer, bookmark, baru rilis, donghua
 ├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
-├── katalog.html               ✅🅘 Jelajah: ?source=animeku|oploverz|donghua&genre=<slug>&filter=<bagian>; bagian berurutan + Lihat Semua
+├── katalog.html               ✅🅘 Jelajah: ?source=animeku|oploverz|donghua&genre=<slug>&filter=<bagian>; bagian berurutan + expand + Lihat Semua
 ├── README.md                  ✅🅓
 ├── package.json               🅓🅔 dependency backend (cheerio/Express/Undici/fetch-socks/tough-cookie; Playwright opsional), skrip dev/start/test/check:sources
 ├── package-lock.json          🅓
@@ -46,11 +47,11 @@ kazanime/
 │   ├── components.css         ✅ navbar, dropdown, card, skeleton, modal, toast, API status, footer, keterangan section, panel Sub Indo per sumber (+ status & retry)
 │   ├── home.css               ✅ hero, genre, jadwal
 │   ├── search.css             ✅ tab sumber, filter, muat lagi
-│   ├── katalog.css            ✅🅘 blok bagian, tautan "Lihat Semua" (.see-all), pemilih genre
+│   ├── katalog.css            ✅🅘 blok bagian, tombol expand, tautan "Lihat Semua" (.see-all), pemilih genre
 │   └── watch.css              ✅🅒 player, server, episode, info, download, platform legal (+ urutan mobile)
 ├── js/
 │   ├── theme-preload.js       ✅ script klasik di <head>: pasang tema sebelum render (anti-kedip)
-│   ├── config.js              ✅🅓🅔🅕 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone), PLAYER (hls, aiSubtitle) & SUB_INDO (batas verifikasi feed)
+│   ├── config.js              ✅🅓🅔🅕 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone), PLAYER (hls, aiSubtitle) & SUB_INDO (batas judul panel: 24 hasil, 6 kartu cuplikan)
 │   ├── routes.js              ✅🅒 pembuat/pembaca URL watch & search (filter di URL, batas nomor episode)
 │   ├── data/
 │   │   └── fallback.js        ✅ data cadangan offline (format ternormalisasi)
@@ -61,7 +62,7 @@ kazanime/
 │   │   ├── kitsu.js           ✅🅒 Kitsu (JSON:API, simple GET) + detail dengan mapping id MAL/AniList
 │   │   ├── sources.js         ✅🅓🅔🅕 klien backend /api/anime/* + /api/stream/servers + /api/stream/subai (aktif; mati otomatis bila /api tidak ada) + normalisasi server/download
 │   │   ├── streams.js         🅒🅓🅔 server streaming per episode (config + slot penyedia + SEMUA situs backend yang cocok), link download
-│   │   ├── subindo.js         ✅🅗 verifikasi feed Sub Indo per sumber: batas waktu, batas kandidat per situs, episode sebelumnya (23 Okt 2026)
+│   │   ├── subindo.js         ✅🅗 katalog Sub Indo per sumber tanpa verifikasi episode (24 Okt 2026): pengelompokan, dedupe, `sourceIds`, batas 24
 │   │   └── index.js           ✅🅓 FASAD untuk UI: rantai fallback (donghua: backend → AniList CN) + getWatchData + getSubIndoHomeSources
 │   ├── services/
 │   │   ├── storage.js         ✅ localStorage aman
@@ -96,7 +97,7 @@ kazanime/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
 │   ├── home.js                ✅🅓🅔🅗 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
-│   ├── katalog.js             ✅🅘 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + Lihat Semua, Muat Lagi di daftar penuh, genre
+│   ├── katalog.js             ✅🅘 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre
 │   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
     ├── app.js                 createApp(): /api/health, /api/bot, /api/anime/*, /api/stream/*, error handler, rate limit masuk (+ klien Gemini bila GEMINI_API_KEY ada 🅕)
@@ -205,7 +206,7 @@ Yang bisa dicoba (Tahap B):
 - `/search.html?q=one piece` — tab sumber, urutan, filter format, "Muat Lebih Banyak"
 - `/search.html?browse=ongoing` · `?browse=new` · `?browse=donghua` · `?genre=Isekai`
 - `/katalog.html` — **Jelajah**: AnimeKu (Terbaru → New Anime Populer → Top Favorit → Coming Soon → Complete),
-  tiap bagian ringkas 6 kartu + tautan **Lihat Semua**; tab **Oploverz** (Terbaru → Populer → Rating Tertinggi →
+  tiap bagian ringkas 6 kartu + tombol **Tampilkan lebih banyak** + tautan **Lihat Semua**; tab **Oploverz** (Terbaru → Populer → Rating Tertinggi →
   Ongoing → Completed → Movie) dengan **filter genre**; tab **Donghua** (rilis terbaru)
 - footer → **📡 Status API** untuk mengecek ulang semua sumber
 
@@ -253,40 +254,41 @@ yang relevan di `js/api/index.js`. UI tidak perlu diubah.
 
 ---
 
-## 🌸 Feed Sub Indo di beranda (penguatan 23 Okt 2026)
+## 🌸 Feed Sub Indo di beranda
 
 Section **Anime Jepang Sub Indo** tepat di bawah hero tetap dipisah per situs.
-`GET /api/anime/latest-subindo` hanya menyediakan katalog per sumber; browser
-memverifikasi sendiri endpoint episode situs tersebut dan hanya menampilkan judul
-yang punya server/track subtitle Indonesia eksplisit. Batasnya dipusatkan di
-`SUB_INDO` (`js/config.js`):
+`GET /api/anime/latest-subindo` mengirim judul terbaru **AnimeKu** dan **Oploverz**;
+beranda menampilkannya apa adanya, tanpa pemeriksaan episode.
+
+> **24 Okt 2026 — verifikasi per episode dihapus** (permintaan pengguna: *"hapus fitur ini,
+> tidak perlu pencocokan filter; AnimeKu & Oploverz sudah situs Sub Indo dengan
+> ekosistemnya sendiri"*). Panel tidak lagi memanggil endpoint episode, tidak punya batas
+> waktu, dan tidak menyembunyikan judul "tanpa bukti". `SUB_INDO` (`js/config.js`) kini
+> hanya berisi `resultLimit: 24` dan `previewLimit: 6`.
 
 | Aspek | Perilaku |
 |---|---|
-| Anggaran waktu | `SUB_INDO.timeBudgetMs` = 15 dtk, dihitung **sejak katalog diminta**. Pemeriksaan yang belum selesai dibatalkan; hasil yang sudah terverifikasi tetap tampil dan panel diberi label **Batas waktu** (bukan dianggap kosong/error). |
-| Batas pemeriksaan | Maks. 24 episode (`maxChecks`) dan maks. 12 kandidat per situs (`perSourceChecks`), dibagikan bergiliran supaya satu situs tidak menghabiskan jatah situs lain. |
-| Episode sebelumnya | Bila episode terbaru tidak punya bukti Sub Indo, episode sebelumnya diperiksa (maks. 6 kali per pemuatan). Kartu memakai `latestEpisode` hasil verifikasi, jadi tautan tidak menjanjikan subtitle yang belum ada. |
-| Coba lagi per panel | Tombol **Coba lagi** mengambil katalog baru (`refresh` → `force` + `noCache`, termasuk `cache: no-store`) lalu hanya memverifikasi ulang situs itu (`sourceIds`); panel lain tidak ikut dimuat ulang. |
-| **Bukti per episode** | `server/lib/subtitle-evidence.js` membaca halaman episode itu sendiri: track subtitle Indonesia, judul episode ("… Subtitle Indonesia"), label download, label server/mirror ("Hardsub Indonesia"), lalu deskripsi episode. Adapter tidak lagi menempelkan `lang: 'id'` hanya karena situsnya situs Indonesia; tanpa bukti, server tetap bisa diputar tetapi judulnya **tidak dihitung Sub Indo**. Buktinya bisa diperiksa sendiri: `npm run check:subindo` (fixture, mengutip teks yang cocok) atau baris `subtitle` pada `npm run check:sources -- --live`. |
-| Transparansi | Ringkasan "N situs · N judul terverifikasi · N episode diperiksa", status per sumber (`N episode diperiksa · N gagal · N tanpa bukti · batas waktu`), jenis bukti yang dipakai (`bukti: judul episode, label download`), dan daftar feed di intro diambil dari respons backend — bukan teks statis. |
-| Panel gagal ringkas | Situs tanpa judul terverifikasi tampil sebagai **satu baris** (ikon + diagnosis + tindakan), bukan kotak kosong besar yang mengulang kepala panel. Diagnosis hanya ditulis sekali: pesan yang sama untuk beberapa situs digabung pada keterangan global ("Penyebab: … (Samehadaku, Otakudesu)"). |
+| **Sumber panel** | Hanya **AnimeKu** lalu **Oploverz** (`SUB_INDO_LATEST_SOURCE_ORDER`). Samehadaku, Sakunime, Otakudesu, dan Kuramanime tidak lagi menjadi panel; adapter mereka tetap bisa dipakai pencarian halaman nonton. `js/home.js` juga menyaring `PANEL_SOURCE_IDS` = `animeku`/`oploverz` sebagai jaring pengaman untuk respons lama di cache CDN/browser, jadi keempat situs itu tidak muncul lagi meski API mengirimnya. |
+| **Tampilan panel** | **6 kartu** (`SUB_INDO.previewLimit`) + tombol **Tampilkan lebih banyak (24)** yang langsung membuka sisa judul yang sudah dimuat (tanpa request baru; tombol berubah jadi **Tampilkan lebih sedikit**) + tautan **Lihat Semua** (`.see-all`) menuju `katalog.html?source=<situs>`. |
+| Ringkasan | "N situs · N judul" dihitung dari respons backend, bukan teks statis; daftar feed di intro juga dari backend. |
+| **Tanpa pemeriksaan** | `groupSubIndoSources()` hanya mengelompokkan, membuang duplikat (slug/judul), dan memotong ke `resultLimit`. Tidak ada `getEpisode`, `timeBudgetMs`, `maxChecks`, atau label "terverifikasi"/"tanpa bukti". |
+| Coba lagi per panel | Tombol **Coba lagi** mengambil katalog baru (`refresh` → `force` + `noCache`, termasuk `cache: no-store`) hanya untuk situs itu (`sourceIds`); panel lain tidak ikut dimuat ulang. |
+| Panel kosong/gagal | Situs tanpa judul tampil sebagai **satu baris** (ikon + diagnosis + tindakan), bukan kotak kosong besar. Diagnosis hanya ditulis sekali: pesan yang sama untuk beberapa situs digabung pada keterangan global ("Penyebab: … (AnimeKu, Oploverz)"). |
 | Label jujur | `blocked`/`policy`/`rate_limited`/`robots` diberi label **Akses dibatasi** (kita sengaja berhenti), sedangkan `parse`/`network` tetap **Sumber bermasalah**. Tidak ada kesan situsnya "rusak" saat penyebabnya kebijakan. |
-| Buka situs | Panel kosong/gagal menyertakan tautan `homeUrl` (`target="_blank"`, `rel="noopener noreferrer"`, hanya `http(s)`) agar pengguna bisa memeriksa situsnya sendiri. Ini tautan biasa — **bukan** upaya menembus Cloudflare/robots, dan tidak ada stealth, solver CAPTCHA, atau rotasi proxy. |
-| **Sumber panel** | Panel diambil dari backend (`SUB_INDO_LATEST_SOURCE_ORDER`): hanya **AnimeKu** lalu **Oploverz** (23 Okt 2026). Samehadaku, Sakunime, Otakudesu, dan Kuramanime tidak lagi menjadi panel; adapter mereka tetap aktif untuk pencarian halaman nonton. `js/home.js` juga menyaring `SUB_INDO_PANEL_IDS` = `animeku`/`oploverz` sebagai jaring pengaman untuk respons lama yang masih tersimpan di cache CDN/browser, jadi panel keempat situs itu tidak muncul lagi meski API mengirimnya. Setiap panel diisi judul yang lolos bukti per episode — bukan judul yang diklaim Sub Indo karena situsnya situs Indonesia. |
-| **Tampilan beranda** | Tiap panel menampilkan **6 kartu** (`SUB_INDO.previewLimit`) dengan tautan **Lihat Semua** (`.see-all`, sama seperti section *Ongoing Anime*/*Anime Populer*) menuju `katalog.html?source=<situs>`; sisa judul terverifikasi (sampai `resultLimit` = 24) tetap dihitung pada status “N terverifikasi” dan tidak dipotong dari katalog Jelajah. |
-| Tanpa backend | Tetap seperti sebelumnya: section menampilkan pesan yang bisa dicoba lagi; tidak ada judul metadata cadangan yang diklaim Sub Indo. |
+| Buka situs | Panel kosong/gagal menyertakan tautan `homeUrl` (`target="_blank"`, `rel="noopener noreferrer"`, hanya `http(s)`). Ini tautan biasa — **bukan** upaya menembus Cloudflare/robots, dan tidak ada stealth, solver CAPTCHA, atau rotasi proxy. |
+| Tanpa backend | Section menampilkan pesan yang bisa dicoba lagi; tidak ada judul metadata cadangan yang diklaim Sub Indo. |
 
-Tes offline: `server/test/subindo-home.test.js` (urutan pemeriksaan, pemisahan
-sumber, fallback episode sebelumnya, batas waktu, batas per sumber, `sourceIds`,
-`homeUrl`, abort), `server/test/subindo-ui.test.js` (ringkasan, retry per panel,
-panel ringkas, CSS, konstanta config), dan `server/test/subindo-state.test.js`
-(label status, diagnosis, penggabungan penyebab, validasi `homeUrl`).
-`server/test/frontend-media.test.js` juga menguji refresh katalog tanpa cache dan
-penerusan `sourceIds` lewat fasad. `server/test/subtitle-evidence.test.js` menguji
-deteksi bukti (track/judul/download/label/deskripsi), penolakan asumsi "situs Indonesia",
-dan pembuangan klaim bahasa tanpa bukti. `server/test/subtitle-report.test.js` menjaga
-laporan `npm run check:subindo` tetap jujur: halaman berpenanda lolos, kontrol negatif dari
-situs yang sama tidak.
+Bukti subtitle tetap ada di sisi server: `server/lib/subtitle-evidence.js` menandai
+`subtitleEvidence` pada data episode (dipakai halaman nonton dan `npm run check:subindo`),
+tetapi beranda tidak lagi memakainya untuk menyaring judul.
+
+Tes offline: `server/test/subindo-home.test.js` (pengelompokan per situs, dedupe, batas
+24, `sourceIds`, fallback, tanpa request episode), `server/test/subindo-ui.test.js`
+(markup ringkasan, tombol expand, Lihat Semua, konstanta config, CSS), dan
+`server/test/subindo-state.test.js` (label status, diagnosis, penggabungan penyebab,
+validasi `homeUrl`, helper verifikasi lama sudah hilang). `server/test/frontend-media.test.js`
+juga menguji fasad Sub Indo tanpa pemeriksaan episode dan `browse` per sumber.
+`server/test/subtitle-evidence.test.js` tetap menguji deteksi bukti sisi server.
 
 ## 🔁 Sumber pengganti: AnimeKu & Oploverz (23 Okt 2026)
 
@@ -318,12 +320,18 @@ pencarian. Ada tiga tab:
 | **Oploverz (Animeloverz)** | Terbaru (`update`) → Populer (`popular`) → Rating Tertinggi (`rating`) → Ongoing → Completed → Movie | ✅ 80 genre dari form `/series/` |
 | **Donghua** | Donghua Baru Upload (feed Donghua Kazanime: AniList negara CN → backend AnimeXin/Anichin) | — |
 
-**Lihat Semua (bukan Expand).** Setiap bagian tampil ringkas **6 kartu** dengan tautan
-**Lihat Semua** di kepala bagian — sama seperti section *Ongoing Anime* / *Anime Populer* di
-beranda. Tautan itu membuka halaman yang sama dalam mode daftar penuh (`?filter=<bagian>`):
-semua judul yang sudah dimuat tampil, dan **Muat Lagi** mengambil halaman berikutnya
-(`page` 1..500) tanpa mengacak urutan. Tidak ada tombol **Expand/Ringkas** — satu bagian tidak
-mekar di dalam halaman; tautan **← Semua bagian** mengembalikan tampilan seluruh bagian.
+**Tampilkan lebih banyak + Lihat Semua.** Setiap bagian tampil ringkas **6 kartu** dengan
+dua jalan untuk melihat sisanya:
+
+- **Tampilkan lebih banyak (n)** — membuka semua judul yang **sudah dimuat** di dalam bagian
+  itu (tanpa request baru); tombol berubah menjadi **Tampilkan lebih sedikit**. Setelah
+  terbuka, **Muat Lagi** mengambil halaman berikutnya (`page` 1..500) tanpa mengacak urutan.
+- **Lihat Semua** (`.see-all`, seperti section *Ongoing Anime* / *Anime Populer* di beranda) —
+  membuka halaman yang sama dalam mode daftar penuh (`?filter=<bagian>`), dengan
+  **Muat Lagi** dan tautan **← Semua bagian** untuk kembali.
+
+Keduanya kompak di kepala bagian pada layar lebar dan menumpuk rapi di layar sempit.
+Kartu katalog tidak pernah diklaim Sub Indo — klaim itu hanya milik panel beranda.
 
 **Hemat request.** Bagian dimuat saat mendekati layar (`IntersectionObserver`, `rootMargin`
 400 px); bagian pertama langsung dimuat. Fetcher tetap menahan 1 request/detik/host, jadi enam
@@ -550,7 +558,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Endpoint | Isi `data` |
 |---|---|
 | `GET /api/anime/latest` | daftar anime (rilis terbaru semua sumber; animexin = episode terbaru tiap seri) |
-| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, browse, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Panel hanya **AnimeKu** lalu **Oploverz** (`SUB_INDO_LATEST_SOURCE_ORDER`, 23 Okt 2026); `browse` menandai sumber yang punya halaman daftar (dipakai tautan "Lihat Semua"). Homepage memeriksa endpoint episode terbaru dan hanya menampilkan anime dengan metadata server/track subtitle Indonesia yang eksplisit; judul yang sama dari situs berbeda tetap menjadi kartu terpisah. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
+| `GET /api/anime/latest-subindo` | grup `{ id, name, items, stale, browse, error? }` untuk homepage; tiap sumber tetap terpisah, tanpa fallback metadata. Panel hanya **AnimeKu** lalu **Oploverz** (`SUB_INDO_LATEST_SOURCE_ORDER`, 23 Okt 2026); `browse` menandai sumber yang punya halaman daftar (dipakai tautan "Lihat Semua"). Sejak 24 Okt 2026 homepage **tidak** memeriksa endpoint episode: katalog ditampilkan apa adanya (6 kartu + expand + Lihat Semua); judul yang sama dari situs berbeda tetap menjadi kartu terpisah. Anoboy belum memiliki rute latest terverifikasi; AnimeIndo masih lookup-only. |
 | `GET /api/anime/browse?source=&filter=&genre=&page=` | **(baru, 23 Okt 2026)** katalog per sumber untuk halaman **Jelajah**: `{ source, data: { items, page, hasNext, filters, genres, filter, genre }, fallback: false, stale, errors }`. `source` wajib punya `supportsBrowse` (AnimeKu, Oploverz); token filter/genre divalidasi → `400`, sumber asing → `404`. Token AnimeKu: `baru`, `populer`, `favorit`, `coming`, `selesai`, `ongoing`, `film`; Oploverz: `update`, `popular`, `rating`, `ongoing`, `completed`, `movie` + 80 genre |
 | `GET /api/anime/search?q=` | daftar anime (2–100 karakter) |
 | `GET /api/anime/downloads/kusonime?title=<romaji>` | paket unduhan Kusonime yang judul detailnya cocok persis setelah normalisasi (dapat mengirim beberapa `title`). Diakses hanya dari bagian unduhan; hasil bisa berupa satu season/seri, bukan episode tunggal. Mirror tidak di-fetch atau di-decode. |
@@ -588,7 +596,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | Aturan | Implementasi |
 |---|---|
 | robots.txt | **Mode diatur `SCRAPER_ROBOTS_MODE`** (23 Okt 2026): `off` *(default proyek, permintaan pemilik)* = robots.txt tidak diminta sama sekali; `warn` = dibaca untuk diagnosis tetapi tidak memblokir; `enforce` = perilaku lama (RFC 9309: grup `KazanimeBot`/`*`, kecocokan terpanjang, `*` & `$`, `Crawl-delay`; 4xx = boleh, 5xx/jaringan = dilarang sementara; blokir Cloudflare = **blocked**). Mode aktif tampil di `/api/health` (`robotsMode`) dan `/api/bot` |
-| ToS | Hasil peninjauan per sumber di `POLICY.tos` adapter (`allowed` / `unknown` / `forbidden`). `forbidden` → adapter tidak pernah dipanggil. `unknown` → tetap boleh dicoba (gerbang robots tidak lagi memblokir), tetapi klaim **Sub Indo wajib punya bukti per episode** (lihat [Bukti subtitle](#-feed-sub-indo-di-beranda-penguatan-23-okt-2026)) |
+| ToS | Hasil peninjauan per sumber di `POLICY.tos` adapter (`allowed` / `unknown` / `forbidden`). `forbidden` → adapter tidak pernah dipanggil. `unknown` → tetap boleh dicoba (gerbang robots tidak lagi memblokir). Data episode tetap membawa bukti subtitle Indonesia sisi server (`subtitleEvidence`), sedangkan panel beranda menampilkan katalog AnimeKu/Oploverz apa adanya — lihat [Feed Sub Indo di beranda](#-feed-sub-indo-di-beranda) |
 | User-Agent | `KazanimeBot/1.0 (+https://<domain>/api/bot; <BOT_CONTACT>)` yang deskriptif; tidak meniru browser. Opsi `headers` hanya untuk kebutuhan protokol terdokumentasi (mis. Origin/Referer media), bukan fingerprint spoofing |
 | Rate limit keluar | maks 1 request/detik per host (Crawl-delay bisa memperbesar), antrean > 6 dtk ditolak |
 | Rate limit masuk | 60 request/menit per IP untuk `/api/anime/*` (header `RateLimit-*`) |

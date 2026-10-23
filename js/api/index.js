@@ -28,7 +28,7 @@ import { createAnime, titleKey, withIds } from './normalize.js';
 import {
     FALLBACK_HERO, FALLBACK_ONGOING, FALLBACK_POPULAR, FALLBACK_NEW, FALLBACK_DONGHUA, FALLBACK_SCHEDULE,
 } from '../data/fallback.js';
-import { getVerifiedSubIndoSources } from './subindo.js';
+import { loadSubIndoSources } from './subindo.js';
 
 export { ApiError, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests };
 export { listStreamServers, getEpisodeExtras, withProviderServers } from './streams.js';
@@ -147,21 +147,22 @@ export async function getHomeSection(kind) {
 }
 
 /**
- * Rilis Sub Indo yang diverifikasi per sumber melalui server/track episode terbaru.
+ * Rilis Sub Indo per situs, **tanpa verifikasi episode** (24 Okt 2026).
+ * Panel menampilkan katalog yang dikirim backend apa adanya.
  * @param {{signal?: AbortSignal, sourceIds?: string[], refresh?: boolean}} [opts]
- *   sourceIds: batasi verifikasi ke situs tertentu (tombol "Coba lagi" per panel).
+ *   sourceIds: batasi ke situs tertentu (tombol "Coba lagi" per panel).
  *   refresh: ambil katalog baru tanpa cache (perlu saat sumber sebelumnya gagal).
  */
 export function getSubIndoHomeSources({ signal, sourceIds, refresh = false } = {}) {
-    return getVerifiedSubIndoSources({
+    return loadSubIndoSources({
         getSources: (opts) => backend.getLatestSubIndoBySource({ ...opts, refresh }),
-        getEpisode: (slug, ep, opts) => backend.getBackendEpisode(slug, ep, opts),
         signal,
         sourceIds,
+        refresh,
     });
 }
 
-/** Alias kompatibilitas; hasil Sub Indo tetap dikelompokkan dan diverifikasi per sumber. */
+/** Alias kompatibilitas; hasil Sub Indo tetap dikelompokkan per sumber. */
 export function getSubIndoHomeSection(opts = {}) {
     return getSubIndoHomeSources(opts);
 }

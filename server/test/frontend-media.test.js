@@ -89,28 +89,30 @@ test('Sub Indo homepage API preserves separate source groups and duplicate title
     assert.equal(result.sections[0].items[0].id, 'samehadaku:samehadaku~judul-sama');
 });
 
-test('homepage facade checks the latest episode and retains identical titles from different sources', async (t) => {
+test('homepage facade keeps separate source groups without checking episodes', async (t) => {
     const originalFetch = globalThis.fetch;
     const requested = [];
     globalThis.fetch = async (input) => {
         const url = String(input);
         requested.push(url);
-        if (url === '/api/anime/latest-subindo') {
-            return new Response(JSON.stringify({
-                ok: true,
-                source: 'samehadaku,otakudesu',
-                fallback: false,
-                data: [
-                    { id: 'samehadaku', name: 'Samehadaku', items: [{ title: 'Judul sama', slug: 'samehadaku~judul-sama', source: 'samehadaku', latestEpisode: 7 }] },
-                    { id: 'otakudesu', name: 'Otakudesu', items: [{ title: 'Judul sama', slug: 'otakudesu~judul-sama', source: 'otakudesu', latestEpisode: 8 }] },
-                ],
-            }), { status: 200, headers: { 'content-type': 'application/json' } });
-        }
-        assert.match(url, /^\/api\/anime\/(?:samehadaku|otakudesu)~judul-sama\/episode\/[78]$/i);
+        assert.equal(url, '/api/anime/latest-subindo', 'beranda tidak boleh memeriksa episode lagi');
         return new Response(JSON.stringify({
             ok: true,
+            source: 'animeku,oploverz',
             fallback: false,
-            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleEvidence: 'episode-title', subtitleType: 'hard' }], downloads: [] },
+            data: [
+                {
+                    id: 'animeku',
+                    name: 'AnimeKu',
+                    browse: true,
+                    items: [
+                        { title: 'Judul sama', slug: 'animeku~judul-sama', source: 'animeku', latestEpisode: 7 },
+                        { title: 'Tanpa bukti', slug: 'animeku~tanpa-bukti', source: 'animeku', latestEpisode: 3 },
+                    ],
+                },
+                { id: 'oploverz', name: 'Oploverz (Animeloverz)', browse: true, items: [{ title: 'Judul sama', slug: 'oploverz~judul-sama', source: 'oploverz', latestEpisode: 8 }] },
+                { id: 'otakudesu', name: 'Otakudesu', items: [{ title: 'Situs lama', slug: 'otakudesu~lama', source: 'otakudesu' }] },
+            ],
         }), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     clearApiCache();
@@ -120,37 +122,31 @@ test('homepage facade checks the latest episode and retains identical titles fro
     });
 
     const result = await getSubIndoHomeSources();
-    assert.deepEqual(result.sections.map((source) => source.id), ['samehadaku', 'otakudesu']);
+    assert.deepEqual(result.sections.map((source) => source.id), ['animeku', 'oploverz']);
     assert.deepEqual(result.sections.map((source) => source.items.map((anime) => anime.title)), [
-        ['Judul sama'],
+        ['Judul sama', 'Tanpa bukti'],
         ['Judul sama'],
     ]);
     assert.deepEqual(result.sections.map((source) => source.items[0].latestEpisode), [7, 8]);
-    assert.equal(requested.length, 3, 'catalogue plus one latest-episode check per source');
+    assert.equal(result.sections[0].browse, true, 'panel membawa penanda halaman daftar untuk tautan Lihat Semua');
+    assert.equal(requested.length, 1, 'hanya katalog: tanpa pemeriksaan episode');
 });
 
-test('per-source Sub Indo retry only checks the requested provider', async (t) => {
+test('per-source Sub Indo retry only fetches the requested provider', async (t) => {
     const originalFetch = globalThis.fetch;
     const requested = [];
     globalThis.fetch = async (input) => {
         const url = String(input);
         requested.push(url);
-        if (url === '/api/anime/latest-subindo') {
-            return new Response(JSON.stringify({
-                ok: true,
-                source: 'samehadaku,otakudesu',
-                fallback: false,
-                data: [
-                    { id: 'samehadaku', name: 'Samehadaku', items: [{ title: 'Satu', slug: 'samehadaku~satu', source: 'samehadaku', latestEpisode: 4 }] },
-                    { id: 'otakudesu', name: 'Otakudesu', items: [{ title: 'Dua', slug: 'otakudesu~dua', source: 'otakudesu', latestEpisode: 5 }] },
-                ],
-            }), { status: 200, headers: { 'content-type': 'application/json' } });
-        }
-        assert.match(url, /^\/api\/anime\/otakudesu~dua\/episode\/5$/);
+        assert.equal(url, '/api/anime/latest-subindo');
         return new Response(JSON.stringify({
             ok: true,
+            source: 'animeku,oploverz',
             fallback: false,
-            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleEvidence: 'episode-title', subtitleType: 'hard' }], downloads: [] },
+            data: [
+                { id: 'animeku', name: 'AnimeKu', items: [{ title: 'Satu', slug: 'animeku~satu', source: 'animeku', latestEpisode: 4 }] },
+                { id: 'oploverz', name: 'Oploverz', items: [{ title: 'Dua', slug: 'oploverz~dua', source: 'oploverz', latestEpisode: 5 }] },
+            ],
         }), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     clearApiCache();
@@ -159,15 +155,12 @@ test('per-source Sub Indo retry only checks the requested provider', async (t) =
         clearApiCache();
     });
 
-    const result = await getSubIndoHomeSources({ sourceIds: ['otakudesu'] });
-    assert.deepEqual(result.sections.map((source) => source.id), ['otakudesu']);
+    const result = await getSubIndoHomeSources({ sourceIds: ['oploverz'], refresh: true });
+    assert.deepEqual(result.sections.map((source) => source.id), ['oploverz']);
     assert.deepEqual(result.sections[0].items.map((anime) => anime.title), ['Dua']);
     assert.equal(result.sections[0].items[0].latestEpisode, 5);
-    assert.equal(result.sections[0].checked, 1);
-    assert.equal(result.sections[0].failedChecks, 0);
-    assert.equal(result.sections[0].timedOut, false);
-    assert.equal(result.timedOut, false);
-    assert.equal(requested.length, 2, 'catalogue plus only the requested episode');
+    assert.equal('checked' in result.sections[0], false, 'tidak ada hitungan pemeriksaan episode');
+    assert.equal(requested.length, 1, 'hanya satu permintaan katalog');
 });
 
 test('Sub Indo per-source refresh bypasses the cached catalogue and HTTP cache', async (t) => {
