@@ -94,7 +94,8 @@
 /* ==========================================================================
    LAYOUT UMUM
    ========================================================================== */
-.main-content{padding-top:70px}
+/* z-index 1 = konten selalu DI ATAS partikel tema (lihat .visual-effects di base.css). */
+.main-content{position:relative;z-index:1;padding-top:70px}
 .section{padding:40px;max-width:var(--desktop-max);margin:0 auto;scroll-margin-top:var(--nav-h)}
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px}
 .section-title{font-family:var(--font-display);font-size:23px;font-weight:700;letter-spacing:-.015em;display:flex;align-items:center;gap:12px}
@@ -336,7 +337,7 @@
 /* ==========================================================================
    FOOTER
    ========================================================================== */
-.footer{padding:40px;border-top:1px solid rgba(255,255,255,.04);margin-top:40px}
+.footer{position:relative;z-index:1;padding:40px;border-top:1px solid rgba(255,255,255,.04);margin-top:40px}
 .footer-inner{max-width:var(--desktop-max);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:30px;flex-wrap:wrap}
 .footer-left p{color:var(--text-secondary);font-size:13px;margin-top:8px;max-width:300px}
 .footer-links{display:flex;gap:22px;flex-wrap:wrap}

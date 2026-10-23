@@ -73,7 +73,13 @@ body.modal-open{overflow:hidden}
 /* ==========================================================================
    EFEK VISUAL TEMA — partikel jatuh (dibuat oleh js/services/theme.js)
    ========================================================================== */
-.visual-effects{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:hidden}
+/*
+ * 24 Okt 2026 (permintaan pengguna): partikel tema harus TIDAK tembus konten.
+ * z-index 0 = lapisan paling bawah (di atas latar body, di bawah .main-content/.footer
+ * yang punya z-index 1). Jadi kelopak/salju tetap terlihat di ruang kosong, tetapi
+ * selalu di belakang kartu, foto, dan video pemutar.
+ */
+.visual-effects{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden}
 .particle-effect{position:absolute;animation:fall linear infinite;opacity:0.7}
 
 @keyframes fall{

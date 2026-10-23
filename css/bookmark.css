@@ -1,0 +1,22 @@
+/**
+ * Kazanime — bookmark.css (bookmark.html)
+ * Halaman Bookmark sendiri (24 Okt 2026): toolbar cari/urutkan + grid kartu.
+ * Kelas dasar (.search-results-section, .anime-grid, .btn-ext) berasal dari
+ * search.css & components.css; di sini hanya bagian khas halaman ini.
+ */
+.bookmark-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:-4px 0 20px}
+.bookmark-toolbar[hidden]{display:none}
+.bookmark-search{display:flex;align-items:center;gap:8px;flex:1 1 260px;max-width:420px;padding:6px 14px;border:1px solid rgba(255,255,255,.08);border-radius:22px;background:var(--bg-card);transition:border-color .2s,box-shadow .2s}
+.bookmark-search:focus-within{border-color:rgba(var(--primary-rgb),.55);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.14)}
+.bookmark-search-icon{display:inline-flex;color:var(--text-muted);flex-shrink:0}
+.bookmark-search-input{flex:1;min-width:0;border:0;background:transparent;color:var(--text-primary);font-family:inherit;font-size:13px;padding:6px 0;outline:none}
+.bookmark-search-input::placeholder{color:var(--text-muted)}
+.bookmark-search-input::-webkit-search-cancel-button{display:none}
+.bookmark-sort{appearance:none;padding:9px 34px 9px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.08);background:var(--bg-card) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 13px center;color:var(--text-primary);font-family:inherit;font-size:12px;cursor:pointer}
+.bookmark-sort:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.bookmark-total{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.bookmark-grid{grid-auto-rows:1fr}
+@media (max-width:600px){
+    .bookmark-search{max-width:100%}
+    .bookmark-sort{width:100%}
+}

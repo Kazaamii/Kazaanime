@@ -27,7 +27,7 @@ import { genreUrl, watchUrl, latestEpisodeOf, katalogUrl } from './routes.js';
 import {
     getHeroSlides, getHomeSection, getSubIndoHomeSources, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
-import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
+import { onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
 import { isPolicyStop, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 import { panelSections } from './api/subindo.js';
@@ -395,34 +395,12 @@ delegate(genreGrid, 'click', '[data-action="retry-genre"]', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Bookmark                                                            */
+/* Bookmark: pindah ke bookmark.html (24 Okt 2026)                      */
 /* ------------------------------------------------------------------ */
-const bookmarkSection = $('#bookmarks');
-const bookmarkGrid = $('#bookmarkGrid');
-
-function renderBookmarkSection() {
-    const user = ctx.getUser();
-    bookmarkSection.hidden = !user;
-    if (!user) {
-        bookmarkGrid.innerHTML = '';
-        return;
-    }
-    const list = getBookmarks();
-    if (!list.length) {
-        bookmarkGrid.innerHTML = String(html`
-            <div class="bookmark-empty">
-                <p class="bookmark-empty-icon" aria-hidden="true">${icon('bookmark')}</p>
-                <h3>Belum ada bookmark</h3>
-                <p>Klik ikon bookmark di pojok kartu anime untuk menambahkannya ke sini.</p>
-            </div>`);
-        return;
-    }
-    renderCards(bookmarkGrid, list, { variant: 'bookmark', isBookmarked: () => true });
-}
-
+/* Daftar bookmark tidak lagi dirender di beranda; halaman bookmark.html yang mengurus
+ * pencarian/urutan. Beranda hanya menyinkronkan status tombol bookmark di kartu. */
 bindCardActions(main, (anime) => ctx.toggleBookmark(anime));
 onBookmarksChange(() => {
-    renderBookmarkSection();
     syncBookmarkButtons(isBookmarked, main);
     hero.refresh();
 });
@@ -484,15 +462,10 @@ function whenVisible(el, callback) {
 /* ------------------------------------------------------------------ */
 /* Mulai                                                               */
 /* ------------------------------------------------------------------ */
-renderBookmarkSection();
 Object.keys(GRIDS).forEach((kind) => loadSection(kind));
 loadSubIndoSection();
 renderScheduleSkeleton(scheduleGrid, { today: wibWeekday() });
 whenVisible($('#jadwal'), loadSchedule);
 
-// Datang dari halaman lain lewat index.html#bookmarks: section ini baru tampil setelah JS jalan
-if (window.location.hash === '#bookmarks' && !bookmarkSection.hidden) {
-    requestAnimationFrame(() => bookmarkSection.scrollIntoView({ block: 'start' }));
-}
 
 console.info('%cKazanime — data live: AniList → Kitsu → cadangan; donghua & jadwal dari backend scraper', 'color:#ff6b9d;font-weight:bold');

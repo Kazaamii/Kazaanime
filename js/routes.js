@@ -17,7 +17,13 @@ export const PAGES = Object.freeze({
     watch: 'watch.html',
     search: 'search.html',
     katalog: 'katalog.html',
+    bookmark: 'bookmark.html',
 });
+
+/** URL halaman Bookmark (halaman sendiri sejak 24 Okt 2026 — bukan lagi section beranda). */
+export function bookmarkUrl() {
+    return PAGES.bookmark;
+}
 
 /**
  * URL halaman Jelajah (katalog situs sumber).

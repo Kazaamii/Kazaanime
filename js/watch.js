@@ -72,6 +72,8 @@ const els = {
     prev: $('#btnPrevEp'),
     next: $('#btnNextEp'),
     nextServer: $('#btnNextServer'),
+    popupGuard: $('#btnPopupGuard'),
+    popupGuardText: $('#btnPopupGuardText'),
     recs: $('#recommendationGrid'),
 };
 
@@ -415,6 +417,27 @@ function goToEpisode(n) {
 els.prev.addEventListener('click', () => goToEpisode(ep - 1));
 els.next.addEventListener('click', () => goToEpisode(ep + 1));
 els.nextServer.addEventListener('click', () => player.nextServer());
+
+/* Proteksi pop-up / tab baru dari iframe player (24 Okt 2026). */
+function renderPopupGuard(enabled = player.popupGuard()) {
+    if (!els.popupGuard) return;
+    els.popupGuard.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    els.popupGuard.classList.toggle('is-off', !enabled);
+    if (els.popupGuardText) els.popupGuardText.textContent = enabled ? 'Pop-up diblokir' : 'Pop-up diizinkan';
+    els.popupGuard.title = enabled
+        ? 'Pop-up & tab baru dari player diblokir. Klik bila player tidak bisa diputar.'
+        : 'Pop-up diizinkan untuk player ini. Klik untuk memblokir lagi.';
+}
+renderPopupGuard();
+els.popupGuard?.addEventListener('click', () => {
+    const enabled = player.setPopupGuard(!player.popupGuard());
+    renderPopupGuard(enabled);
+    showToast(
+        enabled ? 'Pop-up & tab baru dari player diblokir.' : 'Player boleh membuka pop-up (khusus browser ini).',
+        enabled ? 'success' : 'info',
+    );
+});
+player.on('guard', ({ enabled }) => renderPopupGuard(enabled));
 
 /* ------------------------------------------------------------------ */
 /* Auto-next & riwayat tontonan                                        */

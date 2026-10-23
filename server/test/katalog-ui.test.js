@@ -25,7 +25,7 @@ const css = read('css/katalog.css');
 
 /** Id bagian dari literal SOURCES di katalog.js. */
 function sectionIds(sourceId) {
-    const start = pageJs.indexOf(`id: '${sourceId}'`);
+    const start = pageJs.search(new RegExp(`\\n {8}id: '${sourceId}',`));
     assert.notEqual(start, -1, `sumber ${sourceId} harus ada di katalog.js`);
     const block = pageJs.slice(start);
     const list = block.slice(block.indexOf('sections: ['), block.indexOf('],'));
@@ -62,7 +62,8 @@ test('katalog.js: hanya AnimeKu & Oploverz, tanpa empat sumber yang dihapus', ()
 });
 
 test('katalog.js: urutan bagian AnimeKu sesuai permintaan', () => {
-    assert.deepEqual(sectionIds('animeku'), ['baru', 'populer', 'favorit', 'coming', 'selesai']);
+    assert.deepEqual(sectionIds('animeku'), ['baru', 'populer', 'favorit', 'coming', 'selesai', 'donghua'],
+        'lima bagian tetap sesuai permintaan; Donghua ditambahkan sebagai bagian keenam');
     assert.deepEqual(sectionIds('oploverz'), ['update', 'popular', 'rating', 'ongoing', 'completed', 'movie']);
 });
 
@@ -71,11 +72,20 @@ test('katalog.js: bagian berbasis situs = filter yang benar-benar ada di adapter
     const oploverzFilters = stubAdapter(createOploverz, 'oploverz').browseOptions().filters.map((f) => f.id);
     // Coming Soon bukan halaman situs: AnimeKu tidak punya /upcoming/ (404, dicek 23 Okt 2026).
     const siteSections = sectionIds('animeku').filter((id) => id !== 'coming');
-    assert.deepEqual(animekuFilters.slice(0, siteSections.length), siteSections, 'urutan bagian = urutan filter AnimeKu');
+    assert.deepEqual(animekuFilters.filter((id) => siteSections.includes(id)), siteSections,
+        'urutan bagian = urutan filter AnimeKu (Donghua memakai filter khusus)');
     assert.deepEqual(oploverzFilters, sectionIds('oploverz'), 'bagian Oploverz = urutan filter situs');
     assert.equal(animekuFilters.includes('coming'), false, 'tidak ada filter coming yang dikarang');
     assert.equal(stubAdapter(createAnimeku, 'animeku').browseOptions().genres.length, 0,
         'AnimeKu memang tanpa arsip genre → pemilih genre disembunyikan');
+});
+
+test('katalog.js: bagian Donghua AnimeKu dijelaskan sebagai deteksi, bukan kategori situs', () => {
+    const block = pageJs.slice(pageJs.indexOf("id: 'donghua',\n                label: 'Donghua di AnimeKu'"));
+    assert.ok(block.length > 0, 'bagian Donghua di AnimeKu harus ada');
+    assert.match(block, /tidak punya kategori donghua/, 'pengguna diberi tahu batas sumbernya');
+    assert.match(block, /metadata/, 'asal daftar dijelaskan');
+    assert.match(pageJs, /filter: runtime\.def\.id/, 'bagian dikirim sebagai filter=donghua ke backend');
 });
 
 test('katalog.js: tab Donghua memakai feed Donghua Kazanime (bukan kategori karangan)', () => {
@@ -113,6 +123,29 @@ test('katalog.js: ringkas 6 kartu + tombol Tampilkan lebih banyak + Lihat Semua'
     assert.match(pageJs, /loadSection\(runtime, \{ reset: true, refresh: true \}\)/);
 });
 
+test('katalog.html: kolom pencarian mencari DI DALAM sumber (AnimeKu & Oploverz)', () => {
+    assert.match(pageHtml, /<form class="katalog-search" id="katalogSearch" role="search"/);
+    assert.match(pageHtml, /id="katalogSearchInput" name="q" type="search"/);
+    assert.match(pageHtml, /minlength="2" maxlength="100"/);
+    assert.match(pageJs, /function applyQuery\(value\)/);
+    assert.match(pageJs, /state\.query = next\.length >= 2 \? next : ''/);
+    assert.match(pageJs, /const keyword = \(q\.get\('q'\) \|\| ''\)/);
+    assert.match(pageJs, /q\.set\('q', state\.query\)/);
+    assert.match(pageJs, /q: state\.query,/);
+    assert.match(pageJs, /label: `Hasil untuk/);
+    assert.match(sourcesJs, /if \(keyword\) q\.set\('q', keyword\)/);
+    assert.match(sourcesJs, /query: String\(data\.query \|\| ''\)/);
+    assert.match(pageJs, /searchInput\.reportValidity\(\)/, 'kata kunci < 2 karakter ditolak di klien');
+    assert.match(pageJs, /getSourceBrowse\(state\.source, \{/);
+});
+
+test('beranda: tiap panel sumber punya kolom cari yang membuka Jelajah', () => {
+    assert.match(homeJs, /data-subindo-search="\$\{source\.id\}"/);
+    assert.match(homeJs, /placeholder="Cari di \$\{source\.name\}…"/);
+    assert.match(homeJs, /window\.location\.href = katalogUrl\(\{ source: id, q: value \}\)/);
+    assert.match(homeJs, /delegate\(subIndoRoot, 'submit', '\[data-subindo-search\]'/);
+});
+
 test('katalog.js: "Lihat Semua" membuka daftar penuh satu bagian (?filter=) dengan Muat Lagi', () => {
     assert.match(pageJs, /const filter = known\.has\(q\.get\('filter'\)\) \? q\.get\('filter'\) : ''/);
     assert.match(pageJs, /if \(state\.filter\) q\.set\('filter', state\.filter\)/);
@@ -125,7 +158,7 @@ test('katalog.js: "Lihat Semua" membuka daftar penuh satu bagian (?filter=) deng
 });
 
 test('katalogUrl() mendukung filter bagian tanpa memaksa halaman 1', () => {
-    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', page = 1 \} = \{\}\)/);
+    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', q = '', page = 1 \} = \{\}\)/);
     assert.match(routesJs, /if \(filter\) p\.set\('filter', filter\)/);
 });
 
@@ -156,7 +189,8 @@ test('katalog.js: state sumber & genre disimpan di URL', () => {
 
 test('katalog.js: genre hanya muncul bila backend mengirim daftarnya', () => {
     assert.match(pageJs, /if \(!paged && res\.genres\.length && !state\.genres\.length\)/);
-    assert.match(pageJs, /if \(!state\.genres\.length\) \{/);
+    assert.match(pageJs, /if \(!state\.genres\.length \|\| state\.query\) \{/,
+        'pemilih genre disembunyikan saat mode pencarian');
     assert.match(pageJs, /genreWrap\.hidden = true/);
 });
 

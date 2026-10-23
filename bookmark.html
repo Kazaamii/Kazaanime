@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmark Saya - Kazanime</title>
+    <meta name="description" content="Semua anime yang kamu simpan di Kazanime: cari, urutkan, dan buka lagi kapan saja.">
+    <link rel="icon" type="image/jpeg" href="https://media.kitsu.app/characters/images/92508/original.jpg">
+    <meta name="robots" content="noindex, follow">
+    <script src="js/theme-preload.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/search.css">
+    <link rel="stylesheet" href="css/bookmark.css">
+    <script type="module" src="js/bookmark.js"></script>
+</head>
+<body data-page="bookmark">
+
+<div id="app-navbar"></div>
+
+<noscript><p class="noscript-warning">Halaman Bookmark Kazanime membutuhkan JavaScript.</p></noscript>
+
+<main class="main-content" id="main">
+    <section class="search-results-section" id="bookmarkSection">
+
+        <div class="search-results-header">
+            <h2 id="bookmarkTitle">Bookmark Saya</h2>
+            <p id="bookmarkSubtitle" aria-live="polite">Anime yang kamu simpan tersimpan di akun ini — bisa dibuka lagi kapan saja.</p>
+        </div>
+
+        <div class="bookmark-toolbar" id="bookmarkToolbar" hidden>
+            <span class="bookmark-search">
+                <label class="sr-only" for="bookmarkSearch">Cari di bookmark</label>
+                <span class="bookmark-search-icon" aria-hidden="true"><span class="ic-slot" data-icon="search"></span></span>
+                <input id="bookmarkSearch" type="search" class="bookmark-search-input" placeholder="Cari judul di bookmark…"
+                    autocomplete="off" enterkeyhint="search">
+            </span>
+            <label class="sr-only" for="bookmarkSort">Urutkan bookmark</label>
+            <select id="bookmarkSort" class="bookmark-sort">
+                <option value="saved">Terakhir disimpan</option>
+                <option value="title">Judul A–Z</option>
+                <option value="score">Rating tertinggi</option>
+            </select>
+            <span class="bookmark-total" id="bookmarkTotal" aria-live="polite"></span>
+        </div>
+
+        <div class="anime-grid bookmark-grid" id="bookmarkGrid" aria-live="polite" aria-busy="false"></div>
+
+    </section>
+</main>
+
+<div id="app-footer"></div>
+
+</body>
+</html>

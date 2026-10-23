@@ -74,7 +74,7 @@ function navbarHTML(page) {
                                 <p>Member ${APP.name}</p>
                             </div>
                         </div>
-                        <a class="dropdown-item" role="menuitem" href="${page === 'home' ? '#bookmarks' : homeSectionUrl('bookmarks')}" data-action="bookmarks">
+                        <a class="dropdown-item" role="menuitem" href="bookmark.html" data-action="bookmarks">
                             ${ICON_BOOKMARK} Bookmark Saya <span class="bookmark-count" id="bookmarkCountBadge">0</span>
                         </a>
                         <button type="button" class="dropdown-item" role="menuitem" data-action="avatar">${ICON_USER} Ganti Avatar</button>
@@ -193,14 +193,9 @@ export function renderNavbar(mount, { page, onLogin, onTheme, onAvatar, onLogout
         if (!item) return;
         const action = item.dataset.action;
         closeProfile();
-        if (action === 'bookmarks') {
-            if (page === 'home') {
-                e.preventDefault();
-                scrollToSection('bookmarks');
-                setActiveLink('bookmarks');
-            }
-            onBookmarks?.();
-        } else if (action === 'avatar') onAvatar?.();
+        // Bookmark sekarang halaman sendiri (bookmark.html) → biarkan tautannya berpindah.
+        if (action === 'bookmarks') onBookmarks?.();
+        else if (action === 'avatar') onAvatar?.();
         else if (action === 'theme') onTheme?.();
         else if (action === 'logout') onLogout?.();
     });

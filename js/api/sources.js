@@ -165,13 +165,13 @@ export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
  * @param {{filter?: string, genre?: string, page?: number, q?: string, signal?: AbortSignal, refresh?: boolean}} [opts]
  */
 export function getSourceBrowse(source, { filter = '', genre = '', page = 1, q: query = '', signal, refresh = false } = {}) {
-    const params = new URLSearchParams({ source: String(source || '') });
-    if (filter) params.set('filter', filter);
-    if (genre) params.set('genre', genre);
-    if (page > 1) params.set('page', String(page));
+    const q = new URLSearchParams({ source: String(source || '') });
+    if (filter) q.set('filter', filter);
+    if (genre) q.set('genre', genre);
+    if (page > 1) q.set('page', String(page));
     const keyword = String(query || '').trim().slice(0, 100);
-    if (keyword) params.set('q', keyword);
-    return call(`/browse?${params.toString()}`, {
+    if (keyword) q.set('q', keyword);
+    return call(`/browse?${q.toString()}`, {
         signal,
         force: refresh,
         noCache: refresh,

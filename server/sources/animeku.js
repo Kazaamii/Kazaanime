@@ -19,8 +19,15 @@
  *                   player .aku-layar iframe[src], tautan "Semua episode" a.aku-link.
  *                   Tidak ada daftar unduhan → downloads: [].
  *
- * Tidak ada arsip genre di situs ini (dicek 23 Okt 2026: `/genre/` 404 dan tidak ada tautan
- * genre di menu/footer), jadi filter genre tidak ditawarkan untuk AnimeKu.
+ * Genre: halaman arsip genre bertoken ADA (mis. `/genre/aksi-siacdd4/`, 30 kartu/halaman —
+ * dicek 24 Okt 2026), tetapi tidak ada halaman indeks genre (`/genre/` 404) dan token di
+ * belakang slug acak, jadi genre tidak ditawarkan sebagai filter stabil di Kazanime.
+ *
+ * Donghua: situs mengunggah donghua Sub Indo (mis. seri Douluo Dalu), tetapi TIDAK punya
+ * kategori donghua. `/negara/china-n5z6n97/` balas 200 dengan 0 kartu, dan halaman seri
+ * donghua pun diberi label "Negara: Japan". Karena itu daftar donghua AnimeKu di sini
+ * disusun dengan mencari judul donghua yang sedang tayang (metadata AniList, negara CN)
+ * di pencarian situs lalu hanya memakai kartu yang judulnya cocok — bukan kategori situs.
  *
  * Situs memblokir User-Agent browser dari IP pusat data, tetapi menerima User-Agent bot
  * jujur (KazanimeBot). Tidak ada penyamaran UA, rotasi proxy, atau solver challenge.
@@ -32,7 +39,7 @@ import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
     absoluteUrl, cleanText, clip, firstInt, parseEpisodeNumber, parseFormat,
-    parseScore10, parseStatus, parseYear, titleKey,
+    parseScore10, parseStatus, parseYear, stripSeason, titleKey,
 } from '../lib/text.js';
 
 export const ID = 'animeku';
@@ -79,6 +86,9 @@ const FILTERS = Object.freeze([
 ]);
 
 const NAV_TTL_MS = 6 * 60 * 60 * 1000;
+/** Batas pencarian donghua: tiap kueri = satu request ke situs (jeda 1 detik/host). */
+const DONGHUA_QUERIES = 3;
+const DONGHUA_LIMIT = 24;
 
 function siteUrl(value, base) {
     const url = absoluteUrl(value, base);
@@ -353,7 +363,7 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         latestEpisode: card.latestEpisode,
         score: card.score,
         status: card.status || 'ONGOING',
-        country: 'JP',
+        country: card.country || 'JP',
         slug: encodeSlug(ID, card.slug),
         source: ID,
         url: card.url,
@@ -401,7 +411,10 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         /** Urutan + genre yang tersedia (genre memang tidak ada di situs ini). */
         browseOptions() {
             return {
-                filters: FILTERS.map(({ id, label }) => ({ id, label })),
+                filters: [
+                    ...FILTERS.map(({ id, label }) => ({ id, label })),
+                    { id: 'donghua', label: 'Donghua' },
+                ],
                 genres: [],
             };
         },
@@ -437,6 +450,54 @@ export function createAnimeku({ network, createClient, baseUrl }) {
                 filter: chosen.id,
                 genre: '',
             };
+        },
+
+        /**
+         * Donghua yang ada di AnimeKu (24 Okt 2026, permintaan pengguna).
+         *
+         * Situs tidak punya kategori donghua — `/negara/china-n5z6n97/` dibalas 200 tetapi
+         * kosong, dan seri donghua pun dilabeli "Negara: Japan". Jadi daftar ini disusun
+         * dari judul donghua yang SEDANG TAYANG (metadata AniList, negara CN) yang dicari
+         * di pencarian situs; hanya kartu yang judulnya cocok yang dipakai. Hasilnya bisa
+         * kurang lengkap untuk donghua lama — itu batas sumbernya, bukan klaim kami.
+         *
+         * @param {string[]} titles judul donghua dari metadata
+         * @param {object} ctx
+         */
+        async browseDonghua(titles = [], ctx = {}) {
+            const queries = [...new Set((Array.isArray(titles) ? titles : [])
+                .map((title) => cleanText(title))
+                .filter((title) => title.length >= 4))]
+                .slice(0, DONGHUA_QUERIES);
+            const items = [];
+            const seen = new Set();
+            for (const query of queries) {
+                const key = titleKey(stripSeason(query));
+                if (!key) continue;
+                const url = new URL(`${base}/`);
+                url.searchParams.set('s', query);
+                let cards = [];
+                try {
+                    const page = await client.html(url.href, ctx);
+                    cards = parseCards(page.$, base).series;
+                } catch (error) {
+                    // Satu kueri gagal: pakai hasil kueri lain bila sudah ada.
+                    if (items.length) break;
+                    throw error;
+                }
+                for (const card of cards) {
+                    const cardKey = titleKey(stripSeason(card.title));
+                    const related = cardKey === key
+                        || (key.length >= 5 && cardKey.includes(key))
+                        || (cardKey.length >= 5 && key.includes(cardKey));
+                    if (!related) continue;
+                    const slug = encodeSlug(ID, card.slug);
+                    if (!slug || seen.has(slug)) continue;
+                    seen.add(slug);
+                    items.push(toAnime({ ...card, country: 'CN' }));
+                }
+            }
+            return items.slice(0, DONGHUA_LIMIT);
         },
 
         async search(query, ctx = {}) {

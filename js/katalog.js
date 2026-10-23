@@ -47,7 +47,7 @@ const SOURCES = Object.freeze([
     {
         id: 'animeku',
         label: 'AnimeKu',
-        hint: 'Cari di dalam katalog AnimeKu lewat kolom pencarian di atas. AnimeKu tidak menyediakan halaman genre (dicek 404); filter genre tersedia di tab Oploverz.',
+        hint: 'Cari di dalam katalog AnimeKu lewat kolom pencarian di atas. AnimeKu punya donghua Sub Indo — lihat bagian Donghua di bawah. Filter genre tidak stabil di situs ini; genre lengkap ada di tab Oploverz.',
         sections: [
             { id: 'baru', label: 'Terbaru', hint: 'Rilis paling baru dari halaman Baru.' },
             { id: 'populer', label: 'New Anime Populer', hint: 'Halaman Baru diurutkan skor tertinggi — rilis baru yang paling populer.' },
@@ -59,6 +59,11 @@ const SOURCES = Object.freeze([
                 hint: 'Anime yang belum tayang, dari metadata AniList — situs AnimeKu tidak punya halaman Coming Soon.',
             },
             { id: 'selesai', label: 'Complete', hint: 'Seri yang sudah tamat.' },
+            {
+                id: 'donghua',
+                label: 'Donghua di AnimeKu',
+                hint: 'AnimeKu memang mengunggah donghua Sub Indo (mis. Douluo Dalu, Perfect World). Situs tidak punya kategori donghua — halaman /negara/china/ kosong dan seri donghua pun dilabeli "Japan" — jadi daftar ini disusun dari judul donghua tayang (metadata) yang dicari di AnimeKu. Donghua lama bisa belum tercakup.',
+            },
         ],
     },
     {
@@ -440,7 +445,7 @@ function buildSections() {
             hint: `Ditemukan lewat pencarian ${source.label}. Klik kartu untuk membuka detail; tidak ada klaim Sub Indo di sini.`,
         }]
         : source.sections;
-    const focused = !state.query && state.filter ? defs.filter((section) => section.id === state.filter) : defs;
+    const focused = state.filter ? defs.filter((section) => section.id === state.filter) : defs;
     state.sections = (focused.length ? focused : defs).map(makeRuntime);
     sectionsEl.innerHTML = String(html`${state.sections.map((runtime, index) => sectionHTML(runtime, index))}`);
     sectionsEl.setAttribute('aria-busy', 'false');
@@ -471,6 +476,8 @@ function switchGenre(genre) {
     state.genre = genre;
     state.query = '';
     state.loadToken += 1;
+    renderHeader();
+    renderGenre();
     syncUrl();
     buildSections();
 }

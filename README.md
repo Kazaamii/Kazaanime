@@ -26,14 +26,16 @@ beradapter.
 
 Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diubah di Tahap D · 🅔 baru/diubah di Tahap E (22 Okt 2026) ·
 🅕 baru/diubah di Tahap F — Subtitle Indonesia (AI) · 🅖 subtitle lokal browser (22 Okt 2026) ·
-🅗 feed Sub Indo per sumber (23 Okt 2026, verifikasi dihapus 24 Okt 2026) · 🅘 katalog Jelajah (23 Okt 2026)
+🅗 feed Sub Indo per sumber (23 Okt 2026, verifikasi dihapus 24 Okt 2026) · 🅘 katalog Jelajah (23 Okt 2026) ·
+🅙 permintaan 24 Okt 2026: pencarian per sumber, Donghua AnimeKu, semua genre, halaman Bookmark, lapisan efek, proteksi pop-up
 
 ```
 kazanime/
-├── index.html                 ✅🅔 homepage: hero, SUB INDO (per sumber), GENRE (+hasil), JADWAL, ongoing, populer, bookmark, baru rilis, donghua
+├── index.html                 ✅🅔 homepage: hero, SUB INDO (per sumber, + kolom cari), GENRE (+hasil, 19 genre), JADWAL, ongoing, populer, baru rilis, donghua
 ├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
-├── katalog.html               ✅🅘 Jelajah: ?source=animeku|oploverz|donghua&genre=<slug>&filter=<bagian>; bagian berurutan + expand + Lihat Semua
+├── katalog.html               ✅🅘🅙 Jelajah: ?source=animeku|oploverz|donghua&genre=<slug>&filter=<bagian>&q=<kata kunci>; bagian berurutan + expand + Lihat Semua + kolom cari
+├── bookmark.html              🅙 halaman Bookmark sendiri: cari, urutkan, hapus dari daftar (menggantikan section beranda & tautan navbar)
 ├── README.md                  ✅🅓
 ├── package.json               🅓🅔 dependency backend (cheerio/Express/Undici/fetch-socks/tough-cookie; Playwright opsional), skrip dev/start/test/check:sources
 ├── package-lock.json          🅓
@@ -47,11 +49,12 @@ kazanime/
 │   ├── components.css         ✅ navbar, dropdown, card, skeleton, modal, toast, API status, footer, keterangan section, panel Sub Indo per sumber (+ status & retry)
 │   ├── home.css               ✅ hero, genre, jadwal
 │   ├── search.css             ✅ tab sumber, filter, muat lagi
-│   ├── katalog.css            ✅🅘 blok bagian, tombol expand, tautan "Lihat Semua" (.see-all), pemilih genre
+│   ├── katalog.css            ✅🅘🅙 blok bagian, tombol expand, tautan "Lihat Semua" (.see-all), pemilih genre, kolom cari
+│   ├── bookmark.css           🅙 toolbar cari/urutkan halaman Bookmark (variabel tema)
 │   └── watch.css              ✅🅒 player, server, episode, info, download, platform legal (+ urutan mobile)
 ├── js/
 │   ├── theme-preload.js       ✅ script klasik di <head>: pasang tema sebelum render (anti-kedip)
-│   ├── config.js              ✅🅓🅔🅕 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS (slot provider ReAnime/AniZone), PLAYER (hls, aiSubtitle) & SUB_INDO (batas judul panel: 24 hasil, 6 kartu cuplikan)
+│   ├── config.js              ✅🅓🅔🅕🅙 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS, PLAYER (hls, aiSubtitle, sandbox anti pop-up) & SUB_INDO (24 hasil, 6 kartu cuplikan), GENRES (18 genre AniList + Isekai)
 │   ├── routes.js              ✅🅒 pembuat/pembaca URL watch & search (filter di URL, batas nomor episode)
 │   ├── data/
 │   │   └── fallback.js        ✅ data cadangan offline (format ternormalisasi)
@@ -97,7 +100,8 @@ kazanime/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
 │   ├── home.js                ✅🅓🅔🅗 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
-│   ├── katalog.js             ✅🅘 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre
+│   ├── katalog.js             ✅🅘🅙 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre, pencarian per sumber
+│   ├── bookmark.js            🅙 halaman Bookmark: baca services/bookmark.js, cari & urutkan, ajakan login
 │   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
     ├── app.js                 createApp(): /api/health, /api/bot, /api/anime/*, /api/stream/*, error handler, rate limit masuk (+ klien Gemini bila GEMINI_API_KEY ada 🅕)
@@ -316,7 +320,7 @@ pencarian. Ada tiga tab:
 
 | Tab | Bagian (urutan tetap) | Filter genre |
 |---|---|---|
-| **AnimeKu** | Terbaru (`baru`) → New Anime Populer (`populer`) → Top Favorit (`favorit`) → Coming Soon → Complete (`selesai`) | — (situs tidak punya arsip genre; pemilih disembunyikan) |
+| **AnimeKu** | Terbaru (`baru`) → New Anime Populer (`populer`) → Top Favorit (`favorit`) → Coming Soon → Complete (`selesai`) → Donghua (`donghua`) | — (arsip genre ada tetapi bertoken acak & tanpa halaman indeks; pemilih disembunyikan) |
 | **Oploverz (Animeloverz)** | Terbaru (`update`) → Populer (`popular`) → Rating Tertinggi (`rating`) → Ongoing → Completed → Movie | ✅ 80 genre dari form `/series/` |
 | **Donghua** | Donghua Baru Upload (feed Donghua Kazanime: AniList negara CN → backend AnimeXin/Anichin) | — |
 
@@ -343,7 +347,8 @@ bagian tidak menembak bersamaan.
 |---|---|---|
 | AnimeKu "New Anime Populer" | tidak ada halaman populer | token `populer` = halaman **Baru** (rilis terbaru) diurutkan skor tertinggi pada halaman itu |
 | AnimeKu "Coming Soon" | `/upcoming/`, `/jadwal/`, `/jadwal-rilis/`, `/schedule/` → **404**; tidak ada sitemap | bagian **Coming Soon** memakai metadata **AniList** (`status: NOT_YET_RELEASED`, cadangan Kitsu) dan kartunya diberi label sumber + "Segera" |
-| AnimeKu "Filter Genre" | `/genre/`, `/genres/`, `/genre/<slug>/` → **404** | pemilih genre disembunyikan; genre tersedia di tab Oploverz |
+| AnimeKu "Filter Genre" | `/genre/` → **404**, tetapi arsip genre bertoken **ada** (`/genre/aksi-siacdd4/`, 30 kartu/halaman, dicek 24 Okt 2026); tidak ada halaman indeks genre dan token di belakang slug acak | pemilih genre disembunyikan (token bisa berubah kapan saja); genre tersedia di tab Oploverz |
+| AnimeKu "Donghua" | tidak ada kategori donghua: `/donghua/` → **404**, `/negara/china-n5z6n97/` → **200 tetapi 0 kartu**, dan seri donghua pun dilabeli "Negara: Japan" | bagian **Donghua di AnimeKu** = judul donghua tayang (metadata AniList, negara CN) yang dicari di halaman pencarian situs; kartu yang tidak cocok dibuang. Jelas ditulis sebagai deteksi, bukan kategori situs |
 | Oploverz "Donghua" | `?type=donghua` & `?genre[]=donghua` → **0 kartu**, `/donghua/` → **404**, tidak ada genre donghua | tab **Donghua** memakai feed Donghua Kazanime (bukan mengarang kategori di Oploverz) |
 | Oploverz "Coming Soon" | `?status=upcoming` valid tetapi **0 kartu** saat dicek | tidak ditampilkan; tab Oploverz memakai Ongoing/Completed |
 
@@ -357,9 +362,48 @@ hanya diterima bila bagian itu memang ada di sumber yang dipilih). Kartu memakai
 di sini **tidak** mengklaim Sub Indo — klaim itu hanya datang dari panel beranda yang memeriksa
 halaman episode.
 
-**Endpoint.** `GET /api/anime/browse?source=<id>&filter=<token>&genre=<slug>&page=<n>` →
-`{ source, data: { items, page, hasNext, filters, genres, filter, genre }, fallback: false, stale, errors }`.
+**🔎 Pencarian di dalam sumber (24 Okt 2026).** Kolom **Cari** di atas daftar bagian mencari
+langsung di situs yang sedang dibuka (`?s=` AnimeKu/Oploverz), bukan di metadata. Hasilnya satu
+blok **Hasil untuk “<kata kunci>”** (maks. 60 judul, tanpa paginasi); kata kunci < 2
+karakter ditolak dengan pesan yang jelas, dan pemilih genre disembunyikan selama mode pencarian.
+Panel Sub Indo di beranda juga punya kolom cari sendiri yang meneruskan kata kunci ke halaman
+Jelajah dengan tab sumber itu (`katalog.html?source=animeku&q=…`). Kata kunci disimpan di URL
+(`?q=`), jadi refresh/berbagi tautan tetap sama.
+
+**Endpoint.** `GET /api/anime/browse?source=<id>&filter=<token>&genre=<slug>&page=<n>&q=<kata kunci>`
+→ `{ source, data: { items, page, hasNext, filters, genres, filter, genre, query }, fallback: false, stale, errors }`.
+Dengan `q` (2–100 karakter) endpoint memakai pencarian adapter dan `hasNext` selalu `false`.
 Validasi: token/parameter asing → `400`, sumber tanpa halaman daftar → `400`, sumber tidak dikenal → `404`.
+
+**🐉 Donghua di AnimeKu.** Bagian tambahan di tab AnimeKu menjawab pertanyaan "AnimeKu punya
+donghua?" — ya, dan situsnya **tidak** memberinya kategori (lihat tabel di atas). Backend
+mengambil 20 judul donghua tayang dari metadata (`metadata.latestDonghua()`, AniList negara CN),
+lalu adapter mencari **3 judul pertama** di `/?s=` AnimeKu (jeda 1 detik/host, hasil di-cache)
+dan hanya memakai kartu yang judulnya cocok (dinormalisasi: tanpa tanda baca & penanda season).
+Kartu ditandai `country: 'CN'`; bila tidak ada yang cocok, bagian menampilkan pesan kosong —
+tidak ada judul karangan. Batasnya jujur: donghua lama yang tidak sedang tayang bisa belum
+tercakup.
+
+**🔖 Halaman Bookmark (24 Okt 2026).** Daftar bookmark keluar dari navbar yang sempit dan dari
+beranda: sekarang ada `bookmark.html` (menu profil → **Bookmark Saya**, dan tautan di footer).
+Halaman ini menampilkan semua bookmark akun (sumber data tetap `services/bookmark.js`), punya
+kolom cari (judul utama & alternatif) dan urutan **Terakhir disimpan / Judul A–Z / Rating
+tertinggi**, serta ajakan masuk bila belum login. Tombol bookmark di kartu tetap berfungsi
+(hapus langsung dari halaman ini). Beranda kini hanya menyinkronkan status tombol bookmark.
+
+**🎨 Lapisan efek tema (24 Okt 2026).** `.visual-effects` turun ke `z-index: 0`; `.main-content`
+dan `.footer` naik ke `z-index: 1` (player tetap `z-index: 2` + `isolation: isolate`). Jadi
+kelopak/salju/gelembung tetap terlihat di ruang kosong, tetapi **tidak pernah** menembus kartu,
+foto, atau video.
+
+**🚫 Proteksi pop-up player (24 Okt 2026).** Iframe embed dipasang dengan `sandbox` berisi
+`allow-scripts allow-same-origin allow-forms allow-presentation` dan **tanpa**
+`allow-popups`/`allow-top-navigation`, sehingga skrip iklan di dalam player tidak bisa membuka
+tab baru atau membajak tab Kazanime. Karena sebagian embed menolak sandbox, tombol
+**Pop-up diblokir / Pop-up diizinkan** di bawah player bisa melepasnya; pilihan disimpan di
+`localStorage` (`kz:popup-guard`) dan hanya berlaku di browser itu. Server `kind: 'hls'|'video'`
+memakai `<video>` sendiri sehingga tidak terpengaruh. Ini mitigasi terbaik yang bisa dilakukan
+dari sisi halaman — halaman lintas-domain tidak bisa ditutup paksa oleh Kazanime.
 
 ## 🎬 Halaman nonton (Tahap C)
 
@@ -918,6 +962,20 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - Status player menampilkan keadaan terjemahan ("menerjemahkan 1/2", "Indonesia (AI)", "siap di menu subtitle");
   toast saat aktif / gagal (mis. kuota harian habis → subtitle asli tetap dipakai).
 - `vercel.json`: `maxDuration` 30 → 60 dtk. Endpoint baru `GET /api/stream/subai`; `/api/stream/servers` membawa `ai`.
+
+### Perubahan perilaku (24 Okt 2026 — permintaan pengguna)
+- **Sumber default backend** kini `animexin, anichin, anoboy, hianime, animeku, oploverz`; Samehadaku, Sakunime,
+  Otakudesu, dan Kuramanime **dimatikan sebagai default** (adapter tetap ada dan bisa diaktifkan lewat `SCRAPER_SOURCES`).
+- **Pencarian di dalam sumber**: kolom cari di tab AnimeKu/Oploverz halaman Jelajah dan di tiap panel Sub Indo beranda
+  (`katalog.html?source=…&q=…`), memakai halaman pencarian situs (`?s=`), bukan metadata.
+- **Donghua AnimeKu** ditampilkan sebagai bagian sendiri dengan penjelasan bahwa situs tidak punya kategori donghua;
+  judulnya dicocokkan dari daftar donghua tayang (AniList CN) lewat pencarian situs.
+- **Genre beranda** dari 10 menjadi **18 genre AniList + Isekai** (seluruh genre yang disediakan AniList).
+- **Bookmark** pindah ke halaman sendiri (`bookmark.html`, menu profil + footer) dengan pencarian & urutan; section
+  bookmark di beranda dan tautannya di daftar navbar dihapus.
+- **Efek tema** tidak lagi menembus konten: `.visual-effects` di `z-index: 0`, `.main-content`/`.footer` di `z-index: 1`.
+- **Proteksi pop-up player**: iframe embed memakai sandbox tanpa `allow-popups`/`allow-top-navigation`, dengan tombol
+  pelepas (tersimpan per browser) bila player menolak diputar.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

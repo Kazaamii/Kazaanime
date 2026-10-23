@@ -25,7 +25,7 @@ export function renderFooter(mount, { onApiStatus } = {}) {
         <div class="footer-inner">
             <div class="footer-left">${logoHTML({ tag: 'div' })}<p>${APP.tagline}</p></div>
             <nav class="footer-links" aria-label="Tautan footer">
-                <a href="#">Tentang Kami</a><a href="#">Privasi</a><a href="#">Syarat</a><a href="#">Kontak</a><a href="#">DMCA</a>
+                <a href="#">Tentang Kami</a><a href="#">Privasi</a><a href="#">Syarat</a><a href="#">Kontak</a><a href="#">DMCA</a><a href="bookmark.html">Bookmark Saya</a>
                 ${onApiStatus ? html`<button type="button" data-action="api-status">${icon('radio-tower')} Status API</button>` : ''}
             </nav>
             <div class="social-links">

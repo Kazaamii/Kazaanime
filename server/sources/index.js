@@ -407,6 +407,31 @@ export function createRegistry({
                     errors: found.error ? [describeError(found.error)] : [],
                 };
             }
+            if (filter === 'donghua' && typeof adapter.browseDonghua === 'function') {
+                // Donghua per sumber (24 Okt 2026): daftar judul donghua tayang dari metadata
+                // lalu dicari di situs sumber. Dipakai AnimeKu yang tidak punya kategori donghua.
+                if (!metadata) throw badRequest(`Donghua ${adapter.name} membutuhkan metadata untuk mencocokkan judul.`);
+                const feed = await wrap('donghua:titles', ttl.latestTtlMs, () => metadata.latestDonghua(ctx));
+                const titles = (feed.value?.items || []).map((item) => item.title).filter(Boolean).slice(0, 8);
+                const found = await wrap(`browse:donghua:${adapter.id}`, ttl.searchTtlMs, () => adapter.browseDonghua(titles, ctx));
+                const options = typeof adapter.browseOptions === 'function' ? adapter.browseOptions() : { filters: [], genres: [] };
+                return {
+                    source: adapter.id,
+                    data: {
+                        items: Array.isArray(found.value) ? found.value : [],
+                        page: 1,
+                        hasNext: false,
+                        filters: options.filters || [],
+                        genres: options.genres || [],
+                        filter: 'donghua',
+                        genre: '',
+                        query: '',
+                    },
+                    fallback: false,
+                    stale: found.cache === 'stale' || feed.cache === 'stale',
+                    errors: found.error ? [describeError(found.error)] : [],
+                };
+            }
             if (adapter.supportsBrowse !== true || typeof adapter.browse !== 'function') {
                 throw badRequest(`Sumber ${adapter.name} tidak menyediakan halaman daftar.`);
             }
