@@ -13,7 +13,11 @@
  */
 import { SUB_INDO } from '../config.js';
 
+// Urutan di sini tidak menentukan urutan panel — backend mengirim `sections` berurutan.
+// AnimeKu & Oploverz ditambahkan 23 Okt 2026 sebagai sumber pengganti saat sumber lama gagal.
 const SUB_INDO_SOURCE_IDS = new Set([
+    'animeku',
+    'oploverz',
     'samehadaku',
     'otakudesu',
     'kuramanime',
@@ -25,7 +29,7 @@ const SUB_INDO_SOURCE_IDS = new Set([
 const SOURCE_CHECK_LIMIT = SUB_INDO.maxChecks;
 const RESULT_LIMIT = SUB_INDO.resultLimit;
 const CONCURRENCY = SUB_INDO.concurrency;
-const LATEST_FEED_SOURCE_IDS = new Set(['samehadaku', 'sakunime', 'otakudesu', 'kuramanime']);
+const LATEST_FEED_SOURCE_IDS = new Set(['animeku', 'oploverz', 'samehadaku', 'sakunime', 'otakudesu', 'kuramanime']);
 
 function limitOf(value, fallback, min = 1, max = 60) {
     const n = Number(value);

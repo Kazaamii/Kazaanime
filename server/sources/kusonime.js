@@ -5,8 +5,8 @@
  * Selector dan pola WordPress diamati dari scraper publik MIT:
  * https://github.com/Zmy71/Kusonime-Scraper/tree/8f8e7098f1161d6451471f5c28bdf32fa29aad49
  * Implementasi di sini ditulis ulang; URL mirror tidak di-resolve/decode dan tidak di-fetch.
- * Live markup, robots.txt, dan ToS Kusonime belum diverifikasi. Karena ToS unknown, setiap
- * akses halaman tetap wajib lolos robots.txt eksplisit; blokir/challenge langsung dihormati.
+ * Live markup, robots.txt, dan ToS Kusonime belum diverifikasi. Karena ToS unknown, blokir/challenge
+ * langsung dihormati; gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default 'off').
  */
 import { absoluteUrl, bracketParts, cleanText, normalizeQuality, titleKey } from '../lib/text.js';
 

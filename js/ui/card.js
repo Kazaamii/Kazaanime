@@ -23,6 +23,8 @@ const SOURCE_BADGES = {
     anilist: { cls: 'src-anilist', label: 'AniList' },
     kitsu: { cls: 'src-kitsu', label: 'Kitsu' },
     'backend:animexin': { cls: 'src-backend', label: 'AnimeXin' },
+    'backend:animeku': { cls: 'src-backend', label: 'AnimeKu' },
+    'backend:oploverz': { cls: 'src-backend', label: 'Oploverz' },
     'backend:animeindo': { cls: 'src-backend', label: 'AnimeIndo' },
     'backend:samehadaku': { cls: 'src-backend', label: 'Samehadaku' },
     'backend:animeonsen': { cls: 'src-backend', label: 'AnimeOnsen' },

@@ -45,9 +45,15 @@ for (const id of SOURCES.enabled) {
     const snap = network.robots.snapshot()[new URL(adapter.baseUrl).origin] || {};
     line('robots', `${snap.state} (HTTP ${snap.httpStatus || '-'}) · grup "${snap.group}" · ${snap.rules ?? 0} aturan · Crawl-delay ${snap.crawlDelay ?? '-'}`);
     const enforced = SCRAPER.robots.mode === 'enforce';
+    // Jangan menyebut "diblokir robots.txt" bila robots.txt-nya justru tidak terbaca:
+    // mode off memang tetap mencoba, tetapi alasannya harus jujur (tidak terbaca vs dilarang).
+    const unreadable = verdict.reason === 'unreachable' || verdict.reason === 'unverified';
+    const blockedText = enforced
+        ? 'TIDAK'
+        : (unreadable ? 'robots.txt tidak terbaca, tetap dicoba' : 'DIBLOKIR robots.txt, tetap dicoba');
     line('akses', verdict.allowed
         ? `BOLEH (${verdict.reason})`
-        : `${enforced ? 'TIDAK' : 'DIBLOKIR robots.txt, tetap dicoba'} (${verdict.reason}) — mode ${SCRAPER.robots.mode}`);
+        : `${blockedText} (${verdict.reason}) — mode ${SCRAPER.robots.mode}`);
 
     if (!live || (enforced && !verdict.allowed)) continue;
     const t0 = Date.now();

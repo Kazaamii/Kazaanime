@@ -24,6 +24,8 @@ import { parseEpisodePage as parseSakunime } from '../sources/sakunime.js';
 import { parseEpisodePage as parseKuramanime } from '../sources/kuramanime.js';
 import { parseEpisodePage as parseAnoboy } from '../sources/anoboy.js';
 import { parseEpisodePage as parseAnimexin } from '../sources/animexin.js';
+import { parseEpisodePage as parseAnimeku } from '../sources/animeku.js';
+import { parseEpisodePage as parseOploverz } from '../sources/oploverz.js';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
 
@@ -35,6 +37,9 @@ const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test'
  * Teks tagline situs (mis. "Samehadaku - Nonton Streaming Anime Sub Indo" di footer
  * atau header) tidak ikut dikirim parser, jadi tidak bisa meloloskan judul.
  */
+/** Semua penanda bahasa yang dikenali parser; dipakai untuk kontrol negatif. */
+const STRIP_MARKERS = /sub(?:title)?\s*indo(?:nesia)?|indonesia(?:n)?\s*sub(?:title)?/gi;
+
 export const CASES = Object.freeze([
     { source: 'samehadaku', file: 'samehadaku-episode.html', base: 'https://v2.samehadaku.how/', parse: parseSamehadaku },
     {
@@ -56,6 +61,24 @@ export const CASES = Object.freeze([
     },
     // Anichin memakai parser AnimeStream yang sama dengan AnimeXin.
     { source: 'anichin', file: 'anichin-episode.html', base: 'https://anichin.moe/', parse: parseAnimexin },
+    { source: 'animeku', file: 'animeku-episode.html', base: 'https://ww2.animeku.lol', parse: parseAnimeku },
+    {
+        source: 'animeku',
+        file: 'animeku-episode.html',
+        base: 'https://ww2.animeku.lol',
+        parse: parseAnimeku,
+        strip: STRIP_MARKERS,
+        note: 'kontrol negatif — situs yang sama, penanda bahasa dihapus',
+    },
+    { source: 'oploverz', file: 'oploverz-episode.html', base: 'https://oploverz.ch', parse: parseOploverz },
+    {
+        source: 'oploverz',
+        file: 'oploverz-episode.html',
+        base: 'https://oploverz.ch',
+        parse: parseOploverz,
+        strip: STRIP_MARKERS,
+        note: 'kontrol negatif — situs yang sama, penanda bahasa dihapus',
+    },
 ]);
 
 const read = (file) => fs.readFileSync(path.join(DIR, file), 'utf8');
@@ -64,8 +87,9 @@ const read = (file) => fs.readFileSync(path.join(DIR, file), 'utf8');
  * Urai satu halaman contoh dan ringkas buktinya.
  * @param {typeof CASES[number]} item
  */
-export function evidenceRow({ source, file, base, parse, note = '' }) {
-    const page = parse(load(read(file)), base);
+export function evidenceRow({ source, file, base, parse, note = '', strip = null }) {
+    const html = strip ? read(file).replace(strip, 'Subbed') : read(file);
+    const page = parse(load(html), base);
     const servers = Array.isArray(page.servers) ? page.servers : [];
     const proven = servers.filter((server) => server.subtitleEvidence && server.lang === 'id');
     const unproven = servers.length - proven.length;

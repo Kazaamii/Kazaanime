@@ -2,7 +2,7 @@
  * Kazanime backend — sources/sakunime.js
  * Adapter Sakunime (https://sakunime.com), berdasarkan snapshot halaman episode yang diberikan pengguna.
  * Tidak ada live request selama pembuatan adapter; ToS/robots belum ditinjau di sandbox.
- * Semua halaman konten hanya diminta bila robots.txt kelak terbaca dan mengizinkan.
+ * Gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default 'off'); blokir/challenge tidak dilewati.
  *
  * Snapshot menunjukkan search route `/search/<query>/`, seri `/anime/<slug>`, daftar episode
  * `.watch-eprow`, dan URL player default pada `#playerShell[data-default]`. `serverId` di JSON

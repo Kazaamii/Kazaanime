@@ -2,7 +2,7 @@
  * Kazanime backend — sources/anoboy.js
  * Adapter Anoboy (https://anoboy.be), berdasarkan halaman episode HTML yang diberikan pengguna.
  * Tidak ada live request selama pembuatan adapter; ToS/robots belum ditinjau di sandbox.
- * Semua halaman konten hanya diminta bila robots.txt kelak terbaca dan mengizinkan.
+ * Gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default 'off'); blokir/challenge tidak dilewati.
  *
  * Dari snapshot halaman episode diketahui: form pencarian WordPress `/?s=`, tautan seri
  * `/anime/<slug>/`, daftar episode `.episodelist`, dan server publik `.aspd-server[data-url]`.
