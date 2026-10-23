@@ -7,7 +7,7 @@ import { APP } from '../../js/config.js';
 const root = process.cwd();
 
 test('all static pages use the existing Yumeko logo image as their favicon', () => {
-    for (const page of ['index.html', 'search.html', 'watch.html']) {
+    for (const page of ['index.html', 'search.html', 'watch.html', 'katalog.html']) {
         const html = fs.readFileSync(path.join(root, page), 'utf8');
         const tag = html.match(/<link\s+rel="icon"[^>]*>/i)?.[0] || '';
         assert.ok(tag, `${page} should declare a favicon`);

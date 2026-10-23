@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jelajah Anime - Kazanime</title>
+    <meta name="description" content="Jelajah katalog AnimeKu, Oploverz, dan Donghua per bagian: terbaru, populer, top favorit, coming soon, complete, movie, dan genre.">
+    <link rel="icon" type="image/jpeg" href="https://media.kitsu.app/characters/images/92508/original.jpg">
+    <meta name="robots" content="noindex, follow">
+    <script src="js/theme-preload.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/search.css">
+    <link rel="stylesheet" href="css/katalog.css">
+    <script type="module" src="js/katalog.js"></script>
+</head>
+<body data-page="katalog">
+
+<div id="app-navbar"></div>
+
+<noscript><p class="noscript-warning">Halaman Jelajah Kazanime membutuhkan JavaScript.</p></noscript>
+
+<main class="main-content" id="main">
+    <section class="search-results-section" id="katalogSection">
+
+        <div class="search-results-header">
+            <h2 id="katalogTitle">Jelajah Anime</h2>
+            <p id="katalogSubtitle" aria-live="polite">Daftar langsung dari situs sumber — tanpa klaim Sub Indo untuk judul yang belum diperiksa per episode.</p>
+        </div>
+
+        <div class="search-source-tabs" id="katalogSourceTabs" role="tablist" aria-label="Sumber katalog">
+            <button type="button" class="search-source-tab active" role="tab" aria-selected="true" data-source="animeku">
+                <span class="src-dot src-dot--backend" aria-hidden="true"></span>AnimeKu
+            </button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="oploverz">
+                <span class="src-dot src-dot--backend" aria-hidden="true"></span>Oploverz (Animeloverz)
+            </button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="donghua">
+                <span class="src-dot src-dot--backend" aria-hidden="true"></span>Donghua
+            </button>
+        </div>
+
+        <div class="katalog-genre" id="katalogGenreWrap" hidden>
+            <label for="katalogGenre">Genre</label>
+            <select id="katalogGenre" class="katalog-genre-select"></select>
+        </div>
+
+        <p class="katalog-note" id="katalogNote" aria-live="polite"></p>
+
+        <div class="katalog-sections" id="katalogSections" aria-busy="true"></div>
+
+    </section>
+</main>
+
+<div id="app-footer"></div>
+
+</body>
+</html>

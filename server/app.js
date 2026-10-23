@@ -121,7 +121,7 @@ function mountStatic(app) {
     app.use('/js', express.static(path.join(ROOT_DIR, 'js'), opts));
     const page = (file) => (req, res) => res.sendFile(path.join(ROOT_DIR, file));
     app.get('/', page('index.html'));
-    for (const file of ['index.html', 'watch.html', 'search.html']) app.get(`/${file}`, page(file));
+    for (const file of ['index.html', 'watch.html', 'search.html', 'katalog.html']) app.get(`/${file}`, page(file));
     app.get('/favicon.ico', (req, res) => res.status(204).end());
     app.use((req, res) => res.status(404).type('text/plain; charset=utf-8').send('404 — halaman tidak ditemukan.'));
 }

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'cheerio';
 import {
-    createOploverz, episodeSlugFromUrl, isEpisodeSlug, parseAnimePage,
-    parseCards, parseEpisodePage, seriesSlugFromUrl,
+    createOploverz, episodeSlugFromUrl, isEpisodeSlug, nextPageHref, parseAnimePage,
+    parseCards, parseEpisodePage, parseGenreOptions, seriesSlugFromUrl,
 } from '../sources/oploverz.js';
 import { fixture, fixture$, fakeClientFactory } from './helpers.js';
 
@@ -121,6 +121,54 @@ test('oploverz: factory memakai halaman seri untuk detail dan halaman episode un
     assert.equal(ep.servers[0].subtitleEvidence, 'episode-title');
     calls.push(...latest.map((item) => item.slug));
     assert.equal(calls.length, latest.length);
+});
+
+test('oploverz: daftar /series/ — 80 genre, tautan halaman berikutnya', () => {
+    const page = fixture$('oploverz-series-list.html');
+    const genres = parseGenreOptions(page);
+    assert.equal(genres.length, 80);
+    assert.deepEqual(genres[0], { id: 'action', label: 'Action' });
+    assert.ok(genres.some((g) => g.id === 'slice-of-life' && g.label === 'Slice of Life'));
+    assert.equal(nextPageHref(page, BASE), `${BASE}/series/page/2/`);
+});
+
+test('oploverz: katalog — filter urutan, genre, dan paginasi membentuk URL situs', async () => {
+    const list = fixture('oploverz-series-list.html');
+    const { createClient, calls } = fakeClientFactory({
+        [`${BASE}/series/?order=popular`]: list,
+        [`${BASE}/series/?order=update&genre%5B%5D=action`]: list,
+        [`${BASE}/series/page/2/?status=completed`]: list,
+    });
+    const adapter = createOploverz({ network: null, createClient, baseUrl: BASE });
+
+    const popular = await adapter.browse({ filter: 'popular', page: 1 });
+    assert.equal(popular.items.length, 6);
+    assert.equal(popular.items[0].title, 'Toaru Anbu no Item');
+    assert.equal(popular.items[0].slug, 'oploverz~toaru-anbu-no-item');
+    assert.equal(popular.items[0].status, 'ONGOING');
+    assert.equal(popular.items[0].latestEpisode, null, 'kartu seri tidak punya nomor episode');
+    assert.equal(popular.hasNext, true);
+    assert.equal(popular.genres.length, 80);
+    assert.deepEqual(popular.filters.map((f) => f.id), ['update', 'popular', 'rating', 'ongoing', 'completed', 'movie']);
+
+    const byGenre = await adapter.browse({ filter: 'update', genre: 'action' });
+    assert.equal(byGenre.genre, 'action');
+    assert.deepEqual(calls, [`${BASE}/series/?order=popular`, `${BASE}/series/?order=update&genre%5B%5D=action`]);
+
+    const page2 = await adapter.browse({ filter: 'completed', page: 2 });
+    assert.equal(page2.filter, 'completed');
+    assert.equal(page2.page, 2);
+    assert.equal(calls[2], `${BASE}/series/page/2/?status=completed`);
+});
+
+test('oploverz: filter tak dikenal memakai urutan Terbaru (bukan error)', async () => {
+    const { createClient, calls } = fakeClientFactory({
+        [`${BASE}/series/?order=update`]: fixture('oploverz-series-list.html'),
+    });
+    const adapter = createOploverz({ network: null, createClient, baseUrl: BASE });
+    const page = await adapter.browse({ filter: 'entah', page: 1 });
+    assert.equal(page.filter, 'update');
+    assert.equal(calls.length, 1);
 });
 
 test('oploverz: ref tidak valid ditolak, episode tak dikenal → not_found', async () => {

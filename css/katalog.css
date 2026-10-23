@@ -1,0 +1,32 @@
+/**
+ * Kazanime — katalog.css (katalog.html / "Jelajah")
+ * Memakai kelas bersama dari search.css (.search-results-section, .search-source-tab,
+ * .anime-grid, .btn-load-more). Di sini: pemilih genre, catatan status, dan blok bagian
+ * (kepala + tombol Expand/Ringkas + Muat Lagi).
+ */
+.katalog-genre{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 18px;font-size:12px;color:var(--text-secondary)}
+.katalog-genre label{font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:11px;color:var(--text-muted)}
+.katalog-genre-select{appearance:none;padding:9px 34px 9px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.08);background:var(--bg-card) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 13px center;color:var(--text-primary);font-family:inherit;font-size:12px;cursor:pointer;max-width:220px}
+.katalog-genre-select:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.katalog-note{margin:0 0 16px;font-size:12px;color:var(--text-muted);min-height:1.2em}
+.katalog-note.is-error{color:var(--danger,#ff6b6b)}
+
+/* ---------- Blok bagian ---------- */
+.katalog-sections{display:flex;flex-direction:column;gap:34px}
+.katalog-block{scroll-margin-top:90px}
+.katalog-block-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.katalog-block-title h3{margin:0;font-size:17px;font-weight:700;color:var(--text-primary);letter-spacing:-.01em}
+.katalog-block-hint{margin:4px 0 0;font-size:12px;color:var(--text-muted)}
+.katalog-block-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.katalog-block-count{font-size:11px;font-weight:600;color:var(--text-muted);white-space:nowrap}
+.katalog-expand{padding:8px 16px;border-radius:20px;border:1px solid rgba(var(--primary-rgb),.35);background:rgba(var(--primary-rgb),.1);color:var(--primary);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .25s;white-space:nowrap}
+.katalog-expand:hover{background:rgba(var(--primary-rgb),.18);border-color:var(--primary)}
+.katalog-expand:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.katalog-block-grid{grid-auto-rows:1fr}
+.katalog-block-foot{text-align:center;margin-top:18px}
+
+@media (max-width:768px){
+    .katalog-genre-select{max-width:100%}
+    .katalog-block-head{flex-direction:column;gap:10px}
+    .katalog-sections{gap:28px}
+}

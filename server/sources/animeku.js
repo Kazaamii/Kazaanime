@@ -3,18 +3,24 @@
  * Adapter AnimeKu (https://ww2.animeku.lol) — WordPress dengan tema kustom `aku-*`.
  *
  * Struktur diverifikasi dari HTML asli (23 Okt 2026) yang tersimpan sebagai fixture:
- *   server/test/fixtures/animeku-{home,list,series,episode}.html
+ *   server/test/fixtures/animeku-{home,list,series,episode,baru,selesai,favorit}.html
  *
  *   - Beranda     : article.aku-rel-sel (rilis terbaru) → a[href="/play/<slug>-episode-N-<id>/"],
  *                   b.aku-rel-eps ("EP 6"), span.aku-rel-judul (judul seri);
  *                   article.aku-sel (kartu seri) → a.aku-bing[href="/<slug>-<id>/"], span.aku-eps,
  *                   span.aku-nilai (skor), h3 a (judul).
+ *   - Daftar      : halaman nav "Baru/Ongoing/Selesai/Favorit/Movie" memakai artikel yang sama
+ *                   (`article.aku-sel`, 30 per halaman) + paginasi `nav.aku-hal a[href*="/page/"]`.
+ *                   Path tiap halaman memuat token acak (`/baru-utnwb9y/`) → dideteksi dari menu.
  *   - Halaman seri: h1 ("Nonton … Sub Indo HD"), .aku-cap span (jumlah episode/status/studio/skor),
  *                   .aku-fakta-b (kunci–nilai), .aku-cerita (sinopsis),
  *                   daftar episode .aku-epwrap .aku-eplist a[href].
  *   - Episode     : h1.aku-nama-eps ("Nonton … Episode N Sub Indo HD"),
  *                   player .aku-layar iframe[src], tautan "Semua episode" a.aku-link.
  *                   Tidak ada daftar unduhan → downloads: [].
+ *
+ * Tidak ada arsip genre di situs ini (dicek 23 Okt 2026: `/genre/` 404 dan tidak ada tautan
+ * genre di menu/footer), jadi filter genre tidak ditawarkan untuk AnimeKu.
  *
  * Situs memblokir User-Agent browser dari IP pusat data, tetapi menerima User-Agent bot
  * jujur (KazanimeBot). Tidak ada penyamaran UA, rotasi proxy, atau solver challenge.
@@ -48,6 +54,31 @@ export const POLICY = Object.freeze({
 /** Slug bagian path: huruf kecil, angka, titik, garis. Unicode (mis. "☆") tidak didukung. */
 const SLUG_RE = /^[a-z0-9][a-z0-9._-]{0,118}$/;
 const EPISODE_SLUG_RE = /-episode-\d+-[a-z0-9]+$/;
+
+/**
+ * Halaman daftar (urutan) yang tersedia di menu situs. `path` adalah nilai yang teramati
+ * 23 Okt 2026; token acak bisa berubah, jadi adapter lebih dulu membaca menu beranda.
+ */
+/**
+ * Urutan bagian di halaman Jelajah + halaman daftar asalnya.
+ * `nav` dipakai untuk membaca menu beranda (token acak bisa berubah); entri turunan
+ * (`populer`) memakai halaman daftar lain, jadi `nav` sengaja kosong.
+ *
+ * Situs tidak punya halaman genre, jadwal, maupun "coming soon" (dicek 23 Okt 2026:
+ * /genre/, /genres/, /jadwal/, /upcoming/, /populer/ → 404; sitemap juga tidak ada),
+ * jadi ketiganya tidak dibuat di sini — bagian Coming Soon di halaman Jelajah memakai
+ * metadata AniList dan diberi label sumbernya.
+ */
+const FILTERS = Object.freeze([
+    { id: 'baru', label: 'Terbaru', nav: /^baru$/i, path: '/baru-utnwb9y/' },
+    { id: 'populer', label: 'New Anime Populer', nav: null, base: 'baru', path: '/baru-utnwb9y/', sort: 'rating' },
+    { id: 'favorit', label: 'Top Favorit', nav: /^favorit$/i, path: '/favorit-sixkqhv/' },
+    { id: 'selesai', label: 'Complete', nav: /^selesai$/i, path: '/selesai-bjyzaqn/' },
+    { id: 'ongoing', label: 'Ongoing', nav: /^ongoing$/i, path: '/jalan-uf5ms8g/' },
+    { id: 'film', label: 'Movie', nav: /^movie$/i, path: '/film-anime-6d23pb8/' },
+]);
+
+const NAV_TTL_MS = 6 * 60 * 60 * 1000;
 
 function siteUrl(value, base) {
     const url = absoluteUrl(value, base);
@@ -89,7 +120,7 @@ export function episodeSlugFromUrl(value, base) {
     }
 }
 
-/** `/<slug>-<id>/` (bukan /play/, /genre/, /page/) → slug seri. */
+/** `/<slug>-<id>/` (bukan /play/, /page/, /abjad/) → slug seri. */
 export function seriesSlugFromUrl(value, base) {
     try {
         const url = new URL(value, base);
@@ -106,7 +137,7 @@ export function seriesSlugFromUrl(value, base) {
 }
 
 /**
- * Kartu beranda: rilis terbaru (episode) dan kartu seri.
+ * Kartu beranda & halaman daftar: rilis terbaru (episode) dan kartu seri.
  * @returns {{series: object[], episodes: object[]}}
  */
 export function parseCards($, base) {
@@ -256,6 +287,29 @@ export function parseEpisodePage($, base) {
     };
 }
 
+/** Paginasi `nav.aku-hal` → { hasNext, lastPage, nextPath }. */
+export function parsePagination($, base, currentPath) {
+    const basePath = String(currentPath || '/').replace(/\/(?:page\/\d+\/)?$/, '/');
+    const numbers = [];
+    let next = null;
+    $('nav.aku-hal a[href]').each((_, el) => {
+        const href = siteUrl($(el).attr('href'), base);
+        if (!href) return;
+        const m = /\/page\/(\d+)\/?$/.exec(new URL(href).pathname);
+        if (!m) return;
+        numbers.push(Number.parseInt(m[1], 10));
+        if (!next && $(el).hasClass('next')) next = href;
+    });
+    const lastPage = numbers.length ? Math.max(...numbers) : 1;
+    return { nextPath: next, lastPage, basePath };
+}
+
+/** Path halaman ke-N (`/baru-x/page/3/`); halaman 1 memakai path dasar. */
+export function pagePath(path, page) {
+    const clean = String(path || '/').replace(/\/+$/, '');
+    return page > 1 ? `${clean}/page/${page}/` : `${clean}/`;
+}
+
 export function createAnimeku({ network, createClient, baseUrl }) {
     const base = String(baseUrl || 'https://ww2.animeku.lol').replace(/\/+$/, '');
     const host = new URL(base).hostname;
@@ -266,12 +320,39 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         cookies: false,
     });
 
+    let navCache = null;
+
+    /** Path halaman daftar dari menu beranda (token acak bisa berubah). */
+    async function navPaths(ctx = {}) {
+        if (navCache && Date.now() - navCache.at < NAV_TTL_MS) return navCache.paths;
+        const paths = Object.fromEntries(FILTERS.map((filter) => [filter.id, filter.path]));
+        try {
+            const page = await client.html(`${base}/`, ctx);
+            page.$('nav.aku-menu a[href]').each((_, el) => {
+                const anchor = page.$(el);
+                const label = cleanText(anchor.text());
+                const url = siteUrl(anchor.attr('href'), base);
+                if (!url) return;
+                const filter = FILTERS.find((item) => item.nav && item.nav.test(label));
+                if (!filter) return;
+                const path = new URL(url).pathname;
+                if (path && path !== '/') paths[filter.id] = path.endsWith('/') ? path : `${path}/`;
+            });
+            navCache = { at: Date.now(), paths };
+        } catch {
+            // Menu gagal dibaca (mis. 403 sesaat) → pakai path yang teramati.
+            navCache = { at: Date.now() - NAV_TTL_MS / 2, paths };
+        }
+        return paths;
+    }
+
+    /** Kartu → Anime; slug Unicode (mis. "☆") dilewati karena tidak bisa dipakai di URL. */
     const toAnime = (card) => makeAnime({
         title: card.title,
         image: card.image,
         latestEpisode: card.latestEpisode,
         score: card.score,
-        status: 'ONGOING',
+        status: card.status || 'ONGOING',
         country: 'JP',
         slug: encodeSlug(ID, card.slug),
         source: ID,
@@ -288,7 +369,7 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         for (const episode of episodes) {
             const match = byTitle.get(titleKey(episode.title));
             const card = match
-                ? { ...episode, slug: match.slug, url: match.url, image: episode.image || match.image }
+                ? { ...episode, slug: match.slug, url: match.url, image: episode.image || match.image, title: match.title }
                 : episode;
             if (seen.has(card.slug)) continue;
             seen.add(card.slug);
@@ -304,6 +385,7 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         baseUrl: base,
         country: 'JP',
         policy: POLICY,
+        supportsBrowse: true,
 
         parseRef(parts) {
             const slug = String(parts[0] || '').toLowerCase();
@@ -315,6 +397,47 @@ export function createAnimeku({ network, createClient, baseUrl }) {
         },
 
         latest,
+
+        /** Urutan + genre yang tersedia (genre memang tidak ada di situs ini). */
+        browseOptions() {
+            return {
+                filters: FILTERS.map(({ id, label }) => ({ id, label })),
+                genres: [],
+            };
+        },
+
+        /**
+         * Halaman daftar: filter = id urutan (baru/ongoing/selesai/favorit/film), halaman 1..N.
+         * @param {{filter?: string, genre?: string, page?: number}} opts
+         */
+        async browse({ filter = '', genre = '', page = 1 } = {}, ctx = {}) {
+            const options = this.browseOptions();
+            if (genre) throw new SourceError('AnimeKu tidak menyediakan arsip genre.', { kind: 'bad_request', source: ID });
+            const chosen = FILTERS.find((item) => item.id === filter) || FILTERS[0];
+            const paths = await navPaths(ctx);
+            const path = paths[chosen.base || chosen.id] || chosen.path;
+            const target = `${base}${pagePath(path, page)}`;
+            const res = await client.html(target, ctx);
+            // Bagian turunan "New Anime Populer" memakai halaman Baru (rilis terbaru),
+            // lalu diurutkan skor tertinggi pada halaman itu — berbeda dari Top Favorit
+            // yang memang sudah urut skor untuk seluruh katalog.
+            const status = chosen.id === 'selesai' ? 'COMPLETED' : 'ONGOING';
+            let cards = parseCards(res.$, base).series;
+            if (chosen.sort === 'rating') cards = [...cards].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+            const items = cards
+                .map((card) => toAnime({ ...card, status }))
+                .filter((anime) => anime.slug && anime.title);
+            const pagination = parsePagination(res.$, base, path);
+            return {
+                items,
+                page,
+                hasNext: Boolean(pagination.nextPath),
+                filters: options.filters,
+                genres: options.genres,
+                filter: chosen.id,
+                genre: '',
+            };
+        },
 
         async search(query, ctx = {}) {
             const url = new URL(`${base}/`);

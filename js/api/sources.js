@@ -156,6 +156,41 @@ export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
     });
 }
 
+/**
+ * Katalog satu sumber untuk halaman Jelajah (`katalog.html`).
+ * `filter` = urutan/status dari sumber (mis. "popular", "selesai"), `genre` = id genre.
+ * @param {string} source id sumber backend ("animeku" | "oploverz" | ...)
+ * @param {{filter?: string, genre?: string, page?: number, signal?: AbortSignal, refresh?: boolean}} [opts]
+ */
+export function getSourceBrowse(source, { filter = '', genre = '', page = 1, signal, refresh = false } = {}) {
+    const q = new URLSearchParams({ source: String(source || '') });
+    if (filter) q.set('filter', filter);
+    if (genre) q.set('genre', genre);
+    if (page > 1) q.set('page', String(page));
+    return call(`/browse?${q.toString()}`, {
+        signal,
+        force: refresh,
+        noCache: refresh,
+        transform: (json) => {
+            const data = json.data || {};
+            const sourceId = String(json.source || source);
+            const options = (list) => (Array.isArray(list) ? list : [])
+                .filter((entry) => entry && entry.id)
+                .map((entry) => ({ id: String(entry.id), label: String(entry.label || entry.id) }));
+            return {
+                source: sourceId,
+                items: (Array.isArray(data.items) ? data.items : []).map((item) => fromBackend(item, sourceId)).filter(Boolean),
+                page: Number(data.page) || 1,
+                hasNext: Boolean(data.hasNext),
+                filters: options(data.filters),
+                genres: options(data.genres),
+                filter: String(data.filter || ''),
+                genre: String(data.genre || ''),
+            };
+        },
+    });
+}
+
 /** Cari judul di situs sumber → { items, source, fallback }. */
 export function searchBackend(q, { signal } = {}) {
     return call(`/search?q=${encodeURIComponent(q)}`, { ttl: CACHE_TTL.search, signal, transform: toList });

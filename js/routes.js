@@ -16,7 +16,21 @@ export const PAGES = Object.freeze({
     home: 'index.html',
     watch: 'watch.html',
     search: 'search.html',
+    katalog: 'katalog.html',
 });
+
+/**
+ * URL halaman Jelajah (katalog situs sumber).
+ * @param {{source?: string, filter?: string, genre?: string, page?: number}} [state]
+ */
+export function katalogUrl({ source = 'animeku', filter = '', genre = '', page = 1 } = {}) {
+    const p = new URLSearchParams();
+    p.set('source', source);
+    if (filter) p.set('filter', filter);
+    if (genre) p.set('genre', genre);
+    if (page > 1) p.set('page', String(page));
+    return `${PAGES.katalog}?${p.toString()}`;
+}
 
 export const BROWSE_KINDS = Object.freeze(['ongoing', 'popular', 'new', 'donghua']);
 export const SEARCH_SORTS = Object.freeze(['relevance', 'score', 'popularity', 'newest']);

@@ -194,6 +194,23 @@ export function findGenre(label) {
  * @param {{page?:number, perPage?:number, sort?:string, formats?:string[], source?:string, signal?:AbortSignal}} [opts]
  * @returns {Promise<ListResult>}
  */
+/**
+ * "Coming Soon" di halaman Jelajah.
+ *
+ * AnimeKu dan Oploverz tidak menyediakan halaman ini (dicek 23 Okt 2026:
+ * /upcoming/, /jadwal/, /genre/ AnimeKu → 404; `?status=upcoming` Oploverz → 0 kartu),
+ * jadi bagian ini memakai metadata yang sudah dipakai situs (AniList → Kitsu) dan
+ * UI menuliskan sumbernya. Judul yang belum tayang tetap bisa dibuka; watch.html
+ * menampilkan "Anime ini belum tayang" alih-alih player kosong.
+ */
+export async function getUpcomingAnime({ page = 1, perPage = UI.sectionSize, signal } = {}) {
+    const steps = [
+        { source: 'anilist', run: () => anilist.searchMedia({ status: 'NOT_YET_RELEASED', sort: 'popularity', page, perPage, signal }) },
+        { source: 'kitsu', run: () => kitsu.listAnime({ status: 'upcoming', page, limit: perPage, signal }) },
+    ];
+    return finishList(await firstAvailable(steps), { page });
+}
+
 export async function getGenreAnime(label, { page = 1, perPage = UI.sectionSize, sort = 'relevance', formats = [], source, signal } = {}) {
     const g = findGenre(label);
     if (!g) return finishList({ items: [], errors: [new ApiError('Genre tidak dikenal.', { kind: 'empty' })] }, { page });

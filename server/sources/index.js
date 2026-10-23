@@ -69,9 +69,12 @@ const NOT_FOUND = Symbol('notFound');
 // bisa diakses tetap tampil walau Samehadaku/Sakunime/Otakudesu/Kuramanime sedang gagal.
 // AnimeIndo masih lookup-only; Anoboy belum punya rute latest terverifikasi;
 // Anichin/AnimeXin tampil pada section Donghua yang terpisah.
-const SUB_INDO_LATEST_SOURCE_ORDER = ['animeku', 'oploverz', 'samehadaku', 'sakunime', 'otakudesu', 'kuramanime'];
+// 23 Okt 2026: hanya AnimeKu & Oploverz yang tampil di panel beranda (pilihan pengguna).
+// Samehadaku/Sakunime/Otakudesu/Kuramanime tetap aktif sebagai adapter untuk pencarian
+// halaman nonton, tetapi tidak lagi menjadi panel Sub Indo.
+const SUB_INDO_LATEST_SOURCE_ORDER = ['animeku', 'oploverz'];
 const SUB_INDO_LATEST_SOURCE_IDS = new Set(SUB_INDO_LATEST_SOURCE_ORDER);
-const SUB_INDO_LATEST_LIMIT = 12;
+const SUB_INDO_LATEST_LIMIT = 24;
 
 /**
  * Gabungkan beberapa daftar secara selang-seling + buang judul ganda.
@@ -346,6 +349,7 @@ export function createRegistry({
                     homeUrl: adapter.baseUrl || '',
                     items,
                     stale: isStale,
+                    browse: adapter.supportsBrowse === true && typeof adapter.browse === 'function',
                     ...(error ? { error } : {}),
                 });
             });
@@ -363,6 +367,31 @@ export function createRegistry({
                 stale,
                 partial: stale || errors.length > 0 || Boolean(flat.partial),
                 errors,
+            };
+        },
+
+        /**
+         * Katalog satu sumber (halaman "Jelajah"): AnimeKu/Oploverz menyediakan daftar
+         * berurutan + paginasi. Bukan klaim Sub Indo — kartu katalog tidak diverifikasi
+         * per episode (aturan bukti tetap berlaku di `latestSubIndo`).
+         * @param {{source: string, filter?: string, genre?: string, page?: number}} opts
+         */
+        async browse({ source, filter = '', genre = '', page = 1 } = {}, ctx = {}) {
+            const adapter = byId.get(String(source || '').toLowerCase());
+            if (!adapter) throw notFound(`Sumber "${source}" tidak dikenal atau sedang dimatikan.`);
+            if (adapter.policy?.tos?.verdict === 'forbidden') throw notFound(`Sumber "${source}" tidak diizinkan.`);
+            if (adapter.supportsBrowse !== true || typeof adapter.browse !== 'function') {
+                throw badRequest(`Sumber ${adapter.name} tidak menyediakan halaman daftar.`);
+            }
+            const safePage = Math.max(1, Math.min(500, Number.parseInt(page, 10) || 1));
+            const key = `browse:${adapter.id}:${filter}:${genre}:${safePage}`;
+            const r = await wrap(key, ttl.searchTtlMs, () => adapter.browse({ filter, genre, page: safePage }, ctx));
+            return {
+                source: adapter.id,
+                data: r.value,
+                fallback: false,
+                stale: r.cache === 'stale',
+                errors: r.error ? [describeError(r.error)] : [],
             };
         },
 

@@ -43,6 +43,7 @@ export const POLICY = Object.freeze({
     }),
 });
 
+const NAV_TTL_MS = 6 * 60 * 60 * 1000;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,158}$/;
 const EPISODE_SLUG_RE = /-episode-\d+(?:-\d+)?(?:-subtitle-indonesia)?$/;
 
@@ -108,12 +109,12 @@ export function parseCards($, base) {
         const url = siteUrl(anchor.attr('href'), base);
         if (!url) return;
 
-        const episodeTitle = cleanText(card.find('h2[itemprop="headline"]').first().text())
-            || cleanText(card.find('h2').first().text())
-            || cleanText(anchor.attr('title'));
+        const episodeTitle = decodeEntities(card.find('h2[itemprop="headline"]').first().text())
+            || decodeEntities(card.find('h2').first().text())
+            || decodeEntities(anchor.attr('title'));
         const tt = card.find('.tt').first().clone();
         tt.find('h2').remove();
-        const seriesTitle = cleanText(tt.text())
+        const seriesTitle = decodeEntities(tt.text())
             || episodeTitle.replace(/\s+(?:Episode|Eps?\.?)\s*\d+.*$/i, '').trim();
 
         const label = cleanText(card.find('.epx').first().text());
@@ -131,6 +132,7 @@ export function parseCards($, base) {
             image: imageSrc(card.find('img').first(), base),
             latestEpisode: episode,
             format: parseFormat(card.find('.typez').first().text()),
+            status: parseStatus(label),
             label,
         });
     });
@@ -292,6 +294,41 @@ export function parseEpisodePage($, base) {
     };
 }
 
+/**
+ * Urutan/filter yang benar-benar diterima `/series/` (form filter situs, 23 Okt 2026):
+ * order=update|popular|rating, status=ongoing|completed|upcoming, type=movie|drama|...
+ * "Upcoming" tidak dipakai: saat dicek, halaman `?status=upcoming` tidak berisi kartu.
+ */
+export const BROWSE_FILTERS = Object.freeze([
+    { id: 'update', label: 'Terbaru', params: { order: 'update' } },
+    { id: 'popular', label: 'Populer', params: { order: 'popular' } },
+    { id: 'rating', label: 'Rating Tertinggi', params: { order: 'rating' } },
+    { id: 'ongoing', label: 'Ongoing', params: { status: 'ongoing' } },
+    { id: 'completed', label: 'Complete', params: { status: 'completed' } },
+    { id: 'movie', label: 'Movie', params: { type: 'movie' } },
+]);
+
+/** Genre dari form filter `/series/` (80 genre) — id dipakai apa adanya di `?genre[]=`. */
+export function parseGenreOptions($) {
+    const out = [];
+    const seen = new Set();
+    $('input[name="genre[]"][value]').each((_, el) => {
+        const input = $(el);
+        const id = cleanText(input.attr('value')).toLowerCase();
+        if (!/^[a-z0-9-]{2,40}$/.test(id) || seen.has(id)) return;
+        const label = cleanText($(`label[for="${input.attr('id')}"]`).first().text()) || id;
+        seen.add(id);
+        out.push({ id, label });
+    });
+    return out;
+}
+
+/** URL halaman berikutnya dari `<link rel=next>` / `a.next.page-numbers`. */
+export function nextPageHref($, base) {
+    return siteUrl($('link[rel="next"]').attr('href'), base)
+        || siteUrl($('a.next.page-numbers').first().attr('href'), base);
+}
+
 export function createOploverz({ network, createClient, baseUrl }) {
     const base = String(baseUrl || 'https://oploverz.ch').replace(/\/+$/, '');
     const host = new URL(base).hostname;
@@ -301,13 +338,15 @@ export function createOploverz({ network, createClient, baseUrl }) {
         requireExplicitRobots: false,
         cookies: false,
     });
+    /** Daftar genre dari form filter situs; dimuat sekali lalu dipakai ulang. */
+    let genreCache = null;
 
     const toAnime = (card) => makeAnime({
         title: card.title,
         image: card.image,
         latestEpisode: card.latestEpisode,
         format: card.format,
-        status: 'ONGOING',
+        status: card.latestEpisode ? 'ONGOING' : parseStatus(card.label),
         country: 'JP',
         slug: encodeSlug(ID, card.slug),
         source: ID,
@@ -320,6 +359,7 @@ export function createOploverz({ network, createClient, baseUrl }) {
         baseUrl: base,
         country: 'JP',
         policy: POLICY,
+        supportsBrowse: true,
 
         parseRef(parts) {
             const slug = String(parts[0] || '').toLowerCase();
@@ -337,6 +377,43 @@ export function createOploverz({ network, createClient, baseUrl }) {
                 .filter((card) => card.kind === 'episode' && card.latestEpisode)
                 .filter((card) => (seen.has(card.slug) ? false : seen.add(card.slug)))
                 .map(toAnime);
+        },
+
+        /** Opsi urutan + genre dari form `/series/` (genre di-cache 6 jam). */
+        browseOptions() {
+            return { filters: BROWSE_FILTERS.map(({ id, label }) => ({ id, label })), genres: genreCache?.list || [] };
+        },
+
+        /**
+         * Halaman daftar `/series/`: filter = id urutan/status/tipe, genre = id genre.
+         * @param {{filter?: string, genre?: string, page?: number}} opts
+         */
+        async browse({ filter = '', genre = '', page = 1 } = {}, ctx = {}) {
+            const chosen = BROWSE_FILTERS.find((item) => item.id === filter) || BROWSE_FILTERS[0];
+            const params = new URLSearchParams(chosen.params);
+            if (genre) params.append('genre[]', genre);
+            const path = page > 1 ? `/series/page/${page}/` : '/series/';
+            const query = params.toString();
+            const res = await client.html(`${base}${path}${query ? `?${query}` : ''}`, ctx);
+            if (!genreCache || Date.now() - genreCache.at > NAV_TTL_MS) {
+                const list = parseGenreOptions(res.$);
+                if (list.length) genreCache = { at: Date.now(), list };
+            }
+            const seen = new Set();
+            const items = parseCards(res.$, base)
+                .filter((card) => card.kind === 'series')
+                .filter((card) => (seen.has(card.slug) ? false : seen.add(card.slug)))
+                .map(toAnime)
+                .filter((anime) => anime.slug);
+            return {
+                items,
+                page,
+                hasNext: Boolean(nextPageHref(res.$, base)),
+                filters: BROWSE_FILTERS.map(({ id, label }) => ({ id, label })),
+                genres: genreCache?.list || [],
+                filter: chosen.id,
+                genre,
+            };
         },
 
         async search(query, ctx = {}) {

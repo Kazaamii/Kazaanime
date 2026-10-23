@@ -23,7 +23,7 @@ import { setSectionNote } from './ui/notice.js';
 import { showSkeleton } from './ui/skeleton.js';
 import { html, $, delegate } from './ui/dom.js';
 import { GENRES, SCHEDULE, SUB_INDO } from './config.js';
-import { genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
+import { genreUrl, watchUrl, latestEpisodeOf, katalogUrl } from './routes.js';
 import {
     getHeroSlides, getHomeSection, getSubIndoHomeSources, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
 } from './api/index.js';
@@ -206,6 +206,7 @@ function renderSubIndoSources(sources, result = {}) {
                 <div class="subindo-source-header">
                     <h3 id="subindo-source-title-${index}">${source.name}</h3>
                     <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
+                    ${source.browse ? html`<a class="subindo-source-more" href="${katalogUrl({ source: source.id })}">Lihat semua</a>` : ''}
                 </div>
                 ${meta ? html`<p class="subindo-source-meta">${meta}</p>` : ''}
                 ${warnings.length ? html`<p class="subindo-source-warning">${warnings.join(' ')}
