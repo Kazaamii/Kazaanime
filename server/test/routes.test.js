@@ -205,7 +205,12 @@ test('/api/health, /api/bot, /api/<tidak-ada>', async () => {
         assert.match(h.json.data.userAgent, /^KazanimeBot\/1\.0 \(/);
         assert.equal(h.res.headers.get('cache-control'), 'no-store');
         const bot = await get(`${base}/api/bot`);
-        assert.match(bot.text, /User-agent: KazanimeBot\n\s+Disallow: \//);
+        // Mode robots default proyek = off: halaman bot harus jujur menyatakannya,
+        // bukan mengklaim patuh robots.txt.
+        assert.match(bot.text, /SCRAPER_ROBOTS_MODE=off/);
+        assert.match(bot.text, /robots\.txt is not consulted/);
+        assert.match(bot.text, /Opt out: robots\.txt is not enforced/);
+        assert.match(bot.text, /contact address below/);
         assert.match(bot.res.headers.get('content-type'), /text\/plain/);
         const none = await get(`${base}/api/tidak-ada`);
         assert.equal(none.res.status, 404);

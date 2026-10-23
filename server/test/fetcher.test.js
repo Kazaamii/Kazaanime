@@ -11,7 +11,8 @@ const FAST = {
     retries: 1,
     minIntervalMs: 0,
     maxQueueWaitMs: 5000,
-    robots: { ...SCRAPER.robots, timeoutMs: 800 },
+    // Uji perilaku gerbang robots: mode 'enforce' (default proyek kini 'off', lihat config.js).
+    robots: { ...SCRAPER.robots, mode: 'enforce', timeoutMs: 800 },
     circuit: { failures: 2, openMs: 60000, blockedMs: 120000 },
 };
 
@@ -357,4 +358,55 @@ test('fetcher: stream() memutus berkas yang melebihi maxBytes', async () => {
     } finally {
         await t.close();
     }
+});
+
+/* ------------------------------------------------------------------ */
+/* Mode robots.txt: 'off' (default proyek) dan 'warn'                  */
+/* ------------------------------------------------------------------ */
+
+test('fetcher: mode off tidak meminta robots.txt dan tetap mengambil halaman yang dilarang', async () => {
+    const t = setup({
+        '/robots.txt': send(200, 'User-agent: KazanimeBot\nDisallow: /rahasia/'),
+        '/rahasia/x': send(200, 'isi halaman'),
+    }, { scraper: { ...FAST, robots: { ...FAST.robots, mode: 'off' } } });
+    const { srv, client, hits } = await t.ready;
+    try {
+        const res = await client.request(`${srv.url}/rahasia/x`);
+        assert.equal(res.status, 200);
+        assert.deepEqual(hits.map((h) => h.url), ['/rahasia/x'], 'robots.txt tidak pernah diminta');
+        assert.equal(client.robotsMode, 'off');
+    } finally { t.close(); }
+});
+
+test('fetcher: mode warn membaca robots.txt, mencatat pelanggaran, tetapi tidak memblokir', async () => {
+    const t = setup({
+        '/robots.txt': send(200, 'User-agent: KazanimeBot\nDisallow: /rahasia/'),
+        '/rahasia/x': send(200, 'isi halaman'),
+    }, { scraper: { ...FAST, robots: { ...FAST.robots, mode: 'warn' } } });
+    const { srv, client, hits } = await t.ready;
+    try {
+        const res = await client.request(`${srv.url}/rahasia/x`);
+        assert.equal(res.status, 200);
+        assert.deepEqual(hits.map((h) => h.url), ['/robots.txt', '/rahasia/x']);
+        assert.deepEqual(client.robotsNotes.map((note) => note.reason), ['disallowed']);
+        assert.equal(client.robotsNotes[0].source, 'uji');
+    } finally { t.close(); }
+});
+
+test('fetcher: mode off tetap menghentikan 403/429 (tidak pernah menerobos pembatasan)', async () => {
+    const off = { ...FAST, robots: { ...FAST.robots, mode: 'off' } };
+    const forbidden = setup({ '/x': send(403, 'ditolak') }, { scraper: off });
+    const f = await forbidden.ready;
+    try {
+        await assert.rejects(f.client.request(`${f.srv.url}/x`), (error) => ['blocked', 'http'].includes(error.kind));
+        assert.equal(f.hits.filter((hit) => hit.url === '/x').length, 1, '403 tidak diulang');
+        assert.equal(f.hits.some((hit) => hit.url === '/robots.txt'), false);
+    } finally { forbidden.close(); }
+
+    const limited = setup({ '/y': send(429, 'pelan', { 'retry-after': '120' }) }, { scraper: off });
+    const l = await limited.ready;
+    try {
+        await assert.rejects(l.client.request(`${l.srv.url}/y`), (error) => error.kind === 'rate_limited' || error.status === 429);
+        assert.equal(l.hits.filter((hit) => hit.url === '/y').length, 1, '429 tidak diulang');
+    } finally { limited.close(); }
 });

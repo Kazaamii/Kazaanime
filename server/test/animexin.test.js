@@ -86,11 +86,11 @@ test('animexin: halaman episode → 16 server (base64 → iframe), download tanp
 
 test('animexin: parser upstream mirror menerima direct URL, data-em, iframe/source, dan meta embedUrl', () => {
     const episode = parseEpisodePage(fixture$('animexin-mirror-variants.html'), BASE);
-    assert.deepEqual(episode.servers.map((server) => [server.name, server.lang, server.subtitleType, server.url]), [
-        ['Direct (Sub Indo)', 'id', 'hard', 'https://direct.example.test/embed/one'],
-        ['Mirror (Sub English)', 'en', 'soft', 'https://meta.example.test/embed/mirror'],
-        ['Iframe Mirror', null, undefined, 'https://iframe.example.test/embed/mirror'],
-        ['Source Mirror', null, undefined, 'https://source.example.test/video.mp4'],
+    assert.deepEqual(episode.servers.map((server) => [server.name, server.lang, server.subtitleType, server.subtitleEvidence, server.url]), [
+        ['Direct (Sub Indo)', 'id', 'hard', 'server-label', 'https://direct.example.test/embed/one'],
+        ['Mirror (Sub English)', 'en', 'soft', undefined, 'https://meta.example.test/embed/mirror'],
+        ['Iframe Mirror', null, undefined, undefined, 'https://iframe.example.test/embed/mirror'],
+        ['Source Mirror', null, undefined, undefined, 'https://source.example.test/video.mp4'],
     ]);
 });
 

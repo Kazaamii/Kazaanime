@@ -29,7 +29,7 @@ import {
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
-import { isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
+import { evidenceSummary, isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -112,12 +112,16 @@ function renderSubIndoSummary(sources, result = {}) {
     }
 }
 
-/** Baris status per sumber: jumlah episode yang sudah diperiksa + kegagalan. */
+/** Baris status per sumber: episode diperiksa, kegagalan, dan yang tanpa bukti Sub Indo. */
 function subIndoSourceMeta(source) {
     const bits = [];
     if (Number(source.checked) > 0) bits.push(`${source.checked} episode diperiksa`);
     if (Number(source.failedChecks) > 0) bits.push(`${source.failedChecks} gagal`);
+    if (Number(source.unproven) > 0) bits.push(`${source.unproven} tanpa bukti`);
     if (source.timedOut) bits.push('batas waktu');
+    if (source.stale) bits.push('data cache');
+    const proof = evidenceSummary(source.items);
+    if (proof) bits.push(`bukti: ${proof}`);
     return bits.join(' · ');
 }
 
@@ -148,6 +152,7 @@ function updateSubIndoNote(sections) {
  */
 function renderSubIndoEmpty(grid, source) {
     const policyStop = isPolicyStop(source);
+    // "Tanpa bukti" bukan kegagalan teknis: tidak perlu tombol coba lagi, cukup dijelaskan.
     const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
     const homeUrl = safeHomeUrl(source.homeUrl);
     const iconName = policyStop

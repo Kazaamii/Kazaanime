@@ -88,6 +88,18 @@ test('latestSubIndo: feed per sumber, judul lintas sumber tidak digabung, sumber
     assert.deepEqual(animeindo.calls, []);
 });
 
+test('health melaporkan mode gerbang robots.txt yang aktif', () => {
+    const A = stub('samehadaku', {});
+    const registry = createRegistry({
+        adapters: [A],
+        network: { robotsMode: 'off', robots: { snapshot: () => ({}) }, circuit: { snapshot: () => ({}) } },
+        enrichImages: false,
+    });
+    const health = registry.health();
+    assert.equal(health.robotsMode, 'off');
+    assert.equal(health.sources[0].robots, 'unchecked');
+});
+
 test('download-only provider tidak ikut latest/search fan-out; Kusonime lookup tetap memakai cache terpisah', async () => {
     const A = stub('animexin', { latest: async () => [anime('animexin', 'x', 'X')], search: async () => [anime('animexin', 'x', 'X')] });
     let calls = 0;

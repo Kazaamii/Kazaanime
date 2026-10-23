@@ -262,9 +262,10 @@ export function createAnichin({ network, createClient, baseUrl }) {
                 title: parsed.title || entry.title,
                 released: entry.released,
                 url: page.url,
-                // Anichin hanya merilis subtitle Indonesia.
-                servers: parsed.servers.map((s) => ({ ...s, lang: s.lang || 'id' })),
-                downloads: parsed.downloads.map((d) => ({ ...d, subtitle: d.subtitle || 'Sub Indo' })),
+                // Bahasa mengikuti bukti dari halaman episode (lihat lib/subtitle-evidence.js),
+                // bukan asumsi "Anichin situs Indonesia".
+                servers: parsed.servers,
+                downloads: parsed.downloads,
             });
         },
 

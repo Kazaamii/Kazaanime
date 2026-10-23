@@ -75,6 +75,20 @@ export const SCRAPER = Object.freeze({
     /** Halaman lebih besar dari ini dianggap tidak wajar. */
     maxBodyBytes: 3 * 1024 * 1024,
     robots: Object.freeze({
+        /**
+         * Mode gerbang robots.txt:
+         *   'enforce' — taati robots.txt sepenuhnya (perilaku lama): path terlarang tidak diminta.
+         *   'warn'    — robots.txt tetap dibaca untuk diagnosis, tetapi tidak memblokir request.
+         *   'off'     — robots.txt tidak diminta sama sekali; batas tetap lewat rate limit per host.
+         *
+         * Default proyek ini: 'off' (permintaan eksplisit pemilik proyek, 23 Okt 2026).
+         * Set `SCRAPER_ROBOTS_MODE=enforce` untuk mengembalikan perilaku lama.
+         * Apa pun modenya, 403/429/challenge TIDAK pernah diterobos atau diulang.
+         */
+        mode: (() => {
+            const value = String(env.SCRAPER_ROBOTS_MODE || 'off').toLowerCase();
+            return ['enforce', 'warn', 'off'].includes(value) ? value : 'off';
+        })(),
         ttlMs: 6 * 3600 * 1000,
         errorTtlMs: 10 * 60 * 1000,
         timeoutMs: 5000,
@@ -151,7 +165,7 @@ if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length)
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // Anoboy/Sakunime/Kuramanime: ToS unknown → fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime memakai satu base URL tanpa failover.
+    // Anoboy/Sakunime/Kuramanime: ToS unknown → hak akses mengikuti SCRAPER_ROBOTS_MODE (default off). Kuramanime memakai satu base URL tanpa failover.
     enabled: list('SCRAPER_SOURCES', defaultSources).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
     // AnimeIndo opt-in only: add "animeindo" to SCRAPER_SOURCES after verifying robots.txt/terms.

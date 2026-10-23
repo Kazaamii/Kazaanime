@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { makeEpisode } from '../lib/anime.js';
 import { SourceError } from '../lib/errors.js';
 import { isAllowed, parseRobots, rulesFor } from '../lib/robots.js';
 import {
@@ -88,11 +89,13 @@ test('samehadaku: halaman episode → server embed publik (VIP berbayar dilewati
     assert.deepEqual(ep.servers.map((s) => s.name), ['Blogspot', 'Mega 480p', 'Mega 720p', 'Mega 1080p']);
     assert.ok(ep.servers[0].url.startsWith('https://www.blogger.com/video.g?token='));
     assert.ok(ep.servers.slice(1).every((s) => s.url.startsWith('https://mega.nz/embed/')));
-    assert.ok(ep.servers.every((s) => s.lang === 'id' && s.subtitleType === 'hard'), 'Samehadaku = Hardsub Indonesia');
+    // Bukti dari halaman episode (deskripsi "HD Subtitle Indonesia"), bukan asumsi nama situs.
+    assert.ok(ep.servers.every((s) => s.lang === 'id' && s.subtitleType === 'hard' && s.subtitleEvidence === 'episode-page'));
     assert.ok(!ep.servers.some((s) => /vip/i.test(s.name)));
     assert.equal(ep.downloads.length, 8);
     assert.deepEqual(ep.downloads[0], {
-        quality: '360p', size: '', format: 'MKV', subtitle: 'Sub Indo',
+        // Blok download di halaman ini tidak menulis bahasa; label tidak dikarang.
+        quality: '360p', size: '', format: 'MKV', subtitle: '',
         links: [
             { provider: 'Gofile', url: 'https://gofile.io/d/F4T8ejIk' },
             { provider: 'Acefile', url: 'https://acefile.co/f/112388396/knmt-s2-03-360p-samehadaku-care-mkv' },
@@ -103,12 +106,21 @@ test('samehadaku: halaman episode → server embed publik (VIP berbayar dilewati
     assert.ok(ep.downloads.some((g) => g.format === 'MP4'));
 });
 
+test('samehadaku: bukti Sub Indo bertahan sampai payload episode (makeEpisode)', () => {
+    const ep = parseEpisodePage(fixture$('samehadaku-episode.html'), BASE);
+    const payload = makeEpisode({ episode: 3, title: ep.title, servers: ep.servers, downloads: ep.downloads });
+    assert.equal(payload.servers[0].lang, 'id');
+    assert.equal(payload.servers[0].subtitleEvidence, 'episode-page');
+    assert.equal(payload.downloads[0].subtitle, '', 'label download tidak dikarang');
+});
+
 test('samehadaku: halaman FX Senshi snapshot → server publik eksplisit; token/ID fixture disamarkan', () => {
     const ep = parseEpisodePage(fixture$('samehadaku-fx-senshi-episode.html'), BASE);
     assert.equal(ep.title, 'FX Senshi Kurumi-chan Episode 4');
     assert.equal(ep.animeUrl, `${BASE}/anime/fx-senshi-kurumi-chan/`);
     assert.deepEqual(ep.servers.map((server) => server.name), ['Blogspot', 'Mega 480p', 'Mega 720p', 'Mega 1080p']);
-    assert.ok(ep.servers.every((server) => server.lang === 'id' && server.subtitleType === 'hard'));
+    // Fixture minimal ini tidak memuat kalimat subtitle Indonesia → tidak ada klaim bahasa.
+    assert.ok(ep.servers.every((server) => !server.lang && !server.subtitleEvidence && server.subtitleType === 'hard'));
     assert.deepEqual(ep.servers.map((server) => new URL(server.url).hostname), [
         'www.blogger.com', 'mega.nz', 'mega.nz', 'mega.nz',
     ]);
@@ -142,9 +154,10 @@ test('samehadaku adapter: player_ajax fallback sends only explicit data and neve
     const anime = { episodeList: [{ number: 1, title: 'Contoh Episode 1', released: '', url: pageUrl }] };
     const episode = await a.getEpisode({ slug: 'contoh' }, 1, { anime });
 
+    // Halaman AJAX saja tidak menyatakan bahasa: server tetap dipakai, tanpa klaim Sub Indo.
     assert.deepEqual(episode.servers.map((server) => [server.name, server.lang, server.subtitleType, server.url]), [
-        ['Server A', 'id', 'hard', 'https://player.example.test/embed/explicit-a'],
-        ['Server B', 'id', 'hard', 'https://player.example.test/embed/explicit-b'],
+        ['Server A', null, 'hard', 'https://player.example.test/embed/explicit-a'],
+        ['Server B', null, 'hard', 'https://player.example.test/embed/explicit-b'],
     ]);
     const posts = requests.filter((request) => request.method === 'POST');
     assert.equal(posts.length, 2);

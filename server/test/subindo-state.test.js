@@ -9,7 +9,7 @@ globalThis.window = {
     dispatchEvent() {},
 };
 
-const { isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } =
+const { evidenceSummary, isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } =
     await import('../../js/ui/subindo-state.js');
 const { ApiError } = await import('../../js/api/http.js');
 
@@ -76,6 +76,20 @@ test('issuesSummary menghitung batas waktu dan pemeriksaan sebagian, serta koson
         'Batas waktu verifikasi tercapai.',
         'Sebagian episode belum bisa diperiksa.',
     ]);
+});
+
+test('label "tanpa bukti" jujur saat episode terbaca tetapi tidak menyatakan Sub Indo', () => {
+    assert.equal(sourceStatusLabel({ unproven: 3 }, 0), 'Tanpa bukti subtitle');
+    assert.match(sourceDiagnosis({ unproven: 2 }), /tidak menyatakan subtitle Indonesia/);
+    // Bukti yang ada tetap menang atas status "tanpa bukti".
+    assert.equal(sourceStatusLabel({ unproven: 3 }, 2), '2 terverifikasi');
+});
+
+test('evidenceSummary merangkum jenis bukti dari judul yang lolos verifikasi', () => {
+    assert.equal(evidenceSummary([{ subtitleEvidence: 'episode-title' }, { subtitleEvidence: 'download-label' }]), 'judul episode, label download');
+    assert.equal(evidenceSummary([{ subtitleEvidence: 'episode-title' }, { subtitleEvidence: 'episode-title' }]), 'judul episode');
+    assert.equal(evidenceSummary([{}]), '');
+    assert.equal(evidenceSummary(null), '');
 });
 
 test('safeHomeUrl hanya meloloskan tautan http(s)', () => {

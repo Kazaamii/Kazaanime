@@ -52,7 +52,15 @@ test('otakudesu: halaman anime (rekonstruksi struktur) → info + HANYA blok "Ep
 test('otakudesu: halaman episode (rekonstruksi) → server bawaan Sub Indo + download tanpa link donasi', () => {
     const r = parseEpisodePage(fixture$('otakudesu-episode.html'), BASE);
     assert.equal(r.title, 'Kusuriya no Hitorigoto Season 3 Episode 3');
-    assert.deepEqual(r.servers, [{ name: 'desustream', url: 'https://desustream.info/dstream/ondesu3/v5/index.php?id=Q09OVE9I', lang: 'id', subtitleType: 'hard' }]);
+    // Judul episode "… Subtitle Indonesia" adalah bukti; bukan karena Otakudesu situs Indonesia.
+    assert.deepEqual(r.servers, [{
+        name: 'desustream',
+        url: 'https://desustream.info/dstream/ondesu3/v5/index.php?id=Q09OVE9I',
+        lang: 'id',
+        subtitleEvidence: 'episode-title',
+        subtitleType: 'hard',
+    }]);
+    assert.equal(r.subtitleEvidence, 'episode-title');
     assert.equal(r.downloads.length, 3);
     assert.deepEqual(r.downloads.map((d) => `${d.format} ${d.quality} ${d.size}`), ['MP4 360p 45.1 MB', 'MP4 720p 97.4 MB', 'MKV 1080p 210 MB']);
     assert.ok(r.downloads[1].links.every((l) => !l.url.includes('trakteer')), 'link donasi dibuang');

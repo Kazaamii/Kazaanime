@@ -10,7 +10,7 @@
  *   npm run check:sources
  *   npm run check:sources -- --live
  */
-import { BOT, SOURCES } from '../config.js';
+import { BOT, SCRAPER, SOURCES } from '../config.js';
 import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { FACTORIES } from '../sources/index.js';
@@ -21,6 +21,7 @@ const line = (label, text) => console.log(`  ${label.padEnd(9)}: ${text}`);
 
 console.log(`Kazanime — cek sumber (${new Date().toISOString()})`);
 console.log(`User-Agent: ${BOT.userAgent}`);
+console.log(`Mode robots.txt: ${SCRAPER.robots.mode}`);
 
 for (const id of SOURCES.enabled) {
     const factory = FACTORIES[id];
@@ -39,12 +40,16 @@ for (const id of SOURCES.enabled) {
         continue;
     }
 
+    // robots.txt selalu dilaporkan sebagai informasi; hanya memblokir bila mode 'enforce'.
     const verdict = await network.robots.check(`${adapter.baseUrl}/`, { requireExplicit: tos.verdict !== 'allowed' });
     const snap = network.robots.snapshot()[new URL(adapter.baseUrl).origin] || {};
     line('robots', `${snap.state} (HTTP ${snap.httpStatus || '-'}) · grup "${snap.group}" · ${snap.rules ?? 0} aturan · Crawl-delay ${snap.crawlDelay ?? '-'}`);
-    line('akses', verdict.allowed ? `BOLEH (${verdict.reason})` : `TIDAK (${verdict.reason}) — adapter otomatis dilewati, fallback dipakai`);
+    const enforced = SCRAPER.robots.mode === 'enforce';
+    line('akses', verdict.allowed
+        ? `BOLEH (${verdict.reason})`
+        : `${enforced ? 'TIDAK' : 'DIBLOKIR robots.txt, tetap dicoba'} (${verdict.reason}) — mode ${SCRAPER.robots.mode}`);
 
-    if (!live || !verdict.allowed) continue;
+    if (!live || (enforced && !verdict.allowed)) continue;
     const t0 = Date.now();
     try {
         const items = await adapter.latest({});
@@ -58,6 +63,8 @@ for (const id of SOURCES.enabled) {
         if (last) {
             const ep = await adapter.getEpisode(ref, last.number, { anime });
             line('episode', `#${ep.episode} · ${ep.servers.length} server (${ep.servers.slice(0, 3).map((s) => s.name).join(', ')}${ep.servers.length > 3 ? ', …' : ''}) · ${ep.downloads.length} grup download`);
+            const proof = ep.servers.find((s) => s.subtitleEvidence);
+            line('subtitle', proof ? `BUKTI ${proof.subtitleEvidence} — ${proof.name}` : 'TIDAK ADA bukti subtitle Indonesia di halaman episode');
         }
         if (typeof adapter.schedule === 'function') {
             const days = await adapter.schedule({});

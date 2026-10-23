@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { animeRefFromUrl, createKuramanime, parseCards, parseDetail, parseDownloads, parseEpisodePage } from '../sources/kuramanime.js';
 import { fakeClientFactory, fixture, fixture$ } from './helpers.js';
 
@@ -45,9 +46,11 @@ test('kuramanime: detail (dua varian baris info) + episode dari #episodeLists[da
 test('kuramanime: download #animeDownloadLink (link non-aktif & javascript: dibuang)', () => {
     const d = parseDownloads(fixture$('kuramanime-episode.html'), BASE);
     assert.deepEqual(d.map((g) => [g.quality, g.format, g.size, g.subtitle, g.links.map((l) => l.provider)]), [
-        ['480p', 'MKV', '147.85 MB', 'Softsub Indo', ['Pixeldrain', 'Acefile']],
-        ['720p', 'MP4', '220.4 MB', 'Hardsub Indo', ['Pixeldrain']],
+        ['480p', 'MKV', '147.85 MB', 'Softsub', ['Pixeldrain', 'Acefile']],
+        ['720p', 'MP4', '220.4 MB', 'Hardsub', ['Pixeldrain']],
     ]);
+    // Label grup tidak menyebut bahasa → adapter tidak menambah "Indo" sendiri (itu asumsi situs).
+    assert.ok(d.every((g) => textShowsIndonesianSubtitle(g.subtitle) === false));
 });
 
 test('kuramanime: player dilindungi token (data-kk) → tidak ada server, ditandai protectedPlayer', () => {
@@ -63,7 +66,9 @@ test('kuramanime: player publik (iframe + mp4; m3u8 dilewati)', () => {
         ['Kuramanime', 'https://filemoon.sx/e/abc123def'],
         ['Kuramadrive 720p', 'https://kuramadrive.com/kdrive/kusuriya3-03-720.mp4'],
     ]);
-    assert.ok(p.servers.every((s) => s.lang === 'id' && s.subtitleType === 'hard'));
+    // Halaman hanya menulis "(Hardsub)"/"(Softsub)" tanpa bahasa → tidak ada klaim Sub Indo.
+    assert.ok(p.servers.every((s) => !s.lang && !s.subtitleEvidence && s.subtitleType === 'hard'));
+    assert.equal(p.subtitleEvidence, '');
     assert.equal(p.protectedPlayer, false);
 });
 

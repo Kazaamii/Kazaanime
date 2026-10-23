@@ -110,7 +110,7 @@ test('homepage facade checks the latest episode and retains identical titles fro
         return new Response(JSON.stringify({
             ok: true,
             fallback: false,
-            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleType: 'hard' }], downloads: [] },
+            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleEvidence: 'episode-title', subtitleType: 'hard' }], downloads: [] },
         }), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     clearApiCache();
@@ -150,7 +150,7 @@ test('per-source Sub Indo retry only checks the requested provider', async (t) =
         return new Response(JSON.stringify({
             ok: true,
             fallback: false,
-            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleType: 'hard' }], downloads: [] },
+            data: { servers: [{ name: 'Server Indonesia', url: 'https://embed.example.test/watch', lang: 'id', subtitleEvidence: 'episode-title', subtitleType: 'hard' }], downloads: [] },
         }), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     clearApiCache();
@@ -284,6 +284,7 @@ test('episode extras: searches alternate sources when a known source has no Indo
                         name: 'Public embed',
                         url: 'https://player.example.test/embed/hyouken-3',
                         lang: 'id',
+                        subtitleEvidence: 'episode-title',
                         subtitleType: 'hard',
                     }],
                     downloads: [],
@@ -317,4 +318,5 @@ test('episode extras: searches alternate sources when a known source has no Indo
     assert.ok(calls.includes(`/api/anime/${encodeURIComponent(otakuSlug)}/episode/3`), 'requests the matching Otakudesu episode');
     assert.ok(result.servers.some((server) => server.lang === 'id' && server.source === 'backend:otakudesu'));
     assert.equal(result.servers[0].subtitleType, 'hard');
+    assert.equal(result.servers[0].subtitleEvidence, 'episode-title', 'bukti bahasa diteruskan ke payload frontend');
 });

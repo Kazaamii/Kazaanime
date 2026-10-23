@@ -87,15 +87,42 @@ function isIndonesianLanguage(value) {
         || lang === 'bahasa indonesia' || lang.startsWith('id-');
 }
 
+/** Bukti bahasa yang dikirim backend bersama server (lihat server/lib/subtitle-evidence.js). */
+const SUBTITLE_EVIDENCE = new Set(['subtitle-track', 'episode-title', 'download-label', 'server-label', 'episode-page']);
+const INDONESIAN_LABEL = /(?:sub[\s-]*indo|bahasa indonesia|indonesian|hardsub indonesia)/i;
+
+/**
+ * Server ini benar-benar punya subtitle Indonesia?
+ *
+ * `lang: 'id'` saja TIDAK cukup: dulu adapter menempelkannya karena situsnya memang situs
+ * Indonesia, sehingga verifikasi tidak membuktikan apa pun. Sekarang bukti harus datang dari
+ * data episode itu sendiri — track subtitle Indonesia, label server, atau `subtitleEvidence`
+ * yang dibaca backend dari halaman episode tersebut.
+ * @param {Array<object>} servers
+ */
 function hasIndonesianSubtitle(servers) {
     return (Array.isArray(servers) ? servers : []).some((server) => {
         if (!server || server.available === false) return false;
-        if (isIndonesianLanguage(server.lang)) return true;
-        if (/(?:sub[\s-]*indo|bahasa indonesia|indonesian)/i.test(String(server.name || ''))) return true;
-        return (Array.isArray(server.subtitles) ? server.subtitles : []).some((track) =>
-            isIndonesianLanguage(track?.lang)
-            || /(?:bahasa indonesia|indonesian|sub[\s-]*indo)/i.test(String(track?.label || '')));
+        const tracks = Array.isArray(server.subtitles) ? server.subtitles : [];
+        const trackProof = tracks.some((track) =>
+            isIndonesianLanguage(track?.lang) || INDONESIAN_LABEL.test(String(track?.label || '')));
+        if (trackProof) return true;
+        if (INDONESIAN_LABEL.test(String(server.name || ''))) return true;
+        return isIndonesianLanguage(server.lang) && SUBTITLE_EVIDENCE.has(String(server.subtitleEvidence || ''));
     });
+}
+
+/** Ambil label bukti dari server yang lolos verifikasi (untuk ditampilkan di panel). */
+function evidenceOf(media) {
+    const servers = Array.isArray(media?.servers) ? media.servers : [];
+    for (const server of servers) {
+        if (!hasIndonesianSubtitle([server])) continue;
+        if (server.subtitleEvidence) return String(server.subtitleEvidence);
+        const tracks = Array.isArray(server.subtitles) ? server.subtitles : [];
+        const byTrack = tracks.some((track) => isIndonesianLanguage(track?.lang) || INDONESIAN_LABEL.test(String(track?.label || '')));
+        return byTrack ? 'subtitle-track' : 'server-label';
+    }
+    return '';
 }
 
 function episodeOf(anime) {
@@ -253,6 +280,7 @@ export async function getVerifiedSubIndoSources({
                 error: source.error || null,
                 checked: 0,
                 failedChecks: 0,
+                unproven: 0,
                 timedOut: false,
                 scheduled: 0,
                 processed: 0,
@@ -319,9 +347,15 @@ export async function getVerifiedSubIndoSources({
         try {
             const media = await requestEpisode(anime, episode);
             if (hasIndonesianSubtitle(media?.servers)) {
-                results[index] = { source, anime: { ...anime, latestEpisode: episode }, key: titleKey(anime) };
+                results[index] = {
+                    source,
+                    anime: { ...anime, latestEpisode: episode, subtitleEvidence: evidenceOf(media) },
+                    key: titleKey(anime),
+                };
                 return;
             }
+            // Episode terbaca, tetapi tidak ada bukti subtitle Indonesia di halaman episode itu.
+            source.unproven++;
         } catch {
             if (signal?.aborted) throwIfAborted(signal);
             if (isBudgetStop()) {
@@ -341,9 +375,11 @@ export async function getVerifiedSubIndoSources({
             if (hasIndonesianSubtitle(media?.servers)) {
                 results[index] = {
                     source,
-                    anime: { ...anime, latestEpisode: previousEpisode },
+                    anime: { ...anime, latestEpisode: previousEpisode, subtitleEvidence: evidenceOf(media) },
                     key: titleKey(anime),
                 };
+            } else {
+                source.unproven++;
             }
         } catch {
             if (signal?.aborted) throwIfAborted(signal);
@@ -397,8 +433,8 @@ export async function getVerifiedSubIndoSources({
     }
 
     return {
-        sections: sources.map(({ id, name, homeUrl, stale, error, checked, failedChecks, timedOut: expired, items }) => ({
-            id, name, homeUrl, stale, error, checked, failedChecks, timedOut: expired, items,
+        sections: sources.map(({ id, name, homeUrl, stale, error, checked, failedChecks, unproven, timedOut: expired, items }) => ({
+            id, name, homeUrl, stale, error, checked, failedChecks, unproven, timedOut: expired, items,
         })),
         checked: sources.reduce((sum, source) => sum + source.checked, 0),
         timedOut: Boolean(timedOut),

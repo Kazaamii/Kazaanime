@@ -14,7 +14,7 @@ import { ProxyManager, ProxyUnavailableError } from '../lib/proxy-manager.js';
 import { RequestManager } from '../lib/request-manager.js';
 import { HostThrottle } from '../lib/rate-limit.js';
 import { TtlCache } from '../lib/cache.js';
-import { SCRAPER_RUNTIME, SOURCES } from '../config.js';
+import { SCRAPER, SCRAPER_RUNTIME, SOURCES } from '../config.js';
 import { FACTORIES, createRegistry } from '../sources/index.js';
 
 function listen(server) {
@@ -89,7 +89,7 @@ function cookieHeaders() {
     return headers;
 }
 
-test('config runtime: sumber Sub Indo aktif dengan robots gate yang ketat', () => {
+test('config runtime: sumber Sub Indo aktif dengan mode robots yang eksplisit', () => {
     assert.ok(SOURCES.enabled.includes('samehadaku'));
     assert.ok(SOURCES.enabled.includes('otakudesu'));
     assert.ok(FACTORIES.anoboy);
@@ -105,6 +105,9 @@ test('config runtime: sumber Sub Indo aktif dengan robots gate yang ketat', () =
     assert.equal(SOURCES.sakunime.baseUrl, 'https://sakunime.com');
     assert.ok(Object.isFrozen(SCRAPER_RUNTIME.proxy.urls));
     assert.ok(SCRAPER_RUNTIME.request.maxConcurrencyPerHost >= 1);
+    // 23 Okt 2026: gerbang robots.txt dibuat eksplisit & dapat diubah lewat env (default 'off').
+    assert.ok(['enforce', 'warn', 'off'].includes(SCRAPER.robots.mode));
+    assert.equal(SCRAPER.robots.mode, 'off');
 });
 
 test('health diagnostic merangkum proxy/cookie/browser tanpa URL proxy, kredensial, atau cookie', () => {

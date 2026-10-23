@@ -2,7 +2,7 @@
   "name": "kazanime",
   "version": "1.6.0",
   "private": true,
-  "description": "Kazanime — frontend statis + backend scraper (Express) dalam satu proyek Vercel.",
+  "description": "Kazanime \u2014 frontend statis + backend scraper (Express) dalam satu proyek Vercel.",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
@@ -13,6 +13,7 @@
     "start": "node server/index.js",
     "test": "node --test server/test/*.test.js",
     "check:sources": "node server/scripts/check-sources.js",
+    "check:subindo": "node server/scripts/check-subtitle-evidence.js",
     "check:reachability": "node server/scripts/check-source-reachability.js",
     "inspect:animeindo": "node server/scripts/inspect-animeindo-page.js"
   },
