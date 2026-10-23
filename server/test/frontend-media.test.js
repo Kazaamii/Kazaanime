@@ -22,6 +22,7 @@ globalThis.CustomEvent = class extends Event {
 };
 
 const { getBackendEpisode } = await import('../../js/api/sources.js');
+const { getEpisodeExtras } = await import('../../js/api/streams.js');
 const { clearApiCache } = await import('../../js/api/http.js');
 
 test('frontend accepts only same-origin signed AnimeOnsen media proxy URLs', async (t) => {
@@ -60,4 +61,83 @@ test('frontend accepts only same-origin signed AnimeOnsen media proxy URLs', asy
     assert.deepEqual(result.servers[0].subtitles, [{
         label: 'Indonesia', lang: 'id-id', url: subtitleUrl, default: true,
     }]);
+});
+
+
+test('episode extras: searches alternate sources when a known source has no Indonesian server', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    const ownSlug = 'animeindo~hyouken-suberu-s2-sub-indo~hnmgsws-s2-episode-3-sub-indo';
+    const otakuSlug = 'otakudesu~hyouken-no-majutsushi-ga-sekai-wo-suberu-season-2-sub-indo';
+
+    globalThis.fetch = async (input) => {
+        const url = String(input);
+        calls.push(url);
+
+        if (url === `/api/anime/${encodeURIComponent(ownSlug)}/episode/3`) {
+            return new Response(JSON.stringify({
+                ok: true,
+                source: 'animeindo',
+                fallback: false,
+                data: { episode: 3, servers: [], downloads: [] },
+            }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+
+        if (url.startsWith('/api/anime/search?')) {
+            return new Response(JSON.stringify({
+                ok: true,
+                source: 'otakudesu',
+                fallback: false,
+                data: [{
+                    title: 'Hyouken no Majutsushi ga Sekai wo Suberu Season 2',
+                    slug: otakuSlug,
+                    source: 'otakudesu',
+                }],
+            }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+
+        if (url === `/api/anime/${encodeURIComponent(otakuSlug)}/episode/3`) {
+            return new Response(JSON.stringify({
+                ok: true,
+                source: 'otakudesu',
+                fallback: false,
+                data: {
+                    episode: 3,
+                    servers: [{
+                        name: 'Public embed',
+                        url: 'https://player.example.test/embed/hyouken-3',
+                        lang: 'id',
+                        subtitleType: 'hard',
+                    }],
+                    downloads: [],
+                },
+            }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+
+        return new Response(JSON.stringify({ ok: false, error: 'fixture route missing', code: 'NOT_FOUND' }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+        });
+    };
+
+    clearApiCache();
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+        clearApiCache();
+    });
+
+    const result = await getEpisodeExtras({
+        title: 'Hyouken no Majutsushi ga Sekai wo Suberu Season 2',
+        titleAlt: 'The Iceblade Sorcerer Shall Rule the World II',
+        slug: ownSlug,
+        ids: {},
+    }, 3, {
+        slug: ownSlug,
+        titles: ['Hyouken no Majutsushi ga Sekai wo Suberu Season 2'],
+    });
+
+    assert.ok(calls.some((url) => url.startsWith('/api/anime/search?')), 'searches alternate provider catalogs');
+    assert.ok(calls.includes(`/api/anime/${encodeURIComponent(otakuSlug)}/episode/3`), 'requests the matching Otakudesu episode');
+    assert.ok(result.servers.some((server) => server.lang === 'id' && server.source === 'backend:otakudesu'));
+    assert.equal(result.servers[0].subtitleType, 'hard');
 });
