@@ -47,9 +47,17 @@ jobs:
           ser=$(grep -o 'https://oploverz\.ch/series/[a-z0-9-]*/' samples/oploverz-episode.html 2>/dev/null | head -1 || true)
           if [ -n "${ser:-}" ]; then fetch oploverz-series "$ser"; fi
 
-          # Animeku
+          # Animeku (beberapa jalur untuk memastikan 403 bukan hanya di beranda)
           fetch animeku-home 'https://ww2.animeku.lol/'
           fetch animeku-apex 'https://animeku.lol/'
+          fetch animeku-anime 'https://ww2.animeku.lol/anime/'
+          fetch animeku-ongoing 'https://ww2.animeku.lol/ongoing/'
+          fetch animeku-robots 'https://ww2.animeku.lol/robots.txt'
+          # Header respons beranda Animeku (diagnosis 403; tanpa body)
+          curl -sS -m 30 -D samples/animeku-headers.txt -o /dev/null -A 'KazanimeBot/1.0 (+https://github.com/Kazaamii/Kazaanime)' 'https://ww2.animeku.lol/' || true
+
+          # robots.txt Oploverz (informasi kebijakan, bukan gerbang)
+          fetch oploverz-robots 'https://oploverz.ch/robots.txt'
 
           cat samples/manifest.txt
 
