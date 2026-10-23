@@ -355,6 +355,28 @@ test('a caller abort cancels verification instead of returning partial results',
     await assert.rejects(pending, (error) => error?.name === 'AbortError' || error?.kind === 'abort');
 });
 
+test('per-section homeUrl is preserved so a blocked panel can be opened manually', async () => {
+    const result = await getVerifiedSubIndoSources({
+        getSources: async () => ({
+            fallback: false,
+            sections: [
+                {
+                    id: 'samehadaku', name: 'Samehadaku', homeUrl: 'https://samehadaku.test',
+                    items: [], error: { kind: 'blocked', source: 'samehadaku' },
+                },
+                {
+                    id: 'otakudesu', name: 'Otakudesu', homeUrl: 'https://otakudesu.test',
+                    items: [{ title: 'Dua', slug: 'otakudesu~dua', source: 'backend:otakudesu', latestEpisode: 1 }],
+                },
+            ],
+        }),
+        retryPreviousEpisode: false,
+        getEpisode: async () => ({ servers: [{ lang: 'id' }] }),
+    });
+
+    assert.deepEqual(result.sections.map((source) => source.homeUrl), ['https://samehadaku.test', 'https://otakudesu.test']);
+});
+
 test('sourceIds limits verification to one panel for per-source retry', async () => {
     const checked = [];
     const result = await getVerifiedSubIndoSources({

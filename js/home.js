@@ -29,6 +29,7 @@ import {
 } from './api/index.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
+import { isPolicyStop, issuesSummary, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -120,21 +121,52 @@ function subIndoSourceMeta(source) {
     return bits.join(' · ');
 }
 
-/** Keterangan global di bawah panel: jumlah sumber yang belum selesai/gagal. */
+/**
+ * Keterangan global di bawah panel: sebab kegagalan yang sama digabung sekali
+ * (mis. "challenge keamanan" untuk dua situs) supaya tidak diulang per panel.
+ */
 function updateSubIndoNote(sections) {
-    const failed = (Array.isArray(sections) ? sections : [])
-        .filter((source) => source.error || source.failedChecks || source.timedOut).length;
-    if (!failed) {
+    const summary = issuesSummary(sections);
+    if (!summary.count) {
         setSectionNote(subIndoRoot);
         return;
     }
     setSectionNote(subIndoRoot, {
-        text: `${failed} sumber belum berhasil diperbarui atau diperiksa sepenuhnya. Judul tanpa bukti Sub Indo tidak ditampilkan.`,
+        text: summary.text,
         onRetry: () => {
             retrySourcesNow();
             loadSubIndoSection({ refresh: true });
         },
     });
+}
+
+/**
+ * Panel tanpa judul terverifikasi: satu baris ringkas (ikon + diagnosis +
+ * tindakan) menggantikan kotak kosong besar yang isinya mengulang kepala panel.
+ * Tautan "Buka situs" hanya membuka situs di tab baru — tidak ada upaya
+ * menembus pembatasan otomatis.
+ */
+function renderSubIndoEmpty(grid, source) {
+    const policyStop = isPolicyStop(source);
+    const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
+    const homeUrl = safeHomeUrl(source.homeUrl);
+    const iconName = policyStop
+        ? 'lock'
+        : source.error
+            ? 'triangle-alert'
+            : source.timedOut
+                ? 'hourglass'
+                : 'inbox';
+    grid.innerHTML = String(html`
+        <p class="subindo-empty${policyStop ? ' is-policy' : ''}">
+            <span class="subindo-empty-icon" aria-hidden="true">${icon(iconName)}</span>
+            <span class="subindo-empty-text">${sourceDiagnosis(source)}</span>
+            <span class="subindo-empty-actions">
+                ${homeUrl ? html`<a class="subindo-empty-link" href="${homeUrl}" target="_blank" rel="noopener noreferrer">${icon('external-link')} Buka situs</a>` : ''}
+                ${trouble ? html`<button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>` : ''}
+            </span>
+        </p>`);
+    grid.setAttribute('aria-busy', 'false');
 }
 
 function renderSubIndoSources(sources, result = {}) {
@@ -153,23 +185,19 @@ function renderSubIndoSources(sources, result = {}) {
     subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
         const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
         const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
-        const status = source.error
-            ? 'Sumber bermasalah'
-            : source.timedOut
-                ? 'Batas waktu'
-                : source.failedChecks
-                    ? 'Sebagian dicek'
-                    : source.stale
-                        ? 'Data cache'
-                        : items.length ? `${items.length} terverifikasi` : 'Belum ada terverifikasi';
+        const status = sourceStatusLabel(source, items.length);
+        // Tanpa judul, diagnosis tampil sekali di baris ringkas (renderSubIndoEmpty);
+        // jangan ulangi kalimat yang sama di kepala panel.
         const warnings = [];
-        if (source.error) warnings.push(friendlyError(source.error));
-        if (source.timedOut) warnings.push('Pemeriksaan dihentikan karena batas waktu. Hasil yang tampil sudah terverifikasi.');
-        if (source.failedChecks) warnings.push('Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.');
-        if (source.stale) warnings.push('Menampilkan cache karena feed belum berhasil diperbarui.');
+        if (items.length) {
+            if (source.error) warnings.push(friendlyError(source.error));
+            if (source.timedOut) warnings.push('Pemeriksaan dihentikan karena batas waktu. Hasil yang tampil sudah terverifikasi.');
+            if (source.failedChecks) warnings.push('Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.');
+            if (source.stale) warnings.push('Menampilkan cache karena feed belum berhasil diperbarui.');
+        }
         const meta = subIndoSourceMeta(source);
         return html`
-            <section class="subindo-source" aria-labelledby="subindo-source-title-${index}">
+            <section class="subindo-source${items.length ? '' : ' is-empty'}" aria-labelledby="subindo-source-title-${index}">
                 <div class="subindo-source-header">
                     <h3 id="subindo-source-title-${index}">${source.name}</h3>
                     <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
@@ -189,14 +217,8 @@ function renderSubIndoSources(sources, result = {}) {
         const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
         if (items.length) {
             renderCards(grid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
-        } else if (source.error) {
-            gridMessage(grid, { icon: 'triangle-alert', title: 'Sumber belum dapat dimuat', text: friendlyError(source.error) });
-        } else if (source.timedOut) {
-            gridMessage(grid, { icon: 'hourglass', title: 'Pemeriksaan belum selesai', text: 'Batas waktu tercapai sebelum bukti Sub Indo ditemukan. Coba lagi untuk memeriksa ulang.' });
-        } else if (source.failedChecks) {
-            gridMessage(grid, { icon: 'triangle-alert', title: 'Episode belum berhasil diverifikasi', text: 'Pemeriksaan server episode gagal; anime tanpa bukti subtitle Indonesia tidak ditampilkan.' });
         } else {
-            gridMessage(grid, { icon: 'inbox', title: 'Belum ada Sub Indo terverifikasi', text: 'Tidak ada episode terbaru dari situs ini yang terkonfirmasi memiliki subtitle Indonesia.' });
+            renderSubIndoEmpty(grid, source);
         }
     });
 }

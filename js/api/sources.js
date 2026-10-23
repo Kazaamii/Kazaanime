@@ -139,6 +139,7 @@ export function getLatestSubIndoBySource({ signal, refresh = false } = {}) {
                 return {
                     id,
                     name: String(entry?.name || id).slice(0, 60),
+                    homeUrl: String(entry?.homeUrl || ''),
                     items: (Array.isArray(entry?.items) ? entry.items : [])
                         .map((item) => fromBackend(item, id))
                         .filter(Boolean),

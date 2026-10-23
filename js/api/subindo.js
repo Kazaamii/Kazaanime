@@ -248,6 +248,7 @@ export async function getVerifiedSubIndoSources({
             return {
                 id,
                 name: String(source.name || source.id),
+                homeUrl: String(source.homeUrl || ''),
                 stale: Boolean(source.stale),
                 error: source.error || null,
                 checked: 0,
@@ -396,8 +397,8 @@ export async function getVerifiedSubIndoSources({
     }
 
     return {
-        sections: sources.map(({ id, name, stale, error, checked, failedChecks, timedOut: expired, items }) => ({
-            id, name, stale, error, checked, failedChecks, timedOut: expired, items,
+        sections: sources.map(({ id, name, homeUrl, stale, error, checked, failedChecks, timedOut: expired, items }) => ({
+            id, name, homeUrl, stale, error, checked, failedChecks, timedOut: expired, items,
         })),
         checked: sources.reduce((sum, source) => sum + source.checked, 0),
         timedOut: Boolean(timedOut),

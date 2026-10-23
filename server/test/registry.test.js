@@ -79,6 +79,8 @@ test('latestSubIndo: feed per sumber, judul lintas sumber tidak digabung, sumber
     assert.deepEqual(result.data[0].items.map((item) => item.title), ['Anime Sama']);
     assert.deepEqual(result.data[2].items.map((item) => item.title), ['Anime Sama'], 'judul yang sama tetap disajikan oleh sumber kedua');
     assert.equal(result.data[1].error.kind, 'blocked', 'sumber gagal tetap ditampilkan per panel');
+    assert.equal(result.data[0].homeUrl, 'https://samehadaku.test', 'panel sukses membawa tautan situs');
+    assert.equal(result.data[1].homeUrl, 'https://otakudesu.test', 'panel gagal tetap bisa dibuka manual');
     assert.deepEqual(result.errors.map((error) => [error.source, error.kind]), [['otakudesu', 'blocked']]);
     assert.equal(result.partial, true);
     assert.deepEqual(hianime.calls, []);

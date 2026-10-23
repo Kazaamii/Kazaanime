@@ -310,7 +310,8 @@ export function createRegistry({
                     if (isAbort(result.reason)) throw result.reason;
                     const error = describeError(result.reason);
                     errors.push(error);
-                    sources.push({ id: adapter.id, name: adapter.name, items: [], stale: false, error });
+                    // homeUrl: tautan manual ke situs aslinya (bukan upaya menembus pembatasan).
+                    sources.push({ id: adapter.id, name: adapter.name, homeUrl: adapter.baseUrl || '', items: [], stale: false, error });
                     return;
                 }
 
@@ -330,7 +331,14 @@ export function createRegistry({
                 const error = result.value.error ? describeError(result.value.error) : null;
                 if (isStale) stale = true;
                 if (error) errors.push(error);
-                sources.push({ id: adapter.id, name: adapter.name, items, stale: isStale, ...(error ? { error } : {}) });
+                sources.push({
+                    id: adapter.id,
+                    name: adapter.name,
+                    homeUrl: adapter.baseUrl || '',
+                    items,
+                    stale: isStale,
+                    ...(error ? { error } : {}),
+                });
             });
 
             const flat = await withSafeImages(sources.flatMap((source) => source.items));

@@ -15,7 +15,7 @@ beradapter.
 | **D++** | Perbaikan 22 Okt 2026 (2): **Samehadaku** (anime Jepang, Sub Indo) menggantikan Kuramanime; tombol **Server 1, 2, …**; **Jadwal Rilis** dari Samehadaku + AnimeXin (`/api/anime/schedule`); poster donghua Kitsu → **Bangumi** → **MangaBaka**; donghua cadangan via Kitsu & bergambar; cadangan Vidnest/TryEmbed | ✅ Selesai |
 | **E** | Perbaikan 22 Okt 2026 (3): **Genre & Jadwal di atas** beranda (hasil genre langsung di bawah tombol); server cadangan #2 → **ReAnime**, + tombol **AniZone "Multi Sub"** (player HLS bawaan + proxy); **tombol bookmark kartu** di pojok poster; **ikon** pengganti emoji; font **Figtree + Bricolage Grotesque**; donghua + **Anichin**; Sub Indo + **Otakudesu**, **Anoboy** & **Sakunime** (robots.txt fail-closed) + **hianime.ro**; **Jikan dihapus** | ✅ Selesai — lihat [Batasan Cloudflare](#-batasan-cloudflare-dicek-22-okt-2026) |
 | **F+** | Subtitle lokal untuk pemutar HLS: pilih `.srt` / `.vtt` di browser, konversi SRT→WebVTT, ganti/hapus track; tidak diunggah | ✅ Selesai |
-| **G** | Penguatan feed Sub Indo 23 Okt 2026: verifikasi beranggaran waktu, batas kandidat per situs, fallback episode sebelumnya, ringkasan & tombol coba lagi per panel | ✅ Selesai |
+| **G** | Penguatan feed Sub Indo 23 Okt 2026: verifikasi beranggaran waktu, batas kandidat per situs, fallback episode sebelumnya, ringkasan & tombol coba lagi per panel, panel gagal ringkas dengan diagnosis tergabung dan tautan "Buka situs" (tanpa bypass) | ✅ Selesai |
 
 ---
 
@@ -179,7 +179,7 @@ Yang bisa dicoba (Tahap D):
 - `/api/anime/latest` · `/api/anime/search?q=soul%20land` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan/episode/175`
 - `/api/health` (status sumber, robots, circuit, cache) · `/api/bot` (info bot untuk admin situs sumber)
 - `npm run check:sources -- --live` → laporan robots.txt/ToS + uji ambil data tiap sumber
-- `npm test` → 268 unit test backend + helper UI frontend (tanpa internet)
+- `npm test` → 276 unit test backend + helper UI frontend (tanpa internet)
 
 Yang bisa dicoba (Tahap C):
 - klik kartu mana pun → `watch.html`: player, daftar episode asli, info + sinopsis, rekomendasi
@@ -254,13 +254,18 @@ yang punya server/track subtitle Indonesia eksplisit. Batasnya dipusatkan di
 | Episode sebelumnya | Bila episode terbaru tidak punya bukti Sub Indo, episode sebelumnya diperiksa (maks. 6 kali per pemuatan). Kartu memakai `latestEpisode` hasil verifikasi, jadi tautan tidak menjanjikan subtitle yang belum ada. |
 | Coba lagi per panel | Tombol **Coba lagi** mengambil katalog baru (`refresh` → `force` + `noCache`, termasuk `cache: no-store`) lalu hanya memverifikasi ulang situs itu (`sourceIds`); panel lain tidak ikut dimuat ulang. |
 | Transparansi | Ringkasan "N situs · N judul terverifikasi · N episode diperiksa", status per sumber (`N episode diperiksa · N gagal · batas waktu`), dan daftar feed di intro diambil dari respons backend — bukan teks statis. |
+| Panel gagal ringkas | Situs tanpa judul terverifikasi tampil sebagai **satu baris** (ikon + diagnosis + tindakan), bukan kotak kosong besar yang mengulang kepala panel. Diagnosis hanya ditulis sekali: pesan yang sama untuk beberapa situs digabung pada keterangan global ("Penyebab: … (Samehadaku, Otakudesu)"). |
+| Label jujur | `blocked`/`policy`/`rate_limited`/`robots` diberi label **Akses dibatasi** (kita sengaja berhenti), sedangkan `parse`/`network` tetap **Sumber bermasalah**. Tidak ada kesan situsnya "rusak" saat penyebabnya kebijakan. |
+| Buka situs | Panel kosong/gagal menyertakan tautan `homeUrl` (`target="_blank"`, `rel="noopener noreferrer"`, hanya `http(s)`) agar pengguna bisa memeriksa situsnya sendiri. Ini tautan biasa — **bukan** upaya menembus Cloudflare/robots, dan tidak ada stealth, solver CAPTCHA, atau rotasi proxy. |
 | Tanpa backend | Tetap seperti sebelumnya: section menampilkan pesan yang bisa dicoba lagi; tidak ada judul metadata cadangan yang diklaim Sub Indo. |
 
 Tes offline: `server/test/subindo-home.test.js` (urutan pemeriksaan, pemisahan
 sumber, fallback episode sebelumnya, batas waktu, batas per sumber, `sourceIds`,
-abort) dan `server/test/subindo-ui.test.js` (ringkasan, retry per panel, CSS,
-konstanta config). `server/test/frontend-media.test.js` juga menguji refresh
-katalog tanpa cache dan penerusan `sourceIds` lewat fasad.
+`homeUrl`, abort), `server/test/subindo-ui.test.js` (ringkasan, retry per panel,
+panel ringkas, CSS, konstanta config), dan `server/test/subindo-state.test.js`
+(label status, diagnosis, penggabungan penyebab, validasi `homeUrl`).
+`server/test/frontend-media.test.js` juga menguji refresh katalog tanpa cache dan
+penerusan `sourceIds` lewat fasad.
 
 ## 🎬 Halaman nonton (Tahap C)
 

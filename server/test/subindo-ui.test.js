@@ -46,10 +46,26 @@ test('Sub Indo verification limits are centralised in config.js', () => {
     }
 });
 
+test('panel tanpa judul terverifikasi memakai satu baris ringkas, bukan kotak kosong besar', () => {
+    assert.match(homeJs, /function renderSubIndoEmpty\(grid, source\)/);
+    assert.match(homeJs, /renderSubIndoEmpty\(grid, source\)/);
+    assert.match(homeJs, /const status = sourceStatusLabel\(source, items\.length\)/);
+    assert.match(homeJs, /const summary = issuesSummary\(sections\)/);
+    assert.match(homeJs, /class="subindo-empty/);
+    assert.match(homeJs, /const homeUrl = safeHomeUrl\(source\.homeUrl\)/);
+    assert.match(homeJs, /rel="noopener noreferrer"/);
+    assert.match(homeJs, /class="subindo-source\$\{items\.length \? '' : ' is-empty'\}"/);
+    assert.match(homeHtml, /Bila situs membatasi akses otomatis, panel menampilkan tautan untuk membuka situsnya sendiri\./);
+});
+
 test('styles for the summary, per-source meta, and retry button exist', () => {
     assert.match(componentsCss, /\.subindo-status\{/);
     assert.match(componentsCss, /\.subindo-status:empty\{display:none\}/);
     assert.match(componentsCss, /\.subindo-source-meta\{/);
     assert.match(componentsCss, /\.subindo-retry\{/);
     assert.match(componentsCss, /\.subindo-retry \.ic\{/);
+    assert.match(componentsCss, /\.subindo-empty\{/);
+    assert.match(componentsCss, /\.subindo-empty\.is-policy\{/);
+    assert.match(componentsCss, /\.subindo-empty-link\{/);
+    assert.match(componentsCss, /\.subindo-source\.is-empty\{/);
 });
