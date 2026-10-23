@@ -7,7 +7,7 @@
  *                      dari situs sumber. Anime yang dibuka dari AniList/MAL/Kitsu (tanpa slug)
  *                      dicarikan padanannya di backend lewat judul (findBackendMatch).
  *                      Urutan putar (scraping dulu / statis dulu) diatur PLAYER.serverOrder.
- *  - Server statis   : config.STREAMING_SERVERS (MegaPlay, Vidnest, TryEmbed), URL embed dibangun dari
+ *  - Server statis   : config.STREAMING_SERVERS (AniZone Multi Sub lebih dulu, lalu server lain), URL embed dibangun dari
  *                      id anime (AniList / MAL / Kitsu). Tanpa request jaringan — cadangan otomatis.
  *  - Slot penyedia   : (22 Okt 2026) entri STREAMING_SERVERS ber-`provider` (ReAnime, AniZone) diisi
  *                      dari GET /api/stream/servers lewat withProviderServers(); posisinya tetap.
@@ -220,7 +220,7 @@ export async function findBackendMatches(anime, { titles: extra, signal } = {}) 
     return out;
 }
 
-const LANG_RANK = { id: 0, multi: 1, en: 2 };
+const LANG_RANK = { multi: 0, id: 1, en: 2 };
 
 /**
  * Server + link download dari backend scraper untuk satu episode.
@@ -269,7 +269,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
             }
             throw errs.find((e) => !(e?.kind === 'http' && e.status === 404)) || errs[0];
         }
-        // Server: Sub Indo → Multi → Inggris (stabil: urutan situs & urutan asli dipertahankan), tanpa URL ganda.
+        // Multi Sub lebih dulu; server bahasa tunggal (termasuk Sub Indo) tetap tersedia setelahnya.
         const seenUrl = new Set();
         const servers = ok.flatMap((m) => m.servers)
             .filter((x) => x.url && !seenUrl.has(x.url) && seenUrl.add(x.url))

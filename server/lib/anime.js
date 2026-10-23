@@ -73,7 +73,7 @@ export function makeEpisodeList(list = []) {
         .slice(0, 5000);
 }
 
-const LANG_ORDER = { id: 0, multi: 1, en: 2 };
+const LANG_ORDER = { multi: 0, id: 1, en: 2 };
 const SUBTITLE_TYPE_ORDER = { hard: 0, soft: 1 };
 
 /**
@@ -110,7 +110,7 @@ export function makeEpisode({ episode, title = '', released = '', url = '', serv
             };
         })
         .filter((s) => s.url && !seen.has(s.url) && seen.add(s.url))
-        // Sub Indo didahulukan, lalu hardsub eksplisit sebelum softsub; urutan sumber tetap stabil.
+        // Multi Sub didahulukan; setelahnya Hardsub eksplisit sebelum Softsub, urutan sumber stabil.
         .map((s, i) => ({ s, i }))
         .sort((a, b) => ((LANG_ORDER[a.s.lang] ?? 3) - (LANG_ORDER[b.s.lang] ?? 3))
             || ((SUBTITLE_TYPE_ORDER[a.s.subtitleType] ?? 2) - (SUBTITLE_TYPE_ORDER[b.s.subtitleType] ?? 2))

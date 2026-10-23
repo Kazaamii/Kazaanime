@@ -154,8 +154,8 @@ test('animexin adapter: search, getAnime, getEpisode', async () => {
     assert.equal(anime.episodeList.length, 5);
     const ep = await a.getEpisode(ref, 34, { anime });
     assert.equal(ep.episode, 34);
-    assert.equal(ep.servers[0].lang, 'id', 'Sub Indo didahulukan');
-    assert.equal(ep.servers[0].subtitleType, 'hard', 'label Hardsub bertahan hingga payload endpoint');
+    assert.equal(ep.servers[0].lang, 'multi', 'Multi Sub didahulukan bila tersedia');
+    assert.equal(ep.servers.find((server) => server.lang === 'id')?.subtitleType, 'hard', 'label Hardsub bertahan hingga payload endpoint');
     assert.equal(ep.servers.length, 16);
     assert.equal(ep.downloads[0].subtitle, 'Sub Indo');
     assert.equal(ep.url, epUrl);

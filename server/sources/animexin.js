@@ -357,7 +357,7 @@ export function parseEpisodePage($, base) {
             downloads.push({ quality: normalizeQuality(r.find('strong').first().text()), size: '', format, subtitle, links });
         });
     });
-    // Sub Indo didahulukan (sort stabil)
+    // Untuk grup unduhan, Sub Indo didahulukan bila tersedia (urutan stabil).
     downloads.sort((a, b) => (a.subtitle === 'Sub Indo' ? 0 : 1) - (b.subtitle === 'Sub Indo' ? 0 : 1));
 
     return {

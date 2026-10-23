@@ -15,7 +15,7 @@
 
 export const APP = Object.freeze({
     name: 'Kazanime',
-    tagline: 'Platform streaming & download anime subtitle Indonesia terbaik. Kualitas HD hingga 1080p.',
+    tagline: 'Streaming anime Multi Sub dan bahasa lain sesuai ketersediaan tiap judul dan server. Kualitas hingga 1080p.',
     copyrightYear: 2025,
     credit: 'M Rully Febriansyah',
     /*
@@ -138,11 +138,11 @@ export const AUTH_RULES = Object.freeze({ usernameMin: 3, usernameMax: 24, passw
 
 /** Platform streaming legal (link pencarian, tanpa scraping). `icon` = nama ikon di js/ui/icons.js. */
 export const LEGAL_PLATFORMS = Object.freeze([
-    { id: 'bstation', name: 'Bstation',       icon: 'monitor-play', description: 'Platform resmi Bilibili dengan sub Indo',
+    { id: 'bstation', name: 'Bstation',       icon: 'monitor-play', description: 'Platform resmi; bahasa subtitle bergantung pada judul',
       url: (t) => `https://www.bilibili.tv/search?keyword=${encodeURIComponent(t)}` },
-    { id: 'muse',     name: 'Muse Indonesia', icon: 'clapperboard', description: 'YouTube channel resmi anime sub Indo',
+    { id: 'muse',     name: 'Muse Indonesia', icon: 'clapperboard', description: 'Kanal resmi; judul dan bahasa subtitle yang tersedia bervariasi',
       url: (t) => `https://www.youtube.com/@MuseIndonesia/search?query=${encodeURIComponent(t)}` },
-    { id: 'anione',   name: 'Ani-One Asia',   icon: 'film', description: 'Anime legal dengan subtitle Indonesia',
+    { id: 'anione',   name: 'Ani-One Asia',   icon: 'film', description: 'Anime legal; pilihan bahasa bergantung pada judul dan region',
       url: (t) => `https://www.youtube.com/@AniOneAsia/search?query=${encodeURIComponent(t)}` },
     { id: 'vidio',    name: 'Vidio',          icon: 'tv', description: 'Platform streaming Indonesia',
       url: (t) => `https://www.vidio.com/search?q=${encodeURIComponent(t)}` },
@@ -239,7 +239,7 @@ export const UI = Object.freeze({
  * Server UTAMA datang dari backend scraper (server/sources/: AnimeXin, Samehadaku) per
  * episode — lihat PLAYER.serverOrder. Server di bawah hanya dipakai bila situs sumber tidak
  * punya anime/episode itu atau semua servernya gagal. Ingin HANYA server hasil scraping?
- * Set `enabled: false` pada kedua server di bawah (anime yang tidak ada di situs sumber
+ * Set `enabled: false` pada setiap server di bawah (anime yang tidak ada di situs sumber
  * lalu tidak bisa diputar).
  *
  * Host embed (dicek 22 Okt 2026):
@@ -265,10 +265,20 @@ export const UI = Object.freeze({
  */
 const STREAM_HOST = 'https://megaplay.buzz';
 export const STREAMING_SERVERS = Object.freeze([
+    // Utamakan player Multi Sub jika tersedia, lalu server bahasa tunggal sebagai cadangan.
+    Object.freeze({
+        id: 'anizone',
+        provider: 'anizone',
+        name: 'AniZone - Multi Sub',
+        description: 'AniZone - banyak pilihan subtitle (bahasa Indonesia bila tersedia)',
+        lang: 'multi',
+        enabled: true,
+        origins: Object.freeze([]),
+    }),
     Object.freeze({
         id: 'megaplay-anilist',
         flag: '🇯🇵',
-        name: 'Server 1 (MegaPlay - AniList)',
+        name: 'MegaPlay - AniList',
         description: 'Cadangan - MegaPlay via AniList ID (subtitle Inggris)',
         needs: 'anilist',
         lang: 'en',
@@ -282,15 +292,6 @@ export const STREAMING_SERVERS = Object.freeze([
         name: 'ReAnime',
         description: 'Cadangan - ReAnime (subtitle Inggris)',
         lang: 'en',
-        enabled: true,
-        origins: Object.freeze([]),
-    }),
-    Object.freeze({
-        id: 'anizone',
-        provider: 'anizone',
-        name: 'AniZone - Multi Sub',
-        description: 'AniZone - banyak pilihan subtitle (Indonesia bila tersedia)',
-        lang: 'multi',
         enabled: true,
         origins: Object.freeze([]),
     }),

@@ -172,7 +172,7 @@ untuk halaman itu (1 request), section Donghua memakai AniList, bagian download 
 dengan `'http://localhost:3000'` di `js/config.js`.
 
 Yang bisa dicoba (Tahap D):
-- `/` → section **Donghua** berisi rilis terbaru AnimeXin (via backend); klik kartu → episode terbaru langsung diputar dari server AnimeXin (Sub Indo didahulukan) + link download
+- `/` → section **Donghua** berisi rilis terbaru AnimeXin (via backend); klik kartu → episode terbaru diputar dengan Multi Sub lebih dulu bila tersedia, bahasa lain tetap sebagai opsi + link download
 - `/api/anime/latest` · `/api/anime/search?q=soul%20land` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan` · `/api/anime/animexin~soul-land-2-the-peerless-tang-clan/episode/175`
 - `/api/health` (status sumber, robots, circuit, cache) · `/api/bot` (info bot untuk admin situs sumber)
 - `npm run check:sources -- --live` → laporan robots.txt/ToS + uji ambil data tiap sumber
@@ -245,10 +245,10 @@ Satu implementasi player (`ui/player.js`) menggantikan **dua** salinan di file a
 watch.html?title=...&ep=3&anilist=...&mal=...[&alt=judul romaji]
    │  1. cari episode di situs backend aktif lewat judul (default: Samehadaku, Anoboy, Sakunime, Otakudesu,
    │     AnimeXin, Anichin, hianime.ro; Anoboy/Sakunime hanya berjalan jika robots.txt eksplisit mengizinkan),
-   │     judul alternatif & judul tanpa season → server Sub Indo diputar DULU
-   │  2. paralel: GET /api/stream/servers → ReAnime (embed) + AniZone (HLS "Multi Sub") untuk episode itu
+   │     judul alternatif & judul tanpa season → Multi Sub diprioritaskan bila tersedia; bahasa lain tetap jadi opsi
+   │  2. paralel: GET /api/stream/servers → AniZone (HLS "Multi Sub") + ReAnime (embed) untuk episode itu
    │  3. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan sesuai urutan config
-   │     (MegaPlay, ReAnime, AniZone Multi Sub, Vidnest, TryEmbed), lalu server Sub Eng hasil scraping
+   │     (AniZone Multi Sub, lalu MegaPlay/ReAnime/Vidnest/TryEmbed), kemudian server Sub Eng hasil scraping
    ▼
 getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutnya + rekomendasi
                  └ gagal → Kitsu by id (mapping id MAL/AniList) → AniList lagi lewat id hasil mapping
@@ -258,7 +258,7 @@ getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutny
 
 | Fitur | Detail |
 |---|---|
-| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`), lalu `STREAMING_SERVERS` di `js/config.js` sebagai cadangan (urutan = urutan fallback). Tombol tampil **"Server 1, 2, …"** + badge bahasa subtitle (SUB INDO / SUB ENG / MULTI SUB) — nama penyedia/situs tidak ditampilkan. Server yang belum tersedia tampil dengan ikon gembok dan dilewati; slot ReAnime/AniZone yang masih dicari tampil "mencari…" |
+| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`); jika tersedia, **Multi Sub didahulukan**, lalu server bahasa lain. Cadangan statis juga memulai dari AniZone Multi Sub. Tombol tampil **"Server 1, 2, …"** + badge bahasa subtitle (MULTI SUB / SUB INDO / SUB ENG) — nama penyedia/situs tidak ditampilkan. Server yang belum tersedia tampil dengan ikon gembok dan dilewati; slot ReAnime/AniZone yang masih dicari tampil "mencari…" |
 | Fallback otomatis | iframe tidak selesai dimuat dalam `PLAYER.loadTimeout` (15 dtk) **atau** player mengirim event `error` → server berikutnya + toast. Semua gagal → pesan + Bstation/YouTube + "Coba lagi" |
 | Batas browser | Halaman error **di dalam** iframe lintas-domain (mis. "video tidak ditemukan") tidak bisa dibaca JavaScript → tombol **⟳ Server Lain** |
 | Episode | Jumlah dari API (episode yang **sudah tayang**, bukan angka 24 tetap). Bila sumber tidak memberi nomor episode (mis. Kitsu saat AniList mati) → **perkiraan tayang mingguan** dari tanggal mulai (maks. 26 episode, dibatasi total). > 100 episode → tab rentang. Tetap tidak diketahui → input nomor manual. Belum tayang → jadwal episode 1 |
@@ -278,26 +278,26 @@ Urutan sejak 22 Okt 2026 (bagian 3) — `servers()` di `js/watch.js`, slot cadan
 
 | Urutan | Sumber | Isi | Subtitle |
 |---|---|---|---|
-| 1 | **Samehadaku** · **Otakudesu** (backend) | anime Jepang — server per episode + link download | Hardsub Indonesia |
-| 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Indonesia (AnimeXin juga Inggris; label Hardsub/Softsub AnimeXin ditampilkan bila dicantumkan sumber) |
-| 2 | **MegaPlay** `megaplay.buzz` (cadangan #1, via id AniList) | hampir semua anime Jepang | Inggris |
-| 3 | **ReAnime** (cadangan #2 — **menggantikan MegaPlay-MAL**) | embed `flixcloud.cc` dari API publik `reanime.to/api/flix/<id AniList>/<ep>`; mirror HD-2 → HD-1 dicoba otomatis | Inggris |
-| 4 | **AniZone — Multi Sub** (tombol baru) | HLS di player bawaan + 10–16 pilihan subtitle (Indonesia dipilih otomatis bila ada); audio Jepang/Inggris. Chrome/Firefox/Edge/Android: hls.js lewat proxy `/api/stream/hls` (CDN mengunci CORS & key AES ke anizone.to); Safari/iOS: HLS native langsung dari CDN | Banyak bahasa |
+| 1 | **Samehadaku** · **Otakudesu** (backend) | anime Jepang — server per episode + link download | Bahasa mengikuti server; beberapa sumber berisi Hardsub Indonesia |
+| 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Variatif; badge mengikuti bahasa yang dinyatakan sumber |
+| 2 | **AniZone — Multi Sub** (cadangan pertama) | HLS di player bawaan + 10–16 pilihan subtitle; Indonesia hanya bila tersedia. Chrome/Firefox/Edge/Android: hls.js lewat proxy `/api/stream/hls`; Safari/iOS: HLS native langsung dari CDN | Banyak bahasa |
+| 3 | **MegaPlay** `megaplay.buzz` (cadangan) | hampir semua anime Jepang | Inggris |
+| 4 | **ReAnime** (cadangan — **menggantikan MegaPlay-MAL**) | embed `flixcloud.cc` dari API publik `reanime.to/api/flix/<id AniList>/<ep>`; mirror HD-2 → HD-1 dicoba otomatis | Inggris |
 | 5 | **Vidnest** · **TryEmbed** (cadangan, via id AniList) | pustaka HiAnime yang sama | Inggris |
 | 6 | **hianime.ro** (backend) | server "Fast" (player blogger hianime.ro) & "mega" (megaplay.su) — embed berbasis id yang sudah ada di atas tidak diulang | Inggris |
 
-Nomor "Server N" mengikuti urutan putar. Bila anime ada di situs Sub Indo, tombol cadangan bergeser ke belakang
-(mis. Server 1–4 Samehadaku, lalu Server 5 MegaPlay, Server 6 ReAnime, Server 7 AniZone Multi Sub, …).
+Bila tersedia, server Multi Sub didahulukan; server dengan bahasa tunggal tetap ditampilkan sebagai pilihan berikutnya. Urutan dan
+jumlah tombol akhir bergantung pada hasil setiap episode.
 
-Contoh nyata (22 Okt 2026): *The Apothecary Diaries Season 3* ep 2 → dicocokkan ke Samehadaku "Kusuriya no
-Hitorigoto Season 3" dalam ±1 dtk → **Server 1–4 Sub Indo** (Samehadaku) lalu **Server 5–8 Sub Eng** (cadangan).
+Contoh nyata (22 Okt 2026): *The Apothecary Diaries Season 3* ep 2 dicocokkan ke Samehadaku "Kusuriya no
+Hitorigoto Season 3". Label bahasa mengikuti hasil tiap sumber; jika AniZone menyediakan Multi Sub untuk episode itu, server tersebut ditempatkan di urutan pertama.
 
 - **Pencocokan judul.** Anime yang dibuka dari kartu AniList/MAL/Kitsu tidak punya slug situs sumber, jadi
   `js/api/streams.js` mencarinya di `/api/anime/search` dengan judul utama **dan** judul alternatif (romaji —
   ikut di URL sebagai `alt`). Cocok bila judulnya sama persis, atau sama setelah penulisan season disamakan
   ("3rd Season" = "Season 3" = "S3"; format AnimeXin "Pinyin [English]" dipecah). Nomor season harus sama,
   jadi season lain tidak ikut tercocokkan. Hasil API metadata (saat semua scraper gagal) tidak dipakai.
-- **Menunggu.** Selama mencari, player menampilkan "Mencari server Sub Indo untuk Episode N..."
+- **Menunggu.** Selama mencari, player menampilkan "Mencari server Multi Sub atau pilihan bahasa lain untuk Episode N..."
   (maks. `PLAYER.scrapeWaitMs`, default 8 dtk; biasanya 1–3 dtk, lalu ter-cache). Hasil yang datang setelah
   cadangan diputar tetap ditambahkan sebagai tombol server tanpa memutus video.
 - **Samehadaku menggantikan Kuramanime sebagai sumber anime Jepang default.** Adapter Kuramanime tetap tersedia sebagai opt-in,
@@ -714,7 +714,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - [x] Rate limit keluar (1 req/dtk/host + Crawl-delay) & masuk (60/menit/IP), cache 10–15 mnt + CDN, User-Agent jelas, timeout, retry terbatas, circuit breaker
 - [x] Fallback ke API metadata publik (Kitsu → Jikan → AniList) bila scraper gagal
 - [x] Section Donghua homepage dari rilis terbaru AnimeXin (kartu → episode terbaru), cadangan AniList CN
-- [x] Server streaming & link download per episode dari backend di `watch.html` (Sub Indo didahulukan)
+- [x] Server streaming & link download per episode dari backend di `watch.html` (Multi Sub diprioritaskan bila tersedia; bahasa lain tetap ditampilkan)
 - [x] Player memutar server hasil scraping **lebih dulu** untuk semua anime (pencocokan judul + judul alternatif), MegaPlay jadi cadangan otomatis
 - [x] Host embed cadangan diganti `megaplay.buzz` (`animeplay.cfd` suspended) + Vidnest & TryEmbed
 - [x] Samehadaku (Sub Indo) menggantikan Kuramanime sebagai sumber anime Jepang (adapter + fixture asli + 8 test)
