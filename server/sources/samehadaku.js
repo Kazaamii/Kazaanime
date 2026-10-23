@@ -6,7 +6,8 @@
  * Diverifikasi langsung 2026-10-22 (fixture asli di server/test/fixtures/samehadaku-*.html):
  *   - robots.txt : "User-agent: * / Disallow: /wp-admin/ / Allow: /wp-admin/admin-ajax.php" → halaman
  *                  yang dipakai di sini diizinkan. Tidak ada halaman ToS/DMCA yang tertaut → verdict
- *                  "unknown": diakses HANYA bila robots.txt terbaca & mengizinkan (requireExplicitRobots).
+ *                  "unknown": dulu diakses HANYA bila robots.txt terbaca & mengizinkan; sejak 23 Okt 2026
+ *                  gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default 'off').
  *   - Snapshot/fixture ini membuktikan halaman pernah berhasil diambil, bukan akses yang selalu tersedia.
  *     README mencatat Cloudflare dapat men-challenge request dari IP pusat data secara intermiten; status live
  *     harus dianggap belum pasti tanpa pemeriksaan baru. Backend tidak mengulang halaman konten yang di-challenge
@@ -29,6 +30,7 @@
  */
 import { load } from 'cheerio';
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
@@ -47,7 +49,8 @@ export const POLICY = Object.freeze({
         reviewedAt: '2026-10-22',
         verdict: 'unknown',
         note: 'Tidak ada halaman ToS/DMCA yang tertaut dari situs. robots.txt hanya melarang /wp-admin/. '
-            + 'Kebijakan: sumber dengan ToS "unknown" hanya diakses bila robots.txt terbaca DAN mengizinkan.',
+            + 'Kebijakan: ToS "unknown" tidak melarang akses; gerbang robots mengikuti SCRAPER_ROBOTS_MODE. '
+            + 'Klaim Sub Indo tetap butuh bukti per episode.',
     }),
 });
 
@@ -291,7 +294,8 @@ export function parseEpisodePage($, base) {
         const url = embedSrc(opt.attr('data-embed'), base) || absoluteUrl(opt.attr('data-url'), base);
         if (!url || seen.has(url)) return;
         seen.add(url);
-        servers.push({ name: cleanText(opt.find('span').first().text()) || `Server ${servers.length + 1}`, url, lang: 'id', subtitleType: 'hard' });
+        // Bukti bahasa ditempel setelah halaman episode selesai di-parse (lihat akhir fungsi).
+        servers.push({ name: cleanText(opt.find('span').first().text()) || `Server ${servers.length + 1}`, url, subtitleType: 'hard' });
     });
     const ajaxServers = parseAjaxServerOptions($);
 
@@ -310,14 +314,34 @@ export function parseEpisodePage($, base) {
                     provider: cleanText($(a).text()) || 'Link',
                     url: absoluteUrl($(a).attr('href'), base),
                 })).get().filter((l) => l.url);
-                if (links.length) downloads.push({ quality, size: '', format, subtitle: 'Sub Indo', links });
+                // Label diambil dari teks blok download; jangan mengarang "Sub Indo".
+                const blockText = cleanText($(box).text());
+                if (links.length) downloads.push({
+                    quality, size: '', format, subtitle: textShowsIndonesianSubtitle(blockText) ? 'Sub Indo' : '', links,
+                });
             });
         });
     });
 
-    const title = stripSubLabel($('main h1').first().text());
+    const rawTitle = $('main h1').first().text();
+    const title = stripSubLabel(rawTitle);
     const animeLink = $('main a[href*="/anime/"]').filter((_, a) => Boolean(animeSlugFromUrl($(a).attr('href'), base))).first().attr('href');
-    return { title, servers, ajaxServers, downloads, animeUrl: animeLink ? absoluteUrl(animeLink, base) : null };
+    // Bukti Sub Indo dari halaman episode: judul, deskripsi episode, label server, atau label download.
+    const evidence = applySubtitleEvidence(servers, {
+        title: rawTitle,
+        pageText: $('article .entry-content, article .entry-content-single').first().text(),
+        labels: servers.map((server) => server.name),
+        downloads,
+    });
+    return {
+        title,
+        servers: evidence.servers,
+        subtitleEvidence: evidence.evidence,
+        subtitleEvidenceDetail: evidence.detail,
+        ajaxServers,
+        downloads,
+        animeUrl: animeLink ? absoluteUrl(animeLink, base) : null,
+    };
 }
 
 /**
@@ -367,7 +391,7 @@ export function createSamehadaku({ network, createClient, baseUrl, sourceConfig 
     const client = createClient(network, {
         source: ID,
         allowedHosts: [host],
-        // ToS belum bisa ditinjau → robots.txt WAJIB terbaca & mengizinkan sebelum halaman apa pun diambil.
+        // ToS belum bisa ditinjau → dulu robots.txt wajib terbaca; kini mengikuti SCRAPER_ROBOTS_MODE.
         requireExplicitRobots: POLICY.tos.verdict !== 'allowed',
         // Baseline GitHub Actions (2026-10-22): homepage challenged. Don't repeat content requests;
         // back off 30 minutes and use other permitted sources as fallback.
@@ -468,8 +492,10 @@ export function createSamehadaku({ network, createClient, baseUrl, sourceConfig 
                     servers.push({
                         name: item.label || `Server ${servers.length + 1}`,
                         url,
-                        lang: 'id',
-                        subtitleType: 'hard',
+                        // Bahasa hanya diklaim bila halaman episode memberi bukti (lihat parseEpisodePage).
+                        ...(parsed.subtitleEvidence
+                            ? { lang: 'id', subtitleType: 'hard', subtitleEvidence: parsed.subtitleEvidence }
+                            : { subtitleType: 'hard' }),
                     });
                 }
             }

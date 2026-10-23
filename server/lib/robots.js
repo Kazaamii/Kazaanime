@@ -10,6 +10,9 @@
  *            5xx / jaringan / timeout → "tidak terjangkau" = TIDAK boleh semua (§2.3.1.4).
  *  - Tambahan kebijakan Kazanime: halaman blokir/challenge Cloudflare saat mengambil
  *    robots.txt = situs menolak bot → diperlakukan "blocked" (tidak diakses sama sekali).
+ *
+ * Catatan 23 Okt 2026: modul ini hanya *dipakai* saat `SCRAPER_ROBOTS_MODE` = 'enforce'/'warn'.
+ * Default proyek kini 'off' (permintaan pemilik), sehingga fetcher tidak mengambil robots.txt.
  *  - Crawl-delay (non-standar tapi umum) dihormati sebagai jeda minimal antar-request.
  */
 

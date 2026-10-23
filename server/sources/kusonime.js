@@ -19,7 +19,7 @@ export const POLICY = Object.freeze({
         url: null,
         reviewedAt: null,
         verdict: 'unknown',
-        note: 'ToS dan robots.txt belum diverifikasi live. Setiap halaman hanya boleh diakses bila robots.txt terbaca dan secara eksplisit mengizinkan.',
+        note: 'ToS dan robots.txt belum diverifikasi live. Gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default off sejak 23 Okt 2026).',
     }),
 });
 

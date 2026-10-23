@@ -250,6 +250,8 @@ function toEpisodeMedia(json) {
                 reason: '',
                 source: `backend:${site}`,
                 lang: ['id', 'en', 'multi'].includes(x.lang) ? x.lang : '',
+                // Bukti bahasa per episode dari backend ("episode-title", "download-label", …).
+                ...(x.subtitleEvidence ? { subtitleEvidence: String(x.subtitleEvidence).slice(0, 20) } : {}),
                 ...(x.subtitleType === 'hard' || x.subtitleType === 'soft' ? { subtitleType: x.subtitleType } : {}),
                 ...(kind ? { kind } : {}),
                 ...(subtitles.length ? { subtitles } : {}),

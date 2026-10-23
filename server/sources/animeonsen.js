@@ -8,7 +8,8 @@
  *   https://search.animeonsen.xyz/indexes/content/search
  * OAuth uses operator-supplied credentials only; no upstream secret is bundled here.
  *
- * Access is fail-closed: every site/API/auth/search/media request requires explicit robots approval,
+ * Access is fail-closed: with the robots gate enabled (SCRAPER_ROBOTS_MODE=enforce/warn) every
+ * site/API/auth/search/media request requires explicit robots approval; the project default is 'off'.
  * ToS status is unknown, and playback additionally requires exact operator-confirmed
  * ANIMEONSEN_MEDIA_HOSTS entries. No site endpoints are contacted by unit tests.
  */

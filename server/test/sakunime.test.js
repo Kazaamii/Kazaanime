@@ -32,6 +32,7 @@ test('sakunime: episode snapshot → one explicit default URL, opaque serverId i
         name: 'Sakunime',
         url: 'https://desustream.com/dstream/otakuwatch7/new/index.php?id=REDACTED',
         lang: 'id',
+        subtitleEvidence: 'episode-title',
     });
     assert.equal(parsed.episodeList.length, 12);
 });

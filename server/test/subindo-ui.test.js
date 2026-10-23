@@ -53,6 +53,10 @@ test('panel tanpa judul terverifikasi memakai satu baris ringkas, bukan kotak ko
     assert.match(homeJs, /const summary = issuesSummary\(sections\)/);
     assert.match(homeJs, /class="subindo-empty/);
     assert.match(homeJs, /const homeUrl = safeHomeUrl\(source\.homeUrl\)/);
+    assert.match(homeJs, /source\.unproven/);
+    assert.match(homeJs, /if \(source\.stale\) bits\.push\('data cache'\)/);
+    assert.match(homeJs, /const proof = evidenceSummary\(source\.items\)/);
+    assert.match(homeJs, /bukti: \$\{proof\}/);
     assert.match(homeJs, /rel="noopener noreferrer"/);
     assert.match(homeJs, /class="subindo-source\$\{items\.length \? '' : ' is-empty'\}"/);
     assert.match(homeHtml, /Bila situs membatasi akses otomatis, panel menampilkan tautan untuk membuka situsnya sendiri\./);

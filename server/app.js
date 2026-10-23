@@ -13,7 +13,7 @@
  */
 import path from 'node:path';
 import express from 'express';
-import { AI_SUBS, BOT, CACHE, ROOT_DIR, SERVER, SOURCES, STREAMS } from './config.js';
+import { AI_SUBS, BOT, CACHE, ROOT_DIR, SCRAPER, SERVER, SOURCES, STREAMS } from './config.js';
 import { AppError } from './lib/errors.js';
 import { createClient, createNetwork } from './lib/fetcher.js';
 import { createGemini } from './lib/gemini.js';
@@ -64,6 +64,20 @@ function requestLogger(req, res, next) {
     next();
 }
 
+function robotsPolicyLines() {
+    const mode = SCRAPER.robots.mode;
+    if (mode === 'enforce') {
+        return ['  - obeys robots.txt (RFC 9309): group "KazanimeBot", otherwise "*"; honours Crawl-delay'];
+    }
+    if (mode === 'warn') {
+        return ['  - reads robots.txt for diagnostics but does not use it to block requests (operator setting SCRAPER_ROBOTS_MODE=warn)'];
+    }
+    return [
+        '  - robots.txt is not consulted (operator setting SCRAPER_ROBOTS_MODE=off); use the contact address below',
+        '    to ask for removal instead — requests are still identified honestly and rate-limited',
+    ];
+}
+
 function botInfo(req, res) {
     const configuredSources = [...SOURCES.enabled, ...(SOURCES.kusonimeDownloads.enabled ? ['kusonimeDownloads'] : [])];
     const hosts = configuredSources.map((id) => {
@@ -76,21 +90,22 @@ function botInfo(req, res) {
         'What it is: the backend of Kazanime, a small non-commercial anime/donghua fan site.',
         'What it fetches: public listing, search, series and episode pages — nothing behind logins.',
         'Politeness:',
-        '  - obeys robots.txt (RFC 9309): group "KazanimeBot", otherwise "*"; honours Crawl-delay',
+        ...robotsPolicyLines(),
         '  - at most 1 request per second per host, limited retries, 6 s timeout',
         '  - responses cached 10-15 minutes (plus CDN cache), so most visits never reach your site',
         '  - never solves or retries CAPTCHA/security challenges; HTTP 403/429 stops immediately and opens a cooldown;',
         '  - video segments/subtitles for the in-site player are fetched on demand per viewer (not crawling)',
-        'Opt out: add these lines to your robots.txt (picked up within 6 hours):',
-        '  User-agent: KazanimeBot',
-        '  Disallow: /',
+        SCRAPER.robots.mode === 'enforce'
+            ? 'Opt out: add these lines to your robots.txt (picked up within 6 hours):'
+            : 'Opt out: robots.txt is not enforced by this deployment — please use the contact address below:',
+        ...(SCRAPER.robots.mode === 'enforce' ? ['  User-agent: KazanimeBot', '  Disallow: /'] : []),
         BOT.contact ? `Contact: ${BOT.contact}` : 'Contact: set BOT_CONTACT on the deployment to publish an address here.',
         '',
         `Configured sources: ${hosts.join(', ') || '-'}`,
         '',
         '— Bahasa Indonesia —',
-        'Bot backend Kazanime: hanya membaca halaman publik, patuh robots.txt dan batas request per host,',
-        'hasil di-cache 10–15 menit; tanpa solver/retry CAPTCHA/challenge. Tolak bot lewat robots.txt di atas.',
+        `Bot backend Kazanime: hanya membaca halaman publik; mode robots.txt: ${SCRAPER.robots.mode}; batas request per host tetap berlaku,`,
+        'hasil di-cache 10–15 menit; tanpa solver/retry CAPTCHA/challenge. Penolakan bot: lihat alamat kontak di atas.',
     ].join('\n'));
 }
 

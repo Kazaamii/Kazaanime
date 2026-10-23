@@ -19,6 +19,7 @@
  */
 import { load } from 'cheerio';
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
@@ -360,9 +361,17 @@ export function parseEpisodePage($, base) {
     // Untuk grup unduhan, Sub Indo didahulukan bila tersedia (urutan stabil).
     downloads.sort((a, b) => (a.subtitle === 'Sub Indo' ? 0 : 1) - (b.subtitle === 'Sub Indo' ? 0 : 1));
 
+    const title = cleanText($('h1.entry-title').first().text());
+    // Label mirror ("Hardsub Indonesia") sudah jadi bukti per server; sisanya memakai bukti halaman.
+    const labeled = servers.map((server) => (server.lang === 'id' ? { ...server, subtitleEvidence: 'server-label' } : server));
+    // Label mirror sudah per server; bukti halaman memakai judul + label download (tanpa nama server,
+    // supaya server Sub English tidak ikut dianggap bukti).
+    const evidence = applySubtitleEvidence(labeled, { title, downloads });
     return {
-        title: cleanText($('h1.entry-title').first().text()),
-        servers,
+        title,
+        servers: evidence.servers,
+        subtitleEvidence: evidence.evidence,
+        subtitleEvidenceDetail: evidence.detail,
         downloads,
         seriesUrl: absoluteUrl($('.naveps .nvsc a').first().attr('href'), base),
     };

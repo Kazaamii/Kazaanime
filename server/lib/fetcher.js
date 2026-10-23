@@ -87,6 +87,7 @@ export function createNetwork({
     requestManager = null,
     browserAutomation = null,
 } = {}) {
+    const robotsMode = normalizeRobotsMode(scraper.robots?.mode);
     const throttle = new HostThrottle({ intervalMs: scraper.minIntervalMs, maxWaitMs: scraper.maxQueueWaitMs, now });
     const circuit = new CircuitBreaker({ failures: scraper.circuit.failures, openMs: scraper.circuit.openMs, now });
     const proxies = proxyManager || new ProxyManager({ ...runtime.proxy, now });
@@ -187,6 +188,7 @@ export function createNetwork({
     return {
         fetchImpl,
         fetch: fetchUpstream,
+        robotsMode,
         userAgent,
         throttle,
         requestManager: requests,
@@ -227,6 +229,13 @@ function robotsError(reason, source, url, httpStatus = 0) {
     return error;
 }
 
+/** Mode gerbang robots.txt yang dipakai klien (lihat server/config.js). */
+export function normalizeRobotsMode(value) {
+    return ['enforce', 'warn', 'off'].includes(String(value || '').toLowerCase())
+        ? String(value).toLowerCase()
+        : 'enforce';
+}
+
 /**
  * Klien HTTP untuk satu sumber.
  * @param {ReturnType<typeof createNetwork>} net
@@ -249,6 +258,25 @@ export function createClient(net, opts) {
         cookies: useCookies = false,
         renderJavaScript: useBrowser = false,
     } = opts;
+    const robotsMode = normalizeRobotsMode(net.scraper?.robots?.mode);
+    /** Catatan saat robots.txt melarang tetapi mode 'warn' membuat request tetap jalan. */
+    const robotsNotes = [];
+    const warnedSources = new Set();
+    const noteRobots = (verdict, target) => {
+        if (robotsMode !== 'warn') return;
+        const note = {
+            source,
+            reason: String(verdict?.reason || 'disallowed'),
+            url: String(target),
+            at: new Date().toISOString(),
+        };
+        robotsNotes.push(note);
+        if (robotsNotes.length > 100) robotsNotes.shift();
+        if (!warnedSources.has(source)) {
+            warnedSources.add(source);
+            console.warn(`[robots] mode=warn: ${source} ${note.reason} (${note.url}) — request tetap dijalankan karena SCRAPER_ROBOTS_MODE=warn.`);
+        }
+    };
     const suffixes = allowedHostSuffixes.map((s) => String(s).toLowerCase().replace(/^\.+/, '')).filter(Boolean);
     /** Host boleh diakses klien ini? (daftar persis + sufiks domain, mis. "xin-cdn.xyz" → "suzaku.xin-cdn.xyz") */
     const hostAllowed = (host) => {
@@ -334,14 +362,17 @@ export function createClient(net, opts) {
 
             await response.body?.cancel?.().catch(() => {});
             let nextCrawlDelay = crawlDelayMs;
-            if (checkRobots) {
+            if (checkRobots && robotsMode !== 'off') {
                 const verdict = await net.robots.check(next.href, { signal, requireExplicit: requireExplicitRobots });
                 if (!verdict.allowed) {
-                    await response.body?.cancel?.().catch(() => {});
-                    if (verdict.reason === 'blocked') net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
-                    throw robotsError(verdict.reason, source, next);
+                    if (robotsMode === 'enforce') {
+                        await response.body?.cancel?.().catch(() => {});
+                        if (verdict.reason === 'blocked') net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
+                        throw robotsError(verdict.reason, source, next);
+                    }
+                    noteRobots(verdict, next.href);
                 }
-                nextCrawlDelay = Math.max(nextCrawlDelay, Math.min(verdict.crawlDelayMs, net.scraper.maxCrawlDelayMs));
+                nextCrawlDelay = Math.max(nextCrawlDelay, Math.min(verdict.crawlDelayMs || 0, net.scraper.maxCrawlDelayMs));
             }
             if (cookiesEnabled) await net.cookieManager.storeResponse(source, current.href, response.headers);
 
@@ -396,13 +427,17 @@ export function createClient(net, opts) {
         }
 
         let crawlDelayMs = 0;
-        if (useRobots) {
+        if (useRobots && robotsMode !== 'off') {
             const verdict = await net.robots.check(u.href, { signal, requireExplicit: requireExplicitRobots });
             if (!verdict.allowed) {
-                if (verdict.reason === 'blocked') net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
-                throw robotsError(verdict.reason, source, u, verdict.httpStatus);
+                if (robotsMode === 'enforce') {
+                    if (verdict.reason === 'blocked') net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
+                    throw robotsError(verdict.reason, source, u, verdict.httpStatus);
+                }
+                // 'warn': robots.txt hanya informasi; situs tetap diakses dengan identitas bot jujur + rate limit.
+                noteRobots(verdict, u.href);
             }
-            crawlDelayMs = Math.min(verdict.crawlDelayMs, net.scraper.maxCrawlDelayMs);
+            crawlDelayMs = Math.min(verdict.crawlDelayMs || 0, net.scraper.maxCrawlDelayMs);
         }
 
         let lastErr = null;
@@ -635,6 +670,10 @@ export function createClient(net, opts) {
         source,
         request,
         stream,
+        /** Mode gerbang robots.txt klien ini ('enforce' | 'warn' | 'off'). */
+        robotsMode,
+        /** Catatan pelanggaran robots.txt saat mode 'warn' (diagnostik, bukan penegakan). */
+        robotsNotes,
         /** HTML → cheerio. */
         async html(url, o) {
             const res = await request(url, o);

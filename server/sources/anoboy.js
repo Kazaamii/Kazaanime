@@ -9,6 +9,7 @@
  * Hanya URL server yang tercantum langsung di HTML digunakan; tidak ada endpoint/token yang ditebak.
  */
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
@@ -27,7 +28,7 @@ export const POLICY = Object.freeze({
         reviewedAt: '2026-10-22',
         verdict: 'unknown',
         note: 'Berdasarkan HTML episode yang diberikan pengguna; ToS dan robots.txt belum diverifikasi langsung. '
-            + 'Semua request konten mensyaratkan robots.txt terbaca dan mengizinkan; challenge tidak dilewati.',
+            + 'Gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default off sejak 23 Okt 2026); challenge tidak dilewati.',
     }),
 });
 
@@ -164,18 +165,21 @@ export function parseEpisodePage($, base) {
         servers.push({
             name: clip(button.attr('data-label') || button.text(), 40) || `Server ${servers.length + 1}`,
             url,
-            lang: 'id',
         });
     });
 
     const episodeTitle = cleanText($('h1.entry-title').first().text());
+    // Judul halaman Anoboy memuat "Subtitle Indonesia" per episode; itulah buktinya.
+    const evidence = applySubtitleEvidence(servers, { title: episodeTitle, labels: servers.map((server) => server.name) });
     const seriesUrl = siteUrl($('#sidebar #singlepisode .headlist .thumb a[href]').attr('href'), base);
     return {
         title: episodeTitle,
         episode: parseEpisodeNumber($('meta[itemprop="episodeNumber"]').attr('content')) || parseEpisodeNumber(episodeTitle),
         url: siteUrl($('link[rel="canonical"]').attr('href'), base),
         seriesUrl,
-        servers,
+        servers: evidence.servers,
+        subtitleEvidence: evidence.evidence,
+        subtitleEvidenceDetail: evidence.detail,
         downloads: [],
         episodeList: parseEpisodeRows($, base),
     };

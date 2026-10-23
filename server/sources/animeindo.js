@@ -7,6 +7,7 @@
  * AnimeIndo is opt-in until its current robots/terms policy has been independently checked.
  */
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import { absoluteUrl, cleanText, firstInt, parseDurationMinutes, parseStatus, parseYear } from '../lib/text.js';
@@ -21,7 +22,7 @@ export const POLICY = Object.freeze({
         url: null,
         reviewedAt: '2026-10-23',
         verdict: 'unknown',
-        note: 'ToS belum diverifikasi independen. Adapter opt-in; robots.txt harus terbaca dan mengizinkan setiap request.',
+        note: 'ToS belum diverifikasi independen. Adapter opt-in; gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default off sejak 23 Okt 2026).',
     }),
 });
 
@@ -241,9 +242,9 @@ export function parsePublicEmbedSources(payload, pageUrl) {
         if (seen.has(url.href)) continue;
         seen.add(url.href);
         results.push({
+            // Bahasa tidak diklaim di sini: bukti Sub Indo dibaca dari halaman episode (getEpisode).
             name: cleanText(source.label || source.name || 'Public embed').slice(0, 40),
             url: url.href,
-            lang: 'id',
             subtitleType: 'hard',
         });
     }
@@ -318,12 +319,18 @@ export function createAnimeIndo({ network, createClient, baseUrl = DEFAULT_BASE,
                 notice = 'Konfigurasi sumber episode tidak dapat dibaca; metadata episode tetap tersedia.';
             }
 
+            const title = cleanText(page.$('h1').first().text()) || item.title;
+            const evidence = applySubtitleEvidence(servers, {
+                title,
+                pageText: page.$('article, .entry-content').first().text(),
+                labels: servers.map((server) => server.name),
+            });
             return makeEpisode({
                 episode: ep,
-                title: cleanText(page.$('h1').first().text()) || item.title,
+                title,
                 released: item.released,
                 url: item.url,
-                servers,
+                servers: evidence.servers,
                 downloads: [],
                 notice,
             });

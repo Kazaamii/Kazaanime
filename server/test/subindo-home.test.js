@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { getVerifiedSubIndoAnime, getVerifiedSubIndoSources, hasIndonesianSubtitle } from '../../js/api/subindo.js';
 
 test('recognizes only explicit Indonesian server or subtitle-track metadata', () => {
-    assert.equal(hasIndonesianSubtitle([{ lang: 'id', available: true }]), true);
+    // `lang: 'id'` tanpa bukti halaman TIDAK lagi dihitung: itu asumsi "situsnya Indonesia".
+    assert.equal(hasIndonesianSubtitle([{ lang: 'id', available: true }]), false);
+    assert.equal(hasIndonesianSubtitle([{ lang: 'id', available: true, subtitleEvidence: 'episode-title' }]), true);
+    assert.equal(hasIndonesianSubtitle([{ lang: 'id', available: true, subtitleEvidence: 'download-label' }]), true);
+    assert.equal(hasIndonesianSubtitle([{ lang: 'id', available: true, subtitleEvidence: 'site-policy' }]), false);
     assert.equal(hasIndonesianSubtitle([{ lang: 'en', subtitles: [{ lang: 'id', label: 'Indonesian' }] }]), true);
     assert.equal(hasIndonesianSubtitle([{ lang: 'en', name: 'Server 2 (Sub Eng)' }]), false);
     assert.equal(hasIndonesianSubtitle([{ lang: 'en', available: false, name: 'Server (Sub Indo)' }]), false);
@@ -21,7 +25,7 @@ test('legacy flat verifier contains only episodes verified with Indonesian subti
         getEpisode: async (slug, episode) => {
             called.push({ slug, episode });
             return slug === 'otakudesu~indo'
-                ? { servers: [{ name: 'Server Indonesia', lang: 'id' }] }
+                ? { servers: [{ name: 'Server Indonesia', lang: 'id', subtitleEvidence: 'episode-title' }] }
                 : { servers: [{ name: 'Server 1', lang: 'en' }] };
         },
     });
@@ -34,7 +38,7 @@ test('legacy flat verifier contains only episodes verified with Indonesian subti
 test('legacy flat verifier rejects fallback metadata and deduplicates its flat results', async () => {
     const fallback = await getVerifiedSubIndoAnime({
         getLatest: async () => ({ items: [{ title: 'Fake', slug: 'samehadaku~fake' }], fallback: true }),
-        getEpisode: async () => ({ servers: [{ lang: 'id' }] }),
+        getEpisode: async () => ({ servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] }),
     });
     assert.deepEqual(fallback.items, []);
     assert.equal(fallback.unavailable, true);
@@ -47,7 +51,7 @@ test('legacy flat verifier rejects fallback metadata and deduplicates its flat r
                 { title: 'Blue Lock', slug: 'otakudesu~blue-lock', source: 'backend:otakudesu', latestEpisode: 4 },
             ],
         }),
-        getEpisode: async (slug) => ({ servers: slug.startsWith('samehadaku') ? [{ lang: 'en' }] : [{ lang: 'id' }] }),
+        getEpisode: async (slug) => ({ servers: slug.startsWith('samehadaku') ? [{ lang: 'en' }] : [{ lang: 'id', subtitleEvidence: 'episode-title' }] }),
     });
     assert.equal(result.items.length, 1);
     assert.equal(result.items[0].slug, 'otakudesu~blue-lock');
@@ -65,7 +69,7 @@ test('caps episode availability checks and tolerates an individual source failur
         getEpisode: async (_slug) => {
             checks++;
             if (checks === 1) throw new Error('source temporarily unavailable');
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
     assert.equal(result.checked, 3);
@@ -85,7 +89,7 @@ test('source verifier never promotes a fallback catalog to Sub Indo feeds', asyn
         }),
         getEpisode: async () => {
             episodeChecks++;
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
 
@@ -126,7 +130,7 @@ test('verifies the latest episode but keeps same-titled anime separate by source
             checked.push({ slug, episode });
             return slug.endsWith('no-subtitle')
                 ? { servers: [{ lang: 'en' }] }
-                : { servers: [{ lang: 'id', available: true }] };
+                : { servers: [{ lang: 'id', available: true, subtitleEvidence: 'episode-title' }] };
         },
         // Fokus tes ini = pemisahan panel & duplikat judul. Pemeriksaan episode
         // sebelumnya punya tes tersendiri di bawah.
@@ -173,7 +177,7 @@ test('source verifier bounds episode checks and distributes the checks across pr
         concurrency: 1,
         getEpisode: async (slug) => {
             checked.push(slug);
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
 
@@ -216,7 +220,7 @@ test('falls back to the previous episode when the newest episode has no Indonesi
         getEpisode: async (slug, episode) => {
             checked.push(`${slug}#${episode}`);
             if (slug === 'samehadaku~episode-satu' || episode >= 9) return { servers: [{ lang: 'en' }] };
-            return { servers: [{ lang: 'id', available: true }] };
+            return { servers: [{ lang: 'id', available: true, subtitleEvidence: 'download-label' }] };
         },
     });
 
@@ -239,7 +243,7 @@ test('does not request the previous episode when the latest one is already verif
         }),
         getEpisode: async (slug, episode) => {
             checked.push(`${slug}#${episode}`);
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
 
@@ -293,7 +297,7 @@ test('returns verified titles with a timeout marker when the time budget expires
         retryPreviousEpisode: false,
         timeBudgetMs: 40,
         getEpisode: async (slug) => {
-            if (slug === 'samehadaku~cepat') return { servers: [{ lang: 'id' }] };
+            if (slug === 'samehadaku~cepat') return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
             return new Promise(() => {}); // sumber lambat yang tidak pernah selesai
         },
     });
@@ -327,7 +331,7 @@ test('caps checks per source so one provider cannot consume the whole budget', a
         retryPreviousEpisode: false,
         getEpisode: async (slug) => {
             checked.push(slug);
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
 
@@ -371,7 +375,7 @@ test('per-section homeUrl is preserved so a blocked panel can be opened manually
             ],
         }),
         retryPreviousEpisode: false,
-        getEpisode: async () => ({ servers: [{ lang: 'id' }] }),
+        getEpisode: async () => ({ servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] }),
     });
 
     assert.deepEqual(result.sections.map((source) => source.homeUrl), ['https://samehadaku.test', 'https://otakudesu.test']);
@@ -397,7 +401,7 @@ test('sourceIds limits verification to one panel for per-source retry', async ()
         retryPreviousEpisode: false,
         getEpisode: async (slug) => {
             checked.push(slug);
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
 
@@ -448,7 +452,7 @@ test('checks each episode slug only once per source', async () => {
         concurrency: 1,
         getEpisode: async (slug, episode) => {
             checked.push(`${slug}#${episode}`);
-            return { servers: [{ lang: 'id' }] };
+            return { servers: [{ lang: 'id', subtitleEvidence: 'episode-title' }] };
         },
     });
 

@@ -478,6 +478,8 @@ export function createRegistry({
             const robots = network?.robots.snapshot() || {};
             const circuits = network?.circuit.snapshot() || {};
             return {
+                // Mode gerbang robots.txt aktif (enforce/warn/off) — transparan untuk operator.
+                robotsMode: network?.robotsMode || 'enforce',
                 sources: [...list, ...downloadList].map((a) => {
                     const origin = new URL(a.baseUrl).origin;
                     return {

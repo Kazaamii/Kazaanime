@@ -104,6 +104,9 @@ export function makeEpisode({ episode, title = '', released = '', url = '', serv
                 name: clip(s.name, 40) || 'Server',
                 url: absoluteUrl(s.url),
                 lang: s.lang || null,
+                // Bukti bahasa dari halaman episode (lib/subtitle-evidence.js); tanpa ini feed Sub Indo
+                // tidak boleh mengklaim apa pun meski `lang` diisi adapter.
+                ...(s.subtitleEvidence ? { subtitleEvidence: clip(s.subtitleEvidence, 20) } : {}),
                 ...(s.subtitleType === 'hard' || s.subtitleType === 'soft' ? { subtitleType: s.subtitleType } : {}),
                 ...(kind ? { kind } : {}),
                 ...(subtitles.length ? { subtitles } : {}),

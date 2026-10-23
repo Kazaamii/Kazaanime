@@ -9,6 +9,7 @@
  * `data-server` adalah token opaque; adapter sengaja tidak mengurai atau mengirimkannya.
  */
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import { absoluteUrl, cleanText, parseEpisodeNumber } from '../lib/text.js';
@@ -24,7 +25,7 @@ export const POLICY = Object.freeze({
         reviewedAt: '2026-10-22',
         verdict: 'unknown',
         note: 'Berdasarkan HTML episode yang diberikan pengguna; ToS dan robots.txt belum diverifikasi langsung. '
-            + 'Semua request konten mensyaratkan robots.txt terbaca dan mengizinkan. ServerId opaque tidak digunakan.',
+            + 'Gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default off). ServerId opaque tidak digunakan.',
     }),
 });
 
@@ -178,10 +179,15 @@ export function parseEpisodePage($, base) {
     const title = cleanText(shell.attr('data-ep-title')) || cleanText($('h1').first().text());
     const episode = parseEpisodeNumber(shell.attr('data-episode-id')) || parseEpisodeNumber(title);
     const defaultUrl = absoluteUrl(shell.attr('data-default'), base);
-    const servers = defaultUrl ? [{ name: 'Sakunime', url: defaultUrl, lang: 'id' }] : [];
+    const servers = defaultUrl ? [{ name: 'Sakunime', url: defaultUrl }] : [];
     const seriesAnchor = $('a.pg-circle[href]').first();
     const seriesUrl = siteUrl(seriesAnchor.attr('href'), base);
     const seriesSlug = seriesUrl ? animeSlugFromUrl(seriesUrl, base) : null;
+    // Bukti Sub Indo harus datang dari halaman episode ini (judul/atribut), bukan dari nama situs.
+    const evidence = applySubtitleEvidence(servers, {
+        title: title || cleanText($('title').text()),
+        labels: servers.map((server) => server.name),
+    });
     return {
         title,
         episode,
@@ -192,7 +198,9 @@ export function parseEpisodePage($, base) {
         url: siteUrl($('link[rel="canonical"]').attr('href'), base),
         nextUrl: siteUrl(shell.attr('data-next'), base),
         episodeList: episodeRows($, base, animeTitleFromEpisode(title)),
-        servers,
+        servers: evidence.servers,
+        subtitleEvidence: evidence.evidence,
+        subtitleEvidenceDetail: evidence.detail,
         downloads: [],
     };
 }

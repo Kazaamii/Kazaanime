@@ -27,6 +27,7 @@
  *   /anime/<id>/<slug>/episode/<n>          → halaman episode (iframe/source publik + #animeDownloadLink)
  */
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
@@ -44,8 +45,8 @@ export const POLICY = Object.freeze({
         url: null,
         reviewedAt: '2026-10-21',
         verdict: 'unknown',
-        note: 'ToS dan robots.txt untuk domain v9 yang dipilih belum diverifikasi independen. Kebijakan: sumber dengan ToS '
-            + '"unknown" hanya diakses bila robots.txt terbaca DAN mengizinkan (requireExplicitRobots).',
+        note: 'ToS dan robots.txt untuk domain v9 yang dipilih belum diverifikasi independen. Gerbang robots mengikuti '
+            + 'SCRAPER_ROBOTS_MODE (default off sejak 23 Okt 2026); klaim bahasa hanya bila halaman menyebutnya.',
     }),
 });
 
@@ -211,7 +212,11 @@ export function parseDownloads($, base) {
             const heading = cleanText(node.text());
             const size = (/\(\s*([\d.,]+\s*[KMG]i?B)\s*\)/i.exec(heading) || [])[1] || '';
             const format = ((/^(MKV|MP4|X265|HEVC)/i.exec(heading) || [])[1] || '').toUpperCase();
-            const subtitle = /softsub/i.test(heading) ? 'Softsub Indo' : /hardsub/i.test(heading) ? 'Hardsub Indo' : 'Sub Indo';
+            // Judul grup hanya menulis "Softsub"/"Hardsub" tanpa bahasa → jangan menambah "Indo".
+            const subtitle = textShowsIndonesianSubtitle(heading) ? 'Sub Indo'
+                : /softsub/i.test(heading) ? 'Softsub'
+                    : /hardsub/i.test(heading) ? 'Hardsub'
+                        : '';
             current = { quality: normalizeQuality(heading.replace(/\([^)]*\)/g, ' ')), size, format, subtitle, links: [] };
             out.push(current);
         } else if (tag === 'a' && current) {
@@ -230,17 +235,24 @@ export function parseEpisodePage($, base) {
     const servers = [];
     $('#player iframe, .player iframe, #animeVideoPlayer iframe').each((_, f) => {
         const url = absoluteUrl($(f).attr('src') || $(f).attr('data-src'), base);
-        if (url) servers.push({ name: 'Kuramanime', url, lang: 'id', subtitleType: 'hard' });
+        if (url) servers.push({ name: 'Kuramanime', url, subtitleType: 'hard' });
     });
     $('#player source, video#player source').each((_, s) => {
         const url = absoluteUrl($(s).attr('src'), base);
         const size = $(s).attr('size');
-        if (url && !/\.m3u8(\?|$)/i.test(url)) servers.push({ name: `Kuramadrive${size ? ` ${size}p` : ''}`, url, lang: 'id', subtitleType: 'hard' });
+        if (url && !/\.m3u8(\?|$)/i.test(url)) servers.push({ name: `Kuramadrive${size ? ` ${size}p` : ''}`, url, subtitleType: 'hard' });
     });
+    const title = cleanText($('#episodeTitle').first().text()) || cleanText($('h1').first().text());
+    const downloads = parseDownloads($, base);
+    // Kuramanime hanya menulis "(Hardsub)/(Softsub)" tanpa bahasa; jangan klaim Sub Indo
+    // kecuali halaman episode benar-benar menyebut Indonesia (judul/download).
+    const evidence = applySubtitleEvidence(servers, { title, pageText: $('article, .anime-details').first().text(), downloads });
     return {
-        title: cleanText($('#episodeTitle').first().text()) || cleanText($('h1').first().text()),
-        servers,
-        downloads: parseDownloads($, base),
+        title,
+        servers: evidence.servers,
+        subtitleEvidence: evidence.evidence,
+        subtitleEvidenceDetail: evidence.detail,
+        downloads,
         protectedPlayer: !servers.length && $('[data-kk]').length > 0,
     };
 }
@@ -254,7 +266,7 @@ export function createKuramanime({ network, createClient, baseUrl, sourceConfig 
     const client = createClient(network, {
         source: ID,
         allowedHosts: [host],
-        // ToS belum bisa ditinjau → robots.txt WAJIB terbaca & mengizinkan sebelum halaman apa pun diambil.
+        // ToS belum bisa ditinjau → gerbang robots mengikuti SCRAPER_ROBOTS_MODE (default 'off').
         requireExplicitRobots: POLICY.tos.verdict !== 'allowed',
         cookies: sourceConfig.cookiesEnabled ?? true,
         renderJavaScript: Boolean(sourceConfig.renderJavaScript),

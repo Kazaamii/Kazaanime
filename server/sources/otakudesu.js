@@ -21,6 +21,7 @@
  *   /jadwal-rilis/        → .kgjdwl321 .kglist321 (h2 = hari, ul li a = judul)
  */
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
+import { applySubtitleEvidence, textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
 import {
@@ -185,7 +186,7 @@ export function parseEpisodePage($, base) {
     if (def) {
         let host = '';
         try { host = new URL(def).hostname.replace(/^www\./, ''); } catch { /* biarkan kosong */ }
-        servers.push({ name: host.split('.')[0] || 'Otakudesu', url: def, lang: 'id', subtitleType: 'hard' });
+        servers.push({ name: host.split('.')[0] || 'Otakudesu', url: def, subtitleType: 'hard' });
     }
     const downloads = [];
     $('.download ul li').each((_, el) => {
@@ -204,7 +205,11 @@ export function parseEpisodePage($, base) {
             links,
         });
     });
-    return { title: cleanTitle($('h1.posttl, .venutama h1').first().text()), servers, downloads };
+    const rawTitle = $('h1.posttl, .venutama h1').first().text();
+    const title = cleanTitle(rawTitle);
+    // Bukti Sub Indo: judul episode ("… Episode 3 Subtitle Indonesia") atau label download episode ini.
+    const evidence = applySubtitleEvidence(servers, { title: rawTitle, labels: servers.map((server) => server.name), downloads });
+    return { title, servers: evidence.servers, subtitleEvidence: evidence.evidence, subtitleEvidenceDetail: evidence.detail, downloads };
 }
 
 /** /jadwal-rilis/ → { hari: [{title, slug, url}] } */

@@ -19,6 +19,26 @@ export function isPolicyStop(source) {
     return POLICY_KINDS.includes(kind);
 }
 
+/** Nama pendek jenis bukti subtitle untuk baris meta panel. */
+const EVIDENCE_LABEL = Object.freeze({
+    'subtitle-track': 'track subtitle',
+    'episode-title': 'judul episode',
+    'download-label': 'label download',
+    'server-label': 'label server',
+    'episode-page': 'deskripsi episode',
+});
+
+/**
+ * "judul episode, label download" — dari field `subtitleEvidence` pada judul yang lolos verifikasi.
+ * @param {Array<{subtitleEvidence?: string}>} items
+ */
+export function evidenceSummary(items) {
+    const kinds = new Set((Array.isArray(items) ? items : [])
+        .map((item) => String(item?.subtitleEvidence || ''))
+        .filter(Boolean));
+    return [...kinds].map((kind) => EVIDENCE_LABEL[kind] || kind).join(', ');
+}
+
 /** Hanya URL http(s) yang boleh dirender menjadi tautan "Buka situs". */
 export function safeHomeUrl(url) {
     const value = String(url || '').trim();
@@ -35,8 +55,10 @@ export function sourceStatusLabel(source, count = 0) {
     if (source?.error) return isPolicyStop(source) ? 'Akses dibatasi' : 'Sumber bermasalah';
     if (source?.timedOut) return 'Batas waktu';
     if (Number(source?.failedChecks) > 0) return 'Sebagian dicek';
+    if (items > 0) return `${items} terverifikasi`;
+    if (Number(source?.unproven) > 0) return 'Tanpa bukti subtitle';
     if (source?.stale) return 'Data cache';
-    return items > 0 ? `${items} terverifikasi` : 'Belum ada terverifikasi';
+    return 'Belum ada terverifikasi';
 }
 
 /**
@@ -48,6 +70,9 @@ export function sourceDiagnosis(source) {
     if (source?.timedOut) return 'Batas waktu tercapai sebelum bukti Sub Indo ditemukan; coba lagi untuk memeriksa ulang.';
     if (Number(source?.failedChecks) > 0) {
         return 'Pemeriksaan server episode gagal; judul tanpa bukti subtitle Indonesia tidak ditampilkan.';
+    }
+    if (Number(source?.unproven) > 0) {
+        return 'Halaman episode tidak menyatakan subtitle Indonesia; judulnya tidak dihitung sebagai Sub Indo.';
     }
     if (source?.stale) return 'Menampilkan cache karena feed belum berhasil diperbarui.';
     return 'Tidak ada episode terbaru dari situs ini yang terkonfirmasi memiliki subtitle Indonesia.';
