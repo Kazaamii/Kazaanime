@@ -201,17 +201,30 @@ export function createNetwork({
     };
 }
 
-function robotsError(reason, source, url) {
+function robotsError(reason, source, url, httpStatus = 0) {
+    let kind = 'robots';
+    let message;
+    let retryAfter = 0;
     switch (reason) {
         case 'blocked':
-            return new SourceError(`${source} menolak akses bot melalui robots.txt atau challenge keamanan — tidak diakses.`, { kind: 'blocked', source });
+            kind = 'blocked';
+            message = `${source} menolak akses bot melalui robots.txt atau challenge keamanan — tidak diakses.`;
+            break;
         case 'unreachable':
-            return new SourceError(`robots.txt ${source} tidak bisa dibaca (server error) — menurut RFC 9309 dianggap melarang sementara.`, { kind: 'robots', source, retryAfter: 600 });
+            message = `robots.txt ${source} tidak bisa dibaca (server error) — menurut RFC 9309 dianggap melarang sementara.`;
+            retryAfter = 600;
+            break;
         case 'unverified':
-            return new SourceError(`${source}: ToS belum bisa ditinjau dan robots.txt tidak tersedia — tidak diakses.`, { kind: 'policy', source });
+            kind = 'policy';
+            message = `${source}: ToS belum bisa ditinjau dan robots.txt tidak tersedia — tidak diakses.`;
+            break;
         default:
-            return new SourceError(`robots.txt ${source} melarang ${url.pathname}.`, { kind: 'robots', source });
+            message = `robots.txt ${source} melarang ${url.pathname}.`;
+            break;
     }
+    const error = new SourceError(message, { kind, source, httpStatus, retryAfter });
+    error.stage = 'robots';
+    return error;
 }
 
 /**
@@ -387,7 +400,7 @@ export function createClient(net, opts) {
             const verdict = await net.robots.check(u.href, { signal, requireExplicit: requireExplicitRobots });
             if (!verdict.allowed) {
                 if (verdict.reason === 'blocked') net.circuit.failure(source, { reason: 'blocked', immediate: true, openMs: blockedMs });
-                throw robotsError(verdict.reason, source, u);
+                throw robotsError(verdict.reason, source, u, verdict.httpStatus);
             }
             crawlDelayMs = Math.min(verdict.crawlDelayMs, net.scraper.maxCrawlDelayMs);
         }
