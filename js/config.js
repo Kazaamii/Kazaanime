@@ -201,6 +201,32 @@ export const SCHEDULE = Object.freeze({
     perDayDonghua: 5,
 });
 
+/**
+ * Feed "Anime Jepang Sub Indo" di beranda (dipisah per situs sumber).
+ *
+ * Verifikasi berjalan di browser memakai endpoint episode backend: satu judul
+ * hanya ditampilkan bila server/track subtitle Indonesia benar-benar ditemukan.
+ * Batas di bawah mengendalikan biaya pemeriksaan (jumlah request sementara:
+ * katalog + maks. `maxChecks` episode) dan memastikan satu situs yang lambat
+ * tidak menahan panel situs lain.
+ */
+export const SUB_INDO = Object.freeze({
+    /** Maks. kartu per panel sumber (sama dengan batas backend per feed). */
+    resultLimit: 12,
+    /** Maks. total pemeriksaan episode per pemuatan homepage. */
+    maxChecks: 18,
+    /** Maks. kandidat per sumber per pemuatan (keadilan antar-situs). */
+    perSourceChecks: 6,
+    /** Pemeriksaan paralel; backend tetap membatasi laju per host. */
+    concurrency: 4,
+    /** Batas waktu total verifikasi (ms). Hasil yang sudah terverifikasi tetap tampil. */
+    timeBudgetMs: 12000,
+    /** Bila episode terbaru belum punya bukti Sub Indo, periksa episode sebelumnya. */
+    retryPreviousEpisode: true,
+    /** Maks. pemeriksaan episode sebelumnya per pemuatan (di luar `maxChecks`). */
+    previousEpisodeChecks: 6,
+});
+
 /** Pengaturan UI umum. */
 export const UI = Object.freeze({
     heroInterval: 6000,      // ms, autoplay hero (sama seperti asli)

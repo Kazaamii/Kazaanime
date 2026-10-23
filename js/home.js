@@ -22,7 +22,7 @@ import { renderSchedule, renderScheduleSkeleton } from './ui/schedule.js';
 import { setSectionNote } from './ui/notice.js';
 import { showSkeleton } from './ui/skeleton.js';
 import { html, $, delegate } from './ui/dom.js';
-import { GENRES, SCHEDULE } from './config.js';
+import { GENRES, SCHEDULE, SUB_INDO } from './config.js';
 import { genreUrl, watchUrl, latestEpisodeOf } from './routes.js';
 import {
     getHeroSlides, getHomeSection, getSubIndoHomeSources, getGenreAnime, getWeeklySchedule, wibWeekday, friendlyError, retrySourcesNow,
@@ -57,6 +57,8 @@ const GRIDS = {
 };
 const subIndoRoot = $('#subindoSources');
 let subIndoLoadToken = 0;
+/** Hasil terakhir supaya tombol "Coba lagi" per panel bisa memperbarui satu sumber saja. */
+let subIndoState = null;
 
 async function loadSection(kind) {
     const grid = GRIDS[kind];
@@ -78,11 +80,67 @@ async function loadSection(kind) {
     }
 }
 
-const SUB_INDO_HOME_LIMIT = 12;
+const SUB_INDO_HOME_LIMIT = SUB_INDO.resultLimit;
+const subIndoStatus = $('#subIndoStatus');
+const subIndoFeedList = $('#subIndoFeedList');
 
-function renderSubIndoSources(sources) {
+/** Ringkasan kecil di bawah intro: situs, judul terverifikasi, episode diperiksa. */
+function renderSubIndoSummary(sources, result = {}) {
+    const list = Array.isArray(sources) ? sources : [];
+    if (!subIndoStatus) return;
+    if (!list.length) {
+        subIndoStatus.textContent = '';
+        if (subIndoFeedList) subIndoFeedList.textContent = 'Tidak ada sumber Sub Indo yang aktif.';
+        return;
+    }
+    const total = list.reduce((sum, source) => sum + (Array.isArray(source.items) ? source.items.length : 0), 0);
+    const checked = list.reduce((sum, source) => sum + (Number(source.checked) || 0), 0);
+    const failed = list.filter((source) => source.timedOut || source.error || source.failedChecks).length;
+    const incomplete = Boolean(result.timedOut) || failed > 0;
+    const incompleteText = incomplete
+        ? (failed >= list.length ? 'semua sumber belum lengkap' : 'sebagian belum lengkap')
+        : '';
+    subIndoStatus.textContent = [
+        `${list.length} situs`,
+        `${total} judul terverifikasi`,
+        checked ? `${checked} episode diperiksa` : '',
+        incompleteText,
+    ].filter(Boolean).join(' · ');
+    if (subIndoFeedList) {
+        subIndoFeedList.textContent = `Feed: ${list.map((source) => source.name).join(', ')}.`;
+    }
+}
+
+/** Baris status per sumber: jumlah episode yang sudah diperiksa + kegagalan. */
+function subIndoSourceMeta(source) {
+    const bits = [];
+    if (Number(source.checked) > 0) bits.push(`${source.checked} episode diperiksa`);
+    if (Number(source.failedChecks) > 0) bits.push(`${source.failedChecks} gagal`);
+    if (source.timedOut) bits.push('batas waktu');
+    return bits.join(' · ');
+}
+
+/** Keterangan global di bawah panel: jumlah sumber yang belum selesai/gagal. */
+function updateSubIndoNote(sections) {
+    const failed = (Array.isArray(sections) ? sections : [])
+        .filter((source) => source.error || source.failedChecks || source.timedOut).length;
+    if (!failed) {
+        setSectionNote(subIndoRoot);
+        return;
+    }
+    setSectionNote(subIndoRoot, {
+        text: `${failed} sumber belum berhasil diperbarui atau diperiksa sepenuhnya. Judul tanpa bukti Sub Indo tidak ditampilkan.`,
+        onRetry: () => {
+            retrySourcesNow();
+            loadSubIndoSection({ refresh: true });
+        },
+    });
+}
+
+function renderSubIndoSources(sources, result = {}) {
     const list = Array.isArray(sources) ? sources : [];
     subIndoRoot.setAttribute('aria-busy', 'false');
+    renderSubIndoSummary(list, result);
     if (!list.length) {
         gridMessage(subIndoRoot, {
             icon: 'inbox',
@@ -94,25 +152,32 @@ function renderSubIndoSources(sources) {
 
     subIndoRoot.innerHTML = String(html`${list.map((source, index) => {
         const items = Array.isArray(source.items) ? source.items.slice(0, SUB_INDO_HOME_LIMIT) : [];
+        const trouble = Boolean(source.error || source.failedChecks || source.timedOut);
         const status = source.error
             ? 'Sumber bermasalah'
-            : source.stale
-                ? 'Data cache'
+            : source.timedOut
+                ? 'Batas waktu'
                 : source.failedChecks
                     ? 'Sebagian dicek'
-                    : items.length ? `${items.length} terverifikasi` : 'Belum ada terverifikasi';
-        const warning = source.error
-            ? friendlyError(source.error)
-            : source.failedChecks
-                ? 'Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.'
-                : source.stale ? 'Menampilkan cache karena feed belum berhasil diperbarui.' : '';
+                    : source.stale
+                        ? 'Data cache'
+                        : items.length ? `${items.length} terverifikasi` : 'Belum ada terverifikasi';
+        const warnings = [];
+        if (source.error) warnings.push(friendlyError(source.error));
+        if (source.timedOut) warnings.push('Pemeriksaan dihentikan karena batas waktu. Hasil yang tampil sudah terverifikasi.');
+        if (source.failedChecks) warnings.push('Sebagian episode terbaru belum dapat diperiksa; judul tanpa bukti tidak ditampilkan.');
+        if (source.stale) warnings.push('Menampilkan cache karena feed belum berhasil diperbarui.');
+        const meta = subIndoSourceMeta(source);
         return html`
             <section class="subindo-source" aria-labelledby="subindo-source-title-${index}">
                 <div class="subindo-source-header">
                     <h3 id="subindo-source-title-${index}">${source.name}</h3>
-                    <span class="subindo-source-count ${source.stale || source.error || source.failedChecks ? 'is-stale' : ''}">${status}</span>
+                    <span class="subindo-source-count ${trouble || source.stale ? 'is-stale' : ''}">${status}</span>
                 </div>
-                ${warning ? html`<p class="subindo-source-warning">${warning}</p>` : ''}
+                ${meta ? html`<p class="subindo-source-meta">${meta}</p>` : ''}
+                ${warnings.length ? html`<p class="subindo-source-warning">${warnings.join(' ')}
+                    ${trouble ? html`<button type="button" class="subindo-retry" data-action="retry-subindo-source" data-source="${source.id}">${icon('refresh-cw')} Coba lagi</button>` : ''}
+                </p>` : ''}
                 <div class="anime-grid" data-subindo-source-grid="${source.id}" aria-busy="false"></div>
             </section>`;
     })}`);
@@ -126,6 +191,8 @@ function renderSubIndoSources(sources) {
             renderCards(grid, items, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
         } else if (source.error) {
             gridMessage(grid, { icon: 'triangle-alert', title: 'Sumber belum dapat dimuat', text: friendlyError(source.error) });
+        } else if (source.timedOut) {
+            gridMessage(grid, { icon: 'hourglass', title: 'Pemeriksaan belum selesai', text: 'Batas waktu tercapai sebelum bukti Sub Indo ditemukan. Coba lagi untuk memeriksa ulang.' });
         } else if (source.failedChecks) {
             gridMessage(grid, { icon: 'triangle-alert', title: 'Episode belum berhasil diverifikasi', text: 'Pemeriksaan server episode gagal; anime tanpa bukti subtitle Indonesia tidak ditampilkan.' });
         } else {
@@ -134,26 +201,21 @@ function renderSubIndoSources(sources) {
     });
 }
 
-async function loadSubIndoSection() {
+async function loadSubIndoSection({ refresh = false } = {}) {
     const token = ++subIndoLoadToken;
     showSkeleton(subIndoRoot, 4);
     setSectionNote(subIndoRoot);
     try {
-        const result = await getSubIndoHomeSources();
+        const result = await getSubIndoHomeSources({ refresh });
         if (token !== subIndoLoadToken) return;
-        renderSubIndoSources(result.sections);
-        const failed = result.sections.filter((source) => source.error || source.failedChecks).length;
-        if (failed) {
-            setSectionNote(subIndoRoot, {
-                text: `${failed} sumber belum berhasil diperbarui atau diperiksa. Judul tanpa bukti Sub Indo tidak ditampilkan.`,
-                onRetry: () => {
-                    retrySourcesNow();
-                    loadSubIndoSection();
-                },
-            });
-        }
+        subIndoState = result;
+        renderSubIndoSources(result.sections, result);
+        updateSubIndoNote(result.sections);
     } catch (error) {
         if (token !== subIndoLoadToken || error?.kind === 'abort') return;
+        subIndoState = null;
+        renderSubIndoSummary([]);
+        if (subIndoFeedList) subIndoFeedList.textContent = 'Feed tidak tersedia saat ini.';
         gridMessage(subIndoRoot, {
             icon: 'triangle-alert',
             title: 'Daftar Sub Indo belum tersedia',
@@ -165,7 +227,57 @@ async function loadSubIndoSection() {
 
 delegate(subIndoRoot, 'click', '[data-action="retry-subindo"]', () => {
     retrySourcesNow();
-    loadSubIndoSection();
+    loadSubIndoSection({ refresh: true });
+});
+
+/**
+ * Coba lagi SATU panel sumber: katalog diambil ulang tanpa cache (refresh),
+ * lalu hanya episode situs itu yang diperiksa; panel lain tetap memakai hasil
+ * yang sudah ada.
+ */
+async function retrySubIndoSource(sourceId) {
+    const id = String(sourceId || '').trim().toLowerCase();
+    if (!id || !subIndoState) {
+        retrySourcesNow();
+        loadSubIndoSection({ refresh: true });
+        return;
+    }
+    const grid = [...subIndoRoot.querySelectorAll('[data-subindo-source-grid]')]
+        .find((element) => element.dataset.subindoSourceGrid === id);
+    if (grid) showSkeleton(grid, 4);
+    retrySourcesNow();
+    try {
+        // refresh: katalog diambil ulang karena sumber yang gagal tidak punya item di cache lama.
+        const result = await getSubIndoHomeSources({ sourceIds: [id], refresh: true });
+        const updated = result.sections.find((source) => source.id === id);
+        if (!updated) {
+            // Sumber tidak lagi ada di feed backend: kembalikan panel lama, jangan biarkan skeleton.
+            if (subIndoState) renderSubIndoSources(subIndoState.sections, subIndoState);
+            return;
+        }
+        if (!subIndoState) return;
+        const sections = subIndoState.sections.map((source) => (source.id === id ? updated : source));
+        subIndoState = {
+            ...subIndoState,
+            sections,
+            timedOut: sections.some((source) => source.timedOut),
+        };
+        renderSubIndoSources(sections, subIndoState);
+        updateSubIndoNote(sections);
+    } catch (error) {
+        if (error?.kind === 'abort') return;
+        if (grid) {
+            gridMessage(grid, {
+                icon: 'triangle-alert',
+                title: 'Gagal memuat ulang sumber',
+                text: friendlyError(error),
+            });
+        }
+    }
+}
+
+delegate(subIndoRoot, 'click', '[data-action="retry-subindo-source"]', (event, button) => {
+    retrySubIndoSource(button.dataset.source);
 });
 
 /* ------------------------------------------------------------------ */
