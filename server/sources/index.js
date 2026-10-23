@@ -31,6 +31,7 @@ import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { titleKey } from '../lib/text.js';
 import { createAnichin } from './anichin.js';
+import { createAnimeIndo } from './animeindo.js';
 import { createAnoboy } from './anoboy.js';
 import { createAnimeOnsen } from './animeonsen.js';
 import { createAnimexin } from './animexin.js';
@@ -45,6 +46,7 @@ import { createSakunime } from './sakunime.js';
 /** id sumber → factory adapter. */
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
+    animeindo: createAnimeIndo,
     samehadaku: createSamehadaku,
     animeonsen: createAnimeOnsen,
     anoboy: createAnoboy,
@@ -279,7 +281,8 @@ export function createRegistry({
 
         async search(q, ctx = {}) {
             const key = q.toLowerCase();
-            const r = await fanOut((a) => `search:${a.id}:${key}`, ttl.searchTtlMs, (a) => a.search(q, ctx));
+            const candidates = usable().filter((a) => a.supportsSearch !== false && typeof a.search === 'function');
+            const r = await fanOut((a) => `search:${a.id}:${key}`, ttl.searchTtlMs, (a) => a.search(q, ctx), candidates);
             if (r.used.length) {
                 return { source: r.used.join(','), data: mergeLists(r.groups, 60, { perSource: true }), fallback: false, stale: r.stale, errors: r.errors };
             }

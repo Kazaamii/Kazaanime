@@ -237,7 +237,8 @@ const LANG_RANK = { multi: 0, id: 1, en: 2 };
  * @returns {Promise<{servers: StreamServer[], downloads: DownloadGroup[], source: string|null, slug?: string|null, matchedTitle?: string, disabled?: boolean, error?: ApiError}>}
  */
 export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {}) {
-    // (22 Okt 2026) Tanpa slug: SEMUA situs sumber yang punya anime ini dipakai bersamaan.
+    // Prioritas: sumber yang dibuka pengguna. Jika belum menyediakan server Sub Indo,
+    // cari sumber lain dengan judul/season yang sama dan gabungkan server yang ditemukan.
     const disabled = { servers: [], downloads: [], source: null, disabled: true };
     const empty = (message, source = null) => ({
         servers: [],
@@ -246,43 +247,101 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
         error: new ApiError(message, { kind: 'empty', source: 'backend' }),
     });
     if (!backend.isBackendEnabled()) return disabled;
+
     try {
         const own = slug || anime.slug || null;
-        let targets;
+        let primary = null;
+        let primaryError = null;
         let matchedTitle = '';
+
         if (own) {
-            targets = [own];
-        } else {
-            const matches = await findBackendMatches(anime, { titles, signal });
-            if (!matches.length) return empty('Anime ini belum ada di sumber scraping (Samehadaku / Otakudesu / AnimeXin / Anichin / hianime.ro).');
-            targets = matches.map((m) => m.slug);
-            matchedTitle = matches[0].title;
-        }
-        const settled = await Promise.allSettled(targets.map((t) => backend.getBackendEpisode(t, ep, { signal })));
-        const ok = settled.map((r, i) => (r.status === 'fulfilled' ? { ...r.value, slug: targets[i] } : null)).filter(Boolean);
-        if (!ok.length) {
-            const errs = settled.map((r) => r.reason);
-            if (errs.some((e) => e?.kind === 'abort')) throw errs.find((e) => e?.kind === 'abort');
-            // 404 dari API Kazanime (body JSON) = episode belum ada di situs sumber → bukan gangguan
-            if (errs.every((e) => e?.kind === 'http' && e.status === 404 && e.payload)) {
-                return { ...empty(errs[0].message || `Episode ${ep} belum ada di sumber scraping.`), slug: targets[0], matchedTitle };
+            try {
+                primary = { ...(await backend.getBackendEpisode(own, ep, { signal })), slug: own };
+            } catch (error) {
+                if (error?.kind === 'abort') throw error;
+                primaryError = error;
             }
-            throw errs.find((e) => !(e?.kind === 'http' && e.status === 404)) || errs[0];
         }
+
+        // Jika sumber asal sudah punya server yang dikenali sebagai Sub Indo, tidak perlu
+        // membanjiri sumber lain dengan pencarian tambahan.
+        const hasIndonesianServer = (item) => (item?.servers || []).some((server) => server?.lang === 'id');
+        let targets = [];
+        if (!own) {
+            const matches = await findBackendMatches(anime, { titles, signal });
+            if (!matches.length) {
+                return empty('Anime ini belum ditemukan di sumber streaming yang mengizinkan akses otomatis.');
+            }
+            targets = matches.map((match) => match.slug);
+            matchedTitle = matches[0].title;
+        } else if (!hasIndonesianServer(primary)) {
+            // Slug sumber yang dibuka bisa berupa AnimeIndo atau sumber lain tanpa server Indo.
+            // Jangan mengulang slug sendiri; ambil padanan dari provider lain saja.
+            try {
+                const matches = await findBackendMatches(anime, { titles, signal });
+                const alternatives = matches.filter((match) => match.slug && match.slug !== own);
+                targets = alternatives.map((match) => match.slug);
+                matchedTitle = alternatives[0]?.title || '';
+            } catch (error) {
+                if (error?.kind === 'abort') throw error;
+                // Tetap pertahankan data sumber asal jika pencarian provider lain gagal.
+                targets = [];
+            }
+        }
+
+        const settled = await Promise.allSettled(
+            [...new Set(targets)].map((target) => backend.getBackendEpisode(target, ep, { signal })),
+        );
+        const settledTargets = [...new Set(targets)];
+        const ok = [
+            ...(primary ? [primary] : []),
+            ...settled.map((result, index) => (
+                result.status === 'fulfilled'
+                    ? { ...result.value, slug: settledTargets[index] }
+                    : null
+            )).filter(Boolean),
+        ];
+
+        if (!ok.length) {
+            const errors = [
+                ...(primaryError ? [primaryError] : []),
+                ...settled.filter((result) => result.status === 'rejected').map((result) => result.reason),
+            ].filter(Boolean);
+            if (errors.some((error) => error?.kind === 'abort')) {
+                throw errors.find((error) => error?.kind === 'abort');
+            }
+            if (errors.length && errors.every((error) => error?.kind === 'http' && error.status === 404 && error.payload)) {
+                return {
+                    ...empty(errors[0].message || `Episode ${ep} belum ada di sumber yang tersedia.`),
+                    slug: own || settledTargets[0] || null,
+                    matchedTitle,
+                };
+            }
+            if (!errors.length) return empty(`Belum ditemukan server untuk episode ${ep}.`);
+            throw errors.find((error) => !(error?.kind === 'http' && error.status === 404)) || errors[0];
+        }
+
         // Multi Sub lebih dulu; server bahasa tunggal (termasuk Sub Indo) tetap tersedia setelahnya.
         const seenUrl = new Set();
-        const servers = ok.flatMap((m) => m.servers)
-            .filter((x) => x.url && !seenUrl.has(x.url) && seenUrl.add(x.url))
-            .map((x, i) => ({ x, i }))
-            .sort((a, b) => ((LANG_RANK[a.x.lang] ?? 3) - (LANG_RANK[b.x.lang] ?? 3)) || (a.i - b.i))
-            .map(({ x }) => x);
-        const downloads = ok.flatMap((m) => m.downloads)
-            .map((d, i) => ({ d, i }))
-            .sort((a, b) => ((a.d.subtitle === 'Sub Indo' ? 0 : 1) - (b.d.subtitle === 'Sub Indo' ? 0 : 1)) || (a.i - b.i))
-            .map(({ d }) => d);
-        return { servers, downloads, source: ok.map((m) => m.source).join(', '), sources: ok.map((m) => m.source), slug: ok[0].slug, matchedTitle };
-    } catch (err) {
-        if (err?.kind === 'disabled') return disabled;
-        throw err;
+        const servers = ok.flatMap((item) => item.servers || [])
+            .filter((server) => server.url && !seenUrl.has(server.url) && seenUrl.add(server.url))
+            .map((server, index) => ({ server, index }))
+            .sort((a, b) => ((LANG_RANK[a.server.lang] ?? 3) - (LANG_RANK[b.server.lang] ?? 3)) || (a.index - b.index))
+            .map(({ server }) => server);
+        const downloads = ok.flatMap((item) => item.downloads || [])
+            .map((download, index) => ({ download, index }))
+            .sort((a, b) => ((a.download.subtitle === 'Sub Indo' ? 0 : 1) - (b.download.subtitle === 'Sub Indo' ? 0 : 1)) || (a.index - b.index))
+            .map(({ download }) => download);
+        return {
+            servers,
+            downloads,
+            source: [...new Set(ok.map((item) => item.source).filter(Boolean))].join(', '),
+            sources: [...new Set(ok.map((item) => item.source).filter(Boolean))],
+            slug: primary?.slug || ok[0].slug || null,
+            matchedTitle,
+        };
+    } catch (error) {
+        if (error?.kind === 'disabled') return disabled;
+        throw error;
     }
 }

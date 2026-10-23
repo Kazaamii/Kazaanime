@@ -145,15 +145,20 @@ export const CACHE = Object.freeze({
 const animeOnsenClientId = String(env.ANIMEONSEN_CLIENT_ID || '').trim();
 const animeOnsenClientSecret = String(env.ANIMEONSEN_CLIENT_SECRET || '').trim();
 const animeOnsenMediaHosts = list('ANIMEONSEN_MEDIA_HOSTS', []).map((s) => s.toLowerCase().replace(/^\.+/, ''));
-const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime'];
+const defaultSources = ['animexin', 'samehadaku', 'anoboy', 'sakunime', 'anichin', 'otakudesu', 'hianime', 'kuramanime'];
 // AnimeOnsen is opt-in: authorized runtime credentials + an operator-confirmed media allowlist.
 if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length) defaultSources.push('animeonsen');
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // Anoboy/Sakunime aktif untuk menambah Sub Indo, tetapi ToS unknown dan fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime opt-in; base yang dipilih dibatasi ke satu host dan tidak ada failover.
+    // Anoboy/Sakunime/Kuramanime: ToS unknown → fetcher wajib robots.txt eksplisit mengizinkan. Kuramanime memakai satu base URL tanpa failover.
     enabled: list('SCRAPER_SOURCES', defaultSources).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
+    // AnimeIndo opt-in only: add "animeindo" to SCRAPER_SOURCES after verifying robots.txt/terms.
+    animeindo: Object.freeze({
+        baseUrl: (env.ANIMEINDO_BASE_URL || 'https://animeindo.cloud').replace(/\/+$/, ''),
+        renderJavaScript: bool('ANIMEINDO_RENDER_JAVASCRIPT', false),
+    }),
     samehadaku: Object.freeze({
         baseUrl: (env.SAMEHADAKU_BASE_URL || 'https://v2.samehadaku.how').replace(/\/+$/, ''),
         renderJavaScript: bool('SAMEHADAKU_RENDER_JAVASCRIPT', false),
@@ -168,7 +173,7 @@ export const SOURCES = Object.freeze({
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('OTAKUDESU_COOKIES', true),
     }),
     kuramanime: Object.freeze({
-        baseUrl: (env.KURAMANIME_BASE_URL || 'https://v20.kuramanime.ing').replace(/\/+$/, ''),
+        baseUrl: (env.KURAMANIME_BASE_URL || 'https://v9.kuramanime.work').replace(/\/+$/, ''),
         renderJavaScript: bool('KURAMANIME_RENDER_JAVASCRIPT', false),
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('KURAMANIME_COOKIES', true),
     }),

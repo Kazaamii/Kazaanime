@@ -89,17 +89,18 @@ function cookieHeaders() {
     return headers;
 }
 
-test('config runtime: Anoboy/Sakunime aktif untuk Sub Indo; Kuramanime tetap opt-in', () => {
+test('config runtime: sumber Sub Indo aktif dengan robots gate yang ketat', () => {
     assert.ok(SOURCES.enabled.includes('samehadaku'));
     assert.ok(SOURCES.enabled.includes('otakudesu'));
     assert.ok(FACTORIES.anoboy);
     assert.ok(FACTORIES.sakunime);
     assert.ok(SOURCES.enabled.includes('anoboy'));
     assert.ok(SOURCES.enabled.includes('sakunime'));
-    assert.ok(!SOURCES.enabled.includes('kuramanime'));
+    assert.ok(SOURCES.enabled.includes('kuramanime'));
     assert.equal(SOURCES.samehadaku.renderJavaScript, false);
     assert.equal(SOURCES.otakudesu.renderJavaScript, false);
     assert.equal(SOURCES.kuramanime.renderJavaScript, false);
+    assert.equal(SOURCES.kuramanime.baseUrl, 'https://v9.kuramanime.work');
     assert.equal(SOURCES.anoboy.baseUrl, 'https://anoboy.be');
     assert.equal(SOURCES.sakunime.baseUrl, 'https://sakunime.com');
     assert.ok(Object.isFrozen(SCRAPER_RUNTIME.proxy.urls));
