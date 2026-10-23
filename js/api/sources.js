@@ -115,7 +115,9 @@ function fromBackendError(value, fallbackSource = 'backend') {
     if (!value || typeof value !== 'object') return null;
     return new ApiError(String(value.message || 'Sumber tidak dapat diperbarui.'), {
         kind: String(value.kind || 'network'),
-        status: Number(value.status) || 0,
+        status: Number(value.httpStatus || value.status) || 0,
+        retryAfter: Number(value.retryAfter) || 0,
+        stage: String(value.stage || ''),
         source: String(value.source || fallbackSource),
     });
 }

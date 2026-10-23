@@ -38,13 +38,14 @@ export class ApiError extends Error {
      * @param {{kind?: string, status?: number, source?: string, retryAfter?: number, cause?: unknown, payload?: unknown}} [opts]
      *   payload: body JSON dari respons error HTTP (null bila body bukan JSON, mis. halaman 404 server statis)
      */
-    constructor(message, { kind = 'network', status = 0, source = '', retryAfter = 0, cause, payload = null } = {}) {
+    constructor(message, { kind = 'network', status = 0, source = '', retryAfter = 0, stage = '', cause, payload = null } = {}) {
         super(message);
         this.name = 'ApiError';
         this.kind = kind;
         this.status = status;
         this.source = source;
         this.retryAfter = retryAfter;
+        this.stage = stage;
         this.payload = payload;
         if (cause) this.cause = cause;
     }
@@ -458,13 +459,31 @@ export function friendlyError(err) {
     switch (e.kind) {
         case 'timeout': return 'Server terlalu lama merespons. Coba lagi sebentar lagi.';
         case 'network': return 'Tidak dapat terhubung ke server data anime.';
+        case 'blocked':
+            if (e.stage === 'robots') {
+                return e.status
+                    ? `Akses dibatasi pada pemeriksaan robots.txt (HTTP ${e.status}); sumber dilewati.`
+                    : 'Akses dibatasi pada pemeriksaan robots.txt atau challenge keamanan; sumber dilewati.';
+            }
+            if (e.status === 429) return 'Sumber membatasi permintaan (HTTP 429); tidak dicoba ulang otomatis.';
+            if (e.status === 403) return 'Sumber menolak akses (HTTP 403); permintaan dihentikan tanpa menerobos pembatasan.';
+            return 'Sumber mengirim challenge keamanan; permintaan dihentikan.';
+        case 'robots':
+            if (e.stage === 'robots' && e.status >= 200 && e.status < 300) {
+                return 'robots.txt berhasil dibaca, tetapi jalur yang diminta tidak diizinkan; sumber dilewati.';
+            }
+            if (e.status >= 400) return `robots.txt tidak dapat diverifikasi (HTTP ${e.status}); sumber dilewati sementara.`;
+            return 'Sumber dilewati karena aturan robots.txt tidak bisa diverifikasi.';
+        case 'policy':
+            if (e.stage === 'robots' && e.status === 404) return 'robots.txt tidak tersedia dan izin sumber belum dapat diverifikasi; sumber dilewati.';
+            return 'Akses otomatis ke sumber ini tidak diaktifkan sampai kebijakannya dapat diverifikasi.';
+        case 'rate_limited': return 'Sumber membatasi permintaan (HTTP 429); hormati waktu Retry-After sebelum mencoba lagi.';
         case 'circuit':
-            // status = kegagalan terakhir sumber itu (mis. 403 dari AniList) → pesan yang sama spesifiknya
             if (e.status === 403) return 'Akses ke sumber data sedang dibatasi oleh penyedianya.';
             if (e.status === 429) return 'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.';
             return 'Sumber data sedang gangguan. Akan dicoba lagi otomatis sebentar lagi.';
         case 'abort': return 'Permintaan dibatalkan.';
-        case 'parse': return 'Server mengirim data yang tidak valid.';
+        case 'parse': return 'Struktur halaman sumber berubah atau data tidak dikenali.';
         case 'disabled': return e.message;
         case 'empty': return 'Tidak ada data yang ditemukan.';
         default:

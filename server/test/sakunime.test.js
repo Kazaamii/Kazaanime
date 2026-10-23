@@ -9,6 +9,17 @@ const SERIES = 'saijo-osewa-sub-indo';
 const EP1 = `${BASE}/watch/sjnoswa-episode-1-sub-indo`;
 // Minimal search/list link for adapter URL tests; no search-result page was provided.
 const SEARCH_HTML = `<a href="${BASE}/anime/${SERIES}" title="Saijo no Osewa">Saijo no Osewa</a>`;
+const LATEST_HTML = `
+  <main>
+    <article class="episode-card">
+      <a href="${BASE}/anime/saijo-osewa-sub-indo" title="Saijo no Osewa">Saijo no Osewa</a>
+      <a class="watch-eprow" href="${BASE}/watch/sjnoswa-episode-12-sub-indo" title="Saijo no Osewa Episode 12 Subtitle Indonesia">Eps 12</a>
+    </article>
+    <article class="episode-card">
+      <a href="${BASE}/anime/shinja-zero-sub-indo" title="Shinja Zero">Shinja Zero</a>
+      <a class="watch-eprow" href="${BASE}/watch/shinja-zero-episode-3-sub-indo" title="Shinja Zero Episode 3 Subtitle Indonesia">Eps 3</a>
+    </article>
+  </main>`;
 
 test('sakunime: episode snapshot → one explicit default URL, opaque serverId ignored', () => {
     const parsed = parseEpisodePage(fixture$('sakunime-episode.html'), BASE);
@@ -32,6 +43,14 @@ test('sakunime: series metadata dan daftar episode dari tautan watch internal', 
     assert.equal(parsed.episodeList[0].url, `${BASE}/watch/sjnoswa-episode-1-sub-indo`);
 });
 
+test('sakunime: public latest feed keeps the episode number from its related watch link', () => {
+    const parsed = parseAnimeLinks(load(LATEST_HTML), BASE);
+    assert.deepEqual(parsed.map((item) => [item.title, item.latestEpisode]), [
+        ['Saijo no Osewa', 12],
+        ['Shinja Zero', 3],
+    ]);
+});
+
 test('sakunime: hasil pencarian hanya menerima URL seri internal, bukan kategori atau domain luar', () => {
     const $ = load(`
       <a href="/anime/saijo-osewa-sub-indo" title="Saijo no Osewa">Saijo no Osewa</a>
@@ -51,7 +70,7 @@ test('sakunime adapter: search → detail → episode; robots must be explicitly
     const seriesUrl = `${BASE}/anime/${SERIES}`;
     const { createClient, calls } = fakeClientFactory({
         [searchUrl]: SEARCH_HTML,
-        [`${BASE}/anime/ongoing/`]: SEARCH_HTML,
+        [`${BASE}/anime/`]: LATEST_HTML,
         [seriesUrl]: fixture('sakunime-episode.html'),
         [EP1]: fixture('sakunime-episode.html'),
     });
@@ -69,12 +88,14 @@ test('sakunime adapter: search → detail → episode; robots must be explicitly
     const found = await source.search('Saijo no Osewa');
     assert.equal(found.length, 1);
     assert.equal(found[0].title, 'Saijo no Osewa');
-    assert.equal((await source.latest()).length, 1);
+    const latest = await source.latest();
+    assert.equal(latest.length, 2);
+    assert.deepEqual(latest.map((item) => item.latestEpisode), [12, 3]);
     const anime = await source.getAnime({ slug: SERIES });
     const episode = await source.getEpisode({ slug: SERIES }, 1, { anime });
     assert.equal(episode.episode, 1);
     assert.equal(episode.servers.length, 1);
     assert.equal(episode.servers[0].lang, 'id');
     await assert.rejects(source.getEpisode({ slug: SERIES }, 99, { anime }), (err) => err.kind === 'not_found');
-    assert.deepEqual(calls, [searchUrl, `${BASE}/anime/ongoing/`, seriesUrl, EP1]);
+    assert.deepEqual(calls, [searchUrl, `${BASE}/anime/`, seriesUrl, EP1]);
 });
