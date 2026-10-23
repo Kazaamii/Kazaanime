@@ -275,6 +275,7 @@ export function createAnimeIndo({ network, createClient, baseUrl = DEFAULT_BASE,
         country: 'JP',
         policy: POLICY,
         supportsLatest: false,
+        supportsSearch: false,
 
         parseRef,
 
