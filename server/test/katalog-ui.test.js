@@ -9,7 +9,8 @@ import { fakeClientFactory } from './helpers.js';
 /**
  * Halaman "Jelajah" (katalog.html) menampilkan katalog per bagian dari AnimeKu & Oploverz.
  * Test ini menjaga kontraknya: urutan bagian = urutan filter backend, ringkas 6 kartu dengan
- * tombol Expand, state tersimpan di URL, dan tidak ada klaim Sub Indo per kartu.
+ * tautan **Lihat Semua** (bukan Expand/Ringkas), state tersimpan di URL, dan tidak ada klaim
+ * Sub Indo per kartu.
  */
 const root = process.cwd();
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
@@ -95,15 +96,32 @@ test('katalog.js: Coming Soon memakai metadata, bukan halaman karangan', () => {
     assert.match(indexJs, /status: 'upcoming'/);
 });
 
-test('katalog.js: ringkas 6 kartu, Expand membuka sisanya, Muat Lagi per bagian', () => {
+test('katalog.js: ringkas 6 kartu + tautan "Lihat Semua", bukan Expand/Ringkas', () => {
     assert.match(pageJs, /const PREVIEW = 6;/);
-    assert.match(pageJs, /runtime\.expanded \? runtime\.items : runtime\.items\.slice\(0, PREVIEW\)/);
-    assert.match(pageJs, /runtime\.expanded = !runtime\.expanded;/);
-    assert.match(pageJs, /'Ringkas'/);
-    assert.match(pageJs, /data-expand aria-expanded="false" hidden>Expand</);
+    assert.match(pageJs, /const visible = focused \? runtime\.items : runtime\.items\.slice\(0, PREVIEW\)/);
+    // Tautan bergaya section beranda (screenshot 3/4), bukan tombol yang mekar di tempat.
+    assert.match(pageJs, /class="see-all" data-see-all href="\$\{katalogUrl\(\{ source: state\.source, filter: def\.id, genre: state\.genre \}\)\}"/);
+    assert.match(pageJs, /Lihat Semua \$\{icon\('chevron-right'\)\}/);
+    assert.doesNotMatch(pageJs, /data-expand|katalog-expand|'Ringkas'/, 'Expand/Ringkas sudah dihapus');
     assert.match(pageJs, /filter: runtime\.def\.id/);
     assert.match(pageJs, /refresh,/, 'Coba Lagi melewati cache/circuit frontend');
     assert.match(pageJs, /loadSection\(runtime, \{ reset: true, refresh: true \}\)/);
+});
+
+test('katalog.js: "Lihat Semua" membuka daftar penuh satu bagian (?filter=) dengan Muat Lagi', () => {
+    assert.match(pageJs, /const filter = known\.has\(q\.get\('filter'\)\) \? q\.get\('filter'\) : ''/);
+    assert.match(pageJs, /if \(state\.filter\) q\.set\('filter', state\.filter\)/);
+    assert.match(pageJs, /const focused = state\.filter \? defs\.filter\(\(section\) => section\.id === state\.filter\) : defs/);
+    // Daftar penuh menampilkan semua item yang sudah dimuat + Muat Lagi untuk halaman berikutnya.
+    assert.match(pageJs, /if \(foot\) foot\.hidden = !focused \|\| !runtime\.hasNext;/);
+    // Ada jalan kembali ke tampilan seluruh bagian tanpa kehilangan genre.
+    assert.match(pageJs, /katalogUrl\(\{ source: state\.source, genre: state\.genre \}\)/);
+    assert.match(pageJs, /Semua bagian/);
+});
+
+test('katalogUrl() mendukung filter bagian tanpa memaksa halaman 1', () => {
+    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', page = 1 \} = \{\}\)/);
+    assert.match(routesJs, /if \(filter\) p\.set\('filter', filter\)/);
 });
 
 test('kartu katalog memakai varian "catalog": nomor episode, bukan klaim "Sub Indo"', () => {
@@ -155,12 +173,13 @@ test('navigasi: menu "Jelajah" menuju katalog.html dan route-nya tersedia', () =
 
 test('panel Sub Indo menautkan "Lihat semua" hanya untuk sumber berhalaman daftar', () => {
     assert.match(homeJs, /import \{[^}]*katalogUrl[^}]*\} from '\.\/routes\.js'/);
-    assert.match(homeJs, /\$\{source\.browse \? html`<a class="subindo-source-more" href="\$\{katalogUrl\(\{ source: source\.id \}\)\}">Lihat semua<\/a>` : ''\}/);
+    assert.match(homeJs, /\$\{source\.browse \? html`<a class="see-all subindo-source-more" href="\$\{katalogUrl\(\{ source: source\.id \}\)\}">Lihat Semua \$\{icon\('chevron-right'\)\}<\/a>` : ''\}/);
 });
 
 test('css/katalog.css: blok bagian + pemilih genre memakai variabel tema', () => {
     assert.match(css, /\.katalog-sections\{/);
-    assert.match(css, /\.katalog-expand\{/);
+    assert.match(css, /\.katalog-block-actions \.see-all\[hidden\]\{display:none\}/);
+    assert.doesNotMatch(css, /\.katalog-expand\{/, 'gaya tombol Expand sudah dihapus');
     assert.match(css, /\.katalog-genre-select\{/);
     assert.match(css, /background:var\(--bg-card\)/);
     assert.match(css, /\.katalog-note\.is-error\{/);
