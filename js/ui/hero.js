@@ -21,7 +21,7 @@ import { episodeLabel, scoreLabel } from '../api/normalize.js';
 import { UI } from '../config.js';
 import { icon } from './icons.js';
 
-const DEFAULT_DESC = 'Anime trending yang sedang populer saat ini. Tonton sekarang dengan subtitle Indonesia!';
+const DEFAULT_DESC = 'Anime trending yang sedang populer. Cek server untuk pilihan Multi Sub dan bahasa subtitle yang tersedia.';
 const ICON_PLAY = raw('<svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>');
 const ICON_BM_OFF = raw('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>');
 const ICON_BM_ON = raw('<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>');
@@ -88,7 +88,7 @@ export function createHeroSlider(root, { interval = UI.heroInterval, isBookmarke
                 <span>${icon('tags')}${genres}</span>
                 ${slide.year ? html`<span>${icon('calendar')}${slide.year}</span>` : ''}
                 ${episodeLabel(slide) ? html`<span>${icon('film')}${episodeLabel(slide)}</span>` : ''}
-                <span>${icon('captions')}Sub Indo</span>
+                <span>${icon('captions')}Multi Sub</span>
             </div>
             <div class="hero-buttons">
                 <a class="btn-watch" href="${watchUrl(slide, 1)}">${ICON_PLAY} Tonton Sekarang</a>
@@ -105,7 +105,7 @@ export function createHeroSlider(root, { interval = UI.heroInterval, isBookmarke
         contentEl.innerHTML = String(html`
             <div class="hero-info">
                 <h1 class="hero-title">Selamat Datang di Kazanime</h1>
-                <p class="hero-description">Platform streaming anime subtitle Indonesia terbaik</p>
+                <p class="hero-description">Temukan anime dengan pilihan Multi Sub; bahasa yang tersedia bergantung pada judul dan server.</p>
             </div>`);
         prevBtn.hidden = true;
         nextBtn.hidden = true;

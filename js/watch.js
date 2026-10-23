@@ -14,8 +14,8 @@
  *     Server hasil SCRAPING didahulukan (PLAYER.serverOrder = 'scrape-first'): untuk setiap
  *     episode player menunggu backend (AnimeXin / Samehadaku) dulu — anime dari AniList/MAL/
  *     Kitsu dicarikan padanannya lewat judul + judul alternatif — maks. PLAYER.scrapeWaitMs.
- *     Tidak ada di situs sumber / gagal / kelamaan → server cadangan (MegaPlay) langsung
- *     diputar bila id anime sudah ada di URL; tanpa id → menunggu detail dulu.
+ *     Tidak ada di situs sumber / gagal / kelamaan → server Multi Sub (AniZone) dicoba lebih dulu,
+ *     lalu server bahasa lain bila tersedia; tanpa id → menunggu detail dulu.
  *     'static-first' = perilaku Tahap D (server statis dulu, kecuali URL membawa slug).
  *  4. getWatchData() → detail + jumlah episode tayang + rekomendasi
  *     (AniList: 1 request; cadangan Kitsu → data dari URL).
@@ -96,8 +96,8 @@ let kusonimeCtrl = null;
 let kusonimeLoadToken = 0;
 /**
  * Episode yang sedang MENUNGGU hasil scraping sebelum diputar (scrape-first).
- * Selama menunggu, server cadangan tidak dimulai — supaya yang pertama diputar adalah
- * server dari situs sumber (subtitle Indonesia).
+ * Selama menunggu, server cadangan tidak dimulai — bila sumber menyediakan Multi Sub, itulah yang
+ * diprioritaskan; bila tidak, server lain tetap bisa diputar.
  */
 let holdFor = null;
 /** Episode yang pencarian scraping-nya sudah selesai TANPA server (atau batas tunggu habis). */
@@ -150,16 +150,18 @@ function numbered(list) {
 }
 /**
  * Urutan putar (22 Okt 2026):
- *   scrape-first: server Sub Indo/Multi hasil scraping → server cadangan sesuai config (MegaPlay, ReAnime,
- *                 AniZone Multi Sub, Vidnest, TryEmbed) → server Sub Inggris hasil scraping (hianime.ro)
+ *   scrape-first: semua server Multi Sub (scraper/AniZone) lebih dulu, lalu hasil scraping bahasa lain,
+ *                 kemudian server cadangan satu bahasa dan server Sub Eng hasil scraping.
  *   static-first: server cadangan dulu, lalu semua server hasil scraping
  */
 const servers = () => {
     const fallback = withProviderServers(staticServers(), providerResult);
     if (!scrapeFirst()) return numbered([...fallback, ...backendServers]);
+    const multi = [...backendServers.filter((s) => s.lang === 'multi'), ...fallback.filter((s) => s.lang === 'multi')];
+    const local = backendServers.filter((s) => s.lang !== 'en' && s.lang !== 'multi');
+    const otherFallback = fallback.filter((s) => s.lang !== 'multi');
     const english = backendServers.filter((s) => s.lang === 'en');
-    const local = backendServers.filter((s) => s.lang !== 'en');
-    return numbered([...local, ...fallback, ...english]);
+    return numbered([...multi, ...local, ...otherFallback, ...english]);
 };
 /** Semua judul yang diketahui (URL + detail) untuk mencari padanan di situs sumber. */
 const scrapeTitles = () => [ref.title, ref.alt, anime.title, anime.titleAlt];
@@ -168,7 +170,7 @@ const titlesKey = (list) => [...new Set(list.map(titleKey).filter(Boolean))].sor
 
 /**
  * Lepas penahanan episode n dan mulai putar.
- *  - force: server scraping sudah datang → server scraping dulu, server cadangan di belakangnya
+ *  - force: hasil scraping sudah datang → server Multi Sub tetap diprioritaskan oleh servers()
  *  - tanpa force: hanya bila pencarian scraping sudah selesai tanpa server (atau batas tunggu
  *    habis) DAN server cadangan siap (id anime diketahui) atau detail sudah dimuat —
  *    anime dari backend tanpa id menunggu detail (id + jumlah episode) dulu.
@@ -205,7 +207,7 @@ function armHoldTimer(n, ms = PLAYER.scrapeWaitMs) {
 function holdForScrape(n) {
     holdFor = n;
     scrapeDoneFor = null;
-    player.showWaiting(`Mencari server Sub Indo untuk Episode ${n}...`);
+    player.showWaiting(`Mencari server Multi Sub atau pilihan bahasa lain untuk Episode ${n}...`);
     armHoldTimer(n);
 }
 
@@ -248,7 +250,7 @@ function formatWib(sec) {
 /* Render: judul, meta, info, platform, bookmark                       */
 /* ------------------------------------------------------------------ */
 function renderEpisodeLabel() {
-    els.epLabel.textContent = `Episode ${ep} • Subtitle Indonesia`;
+    els.epLabel.textContent = `Episode ${ep} • Cek pilihan subtitle`;
     document.title = anime.title ? `${anime.title} - Episode ${ep} | Kazanime` : 'Nonton Anime - Kazanime';
 }
 
@@ -263,7 +265,7 @@ function renderMeta() {
     if (a.episodes) parts.push(html`<span>${icon('film')}${a.episodes} Episode</span>`);
     if (a.duration) parts.push(html`<span>${icon('timer')}${a.duration} mnt</span>`);
     if (a.studios?.length) parts.push(html`<span>${icon('building-2')}${a.studios[0]}</span>`);
-    parts.push(html`<span>${icon('captions')}Sub Indo</span>`, html`<span>${icon('server')}Multi-Server</span>`);
+    parts.push(html`<span>${icon('captions')}Multi Sub</span>`, html`<span>${icon('server')}Multi-Server</span>`);
     els.meta.innerHTML = String(html`${parts}`);
 }
 
@@ -765,4 +767,4 @@ function start() {
 if (!ref.title && !ref.anilist && !ref.mal && !ref.kitsu && !ref.slug) renderNotFound();
 else start();
 
-console.info('%cKazanime — player: server Sub Indo hasil scraping dulu, lalu cadangan (MegaPlay, ReAnime, AniZone Multi Sub, Vidnest, TryEmbed)', 'color:#ff6b9d;font-weight:bold');
+console.info('%cKazanime — player: Multi Sub diprioritaskan bila tersedia; server lain tetap ditampilkan sesuai bahasa dan ketersediaan', 'color:#ff6b9d;font-weight:bold');
