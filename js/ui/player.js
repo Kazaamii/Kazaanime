@@ -47,9 +47,8 @@
  *    tanpa `allow-popups`/`allow-top-navigation*` → `window.open()` iklan gagal total (tidak ada
  *    tab baru) dan tab Kazanime tidak bisa dibajak. Bila embed menolak sandbox, host diingat
  *    (`kz:no-sandbox`, per sesi) lalu dimuat tanpa sandbox; bila iframe tidak memuat apa pun
- *    dalam `PLAYER.frameGuard.releaseAfterMs`, sandbox dilepas otomatis dan server yang sama
- *    diulang. Tautan kecil di bawah status memberi pelepas manual — pemutaran tidak pernah
- *    dikorbankan.
+ *    dalam `PLAYER.loadTimeout`, server dianggap gagal dan sistem mencoba server berikutnya
+ *    dengan sandbox tetap aktif. Pelepas sandbox hanya tersedia melalui tindakan manual pengguna.
  *  - **Layar penuh standar player**: `requestFullscreen` pada wadah player + kunci orientasi
  *    lanskap (Android), fallback fullscreen `<video>` (iOS). Tombol keluar + kontrol tetap
  *    tersedia; `Esc`/gestur peramban tetap bekerja.
@@ -904,19 +903,12 @@ export function createPlayer({
                 loaded();
                 return;
             }
-            // Pengaman pop-up dicoba dulu tanpa sandbox sebelum server dianggap gagal.
-            if (iframe.dataset.frameGuard === 'on') {
-                releaseFrameGuard('timeout');
-                return;
-            }
+            // Jangan melepas sandbox otomatis: timeout bukan bukti bahwa embed menolaknya.
+            // Coba server lain dengan perlindungan tetap aktif; pengguna dapat memilih pelepas
+            // manual bila halaman secara eksplisit menampilkan "Sandbox not allowed".
             fail(server, 'timeout');
         }, PLAYER.loadTimeout);
-        // `releaseAfterMs` lebih cepat dari loadTimeout: embed yang tidak memuat apa pun karena
-        // sandbox tidak perlu menunggu 15 detik.
-        guardTimer = setTimeout(() => {
-            if (my !== token || state !== 'loading' || iframe.dataset.frameGuard !== 'on') return;
-            releaseFrameGuard('timeout');
-        }, Math.min(PLAYER.frameGuard.releaseAfterMs, PLAYER.loadTimeout));
+        // Tidak ada pelepasan otomatis. Pelepas sandbox hanya dipicu tindakan manual pengguna.
     }
 
     /**
