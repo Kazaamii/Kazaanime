@@ -374,7 +374,13 @@
 }
 @media(max-width:768px){
     .navbar{padding:0 12px}
-    .navbar-inner{height:60px;overflow-x:hidden}
+    /* Putaran 9 (24 Okt 2026) — AKAR BUG menu akun di Android.
+       overflow-x:hidden membuat .navbar-inner menjadi kotak gulir (overflow-y otomatis
+       jadi auto). Menu profil yang absolute di dalamnya menambah area gulir → Chrome
+       Android menggeser isi navbar (logo hilang, avatar terdorong) dan memotong menu di
+       tepi bawah navbar. overflow-x:clip tetap memotong tanpa pernah membuat kotak gulir;
+       baris pertama dipertahankan sebagai cadangan untuk peramban lama. */
+    .navbar-inner{height:60px;overflow-x:hidden;overflow-x:clip}
     .nav-links{display:none}
     .section{padding:25px 16px}
     .anime-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
@@ -395,6 +401,19 @@
     .theme-modal-content{padding:20px}
     .avatar-grid{grid-template-columns:repeat(4,1fr)}
     .profile-name{display:none}
+    /* Putaran 9 (24 Okt 2026) — menu akun di ponsel/Android.
+       Bug yang dilaporkan: menu muncul raksasa, melayang menutupi filter genre, dan
+       terpotong di tepi kanan. Penyebabnya kombinasi position:absolute di dalam
+       .navbar-inner{overflow-x:hidden} + navbar ber-backdrop-filter di Chrome Android.
+       Perbaikan memakai pola yang sama dengan .search-dropdown: position:fixed tepat
+       di bawah navbar (lolos clipping), lebar mengikuti layar, tinggi dibatasi, dan
+       ukuran teks/ikon dipatok supaya tidak ikut membesar. */
+    .profile-dropdown{position:fixed;top:calc(var(--nav-h) + 6px);left:12px;right:12px;width:auto;max-width:calc(100vw - 24px);max-height:calc(100vh - var(--nav-h) - 24px);overflow-y:auto;overscroll-behavior:contain;z-index:1004;padding:10px;border-radius:18px;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    .profile-wrapper.open .profile-dropdown{transform:none}
+    .dropdown-header{padding:10px 8px 12px}
+    .dropdown-header img{width:38px;height:38px;flex:0 0 38px}
+    .dropdown-item{font-size:14px;line-height:1.25;min-height:46px;padding:12px 10px}
+    .dropdown-item svg{width:18px;height:18px;flex:0 0 18px}
 }
 @media(max-width:480px){
     .anime-grid{grid-template-columns:repeat(2,1fr);gap:8px}

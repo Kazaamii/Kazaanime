@@ -89,6 +89,8 @@ function navbarHTML(page) {
 }
 
 let navEl = null;
+/** Kapan menu profil terakhir dibuka (ms) — dipakai penjaga scroll di ponsel. */
+let profileOpenedAt = 0;
 
 /** Scroll halus ke section dengan offset navbar (scroll-margin-top di CSS). */
 function scrollToSection(id) {
@@ -186,6 +188,7 @@ export function renderNavbar(mount, { page, onLogin, onTheme, onAvatar, onLogout
         e.stopPropagation();
         const wrap = $('#profileWrapper', navEl);
         const open = wrap.classList.toggle('open');
+        if (open) profileOpenedAt = Date.now();
         e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
     $('.profile-dropdown', navEl).addEventListener('click', (e) => {
@@ -209,6 +212,15 @@ export function renderNavbar(mount, { page, onLogin, onTheme, onAvatar, onLogout
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeProfile();
     });
+    /* Putaran 9 (24 Okt 2026): menu akun di ponsel sempat menetap di atas konten saat
+       halaman digulir. Menu kini ditutup begitu halaman digulir. Gulir di dalam menu
+       sendiri tidak ikut menutup (event scroll elemen tidak sampai ke window), dan
+       gulir yang terjadi ≤300 ms setelah menu dibuka diabaikan supaya penyusutan
+       address bar Chrome tidak langsung menutup menu yang baru dibuka. */
+    window.addEventListener('scroll', () => {
+        if (Date.now() - profileOpenedAt < 300) return;
+        if (navEl?.querySelector('.profile-wrapper.open')) closeProfile();
+    }, { passive: true });
 
     return navEl;
 }

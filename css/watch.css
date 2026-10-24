@@ -64,6 +64,8 @@
 .player-ctrl-btn[hidden],.player-local-subtitle-tools[hidden]{display:none}
 .player-local-subtitle-tools{display:inline-flex;align-items:center;gap:6px}
 .player-ctrl-btn--clear-subtitle{min-width:32px;padding:6px 9px;font-size:17px;line-height:1}
+/* Putaran 9: label pendek "Eksternal" hanya untuk layar sempit. */
+.ctrl-ext-short{display:none}
 
 /* ==========================================================================
    DETAIL (kolom utama + sidebar)
@@ -160,7 +162,12 @@
    EPISODE & SERVER (sidebar)
    ========================================================================== */
 .episode-list h4,.server-selector h4{font-size:15px;margin-bottom:12px;color:var(--text-secondary)}
-.server-selector{margin-top:20px}
+/* Putaran 9 (24 Okt 2026): panel server pindah ke bawah player, selebar kolom detail,
+   dengan tombol berjejer ke samping. Daftar episode tetap di sidebar, di bawahnya. */
+.server-selector{margin-top:0}
+.server-bar{grid-column:1/-1;padding:14px 16px;background:rgba(var(--primary-rgb),.04);border:1px solid rgba(var(--primary-rgb),.1);border-radius:16px}
+.server-bar h4{margin-bottom:8px;color:var(--text-primary)}
+.server-bar .server-hint{margin-bottom:10px}
 .server-selector h4{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:7px}
 .server-hint{font-size:11px;color:var(--text-secondary);margin-bottom:8px}
 /* FIX Tahap C: aturan ini hilang saat migrasi Tahap A (tombol server jadi bertumpuk 1 kolom) */
@@ -227,27 +234,52 @@ a.ep-btn{display:block;text-decoration:none}
     .streaming-back-btn{margin:12px 16px}
     .streaming-title{font-size:18px}
     .player-statusbar{padding:10px 16px}
-    .watch-title-row{flex-direction:column;gap:10px}
+    /* Putaran 9: judul & tombol bookmark tetap satu baris supaya chip info (rating,
+       status Tamat, jumlah episode) langsung berada di bawah judul — di atas sinopsis. */
+    .watch-title-row{flex-direction:row;gap:10px;align-items:flex-start}
+    .watch-title-row>div{flex:1 1 auto;min-width:0}
+    .watch-title-row .btn-bookmark-hero{flex:0 0 auto;padding:8px 12px;font-size:12px;gap:6px}
+    .watch-title-row .bookmark-label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .streaming-meta{margin:10px 0 12px;gap:8px}
+    /* Putaran 9: server streaming berjejer ke samping (2 kolom) tepat di bawah player,
+       lalu daftar episode di bawahnya. */
+    .server-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .server-btn{width:100%;min-width:0;justify-content:center;text-align:center;flex-wrap:wrap;row-gap:2px;padding:9px 8px;font-size:12px}
+    .server-bar{margin-bottom:16px}
     .watch-info{grid-template-columns:90px 1fr;gap:14px;padding:16px}
     .watch-info-poster{width:90px}
     .download-item{flex-direction:column;align-items:flex-start}
     .btn-download{width:100%;justify-content:center}
     .download-links{width:100%}
     .download-links .btn-download{width:auto;flex:1}
-    /* Tahap C (mobile-first): urutan baca = player → judul → episode & server → info.
-       Dulu daftar episode berada paling bawah, setelah sinopsis, download & platform. */
+    /* Putaran 9 (24 Okt 2026) — urutan baca di ponsel:
+       player → tombol → SERVER (berjejer ke samping) → judul & chip info →
+       daftar episode → sinopsis/download/platform.
+       Dulu server berada di bawah daftar episode, di dalam sidebar. */
     .streaming-details{display:flex;flex-direction:column;gap:0}
     .streaming-main{display:contents}
     .streaming-sidebar{order:1;margin:0 0 20px}
     .watch-info,.download-section,.platforms-section{order:2}
 }
-@media(max-width:480px){
-    .player-controls{width:100%}
-    .player-controls>.player-ctrl-btn{flex:1;min-width:0;text-align:center;padding:6px 6px}
-    .player-local-subtitle-tools{flex:1.35;min-width:0;gap:4px}
-    .player-local-subtitle-tools .player-ctrl-btn:first-child{flex:1;min-width:0;padding:6px 4px}
-    .player-local-subtitle-tools .player-ctrl-btn--clear-subtitle{flex:0 0 28px;min-width:28px;padding:6px 4px}
+/* Putaran 9 (24 Okt 2026) — ponsel: tombol di bawah player tidak lagi saling menimpa.
+   Dulu keempat tombol dipaksa flex:1 sehingga label "Pemutar Eksternal" menimpa
+   "Berikutnya" dan "Server Lain" terpotong. Sekarang dua kolom rapi:
+   [Sebelumnya][Berikutnya] / [Server Lain][Eksternal]. */
+@media(max-width:600px){
+    .player-statusbar{display:block}
+    .player-status{width:100%;margin-bottom:8px}
+    .player-status-text{white-space:normal}
+    .player-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+    .player-controls>.player-ctrl-btn{width:100%;min-width:0;padding:9px 10px;font-size:12px;text-align:center;white-space:nowrap}
+    /* Urutan DOM sudah: Sebelumnya → Berikutnya → Server Lain → Eksternal (tanpa `order`). */
+    .player-local-subtitle-tools{grid-column:1/-1;width:100%;display:flex;gap:6px}
+    .player-local-subtitle-tools .player-ctrl-btn:first-child{flex:1;min-width:0;padding:9px 8px}
+    .player-local-subtitle-tools .player-ctrl-btn--clear-subtitle{flex:0 0 34px;min-width:34px;padding:9px 4px}
     .ctrl-long{display:none}
+    .ctrl-ext-long{display:none}
+    .ctrl-ext-short{display:inline}
+}
+@media(max-width:480px){
     .watch-info{grid-template-columns:1fr}
     .watch-info-poster{display:none}
 }

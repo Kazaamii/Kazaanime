@@ -74,7 +74,9 @@ test('watch: tombol pemutar eksternal menggantikan tombol pop-up', () => {
     assert.doesNotMatch(watchHtml, /id="btnPopupGuard"/);
     assert.doesNotMatch(watchHtml, /Pop-up diblokir|Pop-up diizinkan/);
     assert.match(watchHtml, /<button type="button" class="player-ctrl-btn player-ctrl-btn--external" id="btnExternalPlayer"/);
-    assert.match(watchHtml, /data-icon="external-link"><\/span>Pemutar Eksternal/);
+    // Putaran 9: label panjang tetap ada (desktop) + label pendek "Eksternal" untuk ponsel.
+    assert.match(watchHtml, /data-icon="external-link"><\/span><span class="ctrl-ext-long">Pemutar Eksternal<\/span>/);
+    assert.match(watchHtml, /<span class="ctrl-ext-short">Eksternal<\/span>/);
 
     assert.match(watchJs, /externalPlayer: \$\('#btnExternalPlayer'\)/);
     assert.match(watchJs, /function openExternalPlayer\(\)/);
