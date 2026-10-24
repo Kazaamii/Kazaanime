@@ -174,7 +174,8 @@ test('donghua: pencarian situs dijalankan paralel berbatas, bukan berurutan', ()
 
 test('Jelajah: bagian katalog juga mencoba ulang otomatis', () => {
     assert.match(katalogJs, /import \{ withAutoRetry \} from '\.\/api\/retry\.js'/);
-    assert.match(katalogJs, /await withAutoRetry\(\(attempt\) => getSourceBrowse\(state\.source, \{/);
+    // Putaran 23: sumber bagian boleh berbeda dari tab aktif (tab Donghua → HiAnime/AnimeXin/…).
+    assert.match(katalogJs, /await withAutoRetry\(\(attempt\) => getSourceBrowse\(browseSource, \{/);
     assert.match(katalogJs, /refresh: refresh \|\| attempt > 1/);
     assert.match(katalogJs, /Jaringan lambat — mencoba sekali lagi…/);
 });

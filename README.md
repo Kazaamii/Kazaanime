@@ -38,6 +38,7 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅜 putaran 7 (24 Okt 2026): pencarian header & halaman hasil juga memakai **AnimeKu & Oploverz** (bukan hanya AniList/Kitsu)
 🅝 putaran 8 (24 Okt 2026): **genre situs pindah ke Jelajah saja**, **sandbox/pop-up dihapus** → lapisan anti-iklan + pemutar eksternal, **2 server Sub Indo berlabel** (AnimeKu & Animeloverz), status backend bisa dites ulang
 🅞 putaran 9 (24 Okt 2026): **tata letak ponsel** — menu akun, tombol player, dan panel server dirapikan (server di bawah player, episode di bawahnya)
+🅠 24 Okt 2026: **tab Donghua diperluas** — Donghua di **HiAnime** (7 benih terverifikasi) & **Donghua di AnimeXin** (katalog situs)
 🅟 putaran 10 (24 Okt 2026): **akun tahan banting** (nama tanpa beda huruf, cadangan otomatis, cadangan/pulihkan berkas + kode), **server akun opsional** (file/Redis), foto avatar terverifikasi, **judul di atas player**, tab **AnimeKu/Oploverz** di pencarian
 🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
 🅢 putaran 14 (24 Okt 2026): **baris “Cek pilihan subtitle” dihapus** (nomor episode kini chip kecil di bawah judul), **polesan tampilan desktop** halaman nonton (judul + aksi sejajar, panel server/details lebih lega), **tombol “Suka” dengan hitungan live (“Jejak”)** — satu suka per pengunjung per episode, `GET/POST /api/reactions`, penyimpanan file/Redis/off, tetap jalan dengan jejak lokal bila server mati
@@ -125,7 +126,7 @@ kazanime/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
 │   ├── home.js                ✅🅓🅔🅗🅚🅝 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre AniList → hasil di bawah tombol + filter Tahun/Musim/Urutan; panel Donghua AnimeKu & Oploverz + **auto refresh**; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
-│   ├── katalog.js             ✅🅘🅙🅚 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre + Tahun/Musim (Oploverz), pencarian per sumber, percobaan ulang otomatis
+│   ├── katalog.js             ✅🅘🅙🅚🅠 Jelajah: tab AnimeKu/Oploverz/Donghua (bagian boleh menunjuk sumber lain, mis. HiAnime/AnimeXin), bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre + Tahun/Musim (Oploverz), pencarian per sumber, percobaan ulang otomatis
 │   ├── bookmark.js            🅙 halaman Bookmark: baca services/bookmark.js, cari & urutkan, ajakan login
 │   └── watch.js               ✅🅓🅕🅝 halaman nonton (dua server Sub Indo berlabel AnimeKu/Animeloverz dulu lewat `firstPerSite`, lalu Multi Sub & lainnya; tombol Pemutar Eksternal) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
@@ -161,7 +162,7 @@ kazanime/
     │   └── errors.js          error bertipe → status HTTP & pesan ramah
     ├── sources/
     │   ├── index.js           registry + aggregator + fallback (menambah sumber = 1 file + 1 baris)
-    │   ├── animexin.js        adapter AnimeXin — donghua + mirror HTML/Base64/URL/meta (tidak fetch hoster) + jadwal
+    │   ├── animexin.js        adapter AnimeXin — donghua (katalog + `browseDonghua` = `latest`) + mirror HTML/Base64/URL/meta (tidak fetch hoster) + jadwal
     │   ├── samehadaku.js      adapter Samehadaku — anime Jepang Hardsub Indonesia; embed publik + fallback player_ajax yang eksplisit
     │   ├── animeonsen.js      adapter API AnimeOnsen — OAuth/search token/episode + HLS/native video dan subtitle soft; opt-in fail-closed
     │   ├── kusonime.js        pencarian paket download terpisah — kandidat Romaji + cocok judul exact; hanya halaman lewat robots gate
@@ -351,7 +352,7 @@ pencarian. Ada tiga tab:
 |---|---|---|
 | **AnimeKu** | Terbaru (`baru`) → New Anime Populer (`populer`) → Top Favorit (`favorit`) → Coming Soon → Complete (`selesai`) → Donghua di AnimeKu (`donghua`) | ✅ 23 genre slug terverifikasi (`/genre/aksi/`), tanpa musim |
 | **Oploverz (Animeloverz)** | Terbaru (`update`) → Populer (`popular`) → Rating Tertinggi (`rating`) → Ongoing → Completed → Movie → Donghua di Oploverz (`donghua`) | ✅ 80 genre + **Tahun/Musim** (`season[]`, 24 musim) dari form `/series/` |
-| **Donghua** | Panel **Donghua di AnimeKu** + **Donghua di Oploverz** (katalog situs, benih judul tetap dipakai walau metadata mati) lalu feed Donghua Kazanime (AniList negara CN → backend AnimeXin) | — |
+| **Donghua** | Feed Donghua Kazanime → **Donghua di HiAnime** (7 benih terverifikasi) → **Donghua di AnimeXin** (katalog situs) → **Donghua di AnimeKu** → **Donghua di Oploverz** (katalog situs, benih judul tetap dipakai walau metadata mati) | — |
 
 **Tampilkan lebih banyak + Lihat Semua.** Setiap bagian tampil ringkas **6 kartu** dengan
 dua jalan untuk melihat sisanya:
@@ -379,6 +380,9 @@ bagian tidak menembak bersamaan.
 | AnimeKu "Filter Genre" | `/genre/` → **404**, tetapi arsip genre **bisa dibuka lewat slug**: `/genre/aksi/` dialihkan situs ke `/genre/aksi-<token>/` (30 kartu + paginasi, dicek 24 Okt 2026). 5 slug 404 (`sci-fi`, `mahou-shoujo`, `kehidupan-sehari-hari`, `sekolah`, `laga`) dan `josei` kosong | `GENRE_CATALOG` berisi **23 slug** yang benar-benar 200 + ada kartu; genre di luar daftar → `400` (tidak ada URL tebakan) |
 | AnimeKu "Donghua" | tidak ada kategori donghua: `/donghua/` → **404**, `/negara/china-n5z6n97/` → **200 tetapi 0 kartu**, dan seri donghua pun dilabeli "Negara: Japan" | bagian **Donghua di AnimeKu** = judul donghua tayang (metadata AniList, negara CN) yang dicari di halaman pencarian situs; kartu yang tidak cocok dibuang. Jelas ditulis sebagai deteksi, bukan kategori situs |
 | Oploverz "Donghua" | `?type=donghua` & `?genre[]=donghua` → **0 kartu**, `/donghua/` → **404**, tidak ada genre donghua | bagian **Donghua di Oploverz** = judul donghua tayang (metadata) dicari di `?s=`, hanya kartu yang cocok dipakai; tab **Donghua** tetap feed Donghua Kazanime |
+| HiAnime "Donghua" | tidak punya kategori donghua, tetapi pencarian `?s=` mengenali judul China dengan baik (24 Okt 2026: Soul Land → 5 seri, BTTH → 3, Douluo Dalu → 4, Perfect World → 2, Renegade Immortal → 2, Throne of Seal → 1, Anhe Zhuan → 1) | bagian **Donghua di HiAnime** = 7 benih dicari (maks 3 paralel), hanya kartu yang judulnya cocok yang ditampilkan; subtitle HiAnime berbahasa Inggris |
+| AnimeXin "Donghua" | situsnya memang khusus donghua China (katalog + `/schedule/`) | bagian **Donghua di AnimeXin** = `latest()` apa adanya, **tanpa request tambahan** ke situs |
+| APK **Miku Moe 3.6** (24 Okt 2026) | tab Animeku **dan** Animeloverz di aplikasi itu memakai host yang sama, `apps.animekita.org/api/v1.2.5/`; host tersebut kini **403** di semua path API dan halaman depannya menampilkan vandalisme (`MEMEK EUR`); header aplikasi `Dart/3.9 (dart:io)` tidak ditiru | tidak ada endpoint baru yang diterapkan — lihat [`docs/DONGHUA.md`](docs/DONGHUA.md) §2.4 |
 | Oploverz "Coming Soon" | `?status=upcoming` valid tetapi **0 kartu** saat dicek | tidak ditampilkan; tab Oploverz memakai Ongoing/Completed |
 
 Tidak ada URL atau kategori yang dikarang: setiap token filter yang dipakai sudah diuji ke halaman
@@ -415,6 +419,17 @@ dan hanya memakai kartu yang judulnya cocok (dinormalisasi: tanpa tanda baca & p
 Kartu ditandai `country: 'CN'`; bila tidak ada yang cocok, bagian menampilkan pesan kosong —
 tidak ada judul karangan. Batasnya jujur: donghua lama yang tidak sedang tayang bisa belum
 tercakup.
+
+**🐉 Tab Donghua diperluas (24 Okt 2026).** Tab **Donghua** di Jelajah kini berisi lima bagian:
+feed Donghua Kazanime, **Donghua di HiAnime**, **Donghua di AnimeXin**, Donghua di AnimeKu, dan
+Donghua di Oploverz. HiAnime dilayani `browseDonghua()` baru (`server/sources/hianime.js`) yang
+mencari **6 kueri pertama** dari 7 benih (`Soul Land`, `Battle Through the Heavens`,
+`Perfect World`, `Douluo Dalu`, `Throne of Seal`, `Renegade Immortal`, `Shaonian Ge Xing`) dengan
+`mapLimit(…, 3)` — jadi tidak lebih dari 6 request per 10 menit (di-cache) — lalu **hanya** kartu
+yang judulnya cocok yang dipakai, tanpa judul karangan. AnimeXin memakai `latest()` apa adanya
+(situsnya memang khusus donghua; tanpa request tambahan). Detail: [`docs/DONGHUA.md`](docs/DONGHUA.md)
+§5. Bagian yang menunjuk sumber lain tidak mewarisi genre/tahun/musim tab, dan tautan
+"Lihat Semua" hanya muncul bila tab tujuan memang ada.
 
 **🔖 Halaman Bookmark (24 Okt 2026).** Daftar bookmark keluar dari navbar yang sempit dan dari
 beranda: sekarang ada `bookmark.html` (menu profil → **Bookmark Saya**, dan tautan di footer).

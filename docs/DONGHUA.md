@@ -9,6 +9,12 @@ Katalog donghua di kedua aplikasi berasal dari API khusus aplikasi yang menolak 
 (`403`), sedangkan situs publik `ww2.animeku.lol` dan `oploverz.ch` **tidak punya kategori donghua
 sama sekali**. Karena itu Kazanime tidak bisa menyamakan katalognya tanpa API tersebut.
 
+**Pembaruan 24 Okt 2026 (APK Miku Moe 3.6 dibongkar):** kedua tab di aplikasi itu — "Animeku"
+dan "Animeloverz" — memakai **host API yang sama**, `apps.animekita.org/api/v1.2.5/`. Itu sebabnya
+isinya "hampir sama" seperti yang Anda amati. Host tersebut sekarang **mati**: semua path API →
+**403**, dan halaman depannya menampilkan tulisan vandalisme (`MEMEK EUR`)."
+
+
 ---
 
 ## 1. Isi dua tangkapan layar
@@ -71,6 +77,36 @@ memang menolak klien luar.
 
 ---
 
+### 2.4 Bukti dari APK Miku Moe 3.6 (`64bit.Miku Moe_3.6_R27_v2.apk`)
+
+Dibongkar dengan `androguard` (17,4 MB, `classes.dex` 10 MB, `libmikumoe.so` 9,2 MB).
+
+| Temuan di APK | Nilai |
+|---|---|
+| Kelas tab Animeku | `Lmiku/moe/app/BaseAnimekuGridFragment;`, `AnimekuGridAdapter` |
+| Kelas tab Animeloverz | `Lmiku/moe/app/BaseAnimeLoverzGridFragment$ResponseConsumer;` |
+| API tab **Animeku** | `apps.animekita.org/api/v1.2.5/baruupload.php?page=`, `home/ongoing.php?page=&type=all`, `genreseries.php?page=`, `search.php?keyword=`, `movie.php`, `series.php?url=`, `series/episode/data.php?url=` |
+| API tab **Animeloverz** | **host yang sama**: `baruupload.php?page=` + `home/ongoing.php?page=&type=all` |
+| Filter donghua di aplikasi | `search.php?keyword=donghua&page=` |
+| Header yang dikirim aplikasi | `user-agent: Dart/3.9 (dart:io)`, `accept: application/json` |
+| Sumber lain | `pencarinafkah.xyz/vA6//api` (api_key tertanam), `api.wincamp.web.id/animexnonton` |
+
+Hasil uji host `apps.animekita.org` dari GitHub Actions (User-Agent bot jujur, GET & POST, http & https):
+
+| URL | Hasil |
+|---|---|
+| `/api/v1.2.5/baruupload.php?page=1` (GET & POST) | **403** `403 Forbidden` (Apache di balik Cloudflare) |
+| `/api/v1.2.5/search.php?keyword=donghua&page=1` | **403** |
+| `/api/v1.2.5/genreseries.php?page=1`, `/home/ongoing.php` | **403** |
+| `/` | **200**, 9 byte: `MEMEK EUR` (vandalisme) |
+| `animekita.org` | **200**, 11 byte: `HALO DUNIA!` |
+
+Kesimpulan dari APK: **tidak ada endpoint baru yang bisa dipakai.** Katalog donghua aplikasi
+berjalan di atas API pihak ketiga yang kini rusak/diambil alih, dan header yang dipakai adalah
+identitas aplikasi (`Dart/3.9`) — Kazanime tidak meniru identitas itu.
+
+---
+
 ## 3. Kesimpulan
 
 1. **Situs publik tidak punya donghua sebagai kategori.** AnimeKu: `/genre/donghua/` 404,
@@ -85,6 +121,10 @@ memang menolak klien luar.
 4. **Isi donghua kita memang tipis karena sumbernya tipis**, bukan karena filter kita salah:
    `GET /api/anime/browse?source=animeku&filter=donghua` → **7 judul, semuanya varian Douluo Dalu**
    (satu benih pencarian yang benar-benar ada di situs); `source=oploverz&filter=donghua` → **0**.
+5. **HiAnime adalah satu-satunya sumber donghua yang benar-benar kaya** (dicek 24 Okt 2026 lewat API
+   produksi): `Soul Land` → 5 seri, `Battle Through the Heavens` → 3, `Douluo Dalu` → 4,
+   `Perfect World` → 2, `Renegade Immortal` → 2, `Throne of Seal` → 1, `Shaonian Ge Xing` → 1
+   (termasuk *Anhe Zhuan*). AnimeXin juga situs donghua (seluruh katalognya CN).
 
 ---
 
@@ -94,7 +134,7 @@ memang menolak klien luar.
 |---|---|---|
 | **A. Terima perbedaan (dokumen ini)** | Tidak ada perubahan data; katalog donghua tetap dari AnimeKu (varian Douluo Dalu) + benih Oploverz | Jujur, nol risiko; katalog tetap lebih kecil dari aplikasi |
 | **B. Perkaya donghua dari AnimeKu** | Tambah benih judul donghua yang **benar-benar ada** di AnimeKu (mis. Perfect World, Battle Through the Heavens, Soul Land, Swallowed Star) | Tiap benih = 1 request pencarian (~1 dtk/host); jumlah kueri perlu dinaikkan |
-| **C. Perluas tab Donghua ke sumber lain** | AnimeXin (punya jadwal donghua) dan HiAnime (punya *Anhe Zhuan* dkk.) bisa jadi isi tab Donghua | Melanggar batas lama “panel donghua hanya AnimeKu & Oploverz” → butuh persetujuan pengguna |
+| **C. Perluas tab Donghua ke sumber lain** | AnimeXin (punya jadwal donghua) dan HiAnime (punya *Anhe Zhuan* dkk.) jadi isi tab Donghua | ✅ **dikerjakan 24 Okt 2026** (lihat §7) |
 | **D. Periksa APK aplikasinya** | Kirim APK Animeku / Animeloverz; dibongkar seperti `Sumber APK.zip` untuk mencari endpoint katalog donghua | Satu-satunya jalan menuju paritas isi; hasilnya bisa tetap 403 seperti Animeku API |
 
 Urutan rekomendasi: **D → C → B → A**. Tanpa APK atau izin memperluas sumber, A adalah satu-satunya
@@ -102,7 +142,32 @@ opsi yang tidak mengarang data.
 
 ---
 
-## 5. Cara mengulang probe
+## 5. Tab Donghua yang baru (24 Oktober 2026)
+
+Tab **Donghua** di `katalog.html` kini berisi lima bagian:
+
+| Bagian | Sumber | Isi | Status |
+|---|---|---|---|
+| Donghua Baru Upload | feed Kazanime (metadata) | rilis donghua terbaru | tetap |
+| **Donghua di HiAnime** | `source=hianime&filter=donghua` | 7 benih terverifikasi, difilter judul | **baru** |
+| **Donghua di AnimeXin** | `source=animexin&filter=donghua` | katalog AnimeXin apa adanya (situs donghua) | **baru** |
+| Donghua di AnimeKu | `source=animeku&filter=donghua` | varian Douluo Dalu | tetap, kini di tab yang sama |
+| Donghua di Oploverz | `source=oploverz&filter=donghua` | biasanya kosong (situsnya tidak memuat donghua) | tetap |
+
+Detail teknis:
+
+* `browseDonghua(titles)` di `server/sources/hianime.js` mencari 6 kueri pertama (maks 3 paralel,
+  jeda 1 dtk/host dari `lib/fetcher.js`), lalu **hanya** memakai kartu yang judulnya cocok
+  (`titleKey` setelah `stripSeason`). Benih: `Soul Land`, `Battle Through the Heavens`,
+  `Perfect World`, `Douluo Dalu`, `Throne of Seal`, `Renegade Immortal`, `Shaonian Ge Xing`.
+* `browseDonghua()` di `server/sources/animexin.js` memakai `latest()` — tidak ada request baru.
+* Di `js/katalog.js`, bagian boleh menunjuk sumber lain lewat `source:`; tiap bagian mendapat
+  kunci DOM unik (`key`) karena lima bagian memakai id filter `donghua` yang sama.
+* Tes: `server/test/round23-donghua-tab.test.js` (5 tes).
+
+---
+
+## 6. Cara mengulang probe
 
 ```bash
 # Dari mesin yang bisa menjangkau kedua situs (mis. runner Actions), satu GET per URL:
@@ -123,8 +188,9 @@ situs memperlakukan permintaan beruntun sebagai beban, bukan undangan.
 
 ---
 
-## 6. Riwayat
+## 7. Riwayat
 
 | Tanggal | Perubahan |
 |---|---|
 | 24 Okt 2026 | Dokumen dibuat setelah probe Actions: AnimeKu tanpa genre/kategori donghua, Oploverz tanpa donghua, `apps.animekita.org` 403 dari Actions, `animeloverz.com/.id` tidak resolve, `oploverz.biz` 526. |
+| 24 Okt 2026 (lanjutan) | APK Miku Moe 3.6 dibongkar: kedua tab aplikasi memakai `apps.animekita.org` (403 + halaman depan vandalisme) — tidak ada endpoint baru yang bisa dipakai. Tab **Donghua** di Jelajah diperluas: bagian **Donghua di HiAnime** (7 benih terverifikasi) dan **Donghua di AnimeXin** (katalog situs apa adanya), di samping AnimeKu & Oploverz. |
