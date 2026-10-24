@@ -48,7 +48,7 @@
 .player-ad-shield-pill small{font-weight:500;font-size:11px;opacity:.7}
 .player-ad-shield[hidden]{display:none}
 
-/* ---------- Putaran 11: Mode Aman, bilah pemulihan iklan, tanda server berisiko ---------- */
+/* ---------- Putaran 11: bilah pemulihan iklan & tanda server berisiko ---------- */
 /* Bilah pemulihan TIDAK menutup pemutar — pengguna tetap melihat apa yang terjadi. */
 .player-ad-recovery{position:absolute;left:12px;right:12px;bottom:12px;z-index:4;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:12px;background:rgba(12,14,22,.92);border:1px solid rgba(var(--primary-rgb),.35);box-shadow:0 12px 30px rgba(0,0,0,.45);font-size:12px;color:var(--text-primary);backdrop-filter:blur(6px)}
 .player-ad-recovery-text{display:inline-flex;align-items:center;gap:7px;line-height:1.4}
@@ -59,15 +59,50 @@
 .player-ad-recovery-btn--ghost{background:transparent;border-color:rgba(255,255,255,.16);color:var(--text-secondary)}
 .player-ad-recovery-btn--ghost:hover{color:var(--text-primary);border-color:rgba(255,255,255,.3)}
 
-/* Tombol Mode Aman: titik status di kanan label. */
-.player-ctrl-btn--safe .safe-dot{width:7px;height:7px;border-radius:50%;background:rgba(148,163,184,.75);flex:0 0 7px;margin-left:2px}
-.player-ctrl-btn--safe.is-on{color:#34d399;border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.1)}
-.player-ctrl-btn--safe.is-on .safe-dot{background:#34d399;box-shadow:0 0 6px rgba(52,211,153,.9)}
-
 /* Tanda server yang host-nya ada di daftar blokir iklan (tetap bisa dipilih). */
 .server-badge--ad{background:rgba(245,158,11,.16);color:#fbbf24;border:1px solid rgba(245,158,11,.35)}
 .server-hint-link{background:none;border:0;padding:0;margin:0;color:var(--primary);font-family:inherit;font-size:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .server-hint-link:hover{color:var(--text-primary)}
+
+/* ---------- Putaran 12: layar penuh standar player & rotasi ---------- */
+.player-ctrl-btn--fullscreen.is-on{color:#34d399;border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.1)}
+
+/* Wadah player saat layar penuh: penuh layar, tanpa letterbox 16:9. */
+.streaming-player-wrapper:fullscreen,
+.streaming-player-wrapper:-webkit-full-screen{position:fixed;inset:0;z-index:9999;padding-top:0;width:100vw;height:100vh;height:100dvh;background:#000;border-radius:0}
+.streaming-player-wrapper:fullscreen>#playerStage,
+.streaming-player-wrapper:-webkit-full-screen>#playerStage{position:absolute;inset:0;width:100%;height:100%}
+.streaming-player-wrapper:fullscreen iframe,
+.streaming-player-wrapper:fullscreen video,
+.streaming-player-wrapper:-webkit-full-screen iframe,
+.streaming-player-wrapper:-webkit-full-screen video{width:100%;height:100%;object-fit:contain;background:#000}
+.streaming-player-wrapper:fullscreen .player-ad-shield,
+.streaming-player-wrapper:-webkit-full-screen .player-ad-shield{border-radius:0}
+
+/* Kunci orientasi ditolak peramban (iOS/tablet) → putar panggung 90° selama tegak. */
+.streaming-player-wrapper.is-fs-rotated>#playerStage{position:absolute;top:50%;left:50%;width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center}
+.streaming-player-wrapper.is-fs-rotated .player-fs-exit{top:calc(10px + env(safe-area-inset-top,0px));right:auto;left:calc(10px + env(safe-area-inset-left,0px))}
+
+/* Di layar penuh, bilah pemulihan dinaikkan supaya tidak tertutup kontrol peramban. */
+.streaming-player-wrapper:fullscreen .player-ad-recovery,
+.streaming-player-wrapper:-webkit-full-screen .player-ad-recovery{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(680px,calc(100% - 24px));right:auto;z-index:10000}
+
+/* Tombol keluar layar penuh (peramban ponsel kadang menyembunyikan UI-nya). */
+.player-fs-exit{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));z-index:10001;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(10,12,20,.72);color:#fff;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;backdrop-filter:blur(6px);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.player-fs-exit:hover{background:rgba(10,12,20,.9);border-color:var(--primary)}
+.player-fs-exit .ic{width:15px;height:15px}
+/* Saat halaman dalam layar penuh, kunci gulir & sembunyikan elemen lain. */
+html.player-fullscreen,html.player-fullscreen body{overflow:hidden;background:#000}
+html.player-fullscreen .navbar,html.player-fullscreen .footer,html.player-fullscreen .streaming-sidebar{display:none}
+
+/* Di layar penuh, tautan pelepas sandbox ikut terlihat di atas video. */
+.streaming-player-wrapper:fullscreen .player-frame-hint,
+.streaming-player-wrapper:-webkit-full-screen .player-frame-hint{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:10000;margin:0;background:rgba(10,12,20,.86)}
+
+/* Tautan pelepas sandbox (hanya muncul bila pengaman aktif & video diduga tidak tampil). */
+.player-frame-hint{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 0;padding:6px 10px;border-radius:9px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);font-size:11.5px;color:var(--text-secondary)}
+.player-frame-hint-btn{padding:4px 10px;border-radius:7px;border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.14);color:#fbbf24;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.player-frame-hint-btn:hover{background:rgba(245,158,11,.24);color:#fde68a}
 .streaming-player-wrapper .player-frame{background:#000}
 /* 22 Okt 2026: player video bawaan untuk server HLS (AniZone Multi Sub) */
 .player-video{display:block;width:100%;height:100%;object-fit:contain;background:#000;border:0}
@@ -260,6 +295,9 @@ a.ep-btn{display:block;text-decoration:none}
     .streaming-title{font-size:18px}
     .watch-title-row--top{padding:2px 16px 10px}
     .player-ad-recovery{left:8px;right:8px;bottom:8px;padding:9px 11px;font-size:11px;gap:8px}
+    .streaming-player-wrapper:fullscreen .player-ad-recovery,
+    .streaming-player-wrapper:-webkit-full-screen .player-ad-recovery{left:8px;right:8px;width:auto;transform:none;bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+    .player-fs-exit{padding:7px 12px;font-size:11px}
     .player-ad-recovery-actions{width:100%}
     .player-ad-recovery-btn{flex:1 1 auto;text-align:center;padding:7px 8px}
     .player-statusbar{padding:10px 16px}

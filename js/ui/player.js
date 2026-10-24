@@ -42,13 +42,18 @@
  *  - Subtitle lokal `.srt`/`.vtt` hanya untuk video HLS/native: dikonversi/dipasang di browser sebagai Blob URL,
  *    tidak diunggah; track & object URL dibersihkan saat source berganti dan file dilupakan saat episode berganti.
  *
- * Putaran 11 (24 Okt 2026) — iklan yang memaksa tab baru:
- *  - **Mode Aman** (opt-in) memasang sandbox TANPA `allow-popups`/`allow-top-navigation`, jadi
- *    iklan di dalam embed tidak bisa membuka tab baru atau membajak halaman. Default MATI karena
- *    sebagian embed menolak sandbox; toggle-nya ada di bawah player dan pilihannya diingat.
- *  - **Deteksi pembajakan**: setiap navigasi ulang iframe dihitung. Bila iklan memindahkan
- *    pemutar (mis. halaman JSON "iclick link error"), bilah pemulihan muncul dengan tombol
- *    "Pulihkan pemutar" / "Server lain"; setelah beberapa kali server itu dianggap rusak.
+ * Putaran 12 (24 Okt 2026) — iklan, tab baru, dan layar penuh:
+ *  - **Penahan pop-up selalu aktif** (bukan mode/tombol): iframe embed dipasang dengan sandbox
+ *    tanpa `allow-popups`/`allow-top-navigation*` → `window.open()` iklan gagal total (tidak ada
+ *    tab baru) dan tab Kazanime tidak bisa dibajak. Bila embed menolak sandbox, host diingat
+ *    (`kz:no-sandbox`, per sesi) lalu dimuat tanpa sandbox; bila iframe tidak memuat apa pun
+ *    dalam `PLAYER.frameGuard.releaseAfterMs`, sandbox dilepas otomatis dan server yang sama
+ *    diulang. Tautan kecil di bawah status memberi pelepas manual — pemutaran tidak pernah
+ *    dikorbankan.
+ *  - **Layar penuh standar player**: `requestFullscreen` pada wadah player + kunci orientasi
+ *    lanskap (Android), fallback fullscreen `<video>` (iOS). Tombol keluar + kontrol tetap
+ *    tersedia; `Esc`/gestur peramban tetap bekerja.
+ *  - Deteksi iklan yang memindahkan pemutar tetap ada (bilah "Pulihkan pemutar").
  *
  * Tidak ada fetch di sini. Daftar server (StreamServer[]) datang dari js/api.
  */
@@ -112,46 +117,121 @@ function dropLegacyGuardFlag() {
     } catch {
         // mode privat: tidak ada yang perlu dibersihkan
     }
+    try {
+        // "Mode Aman" (putaran 11) dihapus di putaran 12 — penahan pop-up kini selalu aktif.
+        window.localStorage?.removeItem(STORAGE_KEYS.legacySafeFrame);
+    } catch {
+        // sama: tidak ada yang rusak bila gagal
+    }
 }
 dropLegacyGuardFlag();
 
 /* ------------------------------------------------------------------ */
-/* Mode Aman & deteksi pembajakan iklan (putaran 11)                    */
+/* Penahan pop-up (selalu aktif) & layar penuh                         */
 /* ------------------------------------------------------------------ */
 /**
- * Apakah "Mode Aman" (sandbox tanpa pop-up) sedang aktif.
- * Pilihan disimpan di perangkat; default `PLAYER.safeFrame.defaultOn` (mati).
- * @returns {boolean}
+ * Host pemutar yang terbukti menolak sandbox ("Sandboxed our player is not allowed").
+ * Disimpan per sesi: episode berikutnya memuat host itu langsung tanpa sandbox.
+ * @returns {string[]}
  */
-export function isSafeFrameOn() {
-    const raw = storage.getRaw(STORAGE_KEYS.safeFrame);
-    if (raw === '1') return true;
-    if (raw === '0') return false;
-    return Boolean(PLAYER.safeFrame?.defaultOn);
+function readNoSandboxHosts() {
+    try {
+        const raw = sessionStorage.getItem(STORAGE_KEYS.noSandboxHosts);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list.filter((h) => typeof h === 'string' && h) : [];
+    } catch {
+        return [];
+    }
 }
 
-/** @param {boolean} on */
-export function saveSafeFrame(on) {
-    storage.setRaw(STORAGE_KEYS.safeFrame, on ? '1' : '0');
+/** @param {string} host */
+function rememberNoSandboxHost(host) {
+    const name = String(host || '').toLowerCase();
+    if (!name) return;
+    const limit = PLAYER.frameGuard?.memoryLimit || 20;
+    const list = [name, ...readNoSandboxHosts().filter((h) => h !== name)].slice(0, limit);
+    try {
+        sessionStorage.setItem(STORAGE_KEYS.noSandboxHosts, JSON.stringify(list));
+    } catch {
+        // mode privat / kuota penuh: sandbox tetap dipakai, tidak ada yang rusak
+    }
 }
+
+/** @param {string} url */
+function hostOf(url) {
+    try {
+        return new URL(String(url || '')).hostname.toLowerCase();
+    } catch {
+        return '';
+    }
+}
+
+/** Host ini pernah menolak sandbox pada sesi ini? */
+const hostRefusesSandbox = (url) => readNoSandboxHosts().includes(hostOf(url));
 
 /**
- * Pasang/lepas sandbox pada iframe sesuai Mode Aman.
- *
- * Sandbox sengaja tidak memuat `allow-popups` maupun `allow-top-navigation`: `window.open()`
- * dari embed iklan gagal, dan tab Kazanime tidak bisa dialihkan. `allow-same-origin` +
- * `allow-scripts` dipertahankan supaya pemutar yang membutuhkan storage/worker tetap jalan.
+ * Terapkan kebijakan iframe: sandbox penahan pop-up, atau tanpa sandbox untuk host yang menolak.
  * @param {HTMLIFrameElement} iframe
- * @param {boolean} on
+ * @param {boolean} guard
  */
-function applyFramePolicy(iframe, on) {
-    if (!on) {
+function applyFramePolicy(iframe, guard) {
+    if (!guard) {
         iframe.removeAttribute('sandbox');
         return;
     }
     // `iframe.sandbox` adalah DOMTokenList (PutForwards=value) → setara atribut sandbox.
-    iframe.sandbox.value = PLAYER.safeFrame.policy;
+    iframe.sandbox.value = PLAYER.frameGuard.policy;
 }
+
+/* ------------------------------- layar penuh ------------------------------ */
+const FULLSCREEN_EVENTS = ['fullscreenchange', 'webkitfullscreenchange'];
+
+/**
+ * Kunci orientasi lanskap saat layar penuh (Android Chrome/Firefox).
+ * @returns {Promise<boolean>} true bila peramban benar-benar mengunci orientasi.
+ */
+function lockLandscape() {
+    if (!PLAYER.fullscreen?.lockOrientation) return Promise.resolve(false);
+    try {
+        const orientation = screen.orientation;
+        if (!orientation?.lock) return Promise.resolve(false);
+        const result = orientation.lock(PLAYER.fullscreen?.orientation || 'landscape');
+        return Promise.resolve(result).then(() => true).catch(() => false);
+    } catch {
+        // peramban menolak (bukan fullscreen / iOS) → pakai rotasi CSS
+        return Promise.resolve(false);
+    }
+}
+
+/**
+ * Rotasi CSS 90° sebagai pengganti kunci orientasi (iOS Safari, Samsung Internet, Firefox
+ * Android yang menolak `screen.orientation.lock`). Tanpa ini tombol "Layar Penuh" hanya
+ * memperbesar video tegak di ponsel — keluhan pengguna "saat full screen dia tidak rotate".
+ * @param {HTMLElement} target wadah player
+ * @param {boolean} active sedang layar penuh?
+ * @param {boolean} locked orientasi sudah dikunci peramban?
+ */
+function rotateFallback(target, active, locked) {
+    if (!target) return;
+    const portrait = window.innerHeight > window.innerWidth;
+    target.dataset.fsLocked = locked ? '1' : '0';
+    target.classList.toggle('is-fs-rotated', Boolean(active && !locked && portrait));
+}
+
+function unlockOrientation() {
+    try {
+        screen.orientation?.unlock?.();
+    } catch {
+        // tidak didukung
+    }
+}
+
+const isFullscreenApiAvailable = () => Boolean(
+    document.fullscreenEnabled
+    || document.webkitFullscreenEnabled
+    || Element.prototype.requestFullscreen
+    || Element.prototype.webkitRequestFullscreen,
+);
 
 /** hls.js (Apache-2.0) disimpan lokal; dimuat sekali saat server HLS pertama diputar. */
 let hlsLoader = null;
@@ -249,7 +329,7 @@ export function createPlayer({
     localSubtitleInput = null,
 }) {
     /** @type {Record<string, Set<Function>>} */
-    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), adblock: new Set(), adguide: new Set(), safeFrame: new Set() };
+    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), adblock: new Set(), adguide: new Set(), fullscreen: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
         try { fn(detail); } catch (err) { console.error(`[player] handler "${name}" error:`, err); }
     });
@@ -286,8 +366,12 @@ export function createPlayer({
     let frameLoads = 0;
     /** Waktu load terakhir (ms) — menahan event `load` ganda dari peramban. */
     let lastFrameLoadAt = 0;
-    /** Mode Aman aktif? (sandbox tanpa pop-up) */
-    let safeFrame = isSafeFrameOn();
+    /** Tautan pelepas sandbox di bawah status (hanya bila guard aktif). */
+    let frameHint = null;
+    /** Timer tautan pelepas sandbox. */
+    let hintTimer = 0;
+    /** Timer pelepasan sandbox otomatis (embed tidak memuat apa pun). */
+    let guardTimer = 0;
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -413,6 +497,8 @@ export function createPlayer({
         clearTimeout(overlayTimer);
         timer = 0;
         overlayTimer = 0;
+        clearTimeout(guardTimer);
+        guardTimer = 0;
         markLoaded = null;
         if (frame) {
             frame.remove(); // melepas iframe = video/audio benar-benar berhenti
@@ -435,6 +521,7 @@ export function createPlayer({
         }
         removeAdShield();
         removeAdRecovery();
+        removeFrameHint();
         frameLoads = 0;
         lastFrameLoadAt = 0;
     }
@@ -471,28 +558,57 @@ export function createPlayer({
     }
 
     /**
-     * Terapkan Mode Aman ke iframe yang sedang tampil (opt-in, disimpan di perangkat).
-     * Dipakai tombol di halaman watch, tombol di bilah pemulihan, dan fallback saat timeout.
-     * @param {boolean} on
-     * @returns {boolean} nilai baru
+     * Tautan pelepas sandbox di bawah status player. Tidak menutupi video dan tidak memaksa
+     * apa pun: hanya jalan keluar bila embed menolak sandbox tetapi tetap mengirim `load`
+     * (halaman "Sandboxed our player is not allowed").
+     * @param {number} my token pemutaran
      */
-    function applySafeFrame(on) {
-        safeFrame = Boolean(on);
-        saveSafeFrame(safeFrame);
-        if (frame) {
-            applyFramePolicy(frame, safeFrame);
-            frame.dataset.safeFrame = safeFrame ? 'on' : 'off';
-            // Muat ulang dokumen supaya kebijakan sandbox benar-benar berlaku.
-            try {
-                frame.contentWindow?.location.reload();
-            } catch {
-                const src = frame.src;
-                frame.src = 'about:blank';
-                setTimeout(() => { if (frame) frame.src = src; }, 30);
-            }
-        }
-        emit('safeFrame', { on: safeFrame });
-        return safeFrame;
+    function mountFrameHint(my) {
+        removeFrameHint();
+        if (my !== token || !frame || frame.dataset.frameGuard !== 'on') return;
+        const bar = document.createElement('div');
+        bar.className = 'player-frame-hint';
+        bar.id = 'playerFrameHint';
+        bar.innerHTML = String(html`
+            <span>Video tidak muncul?</span>
+            <button type="button" class="player-frame-hint-btn" data-frame-action="release">Muat ulang tanpa pengaman</button>`);
+        bar.addEventListener('click', (event) => {
+            const btn = event.target instanceof Element ? event.target.closest('[data-frame-action]') : null;
+            if (!btn || my !== token) return;
+            releaseFrameGuard('manual');
+        });
+        stage.insertAdjacentElement('afterend', bar);
+        frameHint = bar;
+    }
+
+    function removeFrameHint() {
+        clearTimeout(hintTimer);
+        hintTimer = 0;
+        if (!frameHint) return;
+        frameHint.remove();
+        frameHint = null;
+    }
+
+    /**
+     * Lepas sandbox untuk host server aktif lalu muat ulang server yang sama.
+     * Dipakai otomatis (tidak ada `load` dalam batas waktu) dan manual (tautan di bawah player).
+     * @param {'timeout'|'manual'} reason
+     */
+    function releaseFrameGuard(reason) {
+        const active = current();
+        if (!active || !frame || frame.dataset.frameGuard !== 'on') return;
+        rememberNoSandboxHost(hostOf(urlOf(active)));
+        removeFrameHint();
+        applyFramePolicy(frame, false);
+        frame.dataset.frameGuard = 'off';
+        showToast(
+            reason === 'timeout'
+                ? 'Pengaman pop-up dilepas untuk server ini: video tidak termuat dengan pengaman. Dimuat ulang tanpa sandbox.'
+                : 'Pengaman pop-up dilepas untuk server ini. Tab baru bisa terbuka lagi — gunakan Pemutar Eksternal bila mengganggu.',
+            'info',
+            8000,
+        );
+        play(active);
     }
 
     /**
@@ -514,7 +630,6 @@ export function createPlayer({
             <span class="player-ad-recovery-actions">
                 <button type="button" class="player-ad-recovery-btn" data-ad-action="restore">Pulihkan pemutar</button>
                 <button type="button" class="player-ad-recovery-btn" data-ad-action="next">Server lain</button>
-                <button type="button" class="player-ad-recovery-btn" data-ad-action="safe"${safeFrame ? ' hidden' : ''}>Aktifkan Mode Aman</button>
                 <button type="button" class="player-ad-recovery-btn player-ad-recovery-btn--ghost" data-ad-action="guide">Cara blokir iklan</button>
             </span>`);
         bar.addEventListener('click', (event) => {
@@ -525,11 +640,6 @@ export function createPlayer({
                 if (active) play(active);
             } else if (action === 'next') {
                 nextServer();
-            } else if (action === 'safe') {
-                // Iklan membajak → tawarkan pelindung satu klik, lalu muat ulang server yang sama.
-                const on = applySafeFrame(true);
-                showToast('Mode Aman aktif — iklan tidak bisa membuka tab baru.', 'success', 5000);
-                if (on && active) play(active);
             } else if (action === 'guide') {
                 emit('adguide', { server: active });
             }
@@ -629,6 +739,99 @@ export function createPlayer({
     }
 
     /* ---------------------------------------------------------------- */
+    /* Layar penuh                                                       */
+    /* ---------------------------------------------------------------- */
+    /** Elemen yang dimasukkan ke mode layar penuh (wadah player, bukan iframe). */
+    const fullscreenTarget = () => stage.closest('.streaming-player-wrapper') || stage;
+    /** Elemen yang sedang fullscreen (lintas vendor). */
+    const fullscreenEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+
+    /** Tombol keluar saat layar penuh (peramban ponsel kadang menyembunyikan UI-nya). */
+    let fsExit = null;
+
+    function syncFullscreenUi() {
+        const active = Boolean(fullscreenEl());
+        const target = fullscreenTarget();
+        target.classList.toggle('is-fullscreen', active);
+        document.documentElement.classList.toggle('player-fullscreen', active);
+        // Kunci orientasi ditolak/tiada → putar panggung 90° selama perangkat tegak.
+        rotateFallback(target, active, target.dataset.fsLocked === '1');
+        if (active && !fsExit) {
+            fsExit = document.createElement('button');
+            fsExit.type = 'button';
+            fsExit.className = 'player-fs-exit';
+            fsExit.id = 'playerFsExit';
+            fsExit.setAttribute('aria-label', 'Keluar layar penuh');
+            fsExit.innerHTML = String(html`${icon('x')}<span>Keluar</span>`);
+            fsExit.addEventListener('click', () => { toggleFullscreen(); });
+            target.append(fsExit);
+        } else if (!active && fsExit) {
+            fsExit.remove();
+            fsExit = null;
+        }
+        emit('fullscreen', { on: active });
+    }
+
+    /**
+     * Masuk/keluar layar penuh pada wadah player (bukan fullscreen bawaan embed), lalu kunci
+     * orientasi lanskap supaya video berputar di ponsel. Fallback: fullscreen `<video>` (iOS,
+     * yang tidak mengizinkan requestFullscreen pada elemen biasa).
+     * @returns {Promise<boolean>}
+     */
+    async function toggleFullscreen() {
+        try {
+            if (fullscreenEl()) {
+                if (document.exitFullscreen) await document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                unlockOrientation();
+                rotateFallback(fullscreenTarget(), false, false);
+                return false;
+            }
+            const target = fullscreenTarget();
+            const request = target.requestFullscreen?.bind(target)
+                || target.webkitRequestFullscreen?.bind(target);
+            if (request) {
+                try {
+                    await request({ navigationUI: 'hide' });
+                } catch {
+                    await request();
+                }
+                const locked = await lockLandscape();
+                rotateFallback(fullscreenTarget(), Boolean(fullscreenEl()), locked);
+                syncFullscreenUi();
+                return Boolean(fullscreenEl());
+            }
+            // iOS: hanya elemen <video> yang bisa fullscreen.
+            if (video?.webkitEnterFullscreen) {
+                video.webkitEnterFullscreen();
+                lockLandscape();
+                return true;
+            }
+            showToast('Peramban ini tidak mendukung layar penuh halaman. Coba Pemutar Eksternal.', 'info', 6000);
+            return false;
+        } catch {
+            showToast('Layar penuh ditolak peramban. Coba lagi setelah video berjalan.', 'info', 6000);
+            return false;
+        }
+    }
+
+    /* Pasang pendengar sekali; `fullscreenchange` juga dipicu saat pengguna menekan Esc. */
+    if (isFullscreenApiAvailable()) {
+        FULLSCREEN_EVENTS.forEach((name) => document.addEventListener(name, () => {
+            if (!fullscreenEl()) unlockOrientation();
+            syncFullscreenUi();
+        }));
+        // Perangkat diputar / jendela diubah ukurannya saat layar penuh → cek ulang rotasi.
+        const recheckRotation = () => {
+            if (!fullscreenEl()) return;
+            const target = fullscreenTarget();
+            rotateFallback(target, true, target.dataset.fsLocked === '1');
+        };
+        window.addEventListener('resize', recheckRotation);
+        window.addEventListener('orientationchange', recheckRotation);
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Memutar & fallback                                                */
     /* ---------------------------------------------------------------- */
     /** @param {StreamServer} server */
@@ -652,23 +855,28 @@ export function createPlayer({
         iframe.allow = PLAYER.allow;
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
-        // Tanpa sandbox secara default (sejak putaran 8): sebagian embed menolak sandbox.
-        // Mode Aman (putaran 11) memasang sandbox tanpa allow-popups/allow-top-navigation.
-        iframe.dataset.popupGuard = 'off';
-        iframe.dataset.safeFrame = safeFrame ? 'on' : 'off';
-        applyFramePolicy(iframe, safeFrame);
+        // Penahan pop-up SELALU AKTIF (putaran 12): sandbox tanpa allow-popups/allow-top-navigation.
+        // Host yang sudah terbukti menolak sandbox (sesi ini) langsung dimuat tanpa sandbox.
+        const guarded = !hostRefusesSandbox(urlOf(server));
+        iframe.dataset.frameGuard = guarded ? 'on' : 'off';
+        applyFramePolicy(iframe, guarded);
         frameLoads = 0;
         lastFrameLoadAt = 0;
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
             clearTimeout(overlayTimer);
+            clearTimeout(guardTimer);
             state = 'playing';
             overlay.remove();
             setStatus(`${server.name} | Episode ${ep}${langSuffix(server)}`, 'ok');
             renderServers();
             mountAdShield(my);
             emit('loaded', { ep, server });
+            // Pengaman aktif tapi halaman "tidak diizinkan" tetap mengirim `load` → beri jalan keluar.
+            if (iframe.dataset.frameGuard === 'on') {
+                hintTimer = setTimeout(() => mountFrameHint(my), PLAYER.frameGuard.hintAfterMs);
+            }
         };
         markLoaded = loaded;
         let firstLoad = true;
@@ -696,8 +904,19 @@ export function createPlayer({
                 loaded();
                 return;
             }
+            // Pengaman pop-up dicoba dulu tanpa sandbox sebelum server dianggap gagal.
+            if (iframe.dataset.frameGuard === 'on') {
+                releaseFrameGuard('timeout');
+                return;
+            }
             fail(server, 'timeout');
         }, PLAYER.loadTimeout);
+        // `releaseAfterMs` lebih cepat dari loadTimeout: embed yang tidak memuat apa pun karena
+        // sandbox tidak perlu menunggu 15 detik.
+        guardTimer = setTimeout(() => {
+            if (my !== token || state !== 'loading' || iframe.dataset.frameGuard !== 'on') return;
+            releaseFrameGuard('timeout');
+        }, Math.min(PLAYER.frameGuard.releaseAfterMs, PLAYER.loadTimeout));
     }
 
     /**
@@ -905,15 +1124,6 @@ export function createPlayer({
     }
 
     function fail(server, reason) {
-        // Mode Aman bisa membuat embed menolak tampil ("Sandboxed our player is not allowed").
-        // Playback tetap prioritas: pada kegagalan pertama, sandbox dilepas lalu server yang
-        // sama dicoba ulang — server tidak langsung dibuang.
-        if (reason === 'timeout' && safeFrame) {
-            applySafeFrame(false);
-            showToast('Mode Aman dimatikan otomatis: server ini tidak memuat video saat di-sandbox. Mencoba ulang tanpa Mode Aman.', 'info', 8000);
-            play(server);
-            return;
-        }
         const idx = mirror.get(server.id) || 0;
         if (server.mirrors && idx < server.mirrors.length - 1) {
             // Mirror lain dari penyedia yang sama (mis. ReAnime HD-2 → HD-1) dicoba dulu.
@@ -1054,16 +1264,15 @@ export function createPlayer({
         /** Nama server aktif (untuk label tombol pemutar eksternal). */
         currentServerName: () => current()?.name || '',
 
-        /** Mode Aman (sandbox tanpa pop-up) sedang aktif? */
-        isSafeFrame: () => safeFrame,
-
         /**
-         * Nyalakan/matikan Mode Aman. Iframe yang sedang tampil langsung diperbarui;
-         * bila embed menolak sandbox (video tidak muncul), panggil lagi dengan `false`.
-         * @param {boolean} on
-         * @returns {boolean} nilai baru
+         * Layar penuh standar player: `requestFullscreen` pada wadah player (bukan iframe),
+         * lalu kunci orientasi lanskap. Memanggilnya lagi saat sudah fullscreen = keluar.
+         * @returns {Promise<boolean>} true bila sekarang fullscreen
          */
-        setSafeFrame: (on) => applySafeFrame(on),
+        toggleFullscreen,
+
+        /** Sedang layar penuh? */
+        isFullscreen: () => Boolean(fullscreenEl()),
 
         /**
          * Putar episode dengan daftar server baru. Server pilihan user sebelumnya
@@ -1144,7 +1353,7 @@ export function createPlayer({
         },
 
         /**
-         * @param {'loaded'|'complete'|'progress'|'exhausted'|'retry'|'servers'|'adblock'|'adguide'|'safeFrame'} name
+         * @param {'loaded'|'complete'|'progress'|'exhausted'|'retry'|'servers'|'adblock'|'adguide'|'fullscreen'} name
          * @param {(detail: any) => void} fn
          */
         on(name, fn) {

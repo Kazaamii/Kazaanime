@@ -52,8 +52,13 @@ export const STORAGE_KEYS = Object.freeze({
     /** Sisa kunci mode sandbox lama (24 Okt 2026). Sandbox sudah dihapus total di putaran 8 —
      *  kuncinya hanya dipakai untuk membersihkan pilihan lama di perangkat pengguna. */
     popupGuard: 'kz:popup-guard',
-    /** Putaran 11 (24 Okt 2026): "Mode Aman" pemutar = sandbox tanpa pop-up (opt-in). */
-    safeFrame: 'kz:safe-frame',
+    /**
+     * Host pemutar yang terbukti menolak sandbox ("Sandboxed our player is not allowed").
+     * Disimpan per sesi agar episode berikutnya langsung dimuat tanpa sandbox.
+     */
+    noSandboxHosts: 'kz:no-sandbox',
+    /** Kunci "Mode Aman" putaran 11 — fiturnya dihapus (putaran 12); hanya dibersihkan saat start. */
+    legacySafeFrame: 'kz:safe-frame',
     /** Cache hasil pemeriksaan host iklan (AdGuard DNS via backend) — 24 jam. */
     adCheckCache: 'kz:adcheck',
 });
@@ -443,24 +448,44 @@ export const PLAYER = Object.freeze({
      */
     adShield: true,
     /**
-     * "Mode Aman" (putaran 11, 24 Okt 2026) — sandbox iframe TANPA `allow-popups` &
-     * `allow-top-navigation`, sehingga iklan di dalam embed tidak bisa membuka tab baru atau
-     * membajak halaman Kazanime.
+     * Penahan pop-up SELALU AKTIF (putaran 12, 24 Okt 2026).
      *
-     * Sengaja **opt-in** (`defaultOn: false`): sebagian embed menolak berjalan di dalam sandbox
-     * ("Sandboxed our player is not allowed") — persis yang membuat putaran 8 menghapus sandbox.
-     * Pengguna menyalakannya lewat tombol "Mode Aman" di bawah player; pilihannya diingat.
-     * Bila video tidak muncul saat Mode Aman aktif, satu klik mematikannya (tanpa layar penolakan).
+     * Permintaan pengguna: *"hapus saja mode aman dan block iklan nya dengan cara melarang new
+     * tab"*. Jadi tidak ada lagi tombol/mode: setiap iframe embed dipasang dengan sandbox yang
+     * TIDAK memuat `allow-popups` maupun `allow-top-navigation*` → `window.open()` dari iklan
+     * gagal (tidak ada tab baru sama sekali) dan tab Kazanime tidak bisa dialihkan.
+     *
+     * Playback tetap prioritas:
+     *  - host yang sudah terbukti menolak sandbox (`noSandboxHosts`, ingat per sesi) dimuat tanpa
+     *    sandbox sejak awal;
+     *  - bila iframe tidak memuat apa pun dalam `releaseAfterMs`, sandbox dilepas & URL yang sama
+     *    dimuat ulang otomatis (host diingat);
+     *  - tautan kecil `hintAfterMs` (\`#playerFrameHint\`) memberi jalan keluar manual tanpa
+     *    mengorbankan pemutaran: "video tidak muncul? muat ulang tanpa pengaman".
      */
-    safeFrame: Object.freeze({
-        defaultOn: false,
+    frameGuard: Object.freeze({
         /**
-         * Token sandbox untuk Mode Aman (opt-in). SENGAJA tanpa `allow-popups` dan
-         * `allow-top-navigation*`: iklan di dalam embed tidak bisa membuka tab baru atau
-         * mengalihkan tab Kazanime. `allow-same-origin` + `allow-scripts` tetap ada supaya
-         * pemutar yang butuh storage/worker tidak rusak.
+         * Token sandbox. SENGAJA tanpa `allow-popups`, `allow-popups-to-escape-sandbox`, dan
+         * `allow-top-navigation*`. `allow-same-origin` + `allow-scripts` dipertahankan supaya
+         * pemutar yang butuh storage/worker tetap jalan.
          */
         policy: 'allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-downloads',
+        /** Batas menunggu `load` sebelum sandbox dilepas (ms). */
+        releaseAfterMs: 12000,
+        /** Setelah sekian ms pemutaran berjalan, tampilkan tautan pelepas manual. */
+        hintAfterMs: 6000,
+        /** Maksimal host yang diingat sebagai "menolak sandbox" (per sesi). */
+        memoryLimit: 20,
+    }),
+    /**
+     * Layar penuh buatan sendiri (putaran 12): `requestFullscreen` pada wadah player + kunci
+     * orientasi lanskap supaya video berputar di ponsel. Bila peramban menolak, dipakai
+     * fullscreen bawaan elemen `<video>` (iOS).
+     */
+    fullscreen: Object.freeze({
+        orientation: 'landscape',
+        /** Tetap coba kunci orientasi saat keluar/layar penuh dibuka lagi. */
+        lockOrientation: true,
     }),
     /**
      * Deteksi pembajakan iklan (putaran 11): bila iframe memuat ulang ke halaman lain lebih dari

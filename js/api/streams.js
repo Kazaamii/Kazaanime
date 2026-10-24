@@ -196,15 +196,72 @@ export async function findBackendMatch(anime, opts = {}) {
  * @param {{titles?: string[], signal?: AbortSignal}} [opts]
  * @returns {Promise<{slug: string, title: string, source: string}[]>}
  */
+/** Cache padanan situs per anime (sesi ini) — menjaga daftar server tetap konsisten antar episode. */
+const MATCH_TTL_MS = 30 * 60 * 1000;
+const MATCH_STORAGE_KEY = 'kz:matches:v1';
+
+const matchCacheKey = (titles) => [...new Set(titles.map((t) => titleKey(t)).filter(Boolean))].sort().join('|');
+
+/** @returns {{at:number, list:{slug:string,title:string,source:string}[]}|null} */
+function readMatchCache(key) {
+    if (!key) return null;
+    try {
+        const raw = JSON.parse(sessionStorage.getItem(MATCH_STORAGE_KEY) || '{}');
+        const hit = raw?.[key];
+        if (!hit || !Array.isArray(hit.list) || Date.now() - Number(hit.at || 0) > MATCH_TTL_MS) return null;
+        return hit.list.length ? hit : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeMatchCache(key, list) {
+    if (!key) return;
+    try {
+        const raw = JSON.parse(sessionStorage.getItem(MATCH_STORAGE_KEY) || '{}');
+        raw[key] = { at: Date.now(), list };
+        // Buang entri kedaluwarsa supaya sessionStorage tidak tumbuh terus.
+        const now = Date.now();
+        for (const [k, v] of Object.entries(raw)) {
+            if (!v || now - Number(v.at || 0) > MATCH_TTL_MS) delete raw[k];
+        }
+        sessionStorage.setItem(MATCH_STORAGE_KEY, JSON.stringify(raw));
+    } catch {
+        // mode privat / kuota penuh → cache hanya di memori proses ini
+    }
+}
+
+/** Padanan situs dari cache (tanpa jaringan) — dipakai untuk menjaga urutan server stabil. */
+export function cachedBackendMatches(anime, { titles } = {}) {
+    const key = matchCacheKey(titleList(titles?.length ? titles : anime));
+    return readMatchCache(key)?.list || null;
+}
+
+/**
+ * Jeda yang bisa dibatalkan (dipakai saat mencoba ulang sumber Sub Indo).
+ * @param {number} ms
+ * @param {AbortSignal} [signal]
+ */
+const wait = (ms, signal) => new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const id = setTimeout(resolve, ms);
+    signal?.addEventListener?.('abort', () => { clearTimeout(id); resolve(); }, { once: true });
+});
+
 export async function findBackendMatches(anime, { titles: extra, signal } = {}) {
     const titles = titleList(extra?.length ? extra : anime);
     if (!titles.length) return [];
     // Kata kunci: judul lengkap dulu, lalu judul tanpa penanda season (pencarian WordPress = semua kata
     // wajib ada). Pencocokan tetap memakai judul LENGKAP, jadi season lain tidak ikut tercocokkan.
     const queries = uniqueTitles([...titles, ...titles.map(stripSeasonSuffix)]).slice(0, MAX_SEARCH_TITLES);
+    const cached = readMatchCache(matchCacheKey(titles));
     const settled = await Promise.allSettled(queries.map((q) => backend.searchBackend(q, { signal })));
     const ok = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-    if (!ok.length) throw settled[0].reason;
+    if (!ok.length) {
+        // Semua pencarian gagal (throttle/offline) tetapi padanan sudah pernah ditemukan → pakai itu.
+        if (cached) return cached.list;
+        throw settled[0].reason;
+    }
     const items = ok.filter((r) => !r.fallback).flatMap((r) => r.items).filter((a) => a.slug);
     const bySource = new Map();
     for (const it of items) {
@@ -217,6 +274,9 @@ export async function findBackendMatches(anime, { titles: extra, signal } = {}) 
         const hit = matchBackendItem(titles, list);
         if (hit) out.push({ slug: hit.slug, title: hit.title, source: site });
     }
+    // Hasil pertama disimpan per sesi: pergantian episode memakai daftar situs yang SAMA,
+    // sehingga Sub Indo tidak "hilang" hanya karena pencarian ulang sedang gagal/di-throttle.
+    if (out.length) writeMatchCache(matchCacheKey(titles), [...out].sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source)));
     // AnimeKu & Oploverz (Sub Indo) dicoba lebih dulu; sisanya tetap tersedia setelahnya.
     return out.sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source));
 }
@@ -278,6 +338,20 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
             } catch (error) {
                 if (error?.kind === 'abort') throw error;
                 primaryError = error;
+                // Sumber asal Sub Indo (AnimeKu/Animeloverz) yang gagal sekali dicoba SEKALI lagi —
+                // penyebab "episode 1 ada Sub Indo, episode lain cuma Sub Inggris" walau sumbernya sama.
+                if (subIndoRank(own) < SUB_INDO_SOURCES.length && !signal?.aborted) {
+                    await wait(700, signal);
+                    if (!signal?.aborted) {
+                        try {
+                            primary = { ...(await backend.getBackendEpisode(own, ep, { signal })), slug: own };
+                            primaryError = null;
+                        } catch (retryError) {
+                            if (retryError?.kind === 'abort') throw retryError;
+                            primaryError = retryError;
+                        }
+                    }
+                }
             }
         }
 
@@ -305,10 +379,31 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
             targets = [];
         }
 
-        const settled = await Promise.allSettled(
-            [...new Set(targets)].map((target) => backend.getBackendEpisode(target, ep, { signal })),
-        );
         const settledTargets = [...new Set(targets)];
+        let settled = await Promise.allSettled(
+            settledTargets.map((target) => backend.getBackendEpisode(target, ep, { signal })),
+        );
+        // AnimeKu/Oploverz yang gagal sekali (halaman lambat, kuota, 5xx sesaat) dicoba SEKALI lagi:
+        // inilah penyebab "episode 1 ada Sub Indo, episode lain cuma Sub Inggris".
+        const subIndoFailed = settled
+            .map((result, index) => (result.status === 'rejected' ? settledTargets[index] : null))
+            .filter((target) => target && subIndoRank(target) < SUB_INDO_SOURCES.length);
+        if (subIndoFailed.length) {
+            await wait(700, signal);
+            if (!signal?.aborted) {
+                const retried = await Promise.allSettled(
+                    subIndoFailed.map((target) => backend.getBackendEpisode(target, ep, { signal })),
+                );
+                settled = settled.map((result, index) => {
+                    const retryIndex = subIndoFailed.indexOf(settledTargets[index]);
+                    return result.status === 'rejected' && retryIndex !== -1 ? retried[retryIndex] : result;
+                });
+            }
+        }
+        const stillFailedSubIndo = settled
+            .map((result, index) => (result.status === 'rejected' ? settledTargets[index] : null))
+            .filter((target) => target && subIndoRank(target) < SUB_INDO_SOURCES.length)
+            .map((target) => siteOfSource(target));
         const ok = [
             ...(primary ? [primary] : []),
             ...settled.map((result, index) => (
@@ -354,6 +449,8 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
         return {
             servers,
             downloads,
+            // Info untuk halaman nonton: sumber Sub Indo mana yang gagal dimuat episode ini.
+            failedSubIndo: stillFailedSubIndo,
             source: [...new Set(ok.map((item) => item.source).filter(Boolean))].join(', '),
             sources: [...new Set(ok.map((item) => item.source).filter(Boolean))],
             slug: primary?.slug || ok[0].slug || null,
