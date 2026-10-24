@@ -32,6 +32,8 @@ const SOURCE_BADGES = {
     'backend:sakunime': { cls: 'src-backend', label: 'Sakunime' },
     'backend:otakudesu': { cls: 'src-backend', label: 'Otakudesu' },
     'backend:hianime': { cls: 'src-backend', label: 'HiAnime' },
+    // Sumber dari APK Miku Moe 3.6; hanya muncul bila ANX_MODE=capture|live (default off).
+    'backend:animexnonton': { cls: 'src-backend', label: 'Anime X Nonton' },
 };
 const ratingHtml = (anime) => html`${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}`;
 

@@ -145,6 +145,7 @@ kazanime/
     │   ├── request-manager.js cache TTL yang ada, backoff terbatas, throttle + semaphore per host
     │   ├── challenge-handler.js deteksi CAPTCHA/403/429/security challenge dan cooldown tanpa solver/retry
     │   ├── stream-proxy.js    🅔 tanda tangan HMAC URL proxy, penulisan ulang playlist m3u8, konversi ASS/SRT → WebVTT
+    │   ├── anx-signer.js      tanda tangan AnxGuard untuk animasi API Anime X Nonton (HKDF `h91b`, AES-256-GCM, cert-lock) — hanya dipakai mode `live`, lihat `docs/ANIMEXNONTON.md`
     │   ├── account-store.js   🅟 penyimpanan akun server: file JSON atomik / Redis REST (Upstash, Vercel KV) / memory; scrypt + token HMAC
     │   ├── reaction-store.js  🅢 hitungan "Suka/Jejak" per episode: file JSON atomik / Redis REST / memory / off; satu suka per pengunjung
     │   ├── gemini.js          🅕 klien Gemini API (generateContent): model utama → cadangan, pendinginan kuota/key, thinking minimal
@@ -168,6 +169,7 @@ kazanime/
     │   ├── sakunime.js        adapter Sakunime — anime Jepang, `data-default` eksplisit; `serverId` opaque diabaikan; bukti dari judul episode
     │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Hardsub Indonesia (diblokir Cloudflare untuk IP pusat data, lihat batasan)
     │   ├── animeku.js         adapter AnimeKu — kartu rilis terbaru → slug seri; judul episode tanpa "Sub Indo" tidak diklaim Indonesia
+    │   ├── animexnonton.js    ⚪ adapter API Anime X Nonton (sumber APK Miku Moe 3.6) — **default `off`**: `capture` membaca snapshot tangkapan sendiri, `live` menunggu `ANX_CANONICAL_TEMPLATE`; peta: `docs/ANIMEXNONTON.md`
     │   ├── oploverz.js        adapter Oploverz (Animeloverz) — kartu `article.bs`, daftar episode `.eplister`, server `#embed_holder`; tanpa klaim bahasa otomatis — peta lengkap: `docs/OPLOVERZ.md`
     │   ├── hianime.js         🅔 adapter hianime.ro — anime Jepang, subtitle Inggris (REST otakuthemes)
     │   └── metadata.js        fallback API publik Kitsu → AniList (Jikan dihapus) + poster Kitsu → Bangumi → MangaBaka
@@ -710,6 +712,7 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | **Otakudesu** | 🔴 adapter ada, diblokir | (22 Okt 2026) domain resmi `otakudesu.blog`: robots.txt, beranda, halaman anime/episode → 403 "Attention Required! \| Cloudflare" untuk IP pusat data; hanya pencarian yang lolos. Adapter mengklasifikasikan server Sub Indo sebagai Hardsub sesuai konfirmasi pemilik proyek; sumber tetap ditandai *blocked*, tanpa data palsu. Gunakan hanya bila pemilik sumber memberi akses/allowlist, selain itu fallback dipakai |
 | **ReAnime** (penyedia stream) | 🟡 parser diverifikasi dgn JSON asli | (22 Okt 2026) robots.txt mengizinkan semua; `/api/flix/<id AniList>/<ep>` publik. Dari IP pusat data sering di-challenge Cloudflare |
 | **AniZone** (penyedia stream) | 🟡 parser & proxy diverifikasi dgn data asli | (22 Okt 2026) robots.txt mengizinkan semua. Halaman episode → HLS + 17 subtitle (termasuk Indonesia). CDN video 200/206 tanpa Referer; halaman & berkas subtitle sering di-challenge dari IP pusat data |
+| **Anime X Nonton (API)** | ⚪ adapter terpasang, **default `off`** | (24 Okt 2026) Sumber JSON milik aplikasi Android Miku Moe 3.6: `POST https://api.wincamp.web.id/animexnonton/new_api/*` (19 path, tanda tangan **AnxGuard**). Server menolak klien luar: `GET` → **403 nginx**, tanda tangan salah → `{"status":"error","message":"app only"}`. Karena itu adapter hanya hidup sebagai `ANX_MODE=capture` (snapshot hasil tangkapan perangkat sendiri) atau `live` bila `ANX_CANONICAL_TEMPLATE` diisi; **default `off` = tidak terdaftar sama sekali**. Tidak ada bypass. Peta sumber & cara pakai: `docs/ANIMEXNONTON.md` |
 | ~~Kuramanime~~ | ❌ dihapus (putaran 20) | 24 Okt 2026: adapter, konfigurasi, fixture, dan test dihapus setelah gagal di beberapa uji akses (Cloudflare 403 termasuk robots.txt). Grup unduhan memang membedakan Hardsub/Softsub, tetapi halaman tidak menulis bahasa — tidak pernah diklaim Sub Indo. Token player tidak dipecahkan |
 | ~~Anichin~~ | ❌ dihapus (putaran 20) | 24 Okt 2026: adapter & test dihapus; donghua tetap tersedia dari AnimeXin + panel AnimeKu/Oploverz |
 | **Kusonime (download saja)** | 🟡 aktif | Cari paket saat membuka halaman nonton dengan kandidat judul Latin/Romaji; detail harus cocok persis setelah normalisasi. Struktur parser diamati dari [scraper MIT publik](https://github.com/Zmy71/Kusonime-Scraper/tree/8f8e7098f1161d6451471f5c28bdf32fa29aad49), bukan dari live check. ToS/robots/markup belum diverifikasi live; gerbang robots mengikuti `SCRAPER_ROBOTS_MODE` (default `off`). Link mirror tidak di-fetch, di-decode, atau ditebak; dapat berupa paket satu season/seri. Matikan dengan `KUSONIME_DOWNLOADS_ENABLED=0` |
@@ -1800,6 +1803,38 @@ tambahkan donghua dari sana"*.
    Anichin & Kuramanime benar-benar tidak ada, sumber yang bekerja tetap lengkap, kedua adapter
    punya benih donghua, dan beranda/katalog tetap menautkan kedua panel. `server/test/oploverz.test.js`
    menambah 1 tes benih Oploverz. Total `npm test` **548 tes lulus**.
+
+### Sumber anime di APK Miku Moe 3.6 (24 Okt 2026 — lanjutan peta sumber)
+
+Permintaan pengguna: *"saya ingin kamu memeriksa source yg anime dipake oleh aplikasi tersebut dan
+jika memungkinkan untuk di terapkan maka terapkan juga"* (lanjutan `docs/OPLOVERZ.md`).
+
+1. **Tiga sumber anime di APK, hanya satu yang mungkin.** `Anime X Nonton`
+   (`api.wincamp.web.id/animexnonton`) masih hidup tetapi bertanda tangan; `Animeku` versi APK
+   (`apps.animekita.org/api/v1.2.5`) **403** dan domainnya sudah ter-deface; `Pencarinafkah`
+   (`pencarinafkah.xyz/vA6//api`) menjawab **200 tapi 0 byte**. `Crotpedia` yang juga disebut di
+   string APK adalah situs **18+** dan tidak dipakai. Rincian: `docs/ANIMEXNONTON.md`.
+2. **Yang diterapkan: adapter `animexnonton`, default `off`.** `server/sources/animexnonton.js` +
+   `server/lib/anx-signer.js` (HKDF `h91b`, AES-256-GCM, cert-lock, render string kanonik). Mode
+   `off` mengembalikan `null` sehingga `/api/health`, pencarian, dan `?source=animexnonton` **persis
+   seperti sebelum fitur ini ada** — diverifikasi: `/api/health` tetap 6 entri
+   (`animexin, anoboy, hianime, animeku, oploverz, kusonime-downloads`), dan
+   `/api/anime/browse?source=animexnonton` → **404** `"Sumber \"animexnonton\" tidak dikenal atau
+   sedang dimatikan."`.
+3. **Tidak ada tebakan yang dikirim ke server orang lain.** Urutan/pemisah string kanonik dan
+   konstruksi IV AES-GCM **belum** berhasil direkonstruksi dari `libmikumoe.so`; karena itu mode
+   `live` **menolak jalan** (error `config`) sampai `ANX_CANONICAL_TEMPLATE` diisi, dan detail judul
+   / daftar episode selalu menuntut snapshot (`ANX_MODE=capture`) alih-alih mengarang data.
+4. **Mode `capture` bekerja penuh** — `latest`, `search`, `genres`, detail, dan episode dibaca dari
+   satu berkas snapshot JSON (`ANX_CAPTURE_FILE`). Bentuk berkas, cara menangkap dengan mitmproxy
+   dari HP sendiri, dan batasannya ada di `docs/ANIMEXNONTON.md` §5. Contoh aman (semua judul
+   `CONTOH`) ada di `server/test/fixtures/animexnonton.capture.json`.
+5. **Badge kartu** `backend:animexnonton` → "Anime X Nonton" ditambahkan di `js/ui/card.js`; badge
+   ini hanya akan tampil bila adaptor dinyalakan.
+6. **Tes.** `server/test/animexnonton.test.js` (12 tes) mengunci: mode `off`/tak dikenal, metadata,
+   snapshot `latest`/`search`/detail/episode/genre, snapshot rusak, live tanpa template (**0
+   request**), live dengan template (lewat `createClient(network, …)` milik repo, header `X-Anx-*`,
+   body `anx=`), signer, dan keamanan fixture. Total `npm test` **560 tes lulus**.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 

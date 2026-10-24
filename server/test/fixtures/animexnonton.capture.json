@@ -1,0 +1,115 @@
+{
+  "_note": "CONTOH struktur snapshot. Ganti dengan hasil tangkapan Anda sendiri (mitmproxy addon capture_anx.py atau Frida). Semua judul diberi awalan 'CONTOH' agar tidak tertukar dengan data asli.",
+  "capturedAt": "2026-10-24T13:00:00Z",
+  "source": "animexnonton",
+  "endpoint": "new_api/get_posts",
+  "posts": [
+    {
+      "cid": 1001,
+      "channelId": 501,
+      "channelName": "CONTOH — One Piece",
+      "channelType": "TV",
+      "channelImage": "https://example.com/banner/one-piece.jpg",
+      "categoryId": 11,
+      "categoryName": "Ongoing",
+      "categoryImage": "https://example.com/cat/ongoing.jpg",
+      "imgUrl": "https://example.com/poster/one-piece.jpg",
+      "genre": "Action, Adventure, Fantasy",
+      "rating": "8.7",
+      "years": "1999",
+      "releaseDate": "1999-10-20",
+      "days": 0,
+      "ongoing": 1,
+      "countAnime": "1122",
+      "countView": "52000000",
+      "totalViews": "52000000",
+      "videoId": "cont-1001",
+      "created": "2026-10-20 10:00:00",
+      "delayStatus": 0,
+      "delayReason": "",
+      "isHdAvailable": true,
+      "isFhdAvailable": true,
+      "safeImages": true,
+      "lang": "id"
+    },
+    {
+      "cid": 1002,
+      "channelId": 502,
+      "channelName": "CONTOH — Frieren: Beyond Journey's End",
+      "channelType": "TV",
+      "channelImage": "https://example.com/banner/frieren.jpg",
+      "categoryId": 12,
+      "categoryName": "Completed",
+      "categoryImage": "https://example.com/cat/completed.jpg",
+      "imgUrl": "https://example.com/poster/frieren.jpg",
+      "genre": "Adventure, Drama, Fantasy",
+      "rating": "9.1",
+      "years": "2023",
+      "releaseDate": "2023-09-29",
+      "days": null,
+      "ongoing": 0,
+      "countAnime": "28",
+      "countView": "9000000",
+      "totalViews": "9000000",
+      "videoId": "cont-1002",
+      "created": "2026-10-19 09:00:00",
+      "delayStatus": 0,
+      "delayReason": "",
+      "isHdAvailable": true,
+      "isFhdAvailable": true,
+      "safeImages": true,
+      "lang": "id"
+    },
+    {
+      "cid": 1003,
+      "channelId": 503,
+      "channelName": "CONTOH — Jujutsu Kaisen",
+      "channelType": "TV",
+      "channelImage": "https://example.com/banner/jjk.jpg",
+      "categoryId": 11,
+      "categoryName": "Ongoing",
+      "categoryImage": "https://example.com/cat/ongoing.jpg",
+      "imgUrl": "https://example.com/poster/jjk.jpg",
+      "genre": "Action, Supernatural",
+      "rating": "8.9",
+      "years": "2020",
+      "releaseDate": "2020-10-03",
+      "days": 5,
+      "ongoing": 1,
+      "countAnime": "47",
+      "countView": "15000000",
+      "totalViews": "15000000",
+      "videoId": "cont-1003",
+      "created": "2026-10-18 08:00:00",
+      "delayStatus": 0,
+      "delayReason": "",
+      "isHdAvailable": true,
+      "isFhdAvailable": false,
+      "safeImages": true,
+      "lang": "id"
+    }
+  ],
+  "genres": ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "Supernatural"],
+  "episodes": {
+    "1001": [
+      {
+        "number": 1,
+        "title": "CONTOH — Episode 1",
+        "released": "1999-10-20",
+        "url": "",
+        "servers": [
+          { "name": "Server 1", "url": "https://example.com/embed/one-piece/1", "kind": "hls" }
+        ]
+      },
+      {
+        "number": 2,
+        "title": "CONTOH — Episode 2",
+        "released": "1999-11-17",
+        "url": "",
+        "servers": [
+          { "name": "Server 1", "url": "https://example.com/embed/one-piece/2", "kind": "hls" }
+        ]
+      }
+    ]
+  }
+}
