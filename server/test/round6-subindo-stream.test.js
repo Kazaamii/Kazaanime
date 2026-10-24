@@ -161,7 +161,7 @@ test('server Sub Indo: sumber asal sudah ber-Sub Indo → cukup tambah situs Sub
 });
 
 test('halaman nonton: urutan tombol server menaruh Sub Indo lebih dulu', () => {
-    assert.match(watchJs, /SUB_INDO_SOURCES, withProviderServers/);
+    assert.match(watchJs, /SUB_INDO_SOURCES,/);
     assert.match(watchJs, /const isSubIndoSource = \(server\) => SUB_INDO_SOURCES\.includes\(siteOf\(server\)\);/);
     assert.match(watchJs, /const subIndo = firstPerSite\(backendServers\.filter\(isSubIndoSource\)\);/,
         'tepat dua tombol Sub Indo (satu per situs)');
@@ -171,7 +171,7 @@ test('halaman nonton: urutan tombol server menaruh Sub Indo lebih dulu', () => {
     // Server statis ber-Sub Eng juga di urutan akhir (bukan terselip di blok cadangan).
     assert.match(watchJs, /const otherFallback = fallback\.filter\(\(s\) => s\.lang !== 'multi' && s\.lang !== 'en'\);/);
     assert.match(watchJs, /const english = \[\.\.\.rest\.filter\(\(s\) => s\.lang === 'en'\), \.\.\.fallback\.filter\(\(s\) => s\.lang === 'en'\)\];/);
-    assert.match(read('js/api/index.js'), /export \{ listStreamServers, getEpisodeExtras, withProviderServers, SUB_INDO_SOURCES \}/);
+    assert.match(read('js/api/index.js'), /export \{ listStreamServers, getEpisodeExtras, SUB_INDO_SOURCES \}/);
 });
 
 test('server Sub Indo: urutan memakai peringkat sumber, bukan asal situs', () => {

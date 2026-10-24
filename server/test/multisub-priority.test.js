@@ -19,7 +19,10 @@ test('general site messaging promotes Multi Sub without promising Indonesian sub
     assert.doesNotMatch(hero, /Sub Indo/);
 });
 
-test('AniZone Multi Sub is the first configured fallback server', () => {
-    assert.equal(STREAMING_SERVERS[0]?.id, 'anizone');
-    assert.equal(STREAMING_SERVERS[0]?.lang, 'multi');
+test('server cadangan statis hanya yang hidup (MegaPlay, Vidnest, TryEmbed)', () => {
+    // Putaran 17 (24 Okt 2026): AniZone & ReAnime dihapus — backend selalu ditolak Cloudflare 403,
+    // jadi dua tombol itu tidak pernah bisa memutar apa pun.
+    assert.deepEqual(STREAMING_SERVERS.map((s) => s.id), ['megaplay-anilist', 'vidnest-anilist', 'tryembed-anilist']);
+    assert.equal(STREAMING_SERVERS[0]?.lang, 'en');
+    assert.ok(STREAMING_SERVERS.every((s) => !s.provider), 'tidak ada slot penyedia yang tersisa');
 });

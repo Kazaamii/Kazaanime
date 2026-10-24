@@ -14,8 +14,8 @@
  *     Server hasil SCRAPING didahulukan (PLAYER.serverOrder = 'scrape-first'): untuk setiap
  *     episode player menunggu backend (AnimeXin / Samehadaku) dulu — anime dari AniList/MAL/
  *     Kitsu dicarikan padanannya lewat judul + judul alternatif — maks. PLAYER.scrapeWaitMs.
- *     Tidak ada di situs sumber / gagal / kelamaan → server Multi Sub (AniZone) dicoba lebih dulu,
- *     lalu server bahasa lain bila tersedia; tanpa id → menunggu detail dulu.
+ *     Tidak ada di situs sumber / gagal / kelamaan → server cadangan statis (MegaPlay, Vidnest,
+ *     TryEmbed) dipakai; tanpa id AniList → menunggu detail dulu.
  *     'static-first' = perilaku Tahap D (server statis dulu, kecuali URL membawa slug).
  *  4. getWatchData() → detail + jumlah episode tayang + rekomendasi
  *     (AniList: 1 request; cadangan Kitsu → data dari URL).
@@ -40,8 +40,8 @@ import { PAGES, genreUrl, parseWatchParams, watchUrl } from './routes.js';
 import { DAY_NAMES, GENRES, LEGAL_PLATFORMS, PLAYER, SCHEDULE, STORAGE_KEYS } from './config.js';
 import { airedEpisodeCount, formatLabel, seasonLabel, statusLabel, titleKey } from './api/normalize.js';
 import {
-    friendlyError, getAiSubtitlePart, getEpisodeExtras, getEpisodeSubtitles, getKusonimeDownloads, getRecommendations, getStreamServers, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
-    retrySourcesNow, SUB_INDO_SOURCES, withProviderServers,
+    friendlyError, getAiSubtitlePart, getEpisodeExtras, getEpisodeSubtitles, getKusonimeDownloads, getRecommendations, getWatchData, isBackendEnabled, listStreamServers, provisionalAnime,
+    retrySourcesNow, SUB_INDO_SOURCES,
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { getWatchedEpisodes, markWatched } from './services/history.js';
@@ -120,17 +120,6 @@ let subIndoSeen = false;
 let subIndoRetryFor = null;
 /** Detail membawa judul baru saat pencarian masih berjalan → cari lagi bila hasilnya kosong. */
 let rescrapePending = false;
-/**
- * Server dari penyedia berbasis id/judul (ReAnime, AniZone) untuk episode aktif (22 Okt 2026).
- * null = masih dicari (slot tampil "mencari…").
- * @type {{servers: object[], status: Record<string,string>, error?: unknown}|null}
- */
-let providerResult = null;
-/** @type {AbortController|null} */
-let providerCtrl = null;
-/** id AniList + judul yang dipakai permintaan penyedia terakhir (diminta ulang bila detail membawa data baru). */
-let providerKey = '';
-
 const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 const urlFor = (n) => watchUrl(anime, n, { src: ref.src, slug: ref.slug });
 /** Anime berasal dari backend scraper (URL membawa slug) → daftar episode situs sumber = yang bisa diputar. */
@@ -210,7 +199,7 @@ function firstPerSite(list) {
 
 /**
  * Urutan putar (24 Okt 2026):
- *   scrape-first: server AnimeKu & Oploverz (Sub Indo) → server Multi Sub (scraper/AniZone)
+ *   scrape-first: server AnimeKu & Oploverz (Sub Indo) → server Multi Sub hasil scraping
  *                 → hasil scraping bahasa lain → server cadangan → server Sub Eng.
  *   static-first: server cadangan dulu, lalu semua server hasil scraping
  */
@@ -224,7 +213,7 @@ const hostOf = (value) => {
 };
 
 const servers = () => {
-    const fallback = withProviderServers(staticServers(), providerResult);
+    const fallback = staticServers();
     if (!scrapeFirst()) {
         const subIndoStatic = firstPerSite(backendServers.filter(isSubIndoSource));
         return numbered([
@@ -660,7 +649,6 @@ function playEpisode(n, { initial = false, announce = true } = {}) {
     ep = n;
     backendServers = [];
     subIndoRetryFor = null;
-    providerResult = null;
     holdFor = null;
     scrapeDoneFor = null;
     rescrapePending = false;
@@ -674,7 +662,6 @@ function playEpisode(n, { initial = false, announce = true } = {}) {
     else if (scrapeFirst()) holdForScrape(n);
     else player.load(n, servers());
     loadExtras(n);
-    if (total !== 0) loadProviders(n);
     if (announce && !initial) showToast(`Episode ${n} dimuat`, 'info');
 }
 
@@ -843,12 +830,7 @@ function applyDetail(data) {
         if (player.state !== 'message') player.setServers(servers()); // mulai bila menunggu; buka kunci server baru tanpa memutus video
         if (rescrapeNow) loadExtras(ep);
     }
-    // Penyedia (ReAnime/AniZone) diminta ulang bila detail membawa id AniList / judul yang belum dipakai.
-    if (total !== 0 && providerKeyFor() !== providerKey && !(providerResult?.servers?.length)) loadProviders(ep);
 }
-
-const providerTitles = () => [...new Set(scrapeTitles().map((t) => String(t || '').trim()).filter(Boolean))];
-const providerKeyFor = () => `${anime.ids?.anilist || ref.anilist || ''}|${titlesKey(providerTitles())}`;
 
 /**
  * Cari ulang server Sub Indo (AnimeKu & Animeloverz) tanpa memuat ulang halaman — putaran 16.
@@ -879,31 +861,6 @@ function refreshServers() {
     if (total === 0 || player.state === 'message' || holdFor === ep) return;
     player.setServers(servers());
     refreshAdRisk();
-}
-
-/** Server ReAnime + AniZone untuk episode n (lewat backend /api/stream/servers). */
-async function loadProviders(n) {
-    providerCtrl?.abort();
-    const ctrl = new AbortController();
-    providerCtrl = ctrl;
-    providerResult = null;
-    providerKey = providerKeyFor();
-    const anilistId = anime.ids?.anilist || ref.anilist || null;
-    const titles = providerTitles();
-    if (!isBackendEnabled() || (!anilistId && !titles.length)) {
-        providerResult = { servers: [], status: {}, error: { kind: isBackendEnabled() ? 'empty' : 'disabled' } };
-        refreshServers();
-        return;
-    }
-    try {
-        const res = await getStreamServers({ anilist: anilistId, ep: n, titles, year: anime.year || null, signal: ctrl.signal });
-        if (ctrl.signal.aborted || n !== ep) return;
-        providerResult = res;
-    } catch (err) {
-        if (err?.kind === 'abort' || ctrl.signal.aborted || n !== ep) return;
-        providerResult = { servers: [], status: {}, error: err };
-    }
-    refreshServers();
 }
 
 async function loadDetail() {

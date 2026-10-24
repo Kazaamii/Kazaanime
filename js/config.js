@@ -322,9 +322,6 @@ export const UI = Object.freeze({
  *  - needs    : ID yang wajib ada ('anilist' | 'mal' | 'kitsu'). Tanpa ID itu server
  *               ditampilkan terkunci dan dilewati otomatis.
  *  - url(ctx) : ctx = { anilist, mal, kitsu, ep, title } → URL embed (http/https).
- *  - provider : (22 Okt 2026) slot yang diisi server dari backend GET /api/stream/servers
- *               ('reanime' | 'anizone'). Tanpa url(); posisinya di daftar tetap (nomor server
- *               tidak bergeser) — tampil "mencari…" lalu tersedia / tidak tersedia.
  *  - lang     : bahasa subtitle ('id' | 'en' | 'multi') — tampil di status player.
  *  - origins  : origin TAMBAHAN yang boleh mengirim postMessage (auto-next & progres),
  *               mis. bila player asli berada di iframe bersarang domain lain.
@@ -352,24 +349,23 @@ export const UI = Object.freeze({
  *  - Vidnest (vidnest.fun) & TryEmbed (tryembed.us.cc): embed lain berbasis id AniList yang dipakai
  *    hianime.ro untuk pustaka HiAnime yang sama (dicek: bisa di-embed, tanpa X-Frame-Options/CSP).
  *    Subtitle Inggris. Ketersediaan per episode tidak bisa dicek dari luar → pakai "⟳ Server Lain".
- *  - 22 Okt 2026 (permintaan pemilik proyek): server cadangan #2 (MegaPlay via id MAL) diganti
- *    ReAnime (embed flixcloud dari API publik reanime.to, subtitle Inggris), dan ditambah satu
- *    tombol AniZone "Multi Sub" (HLS + banyak subtitle termasuk Indonesia bila tersedia, diputar
- *    player bawaan lewat proxy /api/stream/hls — lihat server/routes/stream.js).
+ *  - 24 Okt 2026: slot penyedia ReAnime & AniZone dihapus — backend selalu ditolak Cloudflare
+ *    (403) sehingga tombolnya tidak pernah bisa diputar (lihat catatan di bawah daftar).
  * Ganti host: ubah STREAM_HOST (pola path sama) atau tambah entri baru di bawah.
  */
 const STREAM_HOST = 'https://megaplay.buzz';
+/**
+ * 24 Okt 2026 (putaran 17) — AniZone ("Multi Sub") & ReAnime DIHAPUS dari daftar.
+ * Keduanya bukan situs mati, tetapi backend kita SELALU ditolak Cloudflare (HTTP 403 challenge):
+ *   GET /api/stream/servers → status { reanime: 'blocked', anizone: 'blocked' }, servers: []
+ * sehingga dua tombol itu hanya bisa tampil sebagai placeholder 🔒 ("tidak tersedia") dan tidak
+ * pernah bisa memutar apa pun. Sesuai permintaan pengguna ("server 1 dan 3 nampaknya sudah mati,
+ * kalau benar hapus saja"), dua entri itu dibuang; tombol yang tersisa = MegaPlay, Vidnest, TryEmbed
+ * (semuanya berbasis id AniList, dicek hidup 24 Okt 2026).
+ * Backend (server/providers/*, GET /api/stream/servers, proxy HLS) tetap ada untuk pemakaian API
+ * manual, tetapi halaman nonton tidak lagi memintanya (tidak ada slot penyedia).
+ */
 export const STREAMING_SERVERS = Object.freeze([
-    // Utamakan player Multi Sub jika tersedia, lalu server bahasa tunggal sebagai cadangan.
-    Object.freeze({
-        id: 'anizone',
-        provider: 'anizone',
-        name: 'AniZone - Multi Sub',
-        description: 'AniZone - banyak pilihan subtitle (bahasa Indonesia bila tersedia)',
-        lang: 'multi',
-        enabled: true,
-        origins: Object.freeze([]),
-    }),
     Object.freeze({
         id: 'megaplay-anilist',
         flag: '🇯🇵',
@@ -380,15 +376,6 @@ export const STREAMING_SERVERS = Object.freeze([
         enabled: true,
         origins: Object.freeze([]),
         url: ({ anilist, ep }) => `${STREAM_HOST}/stream/ani/${anilist}/${ep}/sub`,
-    }),
-    Object.freeze({
-        id: 'reanime',
-        provider: 'reanime',
-        name: 'ReAnime',
-        description: 'Cadangan - ReAnime (subtitle Inggris)',
-        lang: 'en',
-        enabled: true,
-        origins: Object.freeze([]),
     }),
     Object.freeze({
         id: 'vidnest-anilist',
@@ -484,7 +471,7 @@ export const PLAYER = Object.freeze({
          * block nya khusus server luar seperti anilist dan kitsu"*.
          *
          * Artinya: sandbox HANYA dipasang pada server Sub Indo (AnimeKu & Oploverz). Server luar
-         * — termasuk AniList/Kitsu (MegaPlay, Vidnest, TryEmbed), ReAnime, dan AniZone — dimuat
+         * — termasuk AniList/Kitsu (MegaPlay, Vidnest, TryEmbed) dan embed scraping lain — dimuat
          * tanpa sandbox supaya tidak menolak berjalan ("Sandboxed our player is not allowed").
          */
         subIndoSources: Object.freeze(['animeku', 'oploverz']),
@@ -526,7 +513,7 @@ export const PLAYER = Object.freeze({
     /** Jumlah kartu rekomendasi. */
     recommendationCount: 12,
     /**
-     * Player HLS bawaan (server AniZone "Multi Sub"). hls.js disimpan lokal (js/vendor/, lisensi
+     * Player HLS bawaan (server `kind: 'hls'`, mis. AnimeOnsen). hls.js disimpan lokal (js/vendor/, lisensi
      * Apache-2.0) dan baru dimuat saat server HLS diputar. Safari/iOS memakai HLS native langsung
      * dari CDN (tanpa proxy); browser lain lewat proxy /api/stream/hls (CORS CDN dikunci ke anizone.to).
      */

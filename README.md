@@ -42,6 +42,8 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
 🅢 putaran 14 (24 Okt 2026): **baris “Cek pilihan subtitle” dihapus** (nomor episode kini chip kecil di bawah judul), **polesan tampilan desktop** halaman nonton (judul + aksi sejajar, panel server/details lebih lega), **tombol “Suka” dengan hitungan live (“Jejak”)** — satu suka per pengunjung per episode, `GET/POST /api/reactions`, penyimpanan file/Redis/off, tetap jalan dengan jejak lokal bila server mati
 🅣 putaran 15 (24 Okt 2026): **sandbox hanya untuk server Sub Indo** (AnimeKu & Oploverz) — server luar (AniList/Kitsu, ReAnime, AniZone) dimuat **tanpa sandbox** supaya video Sub English muncul, dan tiap server luar punya tombol **“Matikan blokir”** (`#btnAdBlockToggle`, diingat di `kz:adblock-off`)
+🅤 putaran 16 (24 Okt 2026): **tombol Sub Indo selalu tampil** (AnimeKu & Animeloverz) — bila sumber tidak terjangkau, tombol bertanda **“tidak terjangkau”** dan bisa diklik untuk **mencari ulang** (tanpa memuat ulang halaman)
+🅥 putaran 17 (24 Okt 2026): **AniZone (“Multi Sub”) & ReAnime dihapus** — backend selalu ditolak Cloudflare 403 sehingga dua tombol itu tidak pernah bisa memutar; server cadangan kini **MegaPlay, Vidnest, TryEmbed**
 🅡 putaran 13 (24 Okt 2026): **tawaran pelepas pengaman dihapus** (tautan “Muat ulang tanpa pengaman” + ingatan host `kz:no-sandbox` — sekali klik dulu membuat iklan bisa membuka tab lagi), **daftar blokir iklan diperluas** (70 host / 13 pola, klien = server), **server berisiko ditaruh paling belakang** supaya pemutaran otomatis memakai host bersih
 
 ```
@@ -431,7 +433,7 @@ tombol **Pop-up diblokir/Pop-up diizinkan** sudah **dihapus** — justru sandbox
 host menampilkan *“Sandbox Not Allowed”* dan video tidak jalan. **Putaran 12 mengembalikan sandbox
 sebagai penahan tab baru** (tanpa `allow-popups`/`allow-top-navigation*`) dan **tanpa tawaran pelepas**
 (putaran 13). **Putaran 15 membatasinya: sandbox hanya untuk server Sub Indo (AnimeKu & Oploverz).**
-Server luar — AniList/Kitsu (MegaPlay, Vidnest, TryEmbed), ReAnime, AniZone — dimuat **tanpa sandbox**
+Server luar — AniList/Kitsu (MegaPlay, Vidnest, TryEmbed) dan embed scraping lain — dimuat **tanpa sandbox**
 supaya embed Sub English bisa diputar, dan mendapat tombol **Matikan blokir** per server. Lihat bagian
 **putaran kedua belas**, **ketiga belas**, dan **kelima belas** di bawah.
 Selain itu, di atas iframe diberi lapisan bening `#playerAdShield` yang menangkap klik pertama
@@ -452,9 +454,8 @@ watch.html?title=...&ep=3&anilist=...&mal=...[&alt=judul romaji]
    │  1. cari episode di situs backend aktif lewat judul (default: Samehadaku, AnimeKu, Oploverz, Anoboy, Sakunime,
    │     Otakudesu, AnimeXin, Anichin, hianime.ro; Anoboy/Sakunime hanya berjalan jika robots.txt eksplisit mengizinkan),
    │     judul alternatif & judul tanpa season → Multi Sub diprioritaskan bila tersedia; bahasa lain tetap jadi opsi
-   │  2. paralel: GET /api/stream/servers → AniZone (HLS "Multi Sub") + ReAnime (embed) untuk episode itu
-   │  3. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan sesuai urutan config
-   │     (AniZone Multi Sub, lalu MegaPlay/ReAnime/Vidnest/TryEmbed), kemudian server Sub Eng hasil scraping
+   │  2. tidak ada / gagal / > PLAYER.scrapeWaitMs (8 dtk) → server cadangan sesuai urutan config
+   │     (MegaPlay, Vidnest, TryEmbed — semuanya berbasis id AniList), lalu server lain hasil scraping
    ▼
 getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutnya + rekomendasi
                  └ gagal → Kitsu by id (mapping id MAL/AniList) → AniList lagi lewat id hasil mapping
@@ -464,7 +465,7 @@ getWatchData()  AniList by id/idMal ── 1 request: detail + episode berikutny
 
 | Fitur | Detail |
 |---|---|
-| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`); jika tersedia, **Multi Sub didahulukan**, lalu server bahasa lain. Cadangan statis juga memulai dari AniZone Multi Sub. Tombol tampil **"Server 1, 2, …"** + badge bahasa subtitle (MULTI SUB / SUB INDO / SUB ENG) — nama penyedia/situs tidak ditampilkan. Server yang belum tersedia tampil dengan ikon gembok dan dilewati; slot ReAnime/AniZone yang masih dicari tampil "mencari…" |
+| Server | Hasil scraping backend dulu (`PLAYER.serverOrder = 'scrape-first'`); jika tersedia, **Multi Sub didahulukan** (bila sumber mengirimnya), lalu server bahasa lain. Cadangan statis = **MegaPlay, Vidnest, TryEmbed** (id AniList). Tombol tampil **"Server 1, 2, …"** + badge bahasa subtitle (MULTI SUB / SUB INDO / SUB ENG) — nama penyedia/situs tidak ditampilkan. Server yang belum tersedia tampil dengan ikon gembok dan dilewati; tombol **Sub Indo** yang sumbernya tidak terjangkau memberi tanda "tidak terjangkau" dan bisa diklik untuk mencari ulang |
 | Fallback otomatis | iframe tidak selesai dimuat dalam `PLAYER.loadTimeout` (15 dtk) **atau** player mengirim event `error` → server berikutnya + toast. Semua gagal → pesan + Bstation/YouTube + "Coba lagi" |
 | Batas browser | Halaman error **di dalam** iframe lintas-domain (mis. "video tidak ditemukan") tidak bisa dibaca JavaScript → tombol **⟳ Server Lain** |
 | Episode | Jumlah dari API (episode yang **sudah tayang**, bukan angka 24 tetap). Bila sumber tidak memberi nomor episode (mis. Kitsu saat AniList mati) → **perkiraan tayang mingguan** dari tanggal mulai (maks. 26 episode, dibatasi total). > 100 episode → tab rentang. Tetap tidak diketahui → input nomor manual. Belum tayang → jadwal episode 1 |
@@ -486,17 +487,19 @@ Urutan sejak 22 Okt 2026 (bagian 3) — `servers()` di `js/watch.js`, slot cadan
 |---|---|---|---|
 | 1 | **Samehadaku** · **Otakudesu** (backend) | anime Jepang — server per episode + link download | Bahasa mengikuti server; beberapa sumber berisi Hardsub Indonesia |
 | 1 | **AnimeXin** · **Anichin** (backend) | donghua — ±11–16 server per episode (OK.ru, Dailymotion, Rumble, Odysee, …) + link download | Variatif; badge mengikuti bahasa yang dinyatakan sumber |
-| 2 | **AniZone — Multi Sub** (cadangan pertama) | HLS di player bawaan + 10–16 pilihan subtitle; Indonesia hanya bila tersedia. Chrome/Firefox/Edge/Android: hls.js lewat proxy `/api/stream/hls`; Safari/iOS: HLS native langsung dari CDN | Banyak bahasa |
-| 3 | **MegaPlay** `megaplay.buzz` (cadangan) | hampir semua anime Jepang | Inggris |
-| 4 | **ReAnime** (cadangan — **menggantikan MegaPlay-MAL**) | embed `flixcloud.cc` dari API publik `reanime.to/api/flix/<id AniList>/<ep>`; mirror HD-2 → HD-1 dicoba otomatis | Inggris |
-| 5 | **Vidnest** · **TryEmbed** (cadangan, via id AniList) | pustaka HiAnime yang sama | Inggris |
-| 6 | **hianime.ro** (backend) | server "Fast" (player blogger hianime.ro) & "mega" (megaplay.su) — embed berbasis id yang sudah ada di atas tidak diulang | Inggris |
+| 2 | **MegaPlay** `megaplay.buzz` (cadangan pertama) | hampir semua anime Jepang | Inggris |
+| 3 | **Vidnest** · **TryEmbed** (cadangan, via id AniList) | pustaka HiAnime yang sama | Inggris |
+| 4 | **hianime.ro** (backend) | server "Fast" (player blogger hianime.ro) & "mega" (megaplay.su) — embed berbasis id yang sudah ada di atas tidak diulang | Inggris |
 
 Bila tersedia, server Multi Sub didahulukan; server dengan bahasa tunggal tetap ditampilkan sebagai pilihan berikutnya. Urutan dan
 jumlah tombol akhir bergantung pada hasil setiap episode.
 
 Contoh nyata (22 Okt 2026): *The Apothecary Diaries Season 3* ep 2 dicocokkan ke Samehadaku "Kusuriya no
-Hitorigoto Season 3". Label bahasa mengikuti hasil tiap sumber; jika AniZone menyediakan Multi Sub untuk episode itu, server tersebut ditempatkan di urutan pertama.
+Hitorigoto Season 3". Label bahasa mengikuti hasil tiap sumber.
+
+> **24 Okt 2026 (putaran 17):** AniZone dan ReAnime dihapus dari tabel ini. Kedua situsnya masih hidup, tetapi
+> backend kita **selalu** dijawab Cloudflare dengan HTTP 403 (`status: blocked`), sehingga tombolnya hanya bisa
+> tampil sebagai tempat kosong dan tidak pernah bisa memutar apa pun.
 
 - **Pencocokan judul.** Anime yang dibuka dari kartu AniList/MAL/Kitsu tidak punya slug situs sumber, jadi
   `js/api/streams.js` mencarinya di `/api/anime/search` dengan judul utama **dan** judul alternatif (romaji —
@@ -875,8 +878,9 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 8. **Services tanpa UI.** `auth.js`/`bookmark.js`/`history.js` hanya menyimpan & mengirim event;
    toast/modal diurus `ui/layout.js` / halaman.
 9. **Penyedia video hanya di satu tempat.** Pola URL embed ada di `config.STREAMING_SERVERS`
-   (atau adapter/penyedia backend: `server/sources/`, `server/providers/`); urutan slot cadangan termasuk
-   ReAnime/AniZone diatur di `STREAMING_SERVERS`; `ui/player.js` hanya menerima daftar server jadi dari `js/api/streams.js`.
+   (atau adapter/penyedia backend: `server/sources/`, `server/providers/`); urutan server cadangan
+   (MegaPlay, Vidnest, TryEmbed) diatur di `STREAMING_SERVERS`; `ui/player.js` hanya menerima daftar
+   server jadi dari `js/api/streams.js`.
 10. **Backend: satu pintu keluar.** Hanya `server/lib/fetcher.js` yang melakukan request ke situs lain
     (allowlist/redirect, mode robots `enforce|warn|off`, proxy terkonfigurasi, cookies per sumber,
     throttle/concurrency, UA, timeout, retry terbatas).
@@ -1616,6 +1620,51 @@ secara data, salah secara tampilan.
    `allow-popups`, tombol “Matikan blokir” tetap tersembunyi), Animeloverz tetap tampil sebagai
    “tidak terjangkau”, dan jumlah tombol Sub Indo tetap dua (tidak dobel). Di produksi (sumber hidup)
    kedua tombol tetap tampil normal dengan server aslinya — tidak ada perubahan pada pemutaran.
+
+### Perubahan perilaku (24 Okt 2026 — putaran ketujuh belas: AniZone & ReAnime dihapus)
+
+Permintaan pengguna: *"server 1 dan 3 nampaknya sudah mati jika benar hapus saja tidak akan berguna
+juga klo dugaan saya salah koreksi kembali jika benar langsung merge aja"*.
+
+**Pemeriksaan (produksi, 24 Okt 2026).** Halaman nonton menampilkan
+`AnimeKu Sub Indo | Animeloverz Sub Indo | Server 1 Multi Sub | Server 2–5 Sub Eng`; Server 1 = **AniZone**
+dan Server 3 = **ReAnime**. `GET /api/stream/servers?anilist=…&ep=…&title=…` menjawab
+`servers: []`, `status: { reanime: 'blocked', anizone: 'blocked' }`, dengan pesan
+*“mengirim CAPTCHA atau challenge keamanan (HTTP 403); akses dihentikan tanpa percobaan ulang.”*
+— sama untuk judul lain. Artinya **backend tidak pernah mendapat server** dari keduanya, sehingga dua
+tombol itu selalu tampil sebagai tempat kosong 🔒. Dugaan pengguna **benar untuk aplikasi ini**: kedua
+situsnya masih hidup (API ReAnime menjawab normal dari jaringan biasa), tetapi backend Kazanime
+**selalu** ditolak Cloudflare — dan kita **tidak** melewati challenge (tanpa retry 403/429, tanpa
+headless/stealth). Jadi tombolnya memang tidak berguna.
+
+1. **Dihapus dari daftar server** (`js/config.js`): entri `anizone` (“Multi Sub”, HLS) dan `reanime`
+   (embed flixcloud). `STREAMING_SERVERS` kini berisi **MegaPlay, Vidnest, TryEmbed** — ketiganya
+   berbasis id AniList dan dicek hidup 24 Okt 2026 (halaman pemutarnya memuat player + sumber video).
+   Halaman nonton kini menampilkan `Server 1 Sub Eng | Server 2 Sub Eng | Server 3 Sub Eng` setelah dua
+   tombol Sub Indo.
+2. **Slot penyedia dibersihkan** — `withProviderServers()` di `js/api/streams.js` (dan cabang
+   `provider`/`pending` di `listStreamServers()`) dihapus, `js/api/index.js` tidak mengekspornya lagi,
+   dan `js/watch.js` **tidak lagi memanggil `/api/stream/servers`** (`loadProviders`, `providerResult`,
+   `providerCtrl`, `providerKey` hilang). Efeknya: satu request lebih sedikit per episode dan tidak ada
+   lagi tombol “mencari…” yang tidak pernah selesai.
+3. **Backend sengaja DIPERTAHANKAN** (`server/providers/*`, `GET /api/stream/servers`, proxy HLS/subtitle).
+   Endpoint itu masih bisa dipakai manual/untuk integrasi, dan `server/test/*` tetap menguji parser serta
+   penyaring iklannya. Pemutar HLS bawaan (`kind: 'hls'`/`'video'`) **tidak dihapus** karena masih dipakai
+   sumber scraping lain (mis. AnimeOnsen) dan subtitle lokal/AI.
+4. **Tidak ada regresi pengaman.** Server Sub Indo tetap ber-sandbox penuh (putaran 15), server luar
+   (MegaPlay/Vidnest/TryEmbed) tetap **tanpa sandbox** + tombol **Matikan blokir** (`kz:adblock-off`),
+   dan tidak ada `removeAttribute('sandbox')`.
+5. **Teks yang menyesatkan dibersihkan.** Petunjuk panel server tidak lagi menjanjikan “Server Multi Sub:
+   pilih bahasa lewat tombol CC”; panduan iklan (`js/ui/ad-guide.js`) menyebut MegaPlay/Vidnest/TryEmbed.
+   Tagline situs “Multi Sub” tetap karena server hasil scraping masih bisa membawa beberapa bahasa.
+6. **Tes & verifikasi.** `server/test/round17-dead-servers.test.js` (7 tes) mengunci: daftar server statis
+   tepat tiga, `listStreamServers()` menghasilkan 3 server siap pakai tanpa `pending`, tidak ada
+   `withProviderServers`/`loadProviders`/`getStreamServers` di halaman nonton, dan pemutar HLS tetap ada.
+   Dua tes lama disesuaikan (putaran 6: literal import; multisub: server cadangan pertama). Total
+   `npm test` **535 tes lulus**. Smoke `happy-dom` di preview lokal: tombol =
+   `AnimeKu tidak terjangkau | Animeloverz tidak terjangkau | Server 1 Sub Eng | Server 2 Sub Eng | Server 3 Sub Eng`,
+   tanpa `anizone`/`reanime`; klik Server 1 memuat iframe **tanpa `sandbox`** (`data-frame-guard="off"`),
+   tombol “Matikan blokir” tampil, klik → label “Nyalakan blokir” + `kz:adblock-off = {"megaplay-anilist":true}`.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 

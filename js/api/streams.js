@@ -7,10 +7,10 @@
  *                      dari situs sumber. Anime yang dibuka dari AniList/MAL/Kitsu (tanpa slug)
  *                      dicarikan padanannya di backend lewat judul (findBackendMatch).
  *                      Urutan putar (scraping dulu / statis dulu) diatur PLAYER.serverOrder.
- *  - Server statis   : config.STREAMING_SERVERS (AniZone Multi Sub lebih dulu, lalu server lain), URL embed dibangun dari
- *                      id anime (AniList / MAL / Kitsu). Tanpa request jaringan — cadangan otomatis.
- *  - Slot penyedia   : (22 Okt 2026) entri STREAMING_SERVERS ber-`provider` (ReAnime, AniZone) diisi
- *                      dari GET /api/stream/servers lewat withProviderServers(); posisinya tetap.
+ *  - Server statis   : config.STREAMING_SERVERS (MegaPlay, Vidnest, TryEmbed — berbasis id AniList),
+ *                      URL embed dibangun dari id anime. Tanpa request jaringan — cadangan otomatis.
+ *                      (24 Okt 2026: slot penyedia ReAnime/AniZone dihapus karena backend selalu
+ *                      ditolak Cloudflare 403 → tombolnya tidak pernah bisa memutar apa pun.)
  *
  * UI (ui/player.js) hanya menerima objek StreamServer yang sudah jadi dan tidak
  * tahu pola URL penyedia mana pun. Menambah/mengganti penyedia = ubah config.js
@@ -36,8 +36,6 @@
  * @property {{url:string, from:string, sourceLabel:string, label:string}|null} [ai] (hls, 22 Okt 2026) tawaran
  *           "Subtitle Indonesia (AI)" dari backend — hanya ada bila episode TIDAK punya subtitle Indonesia
  *           dan backend punya GEMINI_API_KEY (lihat ui/ai-subtitle.js)
- * @property {string} [provider]     slot penyedia ('reanime' | 'anizone')
- * @property {boolean} [pending]     slot penyedia yang hasilnya belum datang
  *
  * @typedef {{quality:string, size:string, format?:string, subtitle?:string, links:{provider:string, url:string}[]}} DownloadGroup
  */
@@ -56,14 +54,6 @@ import * as backend from './sources.js';
 export function listStreamServers(anime, ep) {
     const ids = anime?.ids || {};
     return STREAMING_SERVERS.filter((s) => s.enabled !== false).map((s) => {
-        if (s.provider) {
-            // Slot penyedia: diisi withProviderServers() setelah backend menjawab.
-            return {
-                id: s.id, provider: s.provider, name: s.name, flag: '', description: s.description || '', badge: '',
-                url: null, available: false, pending: true, reason: 'Server ini sedang dicari…',
-                source: 'static', lang: s.lang || '', origins: [...(s.origins || [])], kind: 'embed', mirrors: null,
-            };
-        }
         const hasId = !s.needs || Boolean(ids[s.needs]);
         let url = '';
         if (hasId) {
@@ -91,40 +81,6 @@ export function listStreamServers(anime, ep) {
             source: 'static',
             lang: s.lang || '',
             origins: [originOf(url), ...(s.origins || [])].filter(Boolean),
-        };
-    });
-}
-
-/**
- * Isi slot penyedia (ReAnime, AniZone) dengan hasil GET /api/stream/servers.
- * @param {StreamServer[]} list hasil listStreamServers()
- * @param {{servers: object[], status: Record<string,string>, error?: unknown}|null} result
- *   null = masih menunggu (slot tetap "mencari…")
- * @returns {StreamServer[]}
- */
-export function withProviderServers(list, result) {
-    if (!result) return list;
-    return list.map((s) => {
-        if (!s.provider) return s;
-        const hit = (result.servers || []).find((x) => x.provider === s.provider);
-        if (!hit) {
-            const st = result.status?.[s.provider];
-            const reason = st === 'not_found'
-                ? 'Anime/episode ini belum tersedia di server ini'
-                : result.error?.kind === 'disabled' ? 'Server ini membutuhkan backend (npm run dev / Vercel)' : 'Server ini sedang tidak bisa dipakai';
-            return { ...s, pending: false, available: false, reason };
-        }
-        return {
-            ...s,
-            ...hit,
-            id: s.id,
-            name: s.name,
-            description: s.description,
-            source: 'static',
-            pending: false,
-            available: true,
-            reason: '',
-            lang: hit.lang || s.lang,
         };
     });
 }
