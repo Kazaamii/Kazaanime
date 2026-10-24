@@ -73,27 +73,31 @@ test('player: pembajakan dihitung per server dalam jendela waktu', () => {
 
 test('player: batas tercapai → server ditandai, pindah server lain', () => {
     const fn = playerCode.slice(playerCode.indexOf('function noteFrameReload('));
-    const body = fn.slice(0, fn.indexOf('function renderServers('));
+    const body = fn.slice(0, fn.indexOf('function notifyRemembered('));
     assert.match(body, /const count = noteAdTakeover\(active\.id\);/);
-    assert.match(body, /if \(!adBlocked\.has\(active\.id\) && count < limit\) \{/, 'pembajakan pertama: tampilkan bilah pemulihan');
-    assert.match(body, /removeAdRecovery\(\);/);
-    assert.match(body, /failed\.add\(active\.id\);/);
-    assert.match(body, /adBlocked\.add\(active\.id\);/);
-    assert.match(body, /emit\('adblock', \{ type: 'skipped', server: active, count, repeat: true \}\);/);
-    assert.match(body, /const next = available\(\)\.find\(\(item\) => item\.id !== active\.id && !failed\.has\(item\.id\) && !adBlocked\.has\(item\.id\)\);/);
-    assert.match(body, /if \(next\) \{\s*play\(next\);/);
+    assert.match(body, /if \(!autoBlocked\(active\) && count < limit\) \{/, 'pembajakan pertama: tampilkan bilah pemulihan');
+    assert.match(body, /blockActiveServer\(active, \{ count \}\);/);
+    // Inti penandaan ada di blokActiveServer (dipakai juga jalur popup putaran 19).
+    const block = playerCode.slice(playerCode.indexOf('function blockActiveServer('));
+    const blockBody = block.slice(0, block.indexOf('function notePopupSignal('));
+    assert.match(blockBody, /removeAdRecovery\(\);/);
+    assert.match(blockBody, /failed\.add\(active\.id\);/);
+    assert.match(blockBody, /adBlocked\.add\(active\.id\);/);
+    assert.match(blockBody, /emit\('adblock', \{ type: 'skipped', server: active, count, repeat: true, popup \}\);/);
+    assert.match(blockBody, /const next = available\(\)\.find\(\(item\) => item\.id !== active\.id && !failed\.has\(item\.id\) && !autoBlocked\(item\)\);/);
+    assert.match(blockBody, /if \(next\) \{\s*play\(next\);/);
 });
 
 test('player: server bertanda tidak dipilih otomatis (manual tetap boleh)', () => {
-    // pickAuto melewati adBlocked.
+    // pickAuto melewati server bertanda (sesi & antar-halaman — putaran 19).
     const pick = playerCode.slice(playerCode.indexOf('function pickAuto('));
-    assert.match(pick.slice(0, 400), /const usable = list\.filter\(\(s\) => !adBlocked\.has\(s\.id\)\);/);
+    assert.match(pick.slice(0, 400), /const usable = list\.filter\(\(s\) => !autoBlocked\(s\)\);/);
     // load() & setServers() memakai pickAuto.
     assert.match(playerCode, /const first = keepCurrent \|\| pickAuto\(available\(\)\) \|\| available\(\)\[0\];/);
     assert.match(playerCode, /const next = pickAuto\(available\(\), \{ skipFailed: true \}\);/);
     // nextCandidate() (fallback otomatis) menyaring server bertanda.
     const next = playerCode.slice(playerCode.indexOf('function nextCandidate('));
-    assert.match(next.slice(0, 400), /const list = available\(\)\.filter\(\(s\) => !adBlocked\.has\(s\.id\)\);/);
+    assert.match(next.slice(0, 400), /const list = available\(\)\.filter\(\(s\) => !autoBlocked\(s\)\);/);
     // Tombol "Server Lain" (tindakan manual) tetap memakai seluruh daftar.
     assert.match(playerCode, /nextServer\(\) \{\s*const list = available\(\);/);
 });
@@ -101,7 +105,7 @@ test('player: server bertanda tidak dipilih otomatis (manual tetap boleh)', () =
 test('player: "Pulihkan pemutar" tidak memuat ulang embed yang sudah membajak', () => {
     const restore = playerCode.slice(playerCode.indexOf("if (action === 'restore')"));
     const body = restore.slice(0, restore.indexOf("} else if (action === 'next')"));
-    assert.match(body, /if \(adRepeatSeen\(active\.id\) \|\| adBlocked\.has\(active\.id\)\) \{/);
+    assert.match(body, /if \(adRepeatSeen\(active\.id\) \|\| autoBlocked\(active\)\) \{/);
     assert.match(body, /adBlocked\.add\(active\.id\);/);
     assert.match(body, /emit\('adblock', \{ type: 'recover', server: active, next: clean \|\| null \}\);/);
     assert.match(body, /if \(clean\) \{\s*play\(clean\);\s*return;/);

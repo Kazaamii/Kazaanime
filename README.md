@@ -1713,6 +1713,57 @@ AdGuard tetap dipakai. Yang diperkuat adalah perilaku saat popup **berulang**:
    pertama langsung pindah. Smoke halaman `watch.html` (8 pemeriksaan): 5 tombol, sandbox aktif untuk
    AnimeKu, server Inggris tetap tanpa sandbox, hint tampil.
 
+### Perubahan perilaku (24 Okt 2026 — putaran kesembilan belas: AnimeKu diperkuat)
+
+Permintaan pengguna: *"perkuat lagi untuk yang di animeku"* — setelah penguatan putaran 18 (popup yang
+sama tidak muncul lagi), AnimeKu masih memunculkan iklan, jadi situs itu mendapat lapisan tambahan.
+
+**Penting — pola iklan TIDAK berubah dan tetap SATU daftar** untuk AnimeKu & Oploverz: `AD_HOSTS` 70
+entri dan `AD_URL_PATTERNS` 13 pola di `js/services/adblock.js` (cermin `server/lib/adblock.js`), DoH
+AdGuard tetap. Yang diperkuat adalah **kebijakan iframe dan perilaku** khusus AnimeKu:
+
+1. **Sandbox lebih ketat** (`PLAYER.frameGuard.strictSources = ['animeku']` + `strictPolicy`):
+   `allow-forms` dan `allow-downloads` dibuang — dua jalur yang dipakai lapisan iklan untuk membuka
+   tab/jendela baru. Token yang dibutuhkan pemutar (`allow-scripts`, `allow-same-origin`,
+   `allow-presentation`, `allow-orientation-lock`) tetap ada. **Oploverz tetap memakai `policy` dasar**,
+   jadi tidak ada regresi pada server Sub Indo lainnya.
+2. **Dilewati pada pembajakan pertama** (`strictMaxTakeovers: 1`): AnimeKu tidak lagi mendapat
+   "kesempatan kedua" saat `noteFrameReload` mendeteksi iframe membajak — server langsung ditandai,
+   bilah pemulihan tidak ditampilkan, dan pemutar pindah ke server bersih berikutnya.
+3. **Lapisan anti-iklan dipasang ulang** setiap AnimeKu membajak (`strictRemountShield`), supaya klik
+   berikutnya tidak diteruskan ke embed yang sedang menampilkan iklan — termasuk saat tidak ada server
+   lain sehingga pemutar tetap di sana.
+4. **Ingatan antar-halaman** (`persistSources: ['animeku']`, `persistMs` 6 jam, localStorage
+   `kz:adrepeat`): setelah AnimeKu terbukti memunculkan iklan, **halaman berikutnya tidak memutar
+   AnimeKu otomatis** dan tombolnya diberi badge merah **iklan**. Tombol AnimeKu **tetap ada dan tetap
+   bisa diklik manual** (permintaan putaran 16). Tanda dilepas otomatis bila AnimeKu berputar normal
+   20 detik (`healthyClearMs`) atau saat pengguna menekan **Coba lagi**.
+5. **Pengawas popup** (`PLAYER.popupWatch`, khusus AnimeKu): popup yang lolos sebagai jendela baru
+   selalu mencuri fokus tab ini lalu mengembalikannya saat ditutup. Pola `blur → focus` dihitung
+   sebagai popup bila (a) durasi blur 0,35–60 detik, (b) terjadi dalam 45 detik pertama pemutaran,
+   dan (c) dokumen masih `visibilityState === 'visible'` — jadi **pindah tab tidak dihitung**. Tab
+   baru yang Kazanime buka sendiri (**Pemutar Eksternal**) juga dikecualikan (`noteOwnTabOpen()`,
+   6 detik). Dua kejadian dalam 2 menit menandai AnimeKu & memindahkan pemutar, dengan pesan
+   *"Popup iklan terbuka dari AnimeKu — server itu dilewati otomatis…"*.
+6. **Tidak ada pelonggaran pengaman.** Sandbox tidak pernah dilepas, tidak ada `allow-popups`/
+   `allow-top-navigation`/`allow-modals`, tombol "Matikan blokir" tetap tersembunyi untuk AnimeKu &
+   Oploverz, dan seluruh daftar server (termasuk tombol "tidak terjangkau") tidak berubah.
+7. **Batas jujur.** Iklan yang dirender **di dalam** iframe lintas-domain tidak bisa dibaca atau
+   dihapus dari halaman induk; yang bisa dilakukan Kazanime adalah mencegah popup/tab baru, memperketat
+   sandbox, dan berhenti memakai embed itu secara otomatis setelah terbukti bermasalah. Pengawas popup
+   adalah heuristik: bila perangkat menandai AnimeKu karena Anda sempat membuka aplikasi lain, tanda
+   itu hilang sendiri setelah AnimeKu berputar normal 20 detik.
+8. **Tes & verifikasi.** `server/test/round19-animeku-strict.test.js` (13 tes) mengunci kebijakan
+   sandbox ketat (dan Oploverz yang tetap dasar), batas pembajakan per situs, ingatan antar-halaman
+   dengan TTL, pengawas popup beserta penyaringnya, perisai yang dipasang ulang, badge tombol, dan
+   pengaman putaran 15/16. Total `npm test` **557 tes lulus**. Smoke `happy-dom`: 18 pemeriksaan pada
+   modul pemutar (sandbox ketat AnimeKu vs kebijakan dasar Oploverz, pembajakan pertama langsung
+   pindah, `kz:adrepeat` terisi, halaman baru melewati AnimeKu tetapi tombolnya tetap bisa diklik,
+   perisai dipasang ulang), 11 pemeriksaan pengawas popup (dua siklus blur→focus menandai server,
+   pindah tab tidak dihitung, tanda dilepas setelah 20 detik sehat), dan 10 pemeriksaan halaman
+   `watch.html` (5 tombol, AnimeKu sandbox ketat, Animeloverz kebijakan dasar, tombol "Matikan blokir"
+   tetap tersembunyi untuk Sub Indo).
+
 ### Sengaja dihapus (mati / palsu / duplikat)
 
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

@@ -168,6 +168,27 @@ function applyFramePolicy(iframe) {
     iframe.dataset.frameGuard = 'on';
 }
 
+/**
+ * Putaran 19 (24 Okt 2026) — *"perkuat lagi untuk yang di animeku"*.
+ *
+ * Sandbox lebih ketat untuk situs di `PLAYER.frameGuard.strictSources` (AnimeKu): formulir
+ * tersembunyi (`allow-forms`) dan unduhan otomatis (`allow-downloads`) dibuang, karena keduanya
+ * jalur klasik lapisan iklan untuk membuka tab/jendela baru. Token yang dibutuhkan pemutar
+ * (scripts, same-origin, presentation, orientasi) tetap dipasang supaya video tetap berputar.
+ * Oploverz tetap memakai `policy` dasar — pola iklan kedua situs tetap SATU daftar yang sama.
+ * @param {HTMLIFrameElement} iframe
+ */
+function applyStrictFramePolicy(iframe) {
+    iframe.sandbox.value = PLAYER.frameGuard.strictPolicy || PLAYER.frameGuard.policy;
+    iframe.dataset.adStrict = 'on';
+}
+
+/** Situs yang memakai sandbox & penanganan iklan lebih ketat (putaran 19: AnimeKu). */
+function isStrictAdServer(server) {
+    return (PLAYER.frameGuard?.strictSources || []).includes(siteOf(server))
+        || (PLAYER.adTakeover?.strictSources || []).includes(siteOf(server));
+}
+
 /* ------------------------------------------------------------------ */
 /* Sandbox: hanya untuk server Sub Indo (putaran 15)                   */
 /* ------------------------------------------------------------------ */
@@ -198,6 +219,61 @@ function isExternalServer(server) {
 
 /** Batas jumlah server yang pilihannya diingat (localStorage tetap kecil). */
 const AD_BLOCK_OFF_LIMIT = PLAYER.externalGuard?.maxServers || 40;
+
+/* ------------------------------------------------------------------ */
+/* Ingatan "iklannya berulang" antar-halaman (putaran 19)             */
+/* ------------------------------------------------------------------ */
+/** Batas jumlah situs yang diingat (localStorage tetap kecil). */
+const AD_REPEAT_LIMIT = 10;
+
+/**
+ * Situs bertanda yang masih berlaku: `{ [site]: kedaluwarsaMs }`, hanya untuk
+ * `PLAYER.adTakeover.persistSources`. Entri kedaluwarsa dibuang saat dibaca.
+ * @returns {{[site: string]: number}}
+ */
+function readAdRepeatBlock() {
+    const raw = storage.get(STORAGE_KEYS.adRepeatBlock, {});
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const now = Date.now();
+    const out = {};
+    for (const [site, expires] of Object.entries(raw)) {
+        // Hanya situs yang izinkan disimpan + belum kedaluwarsa.
+        if (!(PLAYER.adTakeover?.persistSources || []).includes(site)) continue;
+        const at = Number(expires);
+        if (!Number.isFinite(at) || at <= now) continue;
+        out[site] = at;
+    }
+    return out;
+}
+
+/** Nama situs yang sedang ditandai karena iklannya berulang (antar-halaman). */
+function readAdRepeatSites() {
+    return Object.keys(readAdRepeatBlock());
+}
+
+/**
+ * Ingat bahwa situs ini berulang iklannya (hanya situs di `persistSources`).
+ * @param {string} site
+ */
+function rememberAdRepeatSite(site) {
+    if (!site || !(PLAYER.adTakeover?.persistSources || []).includes(site)) return;
+    const all = readAdRepeatBlock();
+    delete all[site];
+    all[site] = Date.now() + (PLAYER.adTakeover?.persistMs || 21600000);
+    const sites = Object.keys(all);
+    if (sites.length > AD_REPEAT_LIMIT) {
+        for (const stale of sites.slice(0, sites.length - AD_REPEAT_LIMIT)) delete all[stale];
+    }
+    storage.set(STORAGE_KEYS.adRepeatBlock, all);
+}
+
+/** Lepas tanda situs (dipakai saat pengguna meminta coba lagi / server terbukti sehat). */
+function forgetAdRepeatSite(site) {
+    const all = readAdRepeatBlock();
+    if (!(site in all)) return;
+    delete all[site];
+    storage.set(STORAGE_KEYS.adRepeatBlock, all);
+}
 
 /** @returns {Record<string, true>} server luar yang blokir iklannya dimatikan pengguna. */
 function readAdBlockOff() {
@@ -430,6 +506,25 @@ export function createPlayer({
     const adBlocked = new Set();
     /** id server → waktu (ms) pembajakan iklan; dipakai mengenali "popup yang sama". */
     const adTakeovers = new Map();
+    /**
+     * Putaran 19: situs yang iklannya berulang dan diingat antar-halaman (khusus
+     * `PLAYER.adTakeover.persistSources`, yaitu AnimeKu). Isinya nama situs (`animeku`), bukan id
+     * server, supaya tetap berlaku saat daftar server episode berikutnya berubah.
+     * @type {Set<string>}
+     */
+    const adBlockedSites = new Set(readAdRepeatSites());
+    /** id server → waktu (ms) popup lewat kehilangan fokus (putaran 19). */
+    const popupEvents = new Map();
+    /** Waktu (ms) pemutaran server aktif dimulai — dipakai membatasi pengawasan popup. */
+    let playStartedAt = 0;
+    /** Waktu pembajakan terakhir — mencegah popup yang sama dihitung dua kali. */
+    let lastTakeoverAt = 0;
+    /** Situs yang sudah diberi tahu "dilewati otomatis" pada sesi ini. */
+    const rememberedNotified = new Set();
+    /** Waktu (ms) tab baru dibuka oleh Kazanime sendiri (tombol Pemutar Eksternal). */
+    let ownTabAt = 0;
+    /** Timer pelepasan tanda setelah server bertanda berputar normal (putaran 19). */
+    let healthyTimer = 0;
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -473,13 +568,126 @@ export function createPlayer({
     const adRepeatSeen = (serverId) => (adTakeovers.get(serverId) || []).some((at) => Date.now() - at < adRepeatWindow());
 
     /**
-     * Pilih server otomatis: lewati server ber-popup berulang **dan** server yang sudah gagal.
-     * Server yang ditandai tetap bisa dipilih manual lewat tombolnya.
+     * Putaran 19: server ini dilewati otomatis? Dua sumber:
+     *  1. `adBlocked` — id server yang membajak pada sesi ini (putaran 18);
+     *  2. `adBlockedSites` — situs (AnimeKu) yang iklannya berulang, diingat antar-halaman.
+     * Server tetap tampil & tetap bisa dipilih manual (permintaan putaran 16).
+     * @param {StreamServer|null} server
+     */
+    function autoBlocked(server) {
+        if (!server) return false;
+        return adBlocked.has(server.id) || adBlockedSites.has(siteOf(server));
+    }
+
+    /** Batas pembajakan untuk server ini: AnimeKu lebih ketat (putaran 19). */
+    const adTakeoverLimit = (server) => (isStrictAdServer(server)
+        ? (PLAYER.adTakeover?.strictMaxTakeovers || 1)
+        : (PLAYER.adTakeover?.maxTakeovers || 2));
+
+    /**
+     * Tandai server aktif sebagai "iklannya berulang", lepas bilah pemulihan, lalu pindah ke
+     * server bersih berikutnya. Dipakai jalur navigasi-ulang iframe (putaran 18) DAN jalur
+     * popup yang mencuri fokus (putaran 19).
+     * @param {StreamServer} active
+     * @param {{count?: number, popup?: boolean}} [opts]
+     */
+    function blockActiveServer(active, { count = 1, popup = false } = {}) {
+        removeAdRecovery();
+        failed.add(active.id);
+        if (PLAYER.adTakeover?.blockRepeatServer !== false) adBlocked.add(active.id);
+        adTakeovers.delete(active.id);
+        popupEvents.delete(active.id);
+        // Putaran 19: AnimeKu diingat antar-halaman supaya popup yang sama tidak menyambut lagi.
+        rememberAdRepeatSite(siteOf(active));
+        if ((PLAYER.adTakeover?.persistSources || []).includes(siteOf(active))) adBlockedSites.add(siteOf(active));
+        emit('adblock', { type: 'skipped', server: active, count, repeat: true, popup });
+        const next = available().find((item) => item.id !== active.id && !failed.has(item.id) && !autoBlocked(item));
+        if (next) {
+            play(next);
+            return true;
+        }
+        setStatus('Iklan muncul lagi di server ini. Pilih server lain atau Pemutar Eksternal.', 'error');
+        mountAdRecovery(token);
+        return false;
+    }
+
+    /**
+     * Putaran 19 — pengawas popup lewat kehilangan fokus (khusus `PLAYER.popupWatch.sources`).
+     *
+     * Popup/jendela iklan selalu mencuri fokus tab ini lalu mengembalikannya saat ditutup.
+     * Tab yang BENAR-BENAR ditinggalkan pengguna tidak dihitung (`visibilityState` bukan
+     * 'visible'), durasi blur dibatasi, dan tanda baru dipasang setelah `maxEvents` kejadian
+     * dalam `windowMs` — supaya pindah aplikasi sekali tidak menghukum server.
+     */
+    function notePopupSignal() {
+        const watch = PLAYER.popupWatch;
+        const active = current();
+        if (!watch || watch.enabled === false || !active) return;
+        if (!(watch.sources || []).includes(siteOf(active))) return;
+        if (state !== 'loading' && state !== 'playing') return;
+        // Popup iklan muncul saat pemutar memuat / barusan dimulai — bukan menit-menit kemudian.
+        if (!playStartedAt || Date.now() - playStartedAt > (watch.startWindowMs || 45000)) return;
+        const now = Date.now();
+        const list = (popupEvents.get(active.id) || []).filter((at) => now - at < (watch.windowMs || 120000));
+        list.push(now);
+        popupEvents.set(active.id, list.slice(-6));
+        if (list.length < (watch.maxEvents || 2)) return;
+        blockActiveServer(active, { count: list.length, popup: true });
+    }
+
+    /* Popup yang lolos sebagai jendela baru terdeteksi dari blur → focus saat pemutar memuat. */
+    let blurAt = 0;
+    const onWindowBlur = () => {
+        blurAt = 0;
+        const watch = PLAYER.popupWatch;
+        const active = current();
+        if (!watch || watch.enabled === false || !active) return;
+        if (!(watch.sources || []).includes(siteOf(active))) return;
+        // Pindah tab / aplikasi: dokumen tidak lagi terlihat → bukan popup iklan.
+        if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') return;
+        if (Date.now() - lastTakeoverAt < 1500) return; // sudah dihitung sebagai pembajakan iframe
+        // Tab baru yang KITA buka sendiri (Pemutar Eksternal) juga mencuri fokus → bukan popup iklan.
+        if (ownTabAt && Date.now() - ownTabAt < 6000) return;
+        blurAt = Date.now();
+    };
+    const onWindowFocus = () => {
+        if (!blurAt) return;
+        const duration = Date.now() - blurAt;
+        blurAt = 0;
+        const watch = PLAYER.popupWatch || {};
+        if (duration < (watch.minBlurMs || 350) || duration > (watch.maxBlurMs || 60000)) return;
+        notePopupSignal();
+    };
+    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener('focus', onWindowFocus);
+
+    /**
+     * Putaran 19: server bertanda yang berhasil berputar normal selama `healthyClearMs` tidak
+     * dihukum selamanya — tanda sesi & ingatan antar-halaman dilepas. Ini juga pemulih otomatis
+     * bila pengawas popup salah menandai (mis. pengguna sempat membuka aplikasi lain).
+     * @param {StreamServer} server
+     */
+    function armHealthyClear(server) {
+        clearTimeout(healthyTimer);
+        healthyTimer = 0;
+        if (!autoBlocked(server)) return;
+        healthyTimer = setTimeout(() => {
+            if (current()?.id !== server.id || (state !== 'playing' && state !== 'loading')) return;
+            adBlocked.delete(server.id);
+            adBlockedSites.delete(siteOf(server));
+            forgetAdRepeatSite(siteOf(server));
+            renderServers();
+        }, PLAYER.adTakeover?.healthyClearMs || 20000);
+    }
+
+    /**
+     * Pilih server otomatis: lewati server ber-popup berulang (sesi & antar-halaman) **dan**
+     * server yang sudah gagal. Server yang ditandai tetap bisa dipilih manual lewat tombolnya.
      * @param {StreamServer[]} list
      * @param {{skipFailed?: boolean, afterId?: string}} [opts]
      */
     function pickAuto(list, { skipFailed = false } = {}) {
-        const usable = list.filter((s) => !adBlocked.has(s.id));
+        const usable = list.filter((s) => !autoBlocked(s));
         return usable.find((s) => !skipFailed || !failed.has(s.id)) || null;
     }
 
@@ -604,6 +812,8 @@ export function createPlayer({
         }
         removeAdShield();
         removeAdRecovery();
+        clearTimeout(healthyTimer);
+        healthyTimer = 0;
         lastFrameLoadAt = 0;
     }
 
@@ -669,10 +879,12 @@ export function createPlayer({
                 if (!active) return;
                 // Putaran 18: memuat ulang embed yang sudah membajak = memunculkan popup yang sama.
                 // Bila server ini sudah membajak sekali, pindah ke server lain yang belum ditandai.
-                if (adRepeatSeen(active.id) || adBlocked.has(active.id)) {
+                if (adRepeatSeen(active.id) || autoBlocked(active)) {
                     adBlocked.add(active.id);
                     failed.add(active.id);
-                    const clean = available().find((item) => item.id !== active.id && !adBlocked.has(item.id) && !failed.has(item.id));
+                    rememberAdRepeatSite(siteOf(active));
+                    if ((PLAYER.adTakeover?.persistSources || []).includes(siteOf(active))) adBlockedSites.add(siteOf(active));
+                    const clean = available().find((item) => item.id !== active.id && !failed.has(item.id) && !autoBlocked(item));
                     emit('adblock', { type: 'recover', server: active, next: clean || null });
                     if (clean) {
                         play(clean);
@@ -722,27 +934,37 @@ export function createPlayer({
         // Putaran 18: hitung pembajakan per server. "Popup yang sama" = server yang sama membajak
         // lagi dalam jendela waktu — jangan pernah memuat ulang embed itu otomatis.
         const count = noteAdTakeover(active.id);
-        const limit = PLAYER.adTakeover?.maxTakeovers || 2;
+        lastTakeoverAt = Date.now();
+        // Putaran 19: untuk AnimeKu lapisan anti-iklan dipasang LAGI setiap kali iframe membajak,
+        // supaya klik berikutnya tidak diteruskan ke embed yang sedang menampilkan iklan — juga
+        // saat tidak ada server lain sehingga pemutar tetap di sini.
+        if (PLAYER.adTakeover?.strictRemountShield !== false && isStrictAdServer(active)) mountAdShield(my);
+        // Putaran 19: AnimeKu lebih ketat — pembajakan PERTAMA sudah cukup untuk dilewati.
+        const limit = adTakeoverLimit(active);
         // Server yang sudah pernah memunculkan popup (dipilih manual oleh pengguna) langsung
         // dipindahkan pada pembajakan pertama — popup yang sama tidak diberi kesempatan kedua.
-        if (!adBlocked.has(active.id) && count < limit) {
+        if (!autoBlocked(active) && count < limit) {
             emit('adblock', { type: 'takeover', server: active, count });
             mountAdRecovery(my);
             return;
         }
         // Popup kembali setelah ditutup (atau membajak berulang) → tandai server, jangan ulangi.
-        removeAdRecovery();
-        failed.add(active.id);
-        if (PLAYER.adTakeover?.blockRepeatServer !== false) adBlocked.add(active.id);
-        adTakeovers.delete(active.id);
-        emit('adblock', { type: 'skipped', server: active, count, repeat: true });
-        const next = available().find((item) => item.id !== active.id && !failed.has(item.id) && !adBlocked.has(item.id));
-        if (next) {
-            play(next);
+        blockActiveServer(active, { count });
+    }
+
+    /**
+     * Putaran 19: beri tahu sekali per sesi bila AnimeKu dilewati otomatis karena ingatan
+     * antar-halaman (iklannya berulang di perangkat ini). Tombolnya tetap ada & tetap bisa diklik.
+     */
+    function notifyRemembered() {
+        for (const site of adBlockedSites) {
+            if (rememberedNotified.has(site)) continue;
+            if (!servers.some((s) => siteOf(s) === site && s.available && !s.placeholder)) continue;
+            rememberedNotified.add(site);
+            const name = PLAYER.siteLabels?.[site] || site;
+            emit('adblock', { type: 'remembered', site, name });
             return;
         }
-        setStatus('Iklan muncul lagi di server ini. Pilih server lain atau Pemutar Eksternal.', 'error');
-        mountAdRecovery(my);
     }
 
     function renderServers() {
@@ -767,7 +989,12 @@ export function createPlayer({
             const adWarn = s.adRisk
                 ? html` <span class="server-badge server-badge--ad" title="Host server ini ada di daftar blokir iklan (AdGuard DNS)">⚠</span>`
                 : '';
-            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available || offline ? 'false' : 'true'}" title="${s.available || offline ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge && !offline ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${offlineBadge}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
+            // Putaran 19: server yang iklannya berulang diberi tanda, tetapi tombolnya tetap ada
+            // dan tetap bisa diklik (permintaan putaran 16).
+            const repeatBadge = autoBlocked(s) && !offline
+                ? html` <span class="server-badge server-badge--adblock" title="Iklan server ini berulang — dilewati otomatis. Klik untuk tetap mencoba.">iklan</span>`
+                : '';
+            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available || offline ? 'false' : 'true'}" title="${s.available || offline ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge && !offline ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${repeatBadge}${offlineBadge}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
         })}`);
         emit('servers', { count: available().length });
         // Putaran 15: tombol blokir hanya muncul untuk server luar yang sedang diputar.
@@ -972,8 +1199,14 @@ export function createPlayer({
         const guarded = isSubIndoServer(server) || PLAYER.externalGuard?.sandbox === true;
         if (guarded) applyFramePolicy(iframe);
         else iframe.dataset.frameGuard = 'off';
+        // Putaran 19: AnimeKu memakai sandbox lebih ketat (tanpa allow-forms/allow-downloads).
+        if (guarded && isStrictAdServer(server)) applyStrictFramePolicy(iframe);
         syncAdBlockToggle();
         lastFrameLoadAt = 0;
+        playStartedAt = Date.now();
+        blurAt = 0;
+        popupEvents.delete(server.id);
+        armHealthyClear(server);
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
@@ -1213,8 +1446,8 @@ export function createPlayer({
 
     /** Server berikutnya (melingkar) yang tersedia & belum gagal di episode ini. */
     function nextCandidate(afterId) {
-        // Putaran 18: server ber-popup berulang tidak dicoba otomatis lagi (popup sama muncul terus).
-        const list = available().filter((s) => !adBlocked.has(s.id));
+        // Putaran 18/19: server ber-popup berulang (sesi & antar-halaman) tidak dicoba otomatis lagi.
+        const list = available().filter((s) => !autoBlocked(s));
         const start = list.findIndex((s) => s.id === afterId);
         for (let i = 1; i <= list.length; i++) {
             const s = list[(start + i + list.length) % list.length];
@@ -1265,9 +1498,14 @@ export function createPlayer({
 
     function retry() {
         failed = new Set();
-        // Tindakan eksplisit: pengguna minta mencoba lagi, jadi ingatan popup ikut direset.
+        // Tindakan eksplisit: pengguna minta mencoba lagi, jadi ingatan popup ikut direset —
+        // termasuk ingatan antar-halaman AnimeKu (putaran 19).
         adBlocked.clear();
         adTakeovers.clear();
+        for (const site of [...adBlockedSites]) forgetAdRepeatSite(site);
+        adBlockedSites.clear();
+        popupEvents.clear();
+        rememberedNotified.clear();
         const first = available()[0];
         if (first) play(first);
         else emit('retry', { ep }); // tidak ada id → watch.js mencari ulang data anime
@@ -1353,8 +1591,17 @@ export function createPlayer({
         get serverId() { return currentId; },
         get episode() { return ep; },
         hasServers: () => available().length > 0,
-        /** Putaran 18: id server yang iklannya berulang (tidak dipilih otomatis lagi). */
+        /** Putaran 18/19: id server yang iklannya berulang (tidak dipilih otomatis lagi). */
         adBlockedServers: () => [...adBlocked],
+        /** Putaran 19: situs yang diingat antar-halaman karena iklannya berulang (AnimeKu). */
+        adBlockedSites: () => [...adBlockedSites],
+        /** Putaran 19: batas pembajakan untuk server (AnimeKu = 1). */
+        adTakeoverLimit: (server) => adTakeoverLimit(server),
+        /**
+         * Putaran 19: beri tahu pemutar bahwa tab baru dibuka oleh Kazanime sendiri (tombol
+         * Pemutar Eksternal), supaya kehilangan fokus sesudahnya tidak dihitung sebagai popup iklan.
+         */
+        noteOwnTabOpen: () => { ownTabAt = Date.now(); },
 
         /**
          * URL pemutar eksternal untuk server yang sedang dipakai (putaran 8).
@@ -1396,8 +1643,10 @@ export function createPlayer({
             servers = keepPlayable(list);
             failed = new Set();
             mirror = new Map();
-            // Putaran 18: jangan memilih otomatis server yang iklannya berulang (popup sama).
-            const keepCurrent = currentId && byId(currentId)?.available && !adBlocked.has(currentId) ? byId(currentId) : null;
+            // Putaran 18/19: jangan memilih otomatis server yang iklannya berulang (popup sama).
+            const previous = currentId ? byId(currentId) : null;
+            const keepCurrent = previous?.available && !autoBlocked(previous) ? previous : null;
+            notifyRemembered();
             const first = keepCurrent || pickAuto(available()) || available()[0];
             if (first) play(first);
             else exhaust();
