@@ -36,6 +36,7 @@ jobs:
         run: npm ci
       - name: Check ordinary upstream reachability
         run: npm run check:reachability
+      # Probe sementara (dihapus sebelum PR final)
       - name: Probe donghua catalog pages (temporary)
         if: always()
         run: node server/scripts/probe-donghua.mjs
