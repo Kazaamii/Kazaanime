@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/source-reachability.yml'
       - 'server/scripts/check-source-reachability.js'
+      - 'server/scripts/probe-donghua.mjs'
       - 'server/test/reachability.test.js'
       - 'server/lib/fetcher.js'
       - 'server/lib/robots.js'
