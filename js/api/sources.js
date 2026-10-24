@@ -39,6 +39,7 @@
  */
 import { API_CONFIG, CACHE_TTL, PLAYER } from '../config.js';
 import { fetchJSON, ApiError } from './http.js';
+import { withAutoRetry } from './retry.js';
 import { createAnime, originOf, toHttpUrl } from './normalize.js';
 
 const cfg = API_CONFIG.backend;
@@ -557,12 +558,22 @@ export function getSchedule({ signal } = {}) {
     });
 }
 
-/** Cek status backend (/api/health) — hanya jika diaktifkan. */
+/**
+ * Cek status backend (/api/health) — hanya jika diaktifkan.
+ *
+ * 24 Okt 2026 (putaran 8) — perbaikan bug "Backend Scraper: Offline padahal online":
+ * fungsi serverless (Vercel) bisa butuh >6 dtk pada permintaan pertama (cold start),
+ * sehingga ping yang terlalu cepat membuat status nyangkut "Offline" selama circuit 90 dtk.
+ * Sekarang batasnya 15 dtk DAN kegagalan sementara (timeout/jaringan/5xx) dicoba satu kali
+ * lagi sebelum sumber dinyatakan offline. 403/429/challenge tetap tidak pernah diulang.
+ */
 export function ping() {
     if (!isBackendEnabled()) return Promise.resolve(false);
     const base = String(cfg.baseUrl || '').replace(/\/+$/, '');
-    return fetchJSON(`${base}/api/health`, { source: 'backend', timeout: 6000, force: true, transform: () => true })
-        .catch((err) => {
-            throw noteAbsent(err);
-        });
+    return withAutoRetry(
+        () => fetchJSON(`${base}/api/health`, { source: 'backend', timeout: 15000, force: true, transform: () => true }),
+        { attempts: 2, delay: 600 },
+    ).catch((err) => {
+        throw noteAbsent(err);
+    });
 }

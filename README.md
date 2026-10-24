@@ -22,6 +22,7 @@ beradapter.
 | **K** | 24 Okt 2026 (lanjutan): **menu genre situs** (±70 chip jadi satu tombol), **Donghua dari AnimeKu & Oploverz**, **auto refresh AnimeKu & Oploverz** (percobaan ulang otomatis untuk timeout/jaringan/5xx, muat ulang saat jaringan kembali/tab aktif/data basi, cadangan lokal `kz:donghua-last`, tombol **Muat ulang** di bagian Donghua), Sub Indo tahan jaringan ponsel | ✅ Selesai |
 | **L** | 24 Okt 2026 (putaran 6): **filter genre ringkas** — genre situs (AnimeKu/Oploverz) pindah dari panel ±80 tombol ke satu `<select>` di kartu **Tahun/Musim/Urutkan** (`#genreSite`, `<optgroup>` per situs, daftar baru diminta saat disentuh, cache `kz:site-genres`); **Sub Indo diprioritaskan** — server **AnimeKu & Oploverz** selalu dicoba dan tampil paling depan di daftar server, sumber sudah ada baru menambah keduanya | ✅ Selesai |
 | **M** | 24 Okt 2026 (putaran 7): **pencarian header menggabungkan AnimeKu & Oploverz** — grup "AnimeKu & Oploverz" di autocomplete (maks 3 judul/situs, kartu langsung memutar episode) + bagian **"Langsung dari AnimeKu & Oploverz"** di halaman hasil pencarian | ✅ Selesai |
+| **N** | 24 Okt 2026 (putaran 8): **genre situs hanya di Jelajah** (`#genreSite` dihapus dari beranda), **status backend tidak nyangkut "Offline"** (tes ulang ikut mengulang sumber `offline`), **sandbox & tombol pop-up dihapus total** diganti **lapisan anti-iklan** satu klik + tombol **Pemutar Eksternal**, dan **dua server Sub Indo berlabel AnimeKu & Animeloverz** di paling depan | ✅ Selesai |
 
 ---
 
@@ -34,10 +35,11 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅚 permintaan 24 Okt 2026 (lanjutan): **Jadwal & Genre di paling atas**, paragraf pengantar Sub Indo dihapus, **sort Tahun/Musim/Urutan** di genre, genre **AnimeKu** (23 slug) & **Oploverz** (80 genre + 24 musim), Donghua di **kedua** situs
 🅛 putaran 6 (24 Okt 2026): genre situs jadi **satu `<select>`** di kartu filter (beranda ringan) + **server Sub Indo AnimeKu & Oploverz** diprioritaskan di player
 🅜 putaran 7 (24 Okt 2026): pencarian header & halaman hasil juga memakai **AnimeKu & Oploverz** (bukan hanya AniList/Kitsu)
+🅝 putaran 8 (24 Okt 2026): **genre situs pindah ke Jelajah saja**, **sandbox/pop-up dihapus** → lapisan anti-iklan + pemutar eksternal, **2 server Sub Indo berlabel** (AnimeKu & Animeloverz), status backend bisa dites ulang
 
 ```
 kazanime/
-├── index.html                 ✅🅔🅚 homepage: hero, JADWAL, GENRE (filter Tahun/Musim/Urutan + hasil + 19 genre AniList + genre situs), SUB INDO (per sumber, + kolom cari), ongoing, populer, baru rilis, donghua
+├── index.html                 ✅🅔🅚🅝 homepage: hero, JADWAL, GENRE (filter Tahun/Musim/Urutan + hasil + 19 genre AniList; genre situs hanya di katalog.html), SUB INDO (per sumber, + kolom cari), ongoing, populer, baru rilis, donghua
 ├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
 ├── katalog.html               ✅🅘🅙🅚 Jelajah: ?source=…&genre=<slug>&year=<yyyy>&season=<winter|spring|summer|fall>&filter=<bagian>&q=<kata kunci>; bagian berurutan + expand + Lihat Semua + kolom cari
@@ -53,14 +55,14 @@ kazanime/
 ├── css/
 │   ├── base.css               ✅🅔 reset, variabel (+ --font-body/--font-display), 7 tema, ikon .ic, keyframes, partikel tema
 │   ├── components.css         ✅ navbar, dropdown, card, skeleton, modal, toast, API status, footer, keterangan section, panel Sub Indo per sumber (+ status & retry)
-│   ├── home.css               ✅🅚 hero, genre (+filter Tahun/Musim/Urutan + grup genre situs), jadwal
+│   ├── home.css               ✅🅚🅝 hero, genre (+filter Tahun/Musim/Urutan; gaya `#genreSite`/`.genre-filter--site` dihapus), jadwal
 │   ├── search.css             ✅ tab sumber, filter, muat lagi
 │   ├── katalog.css            ✅🅘🅙 blok bagian, tombol expand, tautan "Lihat Semua" (.see-all), pemilih genre, kolom cari
 │   ├── bookmark.css           🅙 toolbar cari/urutkan halaman Bookmark (variabel tema)
-│   └── watch.css              ✅🅒 player, server, episode, info, download, platform legal (+ urutan mobile)
+│   └── watch.css              ✅🅒🅝 player, server, episode, info, download, platform legal (+ urutan mobile), lapisan anti-iklan `.player-ad-shield`
 ├── js/
 │   ├── theme-preload.js       ✅ script klasik di <head>: pasang tema sebelum render (anti-kedip)
-│   ├── config.js              ✅🅓🅔🅕🅙 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS, PLAYER (hls, aiSubtitle, sandbox anti pop-up + opt-out per browser) & SUB_INDO (24 hasil, 6 kartu cuplikan), GENRES (18 genre AniList + Isekai)
+│   ├── config.js              ✅🅓🅔🅕🅙 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS, PLAYER (hls, aiSubtitle, adShield, siteLabels AnimeKu/Animeloverz, subtitlePriority/referrerPolicy) & SUB_INDO (24 hasil, 6 kartu cuplikan), GENRES (18 genre AniList + Isekai)
 │   ├── routes.js              ✅🅒 pembuat/pembaca URL watch & search (filter di URL, batas nomor episode)
 │   ├── data/
 │   │   └── fallback.js        ✅ data cadangan offline (format ternormalisasi)
@@ -98,7 +100,7 @@ kazanime/
 │   │   ├── search-dropdown.js ✅🅔🅜 autocomplete AniList + Kitsu + **AnimeKu & Oploverz** (bertahap, bisa dibatalkan, keyboard, ARIA)
 │   │   ├── search-suggest.js  🅜 pengelompokan saran pencarian (metadata vs situs) — murni, bisa diuji tanpa DOM
 │   │   ├── api-status.js      ✅ widget status sumber data
-│   │   ├── player.js          🅒🅔🅕🅖 SATU player: iframe ATAU video HLS (hls.js / HLS native), mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI & lokal
+│   │   ├── player.js          🅒🅔🅕🅖🅝 SATU player: iframe TANPA sandbox ATAU video HLS (hls.js / HLS native), lapisan anti-iklan `#playerAdShield`, `externalUrl()`/`currentServerName()`, mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI & lokal
 │   │   ├── ai-subtitle.js     🅕 "Subtitle Indonesia (AI)": track AI (TextTrack/VTTCue) per bagian, subtitle bawaan disembunyikan, pilihan pengguna dihormati
 │   │   ├── local-subtitle.js  🅖 pilih .srt/.vtt lokal, konversi SRT→WebVTT, track browser + cleanup object URL; tanpa upload
 │   │   ├── icons.js           🅔 ikon garis Lucide (ISC) pengganti emoji: icon() + hydrateIcons() untuk HTML statis
@@ -106,11 +108,11 @@ kazanime/
 │   │   └── download-list.js   🅒🅓 daftar link download per kualitas (+ format & bahasa subtitle dari backend)
 │   ├── vendor/
 │   │   └── hls.min.js         🅔 hls.js 1.7.3 (Apache-2.0, LICENSE-hls.js.txt) — dimuat malas saat server HLS diputar
-│   ├── home.js                ✅🅓🅔🅗🅚 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre → hasil di bawah tombol + filter Tahun/Musim/Urutan + genre situs dari `/api/anime/genres`; panel Donghua AnimeKu & Oploverz + **auto refresh**; kartu donghua backend → episode terbaru)
+│   ├── home.js                ✅🅓🅔🅗🅚🅝 homepage (feed Sub Indo: ringkasan + coba lagi per panel; genre AniList → hasil di bawah tombol + filter Tahun/Musim/Urutan; panel Donghua AnimeKu & Oploverz + **auto refresh**; kartu donghua backend → episode terbaru)
 │   ├── search.js              ✅🅓 pencarian & "Lihat Semua"
 │   ├── katalog.js             ✅🅘🅙🅚 Jelajah: tab AnimeKu/Oploverz/Donghua, bagian ringkas 6 kartu + expand + Lihat Semua, Muat Lagi, genre + Tahun/Musim (Oploverz), pencarian per sumber, percobaan ulang otomatis
 │   ├── bookmark.js            🅙 halaman Bookmark: baca services/bookmark.js, cari & urutkan, ajakan login
-│   └── watch.js               ✅🅓🅕 halaman nonton (anime dari backend: server situs sumber didahulukan) + getAiSubtitlePart ke player
+│   └── watch.js               ✅🅓🅕🅝 halaman nonton (dua server Sub Indo berlabel AnimeKu/Animeloverz dulu lewat `firstPerSite`, lalu Multi Sub & lainnya; tombol Pemutar Eksternal) + getAiSubtitlePart ke player
 └── server/                    🅓 backend Node.js + Express
     ├── app.js                 createApp(): /api/health, /api/bot, /api/anime/*, /api/stream/*, error handler, rate limit masuk (+ klien Gemini bila GEMINI_API_KEY ada 🅕)
     ├── index.js               server LOKAL: API + file frontend (`npm run dev`)
@@ -408,14 +410,16 @@ dan `.footer` naik ke `z-index: 1` (player tetap `z-index: 2` + `isolation: isol
 kelopak/salju/gelembung tetap terlihat di ruang kosong, tetapi **tidak pernah** menembus kartu,
 foto, atau video.
 
-**🚫 Proteksi pop-up player (24 Okt 2026).** Iframe embed dipasang dengan `sandbox` berisi
-`allow-scripts allow-same-origin allow-forms allow-presentation` dan **tanpa**
-`allow-popups`/`allow-top-navigation`, sehingga skrip iklan di dalam player tidak bisa membuka
-tab baru atau membajak tab Kazanime. Karena sebagian embed menolak sandbox, tombol
-**Pop-up diblokir / Pop-up diizinkan** di bawah player bisa melepasnya; pilihan disimpan di
-`localStorage` (`kz:popup-guard`) dan hanya berlaku di browser itu. Server `kind: 'hls'|'video'`
-memakai `<video>` sendiri sehingga tidak terpengaruh. Ini mitigasi terbaik yang bisa dilakukan
-dari sisi halaman — halaman lintas-domain tidak bisa ditutup paksa oleh Kazanime.
+**🛡️ Penahan iklan player + pemutar eksternal (24 Okt 2026, putaran 8).** Sandbox iframe dan
+tombol **Pop-up diblokir/Pop-up diizinkan** sudah **dihapus** — justru sandbox itulah yang membuat
+host menampilkan *“Sandbox Not Allowed”* dan video tidak jalan. Iframe sekarang dipasang tanpa
+`sandbox`, lalu di atasnya diberi lapisan bening `#playerAdShield` yang menangkap klik pertama
+(`preventDefault` + `stopPropagation`, `{once:true}`) supaya klik iklan di area player tidak
+membuka tab baru. Lapisan dilepas setelah satu klik, jadi **klik berikutnya diteruskan ke player** —
+iklan lanjutan di dalam iframe tetap di luar kendali halaman (batas jujur). Karena itu tersedia
+tombol **Pemutar Eksternal** yang membuka embed server aktif dengan
+`window.open(url, '_blank', 'noopener,noreferrer')`; server `kind: 'hls'|'video'` memakai `<video>`
+sendiri sehingga tidak terpengaruh. Flag lama `kz:popup-guard` dibersihkan saat halaman dimuat.
 
 ## 🎬 Halaman nonton (Tahap C)
 
@@ -989,7 +993,8 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   bookmark di beranda dan tautannya di daftar navbar dihapus.
 - **Efek tema** tidak lagi menembus konten: `.visual-effects` di `z-index: 0`, `.main-content`/`.footer` di `z-index: 1`.
 - **Proteksi pop-up player**: iframe embed memakai sandbox tanpa `allow-popups`/`allow-top-navigation`, dengan tombol
-  pelepas (tersimpan per browser) bila player menolak diputar.
+  pelepas (tersimpan per browser) bila player menolak diputar. (**Diganti putaran 8**: sandbox + tombol itu dihapus,
+  lihat “Penahan iklan player + pemutar eksternal”.)
 
 ### Perubahan perilaku (24 Okt 2026 — putaran kedua)
 - **Urutan beranda**: **Jadwal Rilis → Jelajahi Genre** langsung di bawah hero; panel **Anime Jepang Sub Indo**
@@ -1012,7 +1017,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   arsip situs untuk genre situs) — bukan tombol dekoratif.
 
 ### Perubahan perilaku (24 Okt 2026 — putaran ketiga: player, subtitle, badge per episode)
-- **Sandbox iframe player DEFAULT MATI.** Sejak mode blokir pop-up dinyalakan, banyak embed menolak
+- **Sandbox iframe player DEFAULT MATI** (*sejak putaran 8 sandbox dihapus total, bagian ini hanya catatan sejarah*). Sejak mode blokir pop-up dinyalakan, banyak embed menolak
   berjalan di dalam sandbox dan hanya menampilkan pesannya sendiri —
   *“Opss! Sandboxed our player is not allowed. Remove sandbox to use it.”* — sehingga area player hitam,
   tanpa video dan tanpa subtitle. Sekarang iframe dimuat **tanpa** `sandbox` secara default, dan tombol di
@@ -1169,6 +1174,45 @@ gunakan yg di anime ku dan oploverz juga"*.
 3. **Batas jujur.** Hasil situs mengikuti apa yang dikembalikan pencarian situs itu (judul Indonesia,
    ejaan situs, dan bisa saja tidak lengkap); urutan/filter format tetap hanya berlaku untuk AniList
    dan Kitsu. Tidak ada penerobosan pembatasan situs.
+
+### Perubahan perilaku (24 Okt 2026 — putaran kedelapan: genre pindah, sandbox dihapus, 2 server Sub Indo)
+
+Permintaan pengguna: *"hapus Genre dari Animeloverz di bagian home page … muncul hanya di halaman katalog
+saja"*, *"bug Scraper backend offline tapi pas di test lagi … Online"*, *"benar benar memprioritaskan
+untuk sub indo dlu"*, *"hapus Tombol Pop Up block dan Izinkan karna sudah tidak bekerja bertuliskan
+Sandbod Not Allowed"*, *"kalau bisa ditambahkan pemutar eksternal"*, *"iklan dari host streaming jangan
+membuka tab baru"*, *"pilihan server sub indo tolong dibuat 2 dan tuliskan dari web Animeloverz dan animeku"*.
+
+1. **Genre situs hanya di halaman Jelajah.** Blok `#genreSite` (pemilih genre AnimeKu/Animeloverz beserta
+   cache `kz:site-genres`, `SITE_GENRE_ALIASES`, `ensureSiteGenres`, `selectSiteGenre`) dihapus dari
+   `index.html`, `js/home.js`, dan `css/home.css`. Beranda tinggal **19 chip genre AniList** + kartu
+   **Tahun/Musim/Urutkan/Reset**; pemilih genre per situs tetap ada di `katalog.html`
+   (`#katalogGenreWrap` / `#katalogGenre`, muncul saat sumber mengirim daftar genre). Request
+   `/api/anime/genres` tidak lagi dipanggil dari beranda.
+2. **Status backend tidak lagi nyangkut "Offline".** Dua penyebab ditutup: (a) `ping()` di
+   `js/api/sources.js` kini memakai `withAutoRetry(..., { attempts: 2, delay: 600 })` dengan timeout
+   15 detik, jadi satu request yang meleset tidak langsung menyimpulkan "offline"; (b) tombol status di
+   bagian bawah kini menguji ulang sumber berstatus **`unknown` *atau* `offline`** — sebelumnya hanya
+   `unknown`, sehingga sumber yang sudah dicap offline tidak pernah diuji lagi dan label "Offline" menetap
+   walau backend hidup.
+3. **Sandbox & tombol pop-up dihapus, diganti penahan iklan.** Atribut `sandbox` dan tombol
+   **Pop-up diblokir/Pop-up diizinkan** (`#btnPopupGuard`, `PLAYER.sandbox`, `storePopupGuard`) hilang.
+   Sebagai gantinya `#playerAdShield` (`css/watch.css`) menutup area player setelah iframe `load` dan
+   menelan **satu** klik pertama supaya klik iklan tidak membuka tab baru; setelah itu lapisan dilepas dan
+   player bisa dipakai normal. Flag lama `localStorage['kz:popup-guard']` dibersihkan otomatis
+   (`dropLegacyGuardFlag()`). Batas jujur: iklan yang muncul **setelah** klik pertama dan skrip di dalam
+   iframe lintas-domain tetap tidak bisa diblokir dari halaman Kazanime.
+4. **Pemutar eksternal.** Tombol **Pemutar Eksternal** (`#btnExternalPlayer`) di baris kontrol
+   `watch.html` membuka embed server aktif di tab baru dengan `noopener,noreferrer`. URL diambil dari
+   `player.externalUrl()`: `direct`/`url` untuk server `hls|video`, `url` untuk embed — hanya `http(s)`.
+5. **Dua server Sub Indo berlabel.** `servers()` di `js/watch.js` sekarang memakai
+   `firstPerSite(backendServers.filter(isSubIndoSource))`: **tepat satu tombol AnimeKu** dan **tepat satu
+   tombol Animeloverz**, keduanya di posisi pertama dan kedua dengan nama situs (bukan "Server 1/2") dari
+   `PLAYER.siteLabels`. Sisa server tetap bernomor dan diurutkan Multi Sub → bahasa lain → cadangan →
+   Sub Eng. Badge `Sub Indo · Hardsub/Softsub` dan keterangan “diputar langsung dari <situs>” tetap ada.
+6. **Regresi ikut diperbaiki.** `js/home.js` ternyata memakai `getSourceBrowse` untuk panel Donghua tanpa
+   mengimpornya (panel selalu gagal dengan *"getSourceBrowse is not defined"*) — impor dikembalikan dan
+   dibuktikan lewat smoke happy-dom.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

@@ -70,12 +70,6 @@
 .genre-filter-reset:hover{background:rgba(var(--primary-rgb),.16)}
 .genre-filter-reset[hidden]{display:none}
 
-/* Genre situs (Oploverz/AnimeKu) — 24 Okt 2026: satu <select> di kartu filter,
-   bukan ±80 chip/tombol. Pilihan aslinya dirender browser saat dibuka, jadi tidak
-   menambah ratusan node ke beranda. */
-.genre-filter--site select{min-width:190px}
-.genre-filter--site select:disabled{opacity:.55;cursor:not-allowed}
-
 /* 22 Okt 2026: hasil genre tampil langsung di bawah tombol (Genre kini di atas beranda) */
 .genre-results{margin-top:22px;padding:20px;border-radius:18px;background:linear-gradient(180deg,rgba(var(--primary-rgb),.06),rgba(255,255,255,.015));border:1px solid rgba(var(--primary-rgb),.14);animation:fadeUp .35s ease}
 .genre-results-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
@@ -143,7 +137,6 @@ a.schedule-item:hover .schedule-anime{color:var(--primary)}
     .hero-dot{width:8px!important;height:8px!important}
     .hero-dot.active{width:28px!important}
     .schedule-grid{grid-template-columns:repeat(2,1fr)}
-    .genre-filter--site,.genre-filter--site select{width:100%}
 }
 @media(max-width:480px){
     .hero-buttons{flex-direction:column}

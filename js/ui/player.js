@@ -67,54 +67,43 @@ const HLS_MIME = 'application/vnd.apple.mpegurl';
 const ICON_LOCK = icon('lock');
 
 /* ------------------------------------------------------------------ */
-/* Proteksi pop-up (sandbox iframe)                                    */
+/* Iklan & tab baru dari host streaming (24 Okt 2026, putaran 8)       */
 /* ------------------------------------------------------------------ */
 /**
- * Proteksi pop-up lewat atribut `sandbox` iframe — 24 Okt 2026 (perbaikan putaran 3):
- * DEFAULT MATI.
+ * Permintaan pengguna: *"hapus tombol pop up block dan izinkan karna sudah tidak bekerja
+ * bertuliskan Sandbox Not Allowed"* + *"untuk iklan dari host streaming kita buat agar tidak
+ * berusaha membuka tab baru"*.
  *
- * Sejak sandbox dinyalakan, banyak embed menolak diputar dan menampilkan halamannya sendiri
- * ("Opss! Sandboxed our player is not allowed. Remove sandbox to use it.") sehingga pengguna
- * hanya melihat kotak hitam tanpa video dan tanpa subtitle. Karena itu sandbox kini hanya
- * dipakai bila pengguna MENYALAKANNYA lewat tombol di bawah player; nilai tersimpan 'on'
- * berarti proteksi aktif. Timpa pilihan itu bila embed tetap menolak (lihat sandboxFor()).
+ * Sandbox iframe DIHAPUS TOTAL. Penyebabnya nyata: banyak embed (mis. player dengan pesan
+ * "Opss! Sandboxed our player is not allowed. Remove sandbox to use it.") menolak berjalan di
+ * dalam iframe ber-sandbox, sehingga video tidak muncul sama sekali. Karena sandbox satu-satunya
+ * cara teknis memblokir `window.open()` dari iframe lintas-domain, proteksi tab baru dilakukan
+ * dengan dua cara yang tidak merusak pemutaran:
+ *
+ *  1. **Lapisan anti-iklan (ad shield).** Setelah embed selesai dimuat, satu lapisan transparan
+ *     menutup area player sampai pengguna mengkliknya sekali. Klik pertama itu "dibuang" —
+ *     tidak diteruskan ke iframe — sehingga popunder/pop-up yang dipicu klik pertama (pola iklan
+ *     paling umum di host streaming) tidak pernah terjadi. Setelah itu pemutar dipakai normal.
+ *     Matikan lewat PLAYER.adShield = false bila mengganggu.
+ *  2. **Pemutar eksternal.** Tombol di bawah player membuka embed yang sama di tab baru
+ *     (`noopener,noreferrer`); halaman Kazanime tidak bisa dibajak iklan karena tidak ada iframe
+ *     yang berjalan di tab ini.
+ *
+ * Batas jujur: pop-up yang dipicu OTOMATIS saat embed dimuat tetap mungkin terjadi bila browser
+ * mengizinkannya, dan pop-up dari klik SETELAH lapisan dilepas tidak bisa dicegah tanpa sandbox.
+ * Karena itu tombol pemutar eksternal disediakan sebagai jalan aman.
  */
-function popupGuardEnabled() {
+const AD_SHIELD_ID = 'playerAdShield';
+
+/** Bersihkan sisa preferensi sandbox dari versi lama (kalau tidak, pengguna tetap terkunci). */
+function dropLegacyGuardFlag() {
     try {
-        return window.localStorage.getItem(STORAGE_KEYS.popupGuard) === 'on';
+        window.localStorage?.removeItem(STORAGE_KEYS.popupGuard);
     } catch {
-        return false; // mode privat / storage diblokir → perilaku default: tanpa sandbox
+        // mode privat: tidak ada yang perlu dibersihkan
     }
 }
-
-function storePopupGuard(enabled) {
-    try {
-        if (enabled) window.localStorage.setItem(STORAGE_KEYS.popupGuard, 'on');
-        else window.localStorage.removeItem(STORAGE_KEYS.popupGuard);
-    } catch {
-        // Tidak bisa menyimpan preferensi: efeknya hanya untuk sesi ini.
-    }
-}
-
-/**
- * Host yang sudah terbukti menolak sandbox pada sesi ini. Server dari host itu dimuat TANPA
- * sandbox walau proteksi menyala, jadi pengguna tidak pernah terjebak di layar penolakan.
- */
-const sandboxRefused = new Set();
-function hostOf(value) {
-    try {
-        return new URL(String(value || '')).hostname;
-    } catch {
-        return '';
-    }
-}
-
-/** Pasang sandbox untuk server ini? (proteksi menyala DAN host belum pernah menolak) */
-function sandboxFor(server) {
-    if (!PLAYER.sandbox || !popupGuardEnabled()) return false;
-    const host = hostOf(server?.url);
-    return !(host && sandboxRefused.has(host));
-}
+dropLegacyGuardFlag();
 
 /** hls.js (Apache-2.0) disimpan lokal; dimuat sekali saat server HLS pertama diputar. */
 let hlsLoader = null;
@@ -212,7 +201,7 @@ export function createPlayer({
     localSubtitleInput = null,
 }) {
     /** @type {Record<string, Set<Function>>} */
-    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), guard: new Set() };
+    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
         try { fn(detail); } catch (err) { console.error(`[player] handler "${name}" error:`, err); }
     });
@@ -241,6 +230,8 @@ export function createPlayer({
     const urlOf = (server) => server.mirrors?.[mirror.get(server.id) || 0] || server.url;
     let timer = 0;
     let overlayTimer = 0;
+    /** @type {HTMLElement|null} lapisan anti-iklan di atas iframe (putaran 8) */
+    let adShield = null;
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -371,6 +362,38 @@ export function createPlayer({
             video.remove();
             video = null;
         }
+        removeAdShield();
+    }
+
+    /**
+     * Lapisan anti-iklan di atas iframe (lihat catatan di bagian atas file, putaran 8).
+     * Klik pertama pada area player "dibuang" (tidak diteruskan ke iframe), sehingga pola
+     * popunder/pop-up yang dipicu klik pertama tidak terjadi. Klik kedua (dan seterusnya)
+     * diteruskan normal ke pemutar.
+     * @param {number} my token pemutaran; lapisan hanya dipasang untuk pemutaran yang masih aktif
+     */
+    function mountAdShield(my) {
+        removeAdShield();
+        if (!PLAYER.adShield || my !== token) return;
+        const shield = document.createElement('button');
+        shield.type = 'button';
+        shield.id = AD_SHIELD_ID;
+        shield.className = 'player-ad-shield';
+        shield.setAttribute('aria-label', 'Aktifkan pemutar (lapisan anti-iklan)');
+        shield.innerHTML = String(html`<span class="player-ad-shield-pill">${icon('shield-check')} Klik untuk mengaktifkan pemutar <small>lapisan anti-iklan</small></span>`);
+        shield.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            removeAdShield();
+        }, { once: true });
+        stage.append(shield);
+        adShield = shield;
+    }
+
+    function removeAdShield() {
+        if (!adShield) return;
+        adShield.remove();
+        adShield = null;
     }
 
     function renderServers() {
@@ -450,12 +473,9 @@ export function createPlayer({
         iframe.allow = PLAYER.allow;
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
-        // Mode ketat (opsional): tanpa allow-popups/allow-top-navigation sehingga iklan di dalam
-        // embed tidak bisa membuka tab baru atau mengalihkan tab Kazanime. Default MATI karena
-        // banyak embed langsung menolak diputar saat di-sandbox.
-        const sandboxed = sandboxFor(server);
-        if (sandboxed) iframe.setAttribute('sandbox', PLAYER.sandbox);
-        iframe.dataset.popupGuard = sandboxed ? 'on' : 'off';
+        // TANPA atribut sandbox (putaran 8): embed yang menolak sandbox menampilkan
+        // "Sandboxed our player is not allowed" dan video tidak muncul sama sekali.
+        iframe.dataset.popupGuard = 'off';
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
@@ -464,6 +484,7 @@ export function createPlayer({
             overlay.remove();
             setStatus(`${server.name} | Episode ${ep}${langSuffix(server)}`, 'ok');
             renderServers();
+            mountAdShield(my);
             emit('loaded', { ep, server });
         };
         markLoaded = loaded;
@@ -480,15 +501,6 @@ export function createPlayer({
             // Fokus sudah di dalam iframe = user sedang memakai player → jangan dipindah server.
             if (document.activeElement === iframe) {
                 loaded();
-                return;
-            }
-            if (sandboxed) {
-                // Embed yang menolak sandbox sering tidak pernah menyelesaikan pemuatan.
-                // Lepas sandbox untuk host ini lalu coba server yang sama sekali lagi.
-                const host = hostOf(server.url);
-                if (host) sandboxRefused.add(host);
-                showToast('Mode blokir pop-up dimatikan untuk player ini — mencoba memuat ulang.', 'info');
-                play(server);
                 return;
             }
             fail(server, 'timeout');
@@ -822,22 +834,23 @@ export function createPlayer({
         get episode() { return ep; },
         hasServers: () => available().length > 0,
 
-        /** Mode blokir pop-up (sandbox iframe) aktif? (default false) */
-        popupGuard: () => popupGuardEnabled(),
-
         /**
-         * Nyalakan/matikan mode blokir pop-up (sandbox iframe) lalu muat ulang server yang
-         * sedang dipakai supaya atribut sandbox ikut berubah. Default mati.
-         * @param {boolean} enabled
-         * @returns {boolean} status baru
+         * URL pemutar eksternal untuk server yang sedang dipakai (putaran 8).
+         * Dipakai tombol "Pemutar Eksternal": embed dibuka di tab baru sehingga iklan host
+         * tidak bisa membuka/membajak tab Kazanime. `kind: 'hls'/'video'` memakai URL media
+         * langsungnya (bisa dibuka di tab baru juga).
+         * @returns {string|null}
          */
-        setPopupGuard(enabled) {
-            storePopupGuard(Boolean(enabled));
+        externalUrl() {
             const active = current();
-            if (active && (state === 'loading' || state === 'playing')) play(active);
-            emit('guard', { enabled: Boolean(enabled) });
-            return Boolean(enabled);
+            if (!active) return null;
+            const url = active.kind === 'hls' || active.kind === 'video'
+                ? (active.direct || urlOf(active))
+                : urlOf(active);
+            return /^https?:\/\//i.test(String(url || '')) ? url : null;
         },
+        /** Nama server aktif (untuk label tombol pemutar eksternal). */
+        currentServerName: () => current()?.name || '',
 
         /**
          * Putar episode dengan daftar server baru. Server pilihan user sebelumnya

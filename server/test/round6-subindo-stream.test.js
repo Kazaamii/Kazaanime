@@ -75,31 +75,15 @@ function installFetch() {
     return calls;
 }
 
-test('genre situs: <select> ringkas menggantikan tombol menu & chip', () => {
-    assert.match(homeHtml, /<label class="genre-filter genre-filter--site" for="genreSite">/);
-    assert.match(homeHtml, /<select id="genreSite"[^>]*aria-label="Genre dari AnimeKu atau Oploverz"/);
-    assert.match(homeHtml, /<option value="">Semua genre situs<\/option>/);
-    assert.doesNotMatch(homeHtml, /id="genreMenuBtn"/);
-    assert.doesNotMatch(homeHtml, /id="genreMenu"/);
-    assert.doesNotMatch(homeJs, /data-site-genres|genre-menu-btn|setGenreMenuOpen/);
-    assert.match(homeCss, /\.genre-filter--site select\{/);
-    assert.doesNotMatch(homeCss, /\.genre-menu-btn\{/);
-});
-
-test('genre situs: daftar genre baru diminta saat pilihan disentuh, lalu di-cache', () => {
-    assert.match(homeJs, /const SITE_GENRE_CACHE_KEY = 'kz:site-genres'/);
-    assert.match(homeJs, /async function ensureSiteGenres\(\)/);
-    assert.match(homeJs, /window\.sessionStorage\.getItem\(SITE_GENRE_CACHE_KEY\)/);
-    assert.match(homeJs, /window\.sessionStorage\.setItem\(SITE_GENRE_CACHE_KEY/);
-    // Lazy-load dipasang untuk beberapa peristiwa (pointerdown/focus/keydown) lewat satu loop.
-    assert.match(homeJs, /for \(const eventName of \['pointerdown', 'mouseenter', 'focus', 'keydown'\]\)/);
-    assert.match(homeJs, /genreSite\?\.addEventListener\(eventName, \(\) => \{ void ensureSiteGenres\(\); \}/);
-    // Tidak ada permintaan genre situs saat beranda dimuat.
-    assert.doesNotMatch(homeJs, /^void loadSiteGenres\(\);$/m);
-    assert.match(homeJs, /async function loadSiteGenres|function renderSiteGenreOptions/);
-    // Pilihan memakai optgroup per situs + jalur hasil yang sudah ada.
-    assert.match(homeJs, /<optgroup label="\$\{source\.name\}">/);
-    assert.match(homeJs, /selectSiteGenre\(source, id, label\)/);
+test('genre situs: pindah ke halaman katalog saja (24 Okt 2026, putaran 8)', () => {
+    // Putaran 6 membuat <select> di beranda; putaran 8 memindahkannya sepenuhnya ke
+    // katalog.html (permintaan pengguna) sehingga beranda hanya berisi chip AniList.
+    assert.doesNotMatch(homeHtml, /id="genreSite"/);
+    assert.doesNotMatch(homeHtml, /genre-filter--site/);
+    assert.doesNotMatch(homeJs, /genreSite|SITE_GENRE|ensureSiteGenres|selectSiteGenre|siteGenres/);
+    assert.doesNotMatch(homeJs, /getSourceGenres/);
+    assert.match(read('katalog.html'), /<select id="katalogGenre"/);
+    assert.match(read('js/katalog.js'), /function renderGenre\(\)/);
 });
 
 test('server Sub Indo: AnimeKu & Oploverz selalu dicoba dan didahulukan', async () => {
@@ -178,8 +162,9 @@ test('server Sub Indo: sumber asal sudah ber-Sub Indo → cukup tambah situs Sub
 
 test('halaman nonton: urutan tombol server menaruh Sub Indo lebih dulu', () => {
     assert.match(watchJs, /SUB_INDO_SOURCES, withProviderServers/);
-    assert.match(watchJs, /const isSubIndoSource = \(server\) => SUB_INDO_SOURCES\.includes\(/);
-    assert.match(watchJs, /const subIndo = backendServers\.filter\(isSubIndoSource\);/);
+    assert.match(watchJs, /const isSubIndoSource = \(server\) => SUB_INDO_SOURCES\.includes\(siteOf\(server\)\);/);
+    assert.match(watchJs, /const subIndo = firstPerSite\(backendServers\.filter\(isSubIndoSource\)\);/,
+        'tepat dua tombol Sub Indo (satu per situs)');
     assert.match(watchJs, /return numbered\(\[\.\.\.subIndo, \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english\]\)/,
         'Sub Indo → Multi Sub → bahasa lain → cadangan → Sub Eng');
     // Server statis ber-Sub Eng juga di urutan akhir (bukan terselip di blok cadangan).

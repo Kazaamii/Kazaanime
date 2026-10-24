@@ -103,6 +103,8 @@ export function showApiStatus({ recheck = false } = {}) {
     if (running) return running;
     running = (async () => {
         if (!recheck) await waitForPageRequests(8000);
+        // Sumber offline ikut diuji ulang di dalam checkApiSources (putaran 8): status
+        // "Offline" dari satu timeout tidak lagi menetap padahal backend hidup.
         await checkApiSources({ all: recheck });
         forceLoading = false;
         render();

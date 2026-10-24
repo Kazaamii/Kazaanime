@@ -728,12 +728,21 @@ export function activeApiSources() {
 }
 
 /**
- * Cek ringan sumber yang statusnya belum diketahui (atau semua bila all=true).
- * Sumber yang sudah terpakai oleh halaman tidak di-ping ulang.
+ * Cek ringan sumber yang statusnya belum diketahui, yang sedang OFFLINE, atau semua bila
+ * `all=true`. Sumber yang sudah online tidak di-ping ulang.
+ *
+ * 24 Okt 2026 (putaran 8) — perbaikan bug: keadaan "Offline" bisa berasal dari SATU
+ * permintaan yang kebetulan timeout (cold start serverless / jaringan ponsel). Dulu
+ * widget status hanya memeriksa sumber berstatus `unknown`, sehingga backend yang
+ * sebenarnya hidup tetap tertulis "Offline" sampai pengguna menekan tombol status di
+ * footer (yang memakai `all=true`). Sekarang sumber offline ikut diuji ulang lewat ping
+ * ringan setiap widget status dibuka, jadi statusnya tidak "nyangkut".
  */
 export async function checkApiSources({ all = false } = {}) {
     const health = getAllHealth();
-    const targets = activeApiSources().filter((s) => all || health[s].state === 'unknown');
+    const targets = activeApiSources().filter((s) => all
+        || health[s].state === 'unknown'
+        || health[s].state === 'offline');
     await Promise.allSettled(targets.map((s) => PINGS[s]()));
     return getAllHealth();
 }
