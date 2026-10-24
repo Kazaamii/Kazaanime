@@ -23,6 +23,7 @@ beradapter.
 | **L** | 24 Okt 2026 (putaran 6): **filter genre ringkas** — genre situs (AnimeKu/Oploverz) pindah dari panel ±80 tombol ke satu `<select>` di kartu **Tahun/Musim/Urutkan** (`#genreSite`, `<optgroup>` per situs, daftar baru diminta saat disentuh, cache `kz:site-genres`); **Sub Indo diprioritaskan** — server **AnimeKu & Oploverz** selalu dicoba dan tampil paling depan di daftar server, sumber sudah ada baru menambah keduanya | ✅ Selesai |
 | **M** | 24 Okt 2026 (putaran 7): **pencarian header menggabungkan AnimeKu & Oploverz** — grup "AnimeKu & Oploverz" di autocomplete (maks 3 judul/situs, kartu langsung memutar episode) + bagian **"Langsung dari AnimeKu & Oploverz"** di halaman hasil pencarian | ✅ Selesai |
 | **N** | 24 Okt 2026 (putaran 8): **genre situs hanya di Jelajah** (`#genreSite` dihapus dari beranda), **status backend tidak nyangkut "Offline"** (tes ulang ikut mengulang sumber `offline`), **sandbox & tombol pop-up dihapus total** diganti **lapisan anti-iklan** satu klik + tombol **Pemutar Eksternal**, dan **dua server Sub Indo berlabel AnimeKu & Animeloverz** di paling depan | ✅ Selesai |
+| **O** | 24 Okt 2026 (putaran 9): **tata letak ponsel/Android** — menu akun tidak lagi melayang & terpotong (`overflow-x:clip` + sheet `position:fixed`, ditutup saat digulir), **tombol player tidak saling menimpa** (grid 2 kolom), **panel Server Streaming pindah ke bawah player** dengan tombol berjejer, urutan **server → judul + chip info → episode → sinopsis** | ✅ Selesai |
 
 ---
 
@@ -36,11 +37,12 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅛 putaran 6 (24 Okt 2026): genre situs jadi **satu `<select>`** di kartu filter (beranda ringan) + **server Sub Indo AnimeKu & Oploverz** diprioritaskan di player
 🅜 putaran 7 (24 Okt 2026): pencarian header & halaman hasil juga memakai **AnimeKu & Oploverz** (bukan hanya AniList/Kitsu)
 🅝 putaran 8 (24 Okt 2026): **genre situs pindah ke Jelajah saja**, **sandbox/pop-up dihapus** → lapisan anti-iklan + pemutar eksternal, **2 server Sub Indo berlabel** (AnimeKu & Animeloverz), status backend bisa dites ulang
+🅞 putaran 9 (24 Okt 2026): **tata letak ponsel** — menu akun, tombol player, dan panel server dirapikan (server di bawah player, episode di bawahnya)
 
 ```
 kazanime/
 ├── index.html                 ✅🅔🅚🅝 homepage: hero, JADWAL, GENRE (filter Tahun/Musim/Urutan + hasil + 19 genre AniList; genre situs hanya di katalog.html), SUB INDO (per sumber, + kolom cari), ongoing, populer, baru rilis, donghua
-├── watch.html                 ✅🅒 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=]
+├── watch.html                 ✅🅒🅞 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=] (panel server `.server-bar` di bawah player, daftar episode di sidebar)
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
 ├── katalog.html               ✅🅘🅙🅚 Jelajah: ?source=…&genre=<slug>&year=<yyyy>&season=<winter|spring|summer|fall>&filter=<bagian>&q=<kata kunci>; bagian berurutan + expand + Lihat Semua + kolom cari
 ├── bookmark.html              🅙 halaman Bookmark sendiri: cari, urutkan, hapus dari daftar (menggantikan section beranda & tautan navbar)
@@ -59,7 +61,7 @@ kazanime/
 │   ├── search.css             ✅ tab sumber, filter, muat lagi
 │   ├── katalog.css            ✅🅘🅙 blok bagian, tombol expand, tautan "Lihat Semua" (.see-all), pemilih genre, kolom cari
 │   ├── bookmark.css           🅙 toolbar cari/urutkan halaman Bookmark (variabel tema)
-│   └── watch.css              ✅🅒🅝 player, server, episode, info, download, platform legal (+ urutan mobile), lapisan anti-iklan `.player-ad-shield`
+│   └── watch.css              ✅🅒🅝🅞 player, `.server-bar` berjejer 2 kolom, episode, info, download, platform legal (+ urutan mobile putaran 9), lapisan anti-iklan `.player-ad-shield`
 ├── js/
 │   ├── theme-preload.js       ✅ script klasik di <head>: pasang tema sebelum render (anti-kedip)
 │   ├── config.js              ✅🅓🅔🅕🅙 konstanta UI + API_CONFIG (backend.enabled: true), CACHE_TTL, SCHEDULE + STREAMING_SERVERS, PLAYER (hls, aiSubtitle, adShield, siteLabels AnimeKu/Animeloverz, subtitlePriority/referrerPolicy) & SUB_INDO (24 hasil, 6 kartu cuplikan), GENRES (18 genre AniList + Isekai)
@@ -1213,6 +1215,33 @@ membuka tab baru"*, *"pilihan server sub indo tolong dibuat 2 dan tuliskan dari 
 6. **Regresi ikut diperbaiki.** `js/home.js` ternyata memakai `getSourceBrowse` untuk panel Donghua tanpa
    mengimpornya (panel selalu gagal dengan *"getSourceBrowse is not defined"*) — impor dikembalikan dan
    dibuktikan lewat smoke happy-dom.
+
+### Perubahan perilaku (24 Okt 2026 — putaran kesembilan: tata letak ponsel & halaman nonton)
+
+Permintaan pengguna: *"untuk akun malah seperti gif di atas"*, *"posisi server jangan di bawah
+harusnya kesamping berjejer di bawah player"*, *"keterangan tamat rating dsb … lebih baik di atasnya
+sinopsis"*, *"urutanya Server dlu dibawahnya baru eps"*.
+
+1. **Menu akun di Android.** Akar masalahnya bukan ukuran teks, melainkan
+   `.navbar-inner{overflow-x:hidden}` di ≤768px: nilai itu memaksa `overflow-y` menjadi `auto`,
+   sehingga navbar menjadi kotak gulir. Menu profil yang `position:absolute` di dalamnya menambah
+   area gulir → Chrome Android menggeser isi navbar (logo hilang, avatar terdorong keluar layar) dan
+   memotong menu di tepi bawah navbar. Perbaikan: `overflow-x:clip` (memotong tanpa pernah membuat
+   kotak gulir; `hidden` tetap ditulis lebih dulu sebagai cadangan), menu menjadi **sheet
+   `position:fixed`** tepat di bawah navbar dengan lebar layar, `max-height` + gulir sendiri, dan
+   `text-size-adjust:100%` agar Chrome tidak membesarkan teks sendiri. Menu juga **menutup otomatis
+   saat halaman digulir** supaya tidak menetap di atas konten.
+2. **Tombol di bawah player tidak menimpa.** Dulu keempat tombol dipaksa `flex:1` sehingga
+   "Pemutar Eksternal" menimpa "Berikutnya" dan "Server Lain" terpotong. Di ≤600px kini grid dua
+   kolom dengan urutan **Sebelumnya → Berikutnya → Server Lain → Eksternal**, dan label panjang
+   "Pemutar Eksternal" diganti "Eksternal" (teks penuh tetap ada untuk desktop dan pembaca layar).
+3. **Panel Server Streaming pindah ke bawah player.** Panel `.server-bar` kini menjadi baris penuh
+   tepat setelah tombol player (sebelum judul), bukan lagi di dalam sidebar. Di desktop ia membentang
+   selebar kolom detail di atas grid; di ponsel tombol server tampil **berjejer dua kolom**.
+4. **Urutan ponsel.** player → tombol player → **Server Streaming** → judul + tombol bookmark →
+   chip info (rating, Tamat, TV, musim, jumlah episode, durasi, studio, Multi Sub, Multi-Server) →
+   **daftar episode** → sinopsis → download → platform legal → rekomendasi. Jadi chip info tetap
+   **di atas sinopsis** dan server selalu **di atas daftar episode**.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
