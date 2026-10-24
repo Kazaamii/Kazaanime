@@ -408,15 +408,17 @@ test('player: penahan pop-up dipasang otomatis + pelepas per host (bukan tombol)
     assert.doesNotMatch(playerJs, /btnSafeMode|isSafeFrameOn|saveSafeFrame/);
 });
 
-test('player: sandbox tidak pernah mematikan playback (pelepas otomatis & manual)', () => {
+test('player: sandbox tetap aktif saat timeout; pelepasan hanya manual', () => {
     const releaseBlock = playerJs.slice(playerJs.indexOf('function releaseFrameGuard'), playerJs.indexOf('function releaseFrameGuard') + 1200);
     assert.match(releaseBlock, /applyFramePolicy\(frame, false\)/);
-    assert.match(releaseBlock, /play\(active\)/, 'server yang sama dimuat ulang tanpa sandbox');
-    // Timeout memuat: guard dilepas dulu (server tidak langsung dibuang).
+    assert.match(releaseBlock, /play\(active\)/, 'pelepasan manual memuat ulang server yang sama');
+    assert.match(releaseBlock, /reason === 'manual'/);
+    const timeoutBlock = playerJs.slice(playerJs.indexOf('// Jangan melepas sandbox otomatis'), playerJs.indexOf('// Jangan melepas sandbox otomatis') + 500);
+    assert.match(timeoutBlock, /fail\(server, 'timeout'\)/, 'timeout mencoba server berikutnya dengan sandbox tetap aktif');
+    assert.doesNotMatch(timeoutBlock, /releaseFrameGuard\('timeout'\)/);
     const guardTimerBlock = playerJs.slice(playerJs.indexOf('guardTimer = setTimeout'));
-    assert.match(guardTimerBlock.slice(0, 400), /releaseFrameGuard\('timeout'\)/);
-    const timeoutBlock = playerJs.slice(playerJs.indexOf("fail(server, 'timeout');"));
-    assert.match(timeoutBlock.slice(0, 400), /fail\(server, 'timeout'\)/);
+    assert.match(guardTimerBlock.slice(0, 250), /Tidak ada pelepasan otomatis/);
+    assert.doesNotMatch(guardTimerBlock.slice(0, 250), /releaseFrameGuard\('timeout'\)/);
 });
 
 test('player: deteksi iklan yang memindahkan pemutar + bilah pemulihan', () => {
