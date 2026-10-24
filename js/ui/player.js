@@ -386,7 +386,7 @@ export function createPlayer({
     adBlockBtn = null,
 }) {
     /** @type {Record<string, Set<Function>>} */
-    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), adblock: new Set(), adguide: new Set(), fullscreen: new Set() };
+    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), adblock: new Set(), adguide: new Set(), fullscreen: new Set(), retrysubindo: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
         try { fn(detail); } catch (err) { console.error(`[player] handler "${name}" error:`, err); }
     });
@@ -686,15 +686,20 @@ export function createPlayer({
         serverBox.innerHTML = String(html`${servers.map((s) => {
             const active = s.id === currentId && (state === 'loading' || state === 'playing');
             const isFailed = failed.has(s.id);
-            const cls = ['server-btn', active ? 'active' : '', s.available ? '' : 'is-disabled', isFailed ? 'is-failed' : ''].filter(Boolean).join(' ');
+            // Putaran 16: placeholder Sub Indo (sumber tidak terjangkau) tetap tampil & bisa diklik.
+            const offline = Boolean(s.placeholder);
+            const cls = ['server-btn', active ? 'active' : '', s.available ? '' : 'is-disabled', isFailed ? 'is-failed' : '', offline ? 'is-offline' : ''].filter(Boolean).join(' ');
             const lock = s.pending
                 ? html` <span class="server-badge server-badge--pending">mencari…</span>`
-                : s.available ? '' : html` <span class="server-lock" aria-label="tidak tersedia">${ICON_LOCK}</span>`;
+                : s.available || offline ? '' : html` <span class="server-lock" aria-label="tidak tersedia">${ICON_LOCK}</span>`;
+            const offlineBadge = offline
+                ? html` <span class="server-badge server-badge--offline" title="Klik untuk mencari ulang">tidak terjangkau</span>`
+                : '';
             // Putaran 11: host yang ada di daftar blokir iklan diberi tanda ⚠ (tetap bisa dipilih).
             const adWarn = s.adRisk
                 ? html` <span class="server-badge server-badge--ad" title="Host server ini ada di daftar blokir iklan (AdGuard DNS)">⚠</span>`
                 : '';
-            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available ? 'false' : 'true'}" title="${s.available ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
+            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available || offline ? 'false' : 'true'}" title="${s.available || offline ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge && !offline ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${offlineBadge}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
         })}`);
         emit('servers', { count: available().length });
         // Putaran 15: tombol blokir hanya muncul untuk server luar yang sedang diputar.
@@ -1254,6 +1259,11 @@ export function createPlayer({
         const s = byId(btn.dataset.server);
         if (!s) return;
         if (!s.available) {
+            // Putaran 16: tombol Sub Indo "tidak terjangkau" = aksi cari ulang (bukan error).
+            if (s.placeholder) {
+                emit('retrysubindo', { site: s.site || '', name: s.name });
+                return;
+            }
             showToast(s.pending ? `${s.name} masih dicari, tunggu sebentar…` : `${s.name} tidak tersedia untuk anime ini. Coba server lain.`, 'info');
             return;
         }

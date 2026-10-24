@@ -1554,7 +1554,71 @@ block nya khusus server luar seperti anilist dan kitsu. perbaiki. lagi"*.
    muat ulang server yang sama → tetap tanpa lapisan (pilihan diingat); klik lagi → lapisan kembali
    dan penyimpanan kosong; kembali ke server Sub Indo → sandbox kembali dan tombol tersembunyi.
 
+### Perubahan perilaku (24 Okt 2026 — putaran keenam belas: tombol Sub Indo tidak pernah hilang)
+
+Permintaan pengguna: *"mana server sub indo nya kembalikan"* (pilih: **tombol AnimeKu & Animeloverz
+selalu tampil walau sumber mati**, dengan status “sumber tidak terjangkau” + tombol coba ulang).
+
+**Penyebab sebenarnya.** Fitur Sub Indo tidak pernah dihapus. Dua tombolnya dibangun dari server
+hasil scraping: bila backend tidak bisa menjangkau AnimeKu/Oploverz — jaringan sandbox, situs
+sedang down, episode belum punya tautan, atau respons 502 `UPSTREAM_UNREACHABLE` — daftar server
+hanya berisi server luar, sehingga AnimeKu & Animeloverz **seolah hilang**. Perilakunya benar
+secara data, salah secara tampilan.
+
+1. **Slot Sub Indo yang permanen** — modul baru `js/services/subindo-slots.js`:
+   `SUB_INDO_SITES = ['animeku','oploverz']`, `fillSubIndoServers(list, { sites })` menjamin daftar
+   selalu berisi **tepat satu entri per situs, AnimeKu dulu**. Server asli dipakai apa adanya; situs
+   yang tidak mengirim server diisi `subIndoPlaceholder(site)`:
+   `{ id: 'subindo-animeku-offline', available: false, placeholder: true, url: null, lang: 'id',
+   source: 'backend:animeku', kind: 'embed', origins: [] }` dengan alasan
+   *“Sumber sedang tidak terjangkau. Klik untuk mencari ulang server Sub Indo.”*
+2. **Dipasang di kedua jalur `servers()`** (`js/watch.js`): jalur normal
+   `numbered([...fillSubIndoServers(subIndo), ...multi, ...local, ...otherFallback, ...english])` dan
+   jalur *static-first* `[...fallback, ...fillSubIndoServers(subIndoStatic), ...server lain]`.
+   `numbered()` memberi placeholder badge **“tidak terjangkau”** + keterangan tanpa menghilangkan
+   dua aturan lama: satu server per situs (`firstPerSite`) dan Sub Indo paling depan.
+3. **Tombol yang jelas bisa diklik** (`js/ui/player.js`). Placeholder dirender dengan kelas
+   `server-btn is-offline` — **tanpa** gembok 🔒, `aria-disabled="false"`, border putus-putus kuning
+   (`#f59e0b`) dan badge `.server-badge--offline` “tidak terjangkau”; badge generik tidak dirender
+   dua kali untuk tombol yang sama. Server yang benar-benar tidak tersedia tetap memakai gaya lama
+   (`is-disabled` + gembok), jadi kedua keadaan tidak tertukar. Petunjuk di `watch.html`
+   (`p.server-hint`) menjelaskan: tombol AnimeKu/Animeloverz selalu ada, klik bila bertanda
+   “tidak terjangkau”.
+4. **Klik = cari ulang, bukan error.** Delegasi klik `[data-server]` mengirim
+   `player.emit('retrysubindo')` untuk placeholder (bukan toast *“tidak tersedia untuk anime ini”*).
+   `retrySubIndo()` di `js/watch.js` memanggil `retrySourcesNow()` →
+   `await loadExtras(ep, { refresh: true })` → `player.setServers(servers())`: **tanpa memuat ulang
+   halaman**, video yang sedang berjalan tidak diputus, dan klik berulang dijaga `subIndoRetrying`
+   (toast *“Pencarian ulang server Sub Indo masih berjalan…”*). `refresh` diteruskan sampai
+   `getBackendEpisode()` (`force: true, noCache: true`, `js/api/sources.js`) dan ke **setiap**
+   permintaan episode di `getEpisodeExtras()` (sumber asal, ulangan, padanan, ulangan padanan) —
+   tanpa itu klik bisa mengembalikan hasil cache lama dan tombol tetap “tidak terjangkau”. Bila masih
+   gagal, tombol tetap ada — pengguna bisa mencoba lagi nanti.
+5. **Tidak ada regresi keamanan/putar otomatis.** Placeholder `available:false` sehingga tidak
+   pernah diputar otomatis (`available()`/`keepPlayable` melewatinya), tidak punya `url` sehingga
+   tidak ada permintaan jaringan dan tidak bisa dibuka; `filterAdServers` aman terhadap `url:null`.
+   Server Sub Indo **asli** tetap ber-sandbox penuh sesuai putaran 15 (`applyFramePolicy` satu-satunya
+   pemasang sandbox, tanpa `allow-popups`, tanpa tombol pelepas), dan server luar tetap tanpa sandbox
+   + tombol “Matikan blokir”.
+6. **Tes & verifikasi.** `server/test/round16-subindo-visible.test.js` (12 tes) mengunci: dua slot
+   selalu ada untuk input kosong/`null`/bukan-array, server asli dipertahankan & satu per situs,
+   hanya satu badge, `retrysubindo` terpasang, `refresh` diteruskan ke semua permintaan episode, dan
+   CSS `.server-btn.is-offline` tidak menyamakan tombol dengan server mati. Dua tes lama (putaran 6 &
+   8) diperbarui ke literal baru `fillSubIndoServers(subIndo)` tanpa mengubah jaminan urutan. Total
+   `npm test` **528 tes lulus**.
+   Uji runtime `happy-dom` (backend episode disetel 502 `UPSTREAM_UNREACHABLE`, kondisi sandbox):
+   daftar tombol =
+   `AnimeKu tidak terjangkau | Animeloverz tidak terjangkau | Server 1 Multi Sub | Server 2–5 Sub Eng`;
+   tidak ada `<iframe>` video yang dibuat; klik AnimeKu menambah request episode (bukan toast
+   “tidak tersedia”), muncul toast “Mencari ulang server Sub Indo…”, dan dua tombol Sub Indo tetap
+   ada setelah pencarian ulang gagal. **Skenario pulih:** sumber dihidupkan lalu tombol diklik lagi →
+   AnimeKu berubah menjadi `AnimeKu Sub Indo` yang bisa diputar (`sandbox` terpasang, tanpa
+   `allow-popups`, tombol “Matikan blokir” tetap tersembunyi), Animeloverz tetap tampil sebagai
+   “tidak terjangkau”, dan jumlah tombol Sub Indo tetap dua (tidak dobel). Di produksi (sumber hidup)
+   kedua tombol tetap tampil normal dengan server aslinya — tidak ada perubahan pada pemutaran.
+
 ### Sengaja dihapus (mati / palsu / duplikat)
+
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
 - "Streaming page" di dalam homepage → menjadi `watch.html` (punya URL, bisa di-share, tombol Back browser bekerja)
 - Modal YouTube + peta video ID manual + `confirm()` — tidak pernah terpanggil sejak `openPlayer` di-override

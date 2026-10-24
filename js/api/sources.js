@@ -391,8 +391,18 @@ function toEpisodeMedia(json) {
  * Server embed & link download satu episode.
  * @returns {Promise<{servers: object[], downloads: {quality:string,size:string,format:string,subtitle:string,links:{provider:string,url:string}[]}[], source: string}>}
  */
-export function getBackendEpisode(slug, ep, { signal } = {}) {
-    return call(`/${encodeURIComponent(slug)}/episode/${encodeURIComponent(ep)}`, { ttl: CACHE_TTL.search, signal, transform: toEpisodeMedia });
+/**
+ * @param {{signal?: AbortSignal, refresh?: boolean}} [opts] `refresh` = lewati cache (tombol
+ *   "cari ulang" Sub Indo di halaman nonton, putaran 16) supaya klik tidak mengembalikan hasil gagal lama.
+ */
+export function getBackendEpisode(slug, ep, { signal, refresh = false } = {}) {
+    return call(`/${encodeURIComponent(slug)}/episode/${encodeURIComponent(ep)}`, {
+        ttl: CACHE_TTL.search,
+        signal,
+        force: refresh,
+        noCache: refresh,
+        transform: toEpisodeMedia,
+    });
 }
 
 /** URL relatif ke proxy stream milik sendiri (bukan URL luar dari data penyedia). */

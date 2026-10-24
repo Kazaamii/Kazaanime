@@ -46,6 +46,7 @@ import {
 import { onBookmarksChange } from './services/bookmark.js';
 import { getWatchedEpisodes, markWatched } from './services/history.js';
 import { episodeKey, getReactionCounts, isLiked, likedCount, setReaction } from './services/reactions.js';
+import { fillSubIndoServers, SUB_INDO_OFFLINE_BADGE } from './services/subindo-slots.js';
 import { storage } from './services/storage.js';
 import { icon } from './ui/icons.js';
 
@@ -179,13 +180,19 @@ function numbered(list) {
             ...s,
             name,
             flag: '',
-            badge: [LANG_BADGE[s.lang], SUBTITLE_TYPE_BADGE[s.subtitleType]].filter(Boolean).join(' · '),
-            description: [
-                LANG_DESC[s.lang],
-                SUBTITLE_TYPE_DESC[s.subtitleType],
-                site ? `diputar langsung dari ${site}` : '',
-                s.source === 'static' ? 'server cadangan' : '',
-            ].filter(Boolean).join(' • ') || name,
+            // Putaran 16: tombol Sub Indo yang sumbernya tidak terjangkau tetap tampil dengan
+            // badge "tidak terjangkau" (bukan disembunyikan) dan bisa diklik untuk mencari ulang.
+            badge: s.placeholder
+                ? SUB_INDO_OFFLINE_BADGE
+                : [LANG_BADGE[s.lang], SUBTITLE_TYPE_BADGE[s.subtitleType]].filter(Boolean).join(' · '),
+            description: s.placeholder
+                ? s.reason || SUB_INDO_OFFLINE_BADGE
+                : [
+                    LANG_DESC[s.lang],
+                    SUBTITLE_TYPE_DESC[s.subtitleType],
+                    site ? `diputar langsung dari ${site}` : '',
+                    s.source === 'static' ? 'server cadangan' : '',
+                ].filter(Boolean).join(' • ') || name,
         };
     });
 }
@@ -218,15 +225,24 @@ const hostOf = (value) => {
 
 const servers = () => {
     const fallback = withProviderServers(staticServers(), providerResult);
-    if (!scrapeFirst()) return numbered([...fallback, ...backendServers]);
+    if (!scrapeFirst()) {
+        const subIndoStatic = firstPerSite(backendServers.filter(isSubIndoSource));
+        return numbered([
+            ...fallback,
+            ...fillSubIndoServers(subIndoStatic),
+            ...backendServers.filter((server) => !isSubIndoSource(server)),
+        ]);
+    }
     // Dua tombol Sub Indo: AnimeKu & Animeloverz (satu server per situs).
     const subIndo = firstPerSite(backendServers.filter(isSubIndoSource));
+    // Putaran 16: AnimeKu & Animeloverz selalu punya tombol. Bila backend tidak mengirim server
+    // untuk salah satunya, slot diisi placeholder "tidak terjangkau" yang bisa diklik (cari ulang).
     const rest = backendServers.filter((server) => !isSubIndoSource(server));
     const multi = [...rest.filter((s) => s.lang === 'multi'), ...fallback.filter((s) => s.lang === 'multi')];
     const local = rest.filter((s) => s.lang !== 'en' && s.lang !== 'multi');
     const otherFallback = fallback.filter((s) => s.lang !== 'multi' && s.lang !== 'en');
     const english = [...rest.filter((s) => s.lang === 'en'), ...fallback.filter((s) => s.lang === 'en')];
-    return numbered([...subIndo, ...multi, ...local, ...otherFallback, ...english]);
+    return numbered([...fillSubIndoServers(subIndo), ...multi, ...local, ...otherFallback, ...english]);
 };
 
 /**
@@ -376,6 +392,9 @@ const player = createPlayer({
     clearLocalSubtitleButton: $('#btnClearLocalSubtitle'),
     localSubtitleInput: $('#localSubtitleInput'),
 });
+
+// Putaran 16: tombol Sub Indo "tidak terjangkau" bisa diklik → cari ulang tanpa memuat halaman.
+player.on('retrysubindo', () => { retrySubIndo(); });
 
 const episodes = createEpisodeList({
     grid: $('#episodeGrid'),
@@ -831,6 +850,30 @@ function applyDetail(data) {
 const providerTitles = () => [...new Set(scrapeTitles().map((t) => String(t || '').trim()).filter(Boolean))];
 const providerKeyFor = () => `${anime.ids?.anilist || ref.anilist || ''}|${titlesKey(providerTitles())}`;
 
+/**
+ * Cari ulang server Sub Indo (AnimeKu & Animeloverz) tanpa memuat ulang halaman — putaran 16.
+ * Dipakai tombol server "tidak terjangkau": mengulang sumber yang sedang cooldown, memuat ulang
+ * server episode, lalu menyegarkan daftar tombol. Pemutaran yang sedang berjalan tidak diputus.
+ */
+let subIndoRetrying = false;
+async function retrySubIndo() {
+    if (subIndoRetrying) {
+        showToast('Pencarian ulang server Sub Indo masih berjalan…', 'info');
+        return;
+    }
+    subIndoRetrying = true;
+    showToast('Mencari ulang server Sub Indo (AnimeKu & Animeloverz)…', 'info', 5000);
+    try {
+        retrySourcesNow();
+        await loadExtras(ep, { refresh: true });
+        if (player.state !== 'message') player.setServers(servers());
+    } catch (err) {
+        showToast(friendlyError(err), 'error', 6000);
+    } finally {
+        subIndoRetrying = false;
+    }
+}
+
 /** Perbarui tombol server (atau mulai putar bila player menunggu tanpa server) — kecuali masih menahan untuk scraping. */
 function refreshServers() {
     if (total === 0 || player.state === 'message' || holdFor === ep) return;
@@ -954,7 +997,7 @@ async function loadKusonimeDownloads() {
     }
 }
 
-async function loadExtras(n) {
+async function loadExtras(n, { refresh = false } = {}) {
     extrasCtrl?.abort();
     const ctrl = new AbortController();
     extrasCtrl = ctrl;
@@ -963,7 +1006,7 @@ async function loadExtras(n) {
     renderDownloads(els.downloads, { loading: true });
     // Full-series Kusonime packs load from applyDetail, not with episode-specific extras.
     try {
-        const res = await getEpisodeExtras(anime, n, { slug: ref.slug, titles: scrapeTitles(), signal: ctrl.signal });
+        const res = await getEpisodeExtras(anime, n, { slug: ref.slug, titles: scrapeTitles(), signal: ctrl.signal, refresh });
         if (extrasCtrl === ctrl) extrasBusy = false;
         if (ctrl.signal.aborted || n !== ep) return;
         if (!res.servers.length && rescrapePending) {
