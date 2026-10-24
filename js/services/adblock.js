@@ -32,6 +32,9 @@ export const AD_HOSTS = Object.freeze([
     'trafficfactory.biz', 'a-ads.com', 'coinzilla.com', 'bitmedia.io', 'cointraffic.io',
     'ad-maven.com', 'admaven.com', 'clickaine.com', 'adnium.com', 'adspy.com',
     'monetag.com', 'onclickalgo.com', 'clickadu.com', 'adprovider.net', 'adpushup.com',
+    'aniview.com', 'adskeeper.com', 'bidvertiser.com', 'content.ad', 'zedo.com',
+    'adform.net', 'trafficstars.com', 'tsyndicate.com', 'magsrv.com', 'clksite.com',
+    'profitableratecpm.com', 'highperformanceformat.com', 'popin.cc',
     'adroll.com', 'smartadserver.com', 'rubiconproject.com', 'pubmatic.com',
     'openx.net', 'sharethrough.com', 'teads.tv', 'spotxchange.com', 'yieldmo.com',
 ]);
@@ -48,6 +51,9 @@ export const AD_URL_PATTERNS = Object.freeze([
     /(?:^|[/?&._-])directlink(?:[/?&._-]|$)/i,
     /\/ad(?:s|v)?\/(?:click|redirect|go|link)/i,
     /[?&](?:ad_?id|adzone|zoneid|aff_?id|affiliate_?id|click_?id|campaign_?id)=[^&]*/i,
+    /\/(?:adserver|adserv|adsrv)\//i,
+    /(?:^|[/?&._-])(?:smartlink|direct-?link)(?:[/?&._-]|$)/i,
+    /(?:^|[/?&._-])(?:newtab|new-tab|popup)(?:[/?&._-]|$)/i,
 ]);
 
 /** Host iklan yang cocok (atau null). */
@@ -162,6 +168,27 @@ export async function checkHosts(hosts = [], { timeout = 4000 } = {}) {
         // backend mati / DNS AdGuard tidak terjangkau → tidak ada info, bukan error pengguna
     }
     return fresh;
+}
+
+/**
+ * Taruh server berisiko (host iklan / daftar blokir AdGuard) di PALING BELAKANG.
+ * Putaran 13 (24 Okt 2026): pemutaran otomatis memakai server pertama, jadi server berisiko
+ * tidak boleh menempati urutan pertama — iklan muncul lebih dulu. Server berisiko TETAP ada
+ * dan tetap bisa dipilih manual (host video sah kadang terdaftar di daftar blokir).
+ * @template T
+ * @param {T[]} servers
+ * @param {(server: T) => boolean} [isRisky]
+ * @returns {T[]}
+ */
+export function demoteAdRisk(servers = [], isRisky = () => false) {
+    const list = Array.isArray(servers) ? servers : [];
+    const clean = [];
+    const risky = [];
+    for (const server of list) {
+        if (isRisky(server)) risky.push(server);
+        else clean.push(server);
+    }
+    return risky.length && clean.length ? [...clean, ...risky] : list;
 }
 
 /**

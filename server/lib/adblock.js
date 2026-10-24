@@ -34,6 +34,10 @@ export const AD_HOSTS = Object.freeze([
     'trafficfactory.biz', 'a-ads.com', 'coinzilla.com', 'bitmedia.io', 'cointraffic.io',
     'ad-maven.com', 'admaven.com', 'clickaine.com', 'adnium.com', 'adspy.com',
     'monetag.com', 'onclickalgo.com', 'clickadu.com', 'adprovider.net', 'adpushup.com',
+    // Jaringan iklan video & popunder yang sering menempel di situs anime (putaran 13)
+    'aniview.com', 'adskeeper.com', 'bidvertiser.com', 'content.ad', 'zedo.com',
+    'adform.net', 'trafficstars.com', 'tsyndicate.com', 'magsrv.com', 'clksite.com',
+    'profitableratecpm.com', 'highperformanceformat.com', 'popin.cc',
     // Tracker / analytics iklan yang tidak diperlukan pemutar
     'adroll.com', 'smartadserver.com', 'rubiconproject.com', 'pubmatic.com',
     'openx.net', 'sharethrough.com', 'teads.tv', 'spotxchange.com', 'yieldmo.com',
@@ -56,6 +60,10 @@ export const AD_URL_PATTERNS = Object.freeze([
     /(?:^|[/?&._-])directlink(?:[/?&._-]|$)/i,
     /\/ad(?:s|v|vert|vertisement)?\/(?:click|redirect|go|link|frame|banner)/i,
     /[?&](?:ad_?id|adzone|zoneid|aff_?id|affiliate_?id|click_?id|campaign_?id)=[^&]*/i,
+    // Putaran 13: jalur server iklan / smartlink / pop-up yang tidak pernah berisi video.
+    /\/(?:adserver|adserv|adsrv)\//i,
+    /(?:^|[/?&._-])(?:smartlink|direct-?link)(?:[/?&._-]|$)/i,
+    /(?:^|[/?&._-])(?:newtab|new-tab|popup)(?:[/?&._-]|$)/i,
 ]);
 
 /**

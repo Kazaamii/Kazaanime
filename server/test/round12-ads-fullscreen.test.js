@@ -14,9 +14,9 @@
  *     iklan (penjelasan) tetap ada.
  *  2. Penahan pop-up SELALU AKTIF: iframe dipasang sandbox yang melarang tab baru
  *     (`allow-popups`/`allow-popups-to-escape-sandbox`/`allow-top-navigation*` tidak ada).
- *  3. Tidak ada regresi pemutaran: host yang menolak sandbox diingat per host, sandbox
- *     dilepas otomatis setelah `releaseAfterMs`, dan tautan pelepas manual tersedia —
- *     tidak pernah ada layar penolakan permanen.
+ *  3. Tidak ada regresi pemutaran tanpa mengorbankan pengaman: sandbox tidak pernah dilepas
+ *     (putaran 13 menghapus tautan/manual release); embed yang menolak sandbox diganti server
+ *     berikutnya dan tidak pernah ada layar penolakan permanen.
  *  4. Layar penuh standar pemutar: permintaan fullscreen pada wadah pemutar, kunci
  *     orientasi lanskap (berputar di ponsel), tombol keluar, dan status tombol yang sinkron.
  *  5. Sub Indo konsisten antar-episode: daftar situs padanan disimpan per sesi dan sumber
@@ -55,31 +55,27 @@ test('config: penahan pop-up selalu aktif dan melarang tab baru', () => {
     for (const forbidden of ['allow-popups', 'allow-top-navigation', 'allow-modals']) {
         assert.ok(!policy.includes(forbidden), `tab baru/top-navigation dilarang: ${forbidden}`);
     }
-    assert.match(guard, /releaseAfterMs:\s*\d+/);
-    assert.match(guard, /hintAfterMs:\s*\d+/);
-    assert.match(guard, /memoryLimit:\s*\d+/);
-    // Lepas otomatis HARUS lebih cepat dari batas muat player, kalau tidak embed mati lebih dulu.
-    assert.match(playerJs, /Math\.min\(PLAYER\.frameGuard\.releaseAfterMs, PLAYER\.loadTimeout\)/);
+    // Putaran 13: tidak ada pelepasan otomatis maupun tautan manual.
+    assert.doesNotMatch(guard, /releaseAfterMs|hintAfterMs|memoryLimit/);
     // Tidak ada lagi sandbox opsional / Safe Mode di konfigurasi.
     assert.doesNotMatch(configJs, /PLAYER\.safeFrame\s*=/);
     assert.doesNotMatch(configJs, /safeFrame:\s*Object\.freeze/);
     assert.doesNotMatch(configJs, /^\s*sandbox:\s*'/m);
 });
 
-test('config: host yang menolak sandbox diingat, kunci lama Safe Mode dibersihkan', () => {
-    assert.match(configJs, /noSandboxHosts:\s*'kz:no-sandbox'/);
-    assert.match(playerJs, /PLAYER\.frameGuard\?\.memoryLimit/);
-    // Penanda putaran 11 dibuang supaya pengguna lama tidak membawa setelan mati.
-    const drop = playerJs.match(/function dropLegacyGuardFlag\(\)\{?([\s\S]*?)\n\}/)?.[1] || '';
-    assert.ok(drop, 'dropLegacyGuardFlag ada');
+test('config: kunci lama dibersihkan supaya host tidak dimuat tanpa penahan pop-up', () => {
+    // Putaran 13: daftar host "tanpa sandbox" hanya dikenali untuk dibersihkan.
+    assert.match(configJs, /legacyNoSandbox:\s*'kz:no-sandbox'/);
+    assert.match(configJs, /legacySafeFrame:\s*'kz:safe-frame'/);
+    const drop = playerJs.slice(playerJs.indexOf('function dropLegacyGuardFlag'), playerJs.indexOf('function dropLegacyGuardFlag') + 1200);
     assert.match(drop, /STORAGE_KEYS\.popupGuard/);
     assert.match(drop, /legacySafeFrame/);
+    assert.match(drop, /legacyNoSandbox/);
 });
 
 test('player: sandbox dipasang otomatis tanpa tombol mode', () => {
     assert.match(playerJs, /iframe\.sandbox\.value = PLAYER\.frameGuard\.policy/);
-    assert.match(playerJs, /iframe\.dataset\.frameGuard = guarded \? 'on' : 'off'/);
-    assert.match(playerJs, /const guarded = !hostRefusesSandbox\(urlOf\(server\)\)/);
+    assert.match(playerJs, /iframe\.dataset\.frameGuard = 'on';/);
     // Tidak ada lagi tombol/status Safe Mode di halaman nonton.
     assert.doesNotMatch(watchHtml, /btnSafeMode/);
     assert.doesNotMatch(watchJs, /safeFrame|SafeMode|syncSafeModeButton/);
@@ -91,19 +87,11 @@ test('player: sandbox dipasang otomatis tanpa tombol mode', () => {
 });
 
 test('player: iklan tidak bisa membuka tab baru dan pemutar tetap bisa pulih', () => {
-    // Pelepas per host: setelah gagal dimuat beberapa kali, host diingat tanpa sandbox.
-    assert.match(playerJs, /function rememberNoSandboxHost\(host\)/);
-    assert.match(playerJs, /function releaseFrameGuard\(reason\)/);
-    assert.match(playerJs, /rememberNoSandboxHost\(hostOf\(urlOf\(active\)\)\)/);
-    assert.match(playerJs, /frame\.dataset\.frameGuard = 'off'/);
-    // Tautan pelepas manual (bukan layar penolakan permanen).
-    assert.match(playerJs, /function mountFrameHint\(/);
-    assert.match(playerJs, /data-frame-action="release"/);
-    assert.match(playerJs, /bar\.id = 'playerFrameHint'/);
-    assert.match(watchCss, /\.player-frame-hint\{/);
-    assert.match(playerJs, /releaseFrameGuard\('manual'\)/);
-    // Batas waktu pemutar: server TIDAK dibuang, sandbox dilepas lalu URL sama dimuat ulang.
-    assert.match(playerJs, /if \(iframe\.dataset\.frameGuard === 'on'\) \{\s*\n\s*releaseFrameGuard\('timeout'\);\s*\n\s*return;/);
+    // Putaran 13: tidak ada tawaran melepas pengaman — sandbox selalu aktif.
+    const code = playerJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    assert.doesNotMatch(code, /releaseFrameGuard|mountFrameHint|frameHint|guardTimer/);
+    assert.doesNotMatch(code, /removeAttribute\('sandbox'\)/);
+    assert.doesNotMatch(watchCss, /player-frame-hint/);
     // Bukti pengguna: iklan memindahkan pemutar → bilah pemulihan, bukan halaman JSON mati.
     assert.match(playerJs, /function mountAdRecovery\(/);
     assert.match(playerJs, /function noteFrameReload\(my\)/);

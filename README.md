@@ -39,7 +39,8 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅝 putaran 8 (24 Okt 2026): **genre situs pindah ke Jelajah saja**, **sandbox/pop-up dihapus** → lapisan anti-iklan + pemutar eksternal, **2 server Sub Indo berlabel** (AnimeKu & Animeloverz), status backend bisa dites ulang
 🅞 putaran 9 (24 Okt 2026): **tata letak ponsel** — menu akun, tombol player, dan panel server dirapikan (server di bawah player, episode di bawahnya)
 🅟 putaran 10 (24 Okt 2026): **akun tahan banting** (nama tanpa beda huruf, cadangan otomatis, cadangan/pulihkan berkas + kode), **server akun opsional** (file/Redis), foto avatar terverifikasi, **judul di atas player**, tab **AnimeKu/Oploverz** di pencarian
-🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`, pelepas per host otomatis/manual), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
+🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
+🅡 putaran 13 (24 Okt 2026): **tawaran pelepas pengaman dihapus** (tautan “Muat ulang tanpa pengaman” + ingatan host `kz:no-sandbox` — sekali klik dulu membuat iklan bisa membuka tab lagi), **daftar blokir iklan diperluas** (70 host / 13 pola, klien = server), **server berisiko ditaruh paling belakang** supaya pemutaran otomatis memakai host bersih
 
 ```
 kazanime/
@@ -425,10 +426,9 @@ foto, atau video.
 **🛡️ Penahan iklan player + pemutar eksternal (24 Okt 2026, putaran 8).** Sandbox iframe dan
 tombol **Pop-up diblokir/Pop-up diizinkan** sudah **dihapus** — justru sandbox itulah yang membuat
 host menampilkan *“Sandbox Not Allowed”* dan video tidak jalan. **Putaran 12 mengembalikan sandbox
-sebagai penahan tab baru yang selalu aktif** (tanpa `allow-popups`/`allow-top-navigation*`, dengan
-pelepas per host otomatis setelah 12 detik serta tautan *“Muat ulang tanpa pengaman”*), supaya
-`window.open()` iklan tidak pernah menghasilkan tab baru. Lihat
-bagian **putaran kedua belas** di bawah.
+sebagai penahan tab baru yang selalu aktif** (tanpa `allow-popups`/`allow-top-navigation*`) dan
+**tanpa tawaran pelepas** (putaran 13), supaya `window.open()` iklan tidak pernah menghasilkan tab
+baru. Lihat bagian **putaran kedua belas** dan **putaran ketiga belas** di bawah.
 Selain itu, di atas iframe diberi lapisan bening `#playerAdShield` yang menangkap klik pertama
 (`preventDefault` + `stopPropagation`, `{once:true}`) supaya klik iklan di area player tidak
 membuka tab baru. Lapisan dilepas setelah satu klik, jadi **klik berikutnya diteruskan ke player** —
@@ -1014,7 +1014,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - **Proteksi pop-up player**: iframe embed memakai sandbox tanpa `allow-popups`/`allow-top-navigation`, dengan tombol
   pelepas (tersimpan per browser) bila player menolak diputar. (**Diganti putaran 8**: sandbox + tombol itu dihapus,
   lihat “Penahan iklan player + pemutar eksternal”. **Putaran 12**: penahan tab baru aktif lagi tanpa tombol —
-  sandbox dipasang otomatis dengan pelepas per host.)
+  sandbox dipasang otomatis; **putaran 13** menghapus tawaran pelepasnya.)
 
 ### Perubahan perilaku (24 Okt 2026 — putaran kedua)
 - **Urutan beranda**: **Jadwal Rilis → Jelajahi Genre** langsung di bawah hero; panel **Anime Jepang Sub Indo**
@@ -1377,12 +1377,11 @@ nya harus benar standar player."*
    yang sempat terbuka), dan tab Kazanime tidak bisa dialihkan ke situs iklan. Izin yang dibutuhkan
    pemutar sah tetap ada: `allow-scripts`, `allow-same-origin`, `allow-forms`, `allow-presentation`,
    `allow-orientation-lock`, `allow-downloads`, `allow-fullscreen`.
-2. **Tidak ada regresi pemutaran (pelajaran putaran 3/8).** Host yang terbukti menolak sandbox
-   diingat **per host selama sesi** (`sessionStorage` `kz:no-sandbox`, maks 20 host) dan dimuat tanpa
-   sandbox sejak awal. Bila iframe tidak memuat apa pun dalam **12 detik**, sandbox dilepas dan URL
-   yang sama dimuat ulang otomatis (host diingat, server tidak dibuang). Tautan kecil
-   **“Video tidak muncul? Muat ulang tanpa pengaman”** muncul setelah 6 detik sebagai jalan keluar
-   manual. Tidak ada layar penolakan permanen, dan pemutaran tetap prioritas.
+2. **Pemutaran tidak dikorbankan.** *(Versi awal putaran 12 melepas sandbox otomatis setelah 12
+   detik dan menyediakan tautan “Muat ulang tanpa pengaman”; **putaran 13 menghapus keduanya** —
+   lihat bagian putaran ketiga belas.)* Sekarang sandbox tidak pernah dilepas: embed yang menolak
+   sandbox tidak mengirim `load`, server itu dianggap gagal, dan server berikutnya dicoba dengan
+   pengaman tetap aktif.
 3. **Layar penuh standar pemutar.** Tombol baru **Layar Penuh** (`#btnFullscreen`, di antara *Server
    Lain* dan *Pemutar Eksternal*). `requestFullscreen({ navigationUI: 'hide' })` dipanggil pada
    **wadah player** (`.streaming-player-wrapper`, bukan iframe) sehingga video mengisi layar tanpa
@@ -1409,13 +1408,54 @@ nya harus benar standar player."*
 5. **Panduan iklan tetap ada.** Tombol **Cara blokir iklan** (`#btnAdGuide`) dan `js/ui/ad-guide.js`
    dipertahankan (isi diperbarui: penahan pop-up selalu aktif, tidak ada lagi tombol Mode Aman), dan
    bilah pemulihan iklan memakai tombol **Pulihkan pemutar · Server lain · Cara blokir iklan**.
-6. **Tes.** `server/test/round12-ads-fullscreen.test.js` (11 tes) menjaga kebijakan sandbox, pelepas
-   per host, layar penuh + rotasi, cache padanan Sub Indo, dan percobaan ulang. Total `npm test`
-   **481 tes lulus**. Uji runtime `happy-dom` memverifikasi: sandbox tanpa `allow-popups`; tautan
-   pelepas muncul setelah 6,3 dtk; fullscreen menargetkan wadah + `lock('landscape')`; rotasi CSS
-   aktif saat kunci orientasi tidak ada; pelepas manual menghapus sandbox dan host diingat untuk
-   episode berikutnya; embed yang tidak pernah mengirim `load` melepas sandbox setelah batas waktu
-   pemutar **tanpa membuang server** (URL sama dimuat ulang, host diingat).
+6. **Tes.** `server/test/round12-ads-fullscreen.test.js` menjaga kebijakan sandbox, layar penuh +
+   rotasi, cache padanan Sub Indo, dan percobaan ulang. Uji runtime `happy-dom` memverifikasi:
+   sandbox tanpa `allow-popups`; fullscreen menargetkan wadah + `lock('landscape')`; rotasi CSS aktif
+   saat kunci orientasi tidak ada.
+
+### Perubahan perilaku (24 Okt 2026 — putaran ketiga belas: hapus tawaran pelepas, perluas blokir iklan)
+
+Permintaan pengguna: *"cek lagi saya sudah merge ya baru coba kamu optimal kan hapus tawaran buka
+tombol mode aman saat ada di layar stream itu membuat iklan keluar lagi optimisasi lagi"*.
+
+1. **Tawaran melepas pengaman dihapus seluruhnya.** Putaran 12 meninggalkan tautan **“Video tidak
+   muncul? Muat ulang tanpa pengaman”** (`#playerFrameHint`) dan ingatan host
+   (`sessionStorage kz:no-sandbox`). Sekali diklik, sandbox dilepas **dan host itu diingat sampai tab
+   ditutup**, sehingga semua episode berikutnya dimuat tanpa penahan pop-up — persis penyebab iklan
+   bisa membuka tab lagi. Yang dihapus: `mountFrameHint`, `removeFrameHint`, `releaseFrameGuard`,
+   `frameHint`, `hintTimer`, `guardTimer`, `hostRefusesSandbox`, `rememberNoSandboxHost`,
+   `PLAYER.frameGuard.releaseAfterMs/hintAfterMs/memoryLimit`, CSS `.player-frame-hint*`, dan
+   `STORAGE_KEYS.noSandboxHosts`. `applyFramePolicy(iframe)` kini hanya punya satu tugas: memasang
+   sandbox. **Tidak ada jalur kode yang memanggil `removeAttribute('sandbox')`.**
+2. **Embed yang menolak sandbox → server berikutnya.** Bila iframe tidak mengirim `load` dalam
+   `PLAYER.loadTimeout`, server itu ditandai gagal (`fail(server, 'timeout')`) dan server berikutnya
+   dicoba **dengan sandbox tetap aktif** (server tidak dibuang, episode tidak berhenti).
+3. **Sisa data lama dibersihkan otomatis** (`dropLegacyGuardFlag`): `kz:no-sandbox` di
+   **localStorage dan sessionStorage** serta `kz:safe-frame` dibuang saat halaman dibuka. Tanpa ini,
+   pengguna yang pernah menekan tautan lama akan terus memutar tanpa perlindungan (host "diingat").
+4. **Daftar blokir iklan diperluas & disamakan.** `server/lib/adblock.js` dan cermin klien
+   `js/services/adblock.js` kini berisi **70 host** (tambah `aniview.com`, `adskeeper.com`,
+   `bidvertiser.com`, `content.ad`, `zedo.com`, `adform.net`, `trafficstars.com`, `tsyndicate.com`,
+   `magsrv.com`, `clksite.com`, `profitableratecpm.com`, `highperformanceformat.com`, `popin.cc`)
+   dan **13 pola** (tambah `/adserver|adserv|adsrv/`, `smartlink|direct-link`, `newtab|new-tab|popup`).
+   Daftar tetap **konservatif**: URL pemutar sungguhan (`puterin.biz/e/…`, `putarin.xyz/e/…`,
+   `blogger.com/video.g?token=…`, `play.xtwap.top/cepat2.php?…`) **tidak** diblokir — dijaga tes.
+5. **Server berisiko tidak lagi tampil paling depan.** Host yang ada di daftar blokir lokal langsung
+   diberi ⚠ (tanpa menunggu DoH), lalu **ditaruh paling belakang** oleh `demoteAdRisk()`
+   (`js/services/adblock.js`) — pemutaran otomatis memakai server bersih lebih dulu. Server itu
+   **tetap ada dan tetap bisa dipilih manual** (host video sah kadang terdaftar di daftar blokir);
+   tidak ada penyaringan otomatis yang menghilangkan server.
+6. **Panduan iklan diperbarui** (`js/ui/ad-guide.js`): menegaskan penahan pop-up *tidak bisa
+   dimatikan* (tidak ada tombol maupun tautan pelepas) dan bahwa embed penolak sandbox diganti
+   server lain.
+7. **Tes & verifikasi.** `server/test/round13-no-release.test.js` (11 tes baru) menjaga: tidak ada
+   sisa tautan/fungsi pelepas (kode dibaca tanpa komentar), sandbox tidak pernah dilepas, pembersihan
+   kunci lama, perluasan daftar blokir, URL pemutar sah tetap lolos, klien = server, dan urutan
+   `demoteAdRisk`. Total `npm test` **492 tes lulus**. Uji runtime `happy-dom`: kunci lama
+   (`kz:no-sandbox`, `kz:safe-frame`) terhapus saat modul dimuat; host yang dulu pernah dilepas tetap
+   memakai sandbox; setelah **16 detik** tanpa `load` sandbox **masih terpasang**, server berganti ke
+   server berikutnya; tidak ada elemen `#playerFrameHint`/`[data-frame-action]` dan tidak ada teks
+   "tanpa pengaman" di DOM; 0 galat runtime di halaman `watch.html`.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

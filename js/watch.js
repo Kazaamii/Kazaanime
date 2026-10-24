@@ -28,7 +28,7 @@
 import { initLayout } from './ui/layout.js';
 import { createPlayer } from './ui/player.js';
 import { openAdGuide } from './ui/ad-guide.js';
-import { filterAdServers, checkHosts } from './services/adblock.js';
+import { filterAdServers, checkHosts, adHostMatch, demoteAdRisk } from './services/adblock.js';
 import { createEpisodeList } from './ui/episode-list.js';
 import { renderDownloads } from './ui/download-list.js';
 import { renderCards, bindCardActions, syncBookmarkButtons, gridMessage } from './ui/card.js';
@@ -241,8 +241,16 @@ function guardAdServers(list) {
     } else if (!blocked.length) {
         adBlockedCount = 0;
     }
-    if (!adRiskHosts.size) return kept;
-    return kept.map((server) => (adRiskHosts.has(hostOf(server.url)) ? { ...server, adRisk: true } : server));
+    // Putaran 13: host dari daftar blokir lokal langsung ditandai ⚠ (tanpa menunggu DoH),
+    // lalu hasil pemeriksaan AdGuard DNS menambah/menimpa tanda itu.
+    const risky = (url) => {
+        const host = hostOf(url);
+        return Boolean(host) && (adRiskHosts.has(host) || Boolean(adHostMatch(host)));
+    };
+    const flagged = kept.map((server) => (risky(server.url) ? { ...server, adRisk: true } : server));
+    // Host berisiko TETAP bisa dipilih, tapi ditaruh paling belakang supaya pemutaran otomatis
+    // (dan pilihan pertama) memakai server bersih — iklan tidak muncul lebih dulu.
+    return demoteAdRisk(flagged, (server) => Boolean(server.adRisk));
 }
 
 /**
