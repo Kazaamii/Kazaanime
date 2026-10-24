@@ -314,7 +314,10 @@ const subIndoRank = (source) => {
  * from the title-level watch flow; they are not episode downloads and must not be merged here.
  * @returns {Promise<{servers: StreamServer[], downloads: DownloadGroup[], source: string|null, slug?: string|null, matchedTitle?: string, disabled?: boolean, error?: ApiError}>}
  */
-export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {}) {
+export async function getEpisodeExtras(anime, ep, { slug, titles, signal, refresh = false } = {}) {
+    // Putaran 16: `refresh` (tombol "cari ulang" Sub Indo) melewati cache episode — kalau tidak,
+    // klik bisa memakai hasil lama yang sama dan tombol tetap "tidak terjangkau".
+    const getEpisode = (target) => backend.getBackendEpisode(target, ep, { signal, refresh });
     // Prioritas: sumber yang dibuka pengguna. Jika belum menyediakan server Sub Indo,
     // cari sumber lain dengan judul/season yang sama dan gabungkan server yang ditemukan.
     const disabled = { servers: [], downloads: [], source: null, disabled: true };
@@ -334,7 +337,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
 
         if (own) {
             try {
-                primary = { ...(await backend.getBackendEpisode(own, ep, { signal })), slug: own };
+                primary = { ...(await getEpisode(own)), slug: own };
             } catch (error) {
                 if (error?.kind === 'abort') throw error;
                 primaryError = error;
@@ -344,7 +347,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
                     await wait(700, signal);
                     if (!signal?.aborted) {
                         try {
-                            primary = { ...(await backend.getBackendEpisode(own, ep, { signal })), slug: own };
+                            primary = { ...(await getEpisode(own)), slug: own };
                             primaryError = null;
                         } catch (retryError) {
                             if (retryError?.kind === 'abort') throw retryError;
@@ -381,7 +384,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
 
         const settledTargets = [...new Set(targets)];
         let settled = await Promise.allSettled(
-            settledTargets.map((target) => backend.getBackendEpisode(target, ep, { signal })),
+            settledTargets.map((target) => getEpisode(target)),
         );
         // AnimeKu/Oploverz yang gagal sekali (halaman lambat, kuota, 5xx sesaat) dicoba SEKALI lagi:
         // inilah penyebab "episode 1 ada Sub Indo, episode lain cuma Sub Inggris".
@@ -392,7 +395,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal } = {})
             await wait(700, signal);
             if (!signal?.aborted) {
                 const retried = await Promise.allSettled(
-                    subIndoFailed.map((target) => backend.getBackendEpisode(target, ep, { signal })),
+                    subIndoFailed.map((target) => getEpisode(target)),
                 );
                 settled = settled.map((result, index) => {
                     const retryIndex = subIndoFailed.indexOf(settledTargets[index]);

@@ -165,7 +165,8 @@ test('halaman nonton: urutan tombol server menaruh Sub Indo lebih dulu', () => {
     assert.match(watchJs, /const isSubIndoSource = \(server\) => SUB_INDO_SOURCES\.includes\(siteOf\(server\)\);/);
     assert.match(watchJs, /const subIndo = firstPerSite\(backendServers\.filter\(isSubIndoSource\)\);/,
         'tepat dua tombol Sub Indo (satu per situs)');
-    assert.match(watchJs, /return numbered\(\[\.\.\.subIndo, \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english\]\)/,
+    // Putaran 16: slot Sub Indo diisi placeholder bila sumber tidak terjangkau — urutan tidak berubah.
+    assert.match(watchJs, /return numbered\(\[\.\.\.fillSubIndoServers\(subIndo\), \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english\]\)/,
         'Sub Indo → Multi Sub → bahasa lain → cadangan → Sub Eng');
     // Server statis ber-Sub Eng juga di urutan akhir (bukan terselip di blok cadangan).
     assert.match(watchJs, /const otherFallback = fallback\.filter\(\(s\) => s\.lang !== 'multi' && s\.lang !== 'en'\);/);

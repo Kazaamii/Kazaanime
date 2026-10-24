@@ -294,6 +294,11 @@ a.ep-btn{display:block;text-decoration:none}
 .server-btn .server-badge--pending{background:rgba(var(--accent-rgb),.14);color:var(--accent);text-transform:none}
 .server-btn.is-pending{opacity:.8;cursor:progress}
 .server-btn .server-lock{display:inline-flex;font-size:12px;opacity:.7;vertical-align:-.1em}
+/* Putaran 16: tombol Sub Indo yang sumbernya tidak terjangkau tetap tampil & bisa diklik
+   (mencari ulang). Jangan disamakan dengan server yang benar-benar tidak tersedia. */
+.server-btn.is-offline{cursor:pointer;border-style:dashed;border-color:rgba(245,158,11,.35);color:#fbbf24;opacity:1}
+.server-btn.is-offline:hover{background:rgba(245,158,11,.12);border-color:#fbbf24;color:#fde68a}
+.server-btn .server-badge--offline{background:rgba(245,158,11,.16);color:#fbbf24;text-transform:none;letter-spacing:0}
 
 /* ==========================================================================
    REKOMENDASI
