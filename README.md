@@ -1326,14 +1326,19 @@ dengan tangkapan layar player yang berubah menjadi halaman JSON
    serta `js/api/sources.js` (muatan cache lama ikut bersih). Ini yang dulu menampilkan halaman
    "iclick link error" di dalam player.
 3. **Lapis 2 — AdGuard DNS (DoH) benar-benar dipakai, tetapi sebagai *pemeriksa reputasi*.**
-   `server/lib/dns.js` menanyakan `https://dns.adguard.com/dns-query` (DoH JSON, `?name=host&type=A`)
-   untuk host server yang tampil. Jawaban `Status≠0`, tanpa `Answer`, atau `0.0.0.0`/`::` = host
+   `server/lib/dns.js` mengirim **DNS query biner (DoH wireformat RFC 8484, POST
+   `application/dns-message`)** ke `https://dns.adguard.com/dns-query` — endpoint yang diminta
+   pengguna memang wireformat, bukan JSON (permintaan `?name=…` ke sana dijawab
+   *"no 'dns' query parameter found"*, yang sempat membuat pemeriksaan selalu gagal). Bila endpoint
+   itu menolak, server otomatis memakai JSON AdGuard `https://dns.adguard.com/resolve?name=…&type=A`.
+   Query & jawaban DNS dirakit/diurai sendiri (tanpa dependensi) untuk host server yang tampil. Jawaban `Status≠0`, tanpa `Answer`, atau `0.0.0.0`/`::` = host
    ada di daftar blokir AdGuard → tombol server diberi tanda ⚠. **Server tetap bisa dipilih**
    (host video sah kadang terdaftar; memblokir otomatis berisiko menghilangkan server yang
    berfungsi). Cache 6 jam, cooldown 10 menit setelah gagal, **fail-open**: DoH tidak terjangkau →
    `blocked: null` dan situs jalan seperti biasa. Endpoint: `GET /api/ads/status`,
    `GET /api/ads/check?host=a,b` (maks 20), `GET /api/ads/blocklist`; `/api/health` menampilkan
-   `adFilter`. Env: `ADS_DNS_CHECK`, `ADS_DNS_ENDPOINT`, `ADS_DNS_TIMEOUT_MS`, `ADS_GUIDE_URL`.
+   `adFilter`. Env: `ADS_DNS_CHECK`, `ADS_DNS_ENDPOINT`, `ADS_DNS_JSON_ENDPOINT`,
+   `ADS_DNS_TIMEOUT_MS`, `ADS_GUIDE_URL`.
 4. **Lapis 3 — Mode Aman (opt-in) supaya iklan tidak bisa membuka tab.** Tombol **Mode Aman**
    (`#btnSafeMode`, di baris kontrol player) memasang sandbox tanpa `allow-popups` dan
    `allow-top-navigation*` pada iframe — `window.open()` iklan gagal dan tab Kazanime tidak bisa

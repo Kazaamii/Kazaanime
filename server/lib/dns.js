@@ -12,9 +12,11 @@
  *    memberi tahu frontend bahwa host itu domain iklan/tracker. Hasilnya dipakai sebagai
  *    peringatan + urutan server (tidak dipaksakan), supaya host video yang sah tidak ikut mati.
  *
- * Protokol: DoH JSON (`?name=host&type=A`, header `accept: application/dns-json`), format yang
- * dipakai AdGuard/Cloudflare/Google. Jawaban `Status: 0` tanpa Answer, atau Answer berisi
- * 0.0.0.0 / ::, berarti diblokir daftar blokir.
+ * Protokol: **DoH wireformat RFC 8484** ke `https://dns.adguard.com/dns-query` (POST
+ * `application/dns-message` berisi paket DNS biner) — endpoint yang diminta pengguna memang
+ * wireformat, bukan JSON; permintaan `?name=…` ke sana dijawab "no 'dns' query parameter found".
+ * Bila endpoint itu tidak menjawab, dipakai **JSON** AdGuard `https://dns.adguard.com/resolve?name=…&type=A`.
+ * Jawaban `Status: 0` tanpa Answer, atau Answer berisi 0.0.0.0 / ::, berarti diblokir daftar blokir.
  *
  * Seluruh modul fail-open: bila DoH tidak terjangkau (offline/firewall), hasilnya `null`
  * ("tidak diketahui") dan fitur lain tetap berjalan. Tidak ada retry agresif.
@@ -25,14 +27,97 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;      // hasil valid 6 jam
 const FAILURE_COOLDOWN_MS = 10 * 60 * 1000;   // DoH gagal → berhenti mencoba 10 menit
 const MAX_ENTRIES = 500;
 
+/* ------------------------------------------------------------------ */
+/* Wireformat DNS (RFC 1035 / RFC 8484)                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Bangun paket DNS query tipe A untuk satu host.
+ * @param {string} host
+ * @param {number} [id] pengenal 16-bit (acak bila kosong)
+ * @returns {Uint8Array}
+ */
+export function buildDnsQuery(host, id = Math.floor(Math.random() * 0xffff)) {
+    const labels = String(host || '').replace(/\.$/, '').split('.').filter(Boolean);
+    const size = 12 + labels.reduce((n, label) => n + 1 + Buffer.byteLength(label), 0) + 1 + 4;
+    const buf = Buffer.alloc(size);
+    buf.writeUInt16BE(id & 0xffff, 0);
+    buf.writeUInt16BE(0x0100, 2); // RD (recursion desired)
+    buf.writeUInt16BE(1, 4);      // QDCOUNT
+    let offset = 12;
+    for (const label of labels) {
+        const bytes = Buffer.from(label, 'utf8');
+        buf.writeUInt8(bytes.length, offset);
+        bytes.copy(buf, offset + 1);
+        offset += bytes.length + 1;
+    }
+    buf.writeUInt8(0, offset);    // akar
+    offset += 1;
+    buf.writeUInt16BE(1, offset); // QTYPE A
+    buf.writeUInt16BE(1, offset + 2); // QCLASS IN
+    return new Uint8Array(buf);
+}
+
+/**
+ * Baca jawaban DNS biner → `{ status, addresses }`.
+ * Hanya butuh bagian header, question, dan record A/AAAA.
+ * @param {ArrayBuffer|Uint8Array} data
+ * @returns {{status: number, answers: number, addresses: string[]}}
+ */
+export function parseDnsResponse(data) {
+    const buf = Buffer.from(data instanceof Uint8Array ? data : new Uint8Array(data));
+    if (buf.length < 12) throw new Error('Jawaban DNS terlalu pendek');
+    const status = buf.readUInt16BE(2) & 0x0f; // RCODE
+    const qdcount = buf.readUInt16BE(4);
+    const ancount = buf.readUInt16BE(6);
+    let offset = 12;
+    /** Lewati satu nama (label atau pointer kompresi). */
+    const skipName = () => {
+        while (offset < buf.length) {
+            const len = buf.readUInt8(offset);
+            if (len === 0) { offset += 1; return; }
+            if ((len & 0xc0) === 0xc0) { offset += 2; return; }
+            offset += len + 1;
+        }
+        throw new Error('Nama DNS tidak lengkap');
+    };
+    for (let i = 0; i < qdcount; i += 1) {
+        skipName();
+        offset += 4; // QTYPE + QCLASS
+    }
+    /** @type {string[]} */
+    const addresses = [];
+    for (let i = 0; i < ancount && offset + 10 <= buf.length; i += 1) {
+        skipName();
+        const type = buf.readUInt16BE(offset);
+        const rdlength = buf.readUInt16BE(offset + 8);
+        const rdata = offset + 10;
+        if (type === 1 && rdlength === 4) {
+            addresses.push(`${buf[rdata]}.${buf[rdata + 1]}.${buf[rdata + 2]}.${buf[rdata + 3]}`);
+        } else if (type === 28 && rdlength === 16) {
+            const groups = [];
+            for (let g = 0; g < 16; g += 2) groups.push(buf.readUInt16BE(rdata + g).toString(16));
+            addresses.push(groups.join(':'));
+        }
+        offset = rdata + rdlength;
+    }
+    return { status, answers: ancount, addresses };
+}
+
+/** Apakah hasil DNS berarti "diblokir daftar blokir"? */
+export const isBlockedResult = (status, answers, addresses) => status !== 0
+    || !answers
+    || addresses.every((ip) => ['0.0.0.0', '::', '::1'].includes(String(ip).trim()));
+
 /**
  * @param {{
- *   endpoint?: string, enabled?: boolean, timeoutMs?: number, cacheTtlMs?: number,
- *   fetchImpl?: typeof fetch, now?: () => number,
+ *   endpoint?: string, jsonEndpoint?: string|null, enabled?: boolean, timeoutMs?: number,
+ *   cacheTtlMs?: number, fetchImpl?: typeof fetch, now?: () => number,
  * }} [opts]
  */
 export function createDnsFilter({
     endpoint = ADS.dohEndpoint,
+    jsonEndpoint = ADS.dnsJsonEndpoint || null,
     enabled = ADS.dnsCheck,
     timeoutMs = ADS.dnsTimeoutMs,
     cacheTtlMs = CACHE_TTL_MS,
@@ -63,28 +148,56 @@ export function createDnsFilter({
 
         requests += 1;
         try {
-            const url = `${endpoint}?name=${encodeURIComponent(name)}&type=A`;
-            const res = await fetchImpl(url, {
-                method: 'GET',
-                headers: { accept: 'application/dns-json' },
-                signal: AbortSignal.timeout(timeoutMs),
-                cache: 'no-store',
-            });
-            if (!res.ok) throw new Error(`DoH HTTP ${res.status}`);
-            const json = await res.json();
-            const answers = Array.isArray(json?.Answer) ? json.Answer : [];
-            const status = Number(json?.Status);
-            // NXDOMAIN/REFUSED dari resolver penyaring = diblokir; tanpa Answer juga.
-            const blocked = status !== 0
-                || answers.length === 0
-                || answers.every((a) => ['0.0.0.0', '::', '::1'].includes(String(a?.data || '').trim()));
-            remember(name, blocked);
-            return blocked;
+            const result = await query(name);
+            remember(name, result);
+            return result;
         } catch {
             failures += 1;
             downUntil = now() + FAILURE_COOLDOWN_MS;
             return null;
         }
+    }
+
+    /**
+     * Tanya resolver: wireformat dulu (URL yang diminta pengguna), lalu JSON sebagai cadangan.
+     * @param {string} name
+     * @returns {Promise<boolean>}
+     */
+    async function query(name) {
+        try {
+            return await queryWire(name);
+        } catch (wireError) {
+            if (!jsonEndpoint || jsonEndpoint === endpoint) throw wireError;
+            return queryJson(name);
+        }
+    }
+
+    /** DoH wireformat RFC 8484: POST paket DNS biner ke {endpoint}. */
+    async function queryWire(name) {
+        const res = await fetchImpl(endpoint, {
+            method: 'POST',
+            headers: { accept: 'application/dns-message', 'content-type': 'application/dns-message' },
+            body: buildDnsQuery(name),
+            signal: AbortSignal.timeout(timeoutMs),
+            cache: 'no-store',
+        });
+        if (!res.ok) throw new Error(`DoH HTTP ${res.status}`);
+        const parsed = parseDnsResponse(await res.arrayBuffer());
+        return isBlockedResult(parsed.status, parsed.answers, parsed.addresses);
+    }
+
+    /** JSON API (AdGuard `/resolve`, Cloudflare/Google `?name=`). */
+    async function queryJson(name) {
+        const res = await fetchImpl(`${jsonEndpoint}?name=${encodeURIComponent(name)}&type=A`, {
+            method: 'GET',
+            headers: { accept: 'application/dns-json' },
+            signal: AbortSignal.timeout(timeoutMs),
+            cache: 'no-store',
+        });
+        if (!res.ok) throw new Error(`DoH(JSON) HTTP ${res.status}`);
+        const json = await res.json();
+        const answers = Array.isArray(json?.Answer) ? json.Answer : [];
+        return isBlockedResult(Number(json?.Status), answers.length, answers.map((a) => a?.data));
     }
 
     /** @param {string} name @param {boolean|null} blocked */
@@ -123,6 +236,7 @@ export function createDnsFilter({
             return {
                 enabled,
                 endpoint,
+                jsonEndpoint,
                 coolingDown: now() < downUntil,
                 requests,
                 failures,

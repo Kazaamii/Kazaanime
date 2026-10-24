@@ -255,7 +255,16 @@ const STREAM_SECRET_ENV = env.STREAM_SECRET && env.STREAM_SECRET.length >= 16 ? 
  */
 export const ADS = Object.freeze({
     dnsCheck: bool('ADS_DNS_CHECK', true),
+    /**
+     * Endpoint DoH yang diminta pengguna. AdGuard memakai **wireformat RFC 8484** di sini
+     * (POST biner / `?dns=`), bukan JSON — jadi server mengirim DNS query biner ke URL ini.
+     */
     dohEndpoint: (env.ADS_DNS_ENDPOINT || 'https://dns.adguard.com/dns-query').replace(/\/+$/, ''),
+    /**
+     * Endpoint JSON cadangan (AdGuard: `/resolve?name=…&type=A`). Dipakai bila endpoint DoH
+     * menolak/tidak menjawab, supaya pemeriksaan tetap jalan. Kosongkan untuk mematikan.
+     */
+    dnsJsonEndpoint: (env.ADS_DNS_JSON_ENDPOINT ?? 'https://dns.adguard.com/resolve').replace(/\/+$/, ''),
     dnsTimeoutMs: int('ADS_DNS_TIMEOUT_MS', 3500, { min: 500, max: 15000 }),
     /** Bagian dari judul/hint UI yang boleh dikonfigurasi operator. */
     guideUrl: env.ADS_GUIDE_URL || 'https://adguard-dns.io/',

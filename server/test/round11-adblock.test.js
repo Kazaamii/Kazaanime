@@ -35,7 +35,7 @@ import {
     inspectAdUrl,
     isAdUrl,
 } from '../lib/adblock.js';
-import { createDnsFilter } from '../lib/dns.js';
+import { buildDnsQuery, createDnsFilter, isBlockedResult, parseDnsResponse } from '../lib/dns.js';
 import { readHosts } from '../routes/ads.js';
 
 const root = process.cwd();
@@ -115,38 +115,116 @@ test('adblock: filterAdServers membuang server iklan & mempertahankan HLS/native
 /* ------------------------------------------------------------------ */
 /* 2 · AdGuard DNS DoH (fail-open)                                     */
 /* ------------------------------------------------------------------ */
+/**
+ * Bikin paket DNS biner tiruan (jawaban) untuk satu host + daftar A record.
+ * @param {string} host
+ * @param {string[]} addresses
+ * @param {number} [rcode]
+ */
+function dnsPacket(host, addresses, rcode = 0) {
+    const query = buildDnsQuery(host, 0x1234);
+    const question = query.slice(12); // QNAME + QTYPE + QCLASS
+    const answerName = Buffer.from([0xc0, 0x0c]); // pointer ke nama di question
+    const records = addresses.map((ip) => {
+        const body = Buffer.alloc(14);
+        body.writeUInt16BE(1, 0);        // TYPE A
+        body.writeUInt16BE(1, 2);        // CLASS IN
+        body.writeUInt32BE(60, 4);       // TTL
+        body.writeUInt16BE(4, 8);        // RDLENGTH
+        Buffer.from(ip.split('.').map(Number)).copy(body, 10);
+        return Buffer.concat([answerName, body]);
+    });
+    const header = Buffer.alloc(12);
+    header.writeUInt16BE(0x1234, 0);
+    header.writeUInt16BE(0x8180 | rcode, 2); // QR + RD + RA (+ RCODE)
+    header.writeUInt16BE(1, 4);              // QDCOUNT
+    header.writeUInt16BE(records.length, 6);
+    return Buffer.concat([header, question, ...records]);
+}
+
+/** Jawaban wireformat (RFC 8484) berupa ArrayBuffer. */
+const wireResponse = (packet, status = 200) => ({
+    ok: status === 200,
+    status,
+    async arrayBuffer() { return packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength); },
+});
+
+/** Jawaban JSON (endpoint `/resolve`). */
 const dohResponse = (body, status = 200) => ({ ok: status === 200, status, async json() { return body; } });
-const dohBlocked = () => dohResponse({ Status: 0, Answer: [{ type: 1, data: '0.0.0.0' }] });
-const dohNx = () => dohResponse({ Status: 3, Answer: [] });
-const dohOk = () => dohResponse({ Status: 0, Answer: [{ type: 1, data: '104.21.32.1' }] });
+const dohJsonBlocked = () => dohResponse({ Status: 0, Answer: [{ type: 1, data: '0.0.0.0' }] });
+const dohJsonOk = () => dohResponse({ Status: 0, Answer: [{ type: 1, data: '104.21.32.1' }] });
+const dohJsonNx = () => dohResponse({ Status: 3, Answer: [] });
 
 test('dns: endpoint default AdGuard DoH yang diminta pengguna', () => {
     assert.equal(ADS.dohEndpoint, 'https://dns.adguard.com/dns-query');
+    assert.equal(ADS.dnsJsonEndpoint, 'https://dns.adguard.com/resolve');
     assert.equal(ADS.dnsCheck, true);
-    const dns = createDnsFilter({ fetchImpl: async () => dohOk() });
+    const dns = createDnsFilter({ fetchImpl: async () => wireResponse(dnsPacket('x.example', ['1.2.3.4'])) });
     assert.equal(dns.endpoint, 'https://dns.adguard.com/dns-query');
+    assert.equal(dns.status().jsonEndpoint, 'https://dns.adguard.com/resolve');
 });
 
-test('dns: jawaban 0.0.0.0 / NXDOMAIN = diblokir, A record normal = tidak', async () => {
+test('dns: wireformat RFC 8484 — query biner valid, 0.0.0.0/NXDOMAIN diblokir, A record normal tidak', async () => {
     /** @type {string[]} */
     const calls = [];
     const dns = createDnsFilter({
         fetchImpl: async (url, opts) => {
             calls.push(url);
-            assert.equal(opts.headers.accept, 'application/dns-json');
-            return url.includes('popads') ? dohBlocked() : url.includes('mati') ? dohNx() : dohOk();
+            assert.equal(opts.method, 'POST', 'endpoint /dns-query menerima POST biner');
+            assert.equal(opts.headers['content-type'], 'application/dns-message');
+            assert.ok(opts.body instanceof Uint8Array, 'body = paket DNS biner');
+            const host = Buffer.from(opts.body).includes(Buffer.from('popads')) ? 'popads'
+                : Buffer.from(opts.body).includes(Buffer.from('mati')) ? 'mati' : 'ok';
+            if (host === 'popads') return wireResponse(dnsPacket('popads.net', ['0.0.0.0']));
+            if (host === 'mati') return wireResponse(dnsPacket('mati.example', [], 3));
+            return wireResponse(dnsPacket('animeku.lol', ['104.21.32.1']));
         },
     });
     assert.equal(await dns.isBlocked('popads.net'), true);
-    assert.equal(await dns.isBlocked('mati.example'), true);
+    assert.equal(await dns.isBlocked('mati.example'), true, 'NXDOMAIN dari resolver penyaring = diblokir');
     assert.equal(await dns.isBlocked('animeku.lol'), false);
-    assert.ok(calls[0].startsWith('https://dns.adguard.com/dns-query?name='));
-    assert.ok(calls[0].includes('&type=A'));
+    assert.equal(calls[0], 'https://dns.adguard.com/dns-query');
+    assert.equal(calls.length, 3);
+});
+
+test('dns: packet encoder & parser wireformat', () => {
+    const query = buildDnsQuery('a.b.example', 0xbeef);
+    const buf = Buffer.from(query);
+    assert.equal(buf.readUInt16BE(0), 0xbeef, 'ID dipertahankan');
+    assert.equal(buf.readUInt16BE(4), 1, 'QDCOUNT = 1');
+    assert.equal(buf.readUInt16BE(buf.length - 4), 1, 'QTYPE A');
+    assert.equal(buf.readUInt16BE(buf.length - 2), 1, 'QCLASS IN');
+    assert.deepEqual(parseDnsResponse(dnsPacket('a.b.example', ['93.184.216.34'])), { status: 0, answers: 1, addresses: ['93.184.216.34'] });
+    assert.deepEqual(parseDnsResponse(dnsPacket('a.b.example', ['0.0.0.0'])).addresses, ['0.0.0.0']);
+    assert.equal(parseDnsResponse(dnsPacket('a.b.example', [], 3)).status, 3);
+    assert.equal(isBlockedResult(0, 1, ['0.0.0.0']), true);
+    assert.equal(isBlockedResult(0, 0, []), true, 'tanpa Answer = diblokir daftar');
+    assert.equal(isBlockedResult(3, 0, []), true);
+    assert.equal(isBlockedResult(0, 1, ['104.21.32.1']), false);
+    assert.throws(() => parseDnsResponse(new Uint8Array(4)));
+});
+
+test('dns: endpoint DoH menolak → otomatis pakai JSON AdGuard /resolve', async () => {
+    /** @type {string[]} */
+    const calls = [];
+    const dns = createDnsFilter({
+        fetchImpl: async (url, opts) => {
+            calls.push(url);
+            if (opts.method === 'POST') return { ok: false, status: 405 };
+            assert.equal(opts.headers.accept, 'application/dns-json');
+            return url.includes('popads') ? dohJsonBlocked() : dohJsonOk();
+        },
+    });
+    assert.equal(await dns.isBlocked('popads.net'), true);
+    assert.equal(await dns.isBlocked('animeku.lol'), false);
+    assert.equal(calls[0], 'https://dns.adguard.com/dns-query');
+    assert.ok(calls[1].startsWith('https://dns.adguard.com/resolve?name=popads.net'));
+    assert.ok(calls[1].includes('&type=A'));
 });
 
 test('dns: cache 6 jam (tidak menembak DoH berulang) dan checkMany maksimal 20 host', async () => {
     let n = 0;
-    const dns = createDnsFilter({ fetchImpl: async () => { n++; return dohOk(); } });
+    const dns = createDnsFilter({ fetchImpl: async () => { n++; return wireResponse(dnsPacket('h.example', ['1.1.1.1'])); } });
     await dns.isBlocked('a.example');
     await dns.isBlocked('a.example');
     assert.equal(n, 1, 'hasil di-cache');
@@ -157,10 +235,15 @@ test('dns: cache 6 jam (tidak menembak DoH berulang) dan checkMany maksimal 20 h
 
 test('dns: FAIL-OPEN — DoH error/timeout → null, lalu cooldown 10 menit', async () => {
     let n = 0;
-    const dns = createDnsFilter({ fetchImpl: async () => { n++; throw new Error('offline'); } });
+    /** @type {string[]} */
+    const calls = [];
+    const dns = createDnsFilter({ fetchImpl: async (url) => { n++; calls.push(url); throw new Error('offline'); } });
     assert.equal(await dns.isBlocked('popads.net'), null);
+    assert.equal(n, 2, 'wireformat lalu JSON dicoba sekali masing-masing');
+    assert.equal(calls[0], 'https://dns.adguard.com/dns-query');
+    assert.ok(calls[1].startsWith('https://dns.adguard.com/resolve?name='));
     assert.equal(await dns.isBlocked('lain.example'), null, 'cooldown → tidak mencoba lagi');
-    assert.equal(n, 1);
+    assert.equal(n, 2);
     const status = dns.status();
     assert.equal(status.failures, 1);
     assert.equal(status.coolingDown, true);
@@ -168,7 +251,7 @@ test('dns: FAIL-OPEN — DoH error/timeout → null, lalu cooldown 10 menit', as
 
 test('dns: ADS_DNS_CHECK=0 mematikan pemeriksaan tanpa error', async () => {
     let n = 0;
-    const dns = createDnsFilter({ enabled: false, fetchImpl: async () => { n++; return dohOk(); } });
+    const dns = createDnsFilter({ enabled: false, fetchImpl: async () => { n++; return wireResponse(dnsPacket('h.example', ['1.1.1.1'])); } });
     assert.equal(await dns.isBlocked('popads.net'), null);
     assert.equal(dns.enabled, false);
     assert.equal(n, 0);
@@ -205,7 +288,11 @@ test('GET /api/ads/blocklist: versi, host, pola, endpoint DoH, cache lama', asyn
 });
 
 test('GET /api/ads/check: hasil per host, validasi 400, maks 20 host', async () => {
-    const dns = createDnsFilter({ fetchImpl: async (url) => (url.includes('mati') ? dohNx() : dohOk()) });
+    const dns = createDnsFilter({
+        fetchImpl: async (url, opts) => (Buffer.from(opts.body || '').includes(Buffer.from('mati'))
+            ? wireResponse(dnsPacket('mati.example', [], 3))
+            : wireResponse(dnsPacket('ok.example', ['1.2.3.4']))),
+    });
     await withAdsApp({ adDns: dns }, async (base) => {
         const res = await fetch(`${base}/api/ads/check?host=PopAds.net,animeku.lol,mati.example`);
         assert.equal(res.status, 200);
@@ -227,7 +314,7 @@ test('GET /api/ads/check: hasil per host, validasi 400, maks 20 host', async () 
 
 test('GET /api/ads/status & /api/health: ringkasan penyaring tersedia', async () => {
     main: {
-        const dns = createDnsFilter({ fetchImpl: async () => dohBlocked() });
+        const dns = createDnsFilter({ fetchImpl: async () => wireResponse(dnsPacket('videohost.example', ['0.0.0.0'])) });
         await withAdsApp({ adDns: dns }, async (base) => {
             const res = await fetch(`${base}/api/ads/status?host=videohost.example`);
             const json = await res.json();
