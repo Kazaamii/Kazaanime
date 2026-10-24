@@ -125,7 +125,7 @@ const SOURCES = Object.freeze([
                 source: 'animeku',
                 // Tab AnimeKu juga punya bagian ini → "Lihat Semua" menuju ke sana.
                 seeAll: 'animeku',
-                hint: 'AnimeKu tidak punya kategori donghua (genre donghua 404, negara China kosong), jadi bagian ini hanya berisi judul donghua yang benar-benar ada di pencarian situs — saat ini varian Douluo Dalu. Judul donghua aplikasi lain (Aiyou de Mishi, Aishang Ta de Liyou) tidak ada di AnimeKu.',
+                hint: 'AnimeKu tidak punya kategori donghua (genre donghua 404, negara China kosong), jadi bagian ini hanya berisi judul donghua yang benar-benar ada di pencarian situs: Douluo Dalu (7 seri) dan Doupo Cangqiong — judul asli Battle Through the Heavens (5 seri). Situs hanya mengenali romanisasi China; judul Inggris seperti "Perfect World" dijawab dengan daftar umum, jadi tidak ada judul karangan di sini.',
             },
             {
                 id: 'donghua',

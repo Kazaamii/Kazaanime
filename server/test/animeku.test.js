@@ -184,6 +184,22 @@ test('animeku: menyediakan seed donghua untuk registry (24 Okt 2026)', () => {
     assert.ok(adapter.donghuaSeeds.length >= 3);
 });
 
+test('animeku: seed memakai romanisasi China yang benar-benar dicari situs (24 Okt 2026)', async () => {
+    // Produksi: `browse?source=animeku&q=Doupo Cangqiong` → 5 seri; q="Battle Through the
+    // Heavens" → daftar umum (tidak ada hasil). Jadi seed-nya harus romanisasi China.
+    assert.ok(DONGHUA_SEEDS.includes('Doupo Cangqiong'), 'judul Inggris tidak dikenali situs');
+    assert.equal(DONGHUA_SEEDS.includes('Battle Through the Heavens'), false);
+    const searchHtml = `
+        <article class="aku-sel"><a class="aku-bing" href="https://ww2.animeku.lol/doupo-cangqiong-3rd-season-w7wayqa/"><img src="https://static.anipop.xyz/poster/anime/doupo.jpg" alt="Doupo Cangqiong 3rd Season"></a><h3><a href="https://ww2.animeku.lol/doupo-cangqiong-3rd-season-w7wayqa/">Doupo Cangqiong 3rd Season</a></h3></article>
+        <article class="aku-sel"><a class="aku-bing" href="https://ww2.animeku.lol/doupo-cangqiong-s2-y39t9cf/"><img src="https://static.anipop.xyz/poster/anime/doupo2.jpg" alt="Doupo Cangqiong S2"></a><h3><a href="https://ww2.animeku.lol/doupo-cangqiong-s2-y39t9cf/">Doupo Cangqiong S2</a></h3></article>
+        <article class="aku-sel"><a class="aku-bing" href="https://ww2.animeku.lol/one-piece-x7k4n6u/"><img src="https://static.anipop.xyz/poster/anime/onepiece.jpg" alt="One Piece"></a><h3><a href="https://ww2.animeku.lol/one-piece-x7k4n6u/">One Piece</a></h3></article>`;
+    const { createClient, calls } = fakeClientFactory({ [`${BASE}/?s=Doupo+Cangqiong`]: searchHtml });
+    const adapter = createAnimeku({ network: null, createClient, baseUrl: BASE });
+    const items = await adapter.browseDonghua(['Doupo Cangqiong'], {});
+    assert.deepEqual(items.map((item) => item.title), ['Doupo Cangqiong 3rd Season', 'Doupo Cangqiong S2']);
+    assert.equal(calls.length, 1);
+});
+
 test('animeku: seed cocok dengan judul asli hasil pencarian situs (24 Okt 2026)', () => {
     // Judul diambil dari respons produksi `browse?source=animeku&q=Douluo` (24 Okt 2026).
     const real = [

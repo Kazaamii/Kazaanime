@@ -151,7 +151,7 @@ Tab **Donghua** di `katalog.html` kini berisi lima bagian:
 | Donghua Baru Upload | feed Kazanime (metadata) | rilis donghua terbaru | tetap |
 | **Donghua di HiAnime** | `source=hianime&filter=donghua` | 7 benih terverifikasi, difilter judul | **baru** |
 | **Donghua di AnimeXin** | `source=animexin&filter=donghua` | katalog AnimeXin apa adanya (situs donghua) | **baru** |
-| Donghua di AnimeKu | `source=animeku&filter=donghua` | varian Douluo Dalu | tetap, kini di tab yang sama |
+| Donghua di AnimeKu | `source=animeku&filter=donghua` | Douluo Dalu (7 seri) + Doupo Cangqiong (5 seri) | diperkaya 24 Okt 2026 |
 | Donghua di Oploverz | `source=oploverz&filter=donghua` | biasanya kosong (situsnya tidak memuat donghua) | tetap |
 
 Detail teknis:
@@ -164,6 +164,23 @@ Detail teknis:
 * Di `js/katalog.js`, bagian boleh menunjuk sumber lain lewat `source:`; tiap bagian mendapat
   kunci DOM unik (`key`) karena lima bagian memakai id filter `donghua` yang sama.
 * Tes: `server/test/round23-donghua-tab.test.js` (6 tes).
+
+### Benih donghua AnimeKu (opsi B, 24 Okt 2026)
+
+Pencarian AnimeKu **peka romanisasi**: judul Inggris dijawab dengan daftar umum (bukan hasil),
+judul China dikenali.
+
+| Kueri `?s=` | Hasil (produksi) |
+|---|---|
+| `Douluo Dalu` | **7 seri** (Douluo Dalu + Hanhai Qian Kun, Xiaowu Juebie, Hao Tian Yang Wei, Qian Hua Xi Jin, Xingdou Xian Ji Pian, Jingying Sai) |
+| `Doupo Cangqiong` | **5 seri** (Doupo Cangqiong 2nd Season Specials, Specials, 3rd Season, S2, Live Action) |
+| `Battle Through the Heavens` | daftar umum — **0 cocok** (judul Inggris tidak dikenali) |
+| `Perfect World`, `Wanmei Shijie`, `Swallowed Star`, `Tunshi Xingkong`, `Xian Ni`, `Zhu Xian` | daftar umum — **0 cocok** |
+
+Karena itu `DONGHUA_SEEDS` AnimeKu berubah dari `Douluo Dalu, Perfect World, Battle Through the
+Heavens` menjadi `Douluo Dalu, **Doupo Cangqiong**, Perfect World` — butir kedua yang mati diganti
+romanisasi yang benar-benar berisi 5 seri, dan `DONGHUA_QUERIES` tetap **3** (batas lama: tiap
+kueri satu request dengan jeda 1 dtk/host).
 
 **Hasil produksi (24 Okt 2026, setelah merge PR #46 & #47):**
 
