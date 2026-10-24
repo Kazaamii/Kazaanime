@@ -1414,7 +1414,8 @@ nya harus benar standar player."*
    **481 tes lulus**. Uji runtime `happy-dom` memverifikasi: sandbox tanpa `allow-popups`; tautan
    pelepas muncul setelah 6,3 dtk; fullscreen menargetkan wadah + `lock('landscape')`; rotasi CSS
    aktif saat kunci orientasi tidak ada; pelepas manual menghapus sandbox dan host diingat untuk
-   episode berikutnya.
+   episode berikutnya; embed yang tidak pernah mengirim `load` melepas sandbox setelah batas waktu
+   pemutar **tanpa membuang server** (URL sama dimuat ulang, host diingat).
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
