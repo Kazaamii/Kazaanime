@@ -13,17 +13,14 @@ const UA = 'KazanimeBot/1.0 (+https://github.com/Kazaamii/Kazaanime)';
 const TIMEOUT_MS = 15000;
 
 const TARGETS = Object.freeze([
-    { id: 'animeku-home', url: 'https://ww2.animeku.lol/' },
-    { id: 'animeku-genre-donghua', url: 'https://ww2.animeku.lol/genre/donghua/' },
-    { id: 'animeku-genre-aksi', url: 'https://ww2.animeku.lol/genre/aksi/' },
-    { id: 'animeku-negara-china', url: 'https://ww2.animeku.lol/negara/china-n5z6n97/' },
-    { id: 'animeku-search-anhe', url: 'https://ww2.animeku.lol/?s=Anhe+Zhuan' },
-    { id: 'animeku-search-aiyou', url: 'https://ww2.animeku.lol/?s=Aiyou+de+Mishi' },
-    { id: 'oploverz-home', url: 'https://oploverz.ch/' },
-    { id: 'oploverz-genres-donghua', url: 'https://oploverz.ch/genres/donghua/' },
-    { id: 'oploverz-search-summer', url: 'https://oploverz.ch/?s=Summer+Punch' },
-    { id: 'oploverz-search-divine', url: 'https://oploverz.ch/?s=Divine+Manifestation' },
-    { id: 'oploverz-search-loose', url: 'https://oploverz.ch/?s=King+of+Loose+Cultivators' },
+    // API aplikasi (dari APK Miku Moe) — diuji ulang dari IP GitHub Actions, bukan sandbox.
+    { id: 'animekita-baru', url: 'https://apps.animekita.org/api/v1.2.5/baruupload.php?page=1' },
+    { id: 'animekita-root', url: 'https://apps.animekita.org/api/v1.2.5/' },
+    // Domain alternatif merek aplikasi.
+    { id: 'animeku-tanpa-ww2', url: 'https://animeku.lol/' },
+    { id: 'animeloverz-com', url: 'https://animeloverz.com/' },
+    { id: 'animeloverz-id', url: 'https://animeloverz.id/' },
+    { id: 'oploverz-biz', url: 'https://oploverz.biz/' },
 ]);
 
 function uniq(list, limit = 40) {
@@ -39,7 +36,17 @@ async function probe(target) {
             redirect: 'follow',
             signal: controller.signal,
         });
+        const type = res.headers.get('content-type') || '';
         const html = await res.text();
+        if (!/html/i.test(type)) {
+            return {
+                id: target.id,
+                status: res.status,
+                finalUrl: res.url,
+                type,
+                snippet: html.slice(0, 220).replace(/\s+/g, ' '),
+            };
+        }
         const $ = cheerio.load(html);
         const cards = {
             article: $('article').length,
@@ -59,6 +66,7 @@ async function probe(target) {
             id: target.id,
             status: res.status,
             finalUrl: res.url,
+            type,
             bytes: html.length,
             cards,
             mentionsDonghua: mentions,
@@ -81,6 +89,7 @@ for (const target of TARGETS) {
 
 const lines = results.map((r) => {
     if (r.error) return `${r.id} -> ERROR ${r.error}`;
+    if (r.type && !/html/i.test(r.type)) return `${r.id} -> ${r.status} ${r.finalUrl} ${r.type} :: ${r.snippet}`;
     const cards = `article=${r.cards.article}/aku-sel=${r.cards.akuSel}/bs=${r.cards.bs}`;
     const titles = r.titles.slice(0, 5).map((t) => t.slice(0, 48)).join(' | ');
     const genres = r.genreLinks.slice(0, 10).map((g) => g.slice(0, 48)).join(' | ');
