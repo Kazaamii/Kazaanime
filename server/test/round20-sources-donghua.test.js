@@ -91,3 +91,10 @@ test('putaran 20: beranda tetap menampilkan Donghua AnimeKu & Animeloverz dari k
     assert.match(katalogJs, /label: 'Donghua di AnimeKu'/);
     assert.match(katalogJs, /label: 'Donghua di Oploverz'/);
 });
+
+test('putaran 20: keterangan Oploverz jujur soal hasil pencariannya (cek 24 Okt 2026)', () => {
+    const katalogJs = read('js/katalog.js');
+    // Situsnya tidak memuat judul benih: jangan menjanjikan daftar terisi.
+    assert.match(katalogJs, /Dicek 24 Okt 2026: oploverz\.ch tidak memuat judul-judul itu/);
+    assert.match(katalogJs, /bagian ini wajar kosong/);
+});
