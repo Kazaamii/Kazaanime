@@ -98,3 +98,17 @@ test('putaran 20: keterangan Oploverz jujur soal hasil pencariannya (cek 24 Okt 
     assert.match(katalogJs, /Dicek 24 Okt 2026: oploverz\.ch tidak memuat judul-judul itu/);
     assert.match(katalogJs, /bagian ini wajar kosong/);
 });
+
+test('putaran 20: peta sumber Oploverz terdokumentasi dan cocok dengan adapter', () => {
+    const doc = read('docs/OPLOVERZ.md');
+    const adapter = read('server/sources/oploverz.js');
+
+    // Dokumen tidak boleh memakai selektor yang sudah tidak ada di adapter.
+    for (const selector of ['article.bs', '.eplister', 'dsu-server', '.spe > span']) {
+        assert.ok(adapter.includes(selector), `adapter kehilangan selektor ${selector}`);
+        assert.ok(doc.includes(selector), `docs/OPLOVERZ.md tidak menyebut ${selector}`);
+    }
+    // Klaim penting: Oploverz bukan sumber donghua saat dicek 24 Okt 2026.
+    assert.match(doc, /saat ini tidak memuat donghua/);
+    assert.match(doc, /tidak ada di paket|Tidak memakai Oploverz|tidak memakai Oploverz/i);
+});
