@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - arena/8e2bb76b-kazaanime
+      - arena/12ee4afe-kazaanime
     paths:
       - '.github/workflows/source-reachability.yml'
       - 'server/scripts/check-source-reachability.js'
@@ -35,3 +36,6 @@ jobs:
         run: npm ci
       - name: Check ordinary upstream reachability
         run: npm run check:reachability
+      - name: Probe donghua catalog pages (temporary)
+        if: always()
+        run: node server/scripts/probe-donghua.mjs
