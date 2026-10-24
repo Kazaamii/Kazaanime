@@ -31,8 +31,8 @@ import { onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
 import { isPolicyStop, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from './ui/subindo-state.js';
 import { panelSections } from './api/subindo.js';
-import { getSourceBrowse, getSourceGenres } from './api/sources.js';
 import { withAutoRetry } from './api/retry.js';
+import { getSourceBrowse } from './api/sources.js';
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
@@ -442,42 +442,19 @@ const genreYear = $('#genreYear');
 const genreSeason = $('#genreSeason');
 const genreSort = $('#genreSort');
 const genreReset = $('#genreFilterReset');
-/* Genre situs versi ringkas (24 Okt 2026): satu <select> di kartu filter — ±80 tombol
-   diganti pilihan yang tidak dirender sampai dibuka, jadi beranda tidak berat. */
-const genreSite = $('#genreSite');
 /**
- * Filter aktif: genre (label AniList atau kunci `sumber:token`), tahun, musim
- * (winter/spring/summer/fall), urutan. `siteGenres` diisi dari `/api/anime/genres`.
+ * Filter aktif: genre (label AniList), tahun, musim (winter/spring/summer/fall), urutan.
+ *
+ * 24 Okt 2026 (putaran 8) — genre AnimeKu/Animeloverz tidak lagi dimuat di beranda
+ * (permintaan pengguna: "hapus Genre dari Animeloverz ... dan Animeku, muncul hanya di
+ * halaman katalog saja"). Beranda hanya menampilkan chip genre AniList; genre per situs
+ * ada di katalog.html yang sudah punya pemilih genre sendiri.
  */
 const genreState = {
-    genre: '', source: '', year: '', season: '', sort: 'popularity', token: 0, siteGenres: [],
+    genre: '', year: '', season: '', sort: 'popularity', token: 0,
 };
 
 const SEASON_LABELS = { winter: 'Winter', spring: 'Spring', summer: 'Summer', fall: 'Fall' };
-/**
- * Padanan id genre situs ↔ label AniList, dipakai agar tombol tidak kembar
- * (AnimeKu memakai istilah Indonesia: "aksi" = "Action", dst.).
- */
-const SITE_GENRE_ALIASES = {
-    aksi: 'action',
-    petualangan: 'adventure',
-    komedi: 'comedy',
-    drama: 'drama',
-    ecchi: 'ecchi',
-    fantasi: 'fantasy',
-    horor: 'horror',
-    isekai: 'isekai',
-    mecha: 'mecha',
-    musik: 'music',
-    misteri: 'mystery',
-    olahraga: 'sports',
-    psikologis: 'psychological',
-    romantis: 'romance',
-    'slice-of-life': 'slice of life',
-    supernatural: 'supernatural',
-    thriller: 'thriller',
-    action: 'action',
-};
 const CURRENT_YEAR = new Date().getFullYear();
 const FIRST_YEAR = 1990;
 
@@ -505,31 +482,24 @@ function genreFilterLabel() {
 }
 
 /** Kunci genre untuk tombol: `sumber:token` (situs) atau label (AniList). */
-const tagKey = (tag) => (tag.dataset.source
-    ? `${tag.dataset.source}:${tag.dataset.genre || ''}`
-    : (tag.dataset.genre || ''));
+const tagKey = (tag) => tag.dataset.genre || '';
 
 /** Tombol genre AniList di beranda (genre situs ada di <select>, bukan tombol). */
 function genreTagNodes() {
     return [...genreBox.querySelectorAll('.genre-tag')];
 }
 
-/** Tandai chip AniList yang aktif + sinkronkan pilihan `#genreSite`. */
+/** Tandai chip AniList yang aktif. */
 function markGenre(key) {
     genreTagNodes().forEach((tag) => {
         const on = tagKey(tag) === key;
         tag.classList.toggle('active', on);
         tag.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-    if (genreSite) {
-        const next = key && key.includes(':') ? key : '';
-        if (genreSite.value !== next) genreSite.value = next;
-    }
 }
 
 function closeGenre() {
     genreState.genre = '';
-    genreState.source = '';
     genreState.token++;
     markGenre('');
     genreResults.hidden = true;
@@ -589,177 +559,13 @@ async function selectGenre(genre, { keepOpen = false } = {}) {
     }
 }
 
-/**
- * Genre dari situs sumber (Oploverz ±80, AnimeKu 23) — 24 Okt 2026 versi ringkas.
- *
- * Dulu setiap genre jadi satu tombol di panel menu: ±80 tombol + ikon + grup harus
- * dibuat saat beranda dibuka, dan daftarnya sendiri berasal dari panen 80 genre di
- * Oploverz (permintaan server yang berat). Sekarang:
- *   - satu `<select>` berisi `<optgroup>` per situs (pilihan tidak dirender sampai dibuka),
- *   - daftar genre baru diminta saat pengguna menyentuh pilihan itu (lazy),
- *   - hasilnya di-cache di sessionStorage supaya pindah halaman tidak meminta ulang.
- */
-const SITE_GENRE_CACHE_KEY = 'kz:site-genres';
-const SITE_GENRE_IDS = ['animeku', 'oploverz'];
-let siteGenresLoaded = false;
-let siteGenresPromise = null;
-
-function readSiteGenreCache() {
-    try {
-        const raw = window.sessionStorage.getItem(SITE_GENRE_CACHE_KEY);
-        const parsed = raw ? JSON.parse(raw) : null;
-        const sources = Array.isArray(parsed?.sources) ? parsed.sources : [];
-        return sources.filter((source) => SITE_GENRE_IDS.includes(source?.id));
-    } catch {
-        return [];
-    }
-}
-
-function writeSiteGenreCache(sources) {
-    try {
-        window.sessionStorage.setItem(SITE_GENRE_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), sources }));
-    } catch {
-        // Mode privat / kuota penuh: cache dilewati.
-    }
-}
-
-/**
- * Genre yang belum ada padanannya di daftar AniList, dikelompokkan per situs.
- * Genre kembar (mis. "aksi" = "Action") tidak ditampilkan dua kali.
- */
-function siteGenreGroups() {
-    const known = new Set(GENRES.map((genre) => genre.label.toLowerCase()));
-    return genreState.siteGenres
-        .map((source) => ({
-            id: source.id,
-            name: source.name,
-            genres: (source.genres || []).filter((genre) => {
-                const key = SITE_GENRE_ALIASES[genre.id] || genre.label.toLowerCase();
-                if (known.has(key)) return false;
-                known.add(key);
-                return true;
-            }),
-        }))
-        .filter((source) => source.genres.length);
-}
-
-function renderSiteGenreOptions() {
-    if (!genreSite) return;
-    const groups = siteGenreGroups();
-    // Pilihan TIDAK pernah di-disable: elemen disabled tidak mengirim pointerdown/focus,
-    // jadi daftar genre tidak akan pernah termuat. Bila kosong, cukup beri petunjuk.
-    if (!groups.length) {
-        genreSite.title = 'Daftar genre situs belum tersedia — sentuh lagi untuk mencoba.';
-        return;
-    }
-    genreSite.innerHTML = String(html`<option value="">Semua genre situs</option>${groups.map((source) => html`<optgroup label="${source.name}">${source.genres.map((genre) => html`<option value="${source.id}:${genre.id}">${genre.label}</option>`)}</optgroup>`)}`);
-    genreSite.removeAttribute('title');
-    markGenre(genreState.genre);
-}
-
-function applySiteGenres(sources) {
-    genreState.siteGenres = Array.isArray(sources) ? sources : [];
-    siteGenresLoaded = genreState.siteGenres.length > 0;
-    renderSiteGenreOptions();
-}
-
-/** Muat daftar genre situs sekali (cache sesi lebih dulu) — hanya saat pilihan disentuh. */
-async function ensureSiteGenres() {
-    if (siteGenresLoaded || siteGenresPromise) return siteGenresPromise || undefined;
-    const cached = readSiteGenreCache();
-    if (cached.length) {
-        applySiteGenres(cached);
-        return undefined;
-    }
-    siteGenresPromise = (async () => {
-        try {
-            const res = await getSourceGenres();
-            const sources = (res.sources || []).filter((source) => SITE_GENRE_IDS.includes(source.id) && source.genres?.length);
-            if (sources.length) {
-                writeSiteGenreCache(sources);
-                applySiteGenres(sources);
-            }
-        } catch {
-            // Diamkan: chip genre AniList tetap bisa dipakai tanpa daftar genre situs.
-        } finally {
-            siteGenresPromise = null;
-        }
-    })();
-    return siteGenresPromise;
-}
-
-/**
- * Genre dari situs sumber (Oploverz/AnimeKu) lewat katalog backend.
- * @param {string} source id sumber
- * @param {string} id     id genre situs (mis. "aksi", "slice-of-life")
- * @param {string} label  label tampilan
- */
-async function selectSiteGenre(source, id, label, { keepOpen = false } = {}) {
-    const key = `${source}:${id}`;
-    if (!keepOpen && key === genreState.genre) {
-        closeGenre();
-        return;
-    }
-    markGenre(key);
-    genreState.genre = key;
-    genreState.source = source;
-    const token = ++genreState.token;
-    const def = genreState.siteGenres.find((item) => item.id === source);
-    const filters = genreFilterLabel();
-    genreTitle.textContent = `Genre: ${label}${filters ? ` · ${filters}` : ''} — ${def?.name || source}`;
-    genreSeeAll.href = katalogUrl({
-        source, genre: id, year: genreState.year, season: genreState.season,
-    });
-    genreResults.hidden = false;
-    showSkeleton(genreGrid);
-    revealGenreResults();
-
-    // Urutan mengikuti kontrol "Urutkan": Oploverz punya token order di form `/series/`;
-    // AnimeKu tidak punya token order untuk arsip genre, jadi urutan skor dilakukan di sini.
-    const SITE_ORDER = { oploverz: { popularity: 'popular', score: 'rating', newest: 'update' } };
-    const res = await getSourceBrowse(source, {
-        genre: id,
-        year: genreState.year,
-        season: genreState.season,
-        filter: SITE_ORDER[source]?.[genreState.sort] || '',
-    });
-    if (token !== genreState.token) return;
-    let items = res.items;
-    if (source === 'animeku' && genreState.sort === 'score') {
-        items = [...items].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-    }
-    if (items.length) {
-        renderCards(genreGrid, items, { isBookmarked });
-        const notes = [];
-        if (source === 'animeku' && (genreState.year || genreState.season)) {
-            notes.push('AnimeKu tidak punya filter tahun/musim — semua tahun ditampilkan.');
-        }
-        if (res.hasNext) notes.push('Sebagian hasil ada di halaman berikutnya — buka "Lihat Semua" untuk daftar penuh.');
-        notes.push(`Katalog ${def?.name || source} ditampilkan apa adanya.`);
-        setSectionNote(genreGrid, { text: notes.join(' ') });
-    } else if (res.error && res.error.kind !== 'empty') {
-        gridMessage(genreGrid, {
-            icon: 'triangle-alert',
-            title: 'Gagal memuat genre situs',
-            text: friendlyError(res.error),
-            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-action="retry-genre">${icon('refresh-cw')} Coba Lagi</button>`,
-        });
-    } else {
-        gridMessage(genreGrid, { icon: 'inbox', text: `Tidak ada anime genre "${label}" di ${def?.name || source}` });
-    }
-}
+/* Genre situs (AnimeKu/Animeloverz) sengaja TIDAK dimuat di beranda — hanya di
+ * katalog.html yang punya pemilih genre per sumber (24 Okt 2026, putaran 8). */
 
 /** Perubahan filter: muat ulang genre yang sedang terbuka (bila ada). */
 function applyGenreFilters() {
     updateGenreReset();
     if (!genreState.genre) return;
-    if (genreState.source) {
-        const id = genreState.genre.split(':').slice(1).join(':');
-        const source = genreState.siteGenres.find((item) => item.id === genreState.source);
-        const label = source?.genres.find((genre) => genre.id === id)?.label || id;
-        selectSiteGenre(genreState.source, id, label, { keepOpen: true });
-        return;
-    }
     selectGenre(genreState.genre, { keepOpen: true });
 }
 
@@ -768,28 +574,8 @@ function handleGenreTag(tag) {
     selectGenre(tag.dataset.genre || '');
 }
 
-/** Pilihan genre situs (= `<optgroup>` + `<option value="sumber:token">`). */
-function handleSiteGenreChange() {
-    const value = String(genreSite?.value || '');
-    if (!value) {
-        closeGenre();
-        return;
-    }
-    const [source, ...rest] = value.split(':');
-    const id = rest.join(':');
-    const def = genreState.siteGenres.find((item) => item.id === source);
-    const label = def?.genres.find((genre) => genre.id === id)?.label || id;
-    selectSiteGenre(source, id, label);
-}
-
 delegate(genreBox, 'click', '.genre-tag', (_e, tag) => handleGenreTag(tag));
 
-// Daftar genre situs baru diminta saat pilihan disentuh (bukan saat halaman dibuka).
-// `mouseenter` supaya di desktop daftarnya sudah terisi saat pilihan diklik.
-for (const eventName of ['pointerdown', 'mouseenter', 'focus', 'keydown']) {
-    genreSite?.addEventListener(eventName, () => { void ensureSiteGenres(); }, { passive: true });
-}
-genreSite?.addEventListener('change', handleSiteGenreChange);
 
 $('#genreClose').addEventListener('click', closeGenre);
 genreYear?.addEventListener('change', () => {
@@ -815,20 +601,11 @@ genreReset?.addEventListener('click', () => {
 });
 delegate(genreGrid, 'click', '[data-action="retry-genre"]', () => {
     retrySourcesNow();
-    const key = genreState.genre;
-    const source = genreState.source;
-    genreState.genre = '';
-    if (source) {
-        const id = key.split(':').slice(1).join(':');
-        const def = genreState.siteGenres.find((item) => item.id === source);
-        selectSiteGenre(source, id, def?.genres.find((genre) => genre.id === id)?.label || id, { keepOpen: true });
-        return;
-    }
-    selectGenre(key, { keepOpen: true });
+    selectGenre(genreState.genre, { keepOpen: true });
 });
 
-// Daftar genre situs TIDAK diminta saat halaman dibuka: baru saat <select> disentuh
-// (ensureSiteGenres) lalu di-cache di sessionStorage — beranda lebih ringan.
+// Genre situs tidak ada di beranda (putaran 8): pemilih genre AnimeKu/Animeloverz
+// hanya ada di katalog.html.
 
 /* ------------------------------------------------------------------ */
 /* Donghua dari situs sumber: AnimeKu & Oploverz (24 Okt 2026)         */

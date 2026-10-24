@@ -43,7 +43,9 @@ export const STORAGE_KEYS = Object.freeze({
     anilistNoBatch: 'kz:anilist-nobatch',   // localStorage  — waktu saat query gabungan AniList ditolak
     history: 'kz:history',                  // localStorage  — episode yang sudah dibuka per anime (Tahap C)
     autoNext: 'kz:autonext',                // localStorage  — preferensi auto-next ('1' / '0') (Tahap C)
-    popupGuard: 'kz:popup-guard',           // localStorage  — 'on' = pengguna menyalakan mode blokir pop-up/sandbox (default mati, 24 Okt 2026)
+    /** Sisa kunci mode sandbox lama (24 Okt 2026). Sandbox sudah dihapus total di putaran 8 —
+     *  kuncinya hanya dipakai untuk membersihkan pilihan lama di perangkat pengguna. */
+    popupGuard: 'kz:popup-guard',
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */
@@ -388,23 +390,17 @@ export const PLAYER = Object.freeze({
     /** Sebagian penyedia embed memeriksa Referer (cukup origin) — MegaPlay WAJIB ada Referer. */
     referrerPolicy: 'origin',
     /**
-     * Atribut sandbox iframe untuk MODE KETAT (opsional) — 24 Okt 2026.
+     * Lapisan anti-iklan di atas iframe player — 24 Okt 2026 (putaran 8).
      *
-     * Nilai ini TIDAK memuat `allow-popups`, `allow-popups-to-escape-sandbox`, maupun
-     * `allow-top-navigation`, jadi skrip iklan di dalam player tidak bisa membuka tab
-     * baru atau membajak tab Kazanime. `allow-scripts allow-same-origin` tetap ada supaya
-     * player (MegaPlay dkk.) bisa memutar video.
-     *
-     * 24 Okt 2026 (putaran 3): mode ini DEFAULT MATI. Banyak embed menolak berjalan di dalam
-     * iframe ber-sandbox dan hanya menampilkan "Opss! Sandboxed our player is not allowed.
-     * Remove sandbox to use it." — video dan subtitle jadi tidak muncul. Tombol
-     * "Pop-up diizinkan / Pop-up diblokir" di bawah player menyalakannya kembali bila
-     * pengguna memang menginginkan proteksi; pilihan disimpan di localStorage
-     * (STORAGE_KEYS.popupGuard = 'on'). Host yang menolak sandbox otomatis dikecualikan
-     * (ui/player.js) supaya layar penolakan tidak pernah menjadi jalan buntu.
-     * Server `kind: 'hls' | 'video'` memakai <video> sendiri — tanpa iframe, tanpa pop-up.
+     * Sandbox iframe DIHAPUS (banyak embed menolak: "Sandboxed our player is not allowed",
+     * video tidak muncul). Sebagai gantinya, satu lapisan transparan menutup area player
+     * sampai diklik sekali: klik pertama tidak diteruskan ke iframe sehingga popunder
+     * yang dipicu klik pertama tidak terjadi. Pemutaran tidak terpengaruh sesudahnya.
+     * Set `false` untuk mematikan lapisan ini.
      */
-    sandbox: 'allow-scripts allow-same-origin allow-forms allow-presentation',
+    adShield: true,
+    /** Label singkat situs untuk tombol server Sub Indo (dipakai js/watch.js). */
+    siteLabels: Object.freeze({ animeku: 'AnimeKu', oploverz: 'Animeloverz' }),
     /** Jumlah kartu rekomendasi. */
     recommendationCount: 12,
     /**

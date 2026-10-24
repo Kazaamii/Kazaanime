@@ -22,36 +22,32 @@ const homeCss = read('css/home.css');
 const componentsCss = read('css/components.css');
 const katalogJs = read('js/katalog.js');
 
-test('genre situs: satu <select> ringkas, bukan dinding chip (24 Okt 2026)', () => {
-    // Ronde 6 mengganti tombol menu (yang masih membuat ±80 chip saat dibuka) dengan
-    // satu pilihan di kartu filter, seperti kontrol Tahun/Musim/Urutkan.
-    assert.match(homeHtml, /<label class="genre-filter genre-filter--site" for="genreSite">/);
-    assert.match(homeHtml, /<select id="genreSite"[^>]*aria-label="Genre dari AnimeKu atau Oploverz"/);
-    assert.doesNotMatch(homeHtml, /id="genreMenuBtn"/, 'tombol menu genre situs sudah tidak dipakai');
-    assert.doesNotMatch(homeHtml, /id="genreMenu"/);
-    // Chip AniList tetap langsung terlihat (bukan ±80 tombol genre situs).
-    assert.match(homeHtml, /id="genreTags"[^>]*role="toolbar"/);
+test('genre situs: TIDAK ada di beranda, hanya di halaman katalog (24 Okt 2026, putaran 8)', () => {
+    // Permintaan pengguna: "hapus Genre dari Animeloverz di bagian home page dan Animeku,
+    // muncul hanya di halaman katalog saja". Beranda hanya memuat chip genre AniList.
+    assert.doesNotMatch(homeHtml, /id="genreSite"/, 'pemilih genre situs tidak ada lagi di beranda');
+    assert.doesNotMatch(homeHtml, /genre-filter--site/);
+    assert.doesNotMatch(homeHtml, /id="genreMenuBtn"/, 'menu genre situs (putaran 4-6) juga sudah tidak dipakai');
+    assert.match(homeHtml, /id="genreTags"[^>]*role="toolbar"/, 'chip genre AniList tetap ada');
 
-    assert.match(homeJs, /const genreSite = \$\('#genreSite'\)/);
-    assert.match(homeJs, /function renderSiteGenreOptions\(\)/);
-    assert.match(homeJs, /<optgroup label="\$\{source\.name\}">/, 'genre dikelompokkan per situs di dalam select');
-    assert.match(homeJs, /value="\$\{source\.id\}:\$\{genre\.id\}"/, 'nilai pilihan = sumber:token');
-    assert.match(homeJs, /async function ensureSiteGenres\(\)/);
-    assert.match(homeJs, /const SITE_GENRE_CACHE_KEY = 'kz:site-genres'/);
-    // Daftar genre situs tidak diminta saat halaman dibuka (beranda ringan).
-    assert.doesNotMatch(homeJs, /^void loadSiteGenres\(\);$/m, 'tidak ada permintaan genre situs saat memuat beranda');
-    assert.match(homeJs, /genreSite\?\.addEventListener\('change', handleSiteGenreChange\)/);
+    assert.doesNotMatch(homeJs, /genreSite|SITE_GENRE|ensureSiteGenres|selectSiteGenre|siteGenres/,
+        'js/home.js tidak lagi memuat logika genre situs');
+    assert.doesNotMatch(homeJs, /getSourceGenres/, 'beranda tidak meminta daftar genre situs');
+    assert.match(homeJs, /function handleGenreTag\(tag\)/);
+    assert.match(homeJs, /selectGenre\(tag\.dataset\.genre \|\| ''\)/);
 
-    assert.match(homeCss, /\.genre-filter--site select\{/, 'select genre situs punya gaya sendiri');
-    assert.doesNotMatch(homeCss, /\.genre-menu-btn\{/, 'CSS menu lama dibuang');
+    assert.doesNotMatch(homeCss, /\.genre-filter--site/, 'CSS genre situs di beranda dibuang');
+
+    // Genre per situs tetap tersedia di halaman Jelajah (katalog.html).
+    assert.match(homeHtml.includes('katalogGenre') ? homeHtml : read('katalog.html'), /<select id="katalogGenre"/);
+    assert.match(katalogJs, /genreSelect\.addEventListener\('change', \(\) => switchGenre\(genreSelect\.value\)\)/);
 });
 
-test('genre situs: memilih genre menampilkan hasil dengan filter tahun/musim', () => {
-    assert.match(homeJs, /function handleSiteGenreChange\(\)/);
-    assert.match(homeJs, /const \[source, \.\.\.rest\] = value\.split\(':'\)/);
-    assert.match(homeJs, /selectSiteGenre\(source, id, label\)/);
-    assert.match(homeJs, /katalogUrl\(\{\s*source, genre: id, year: genreState\.year, season: genreState\.season,\s*\}\)/s);
-    assert.match(homeJs, /year: genreState\.year,\s*season: genreState\.season,/s, 'filter tahun & musim diteruskan ke browse');
+test('genre beranda: filter tahun/musim/urutan tetap memakai data AniList', () => {
+    assert.match(homeJs, /function applyGenreFilters\(\)/);
+    assert.match(homeJs, /selectGenre\(genreState\.genre, \{ keepOpen: true \}\)/);
+    assert.match(homeJs, /getGenreAnime\(genre, \{\s*year: genreState\.year,\s*season: genreState\.season,\s*sort: genreState\.sort,/s);
+    assert.match(homeJs, /genreSort\?\.addEventListener\('change'/);
 });
 
 test('donghua beranda: panel AnimeKu & Oploverz di atas grid metadata', () => {

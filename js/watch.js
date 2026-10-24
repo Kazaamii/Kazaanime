@@ -72,8 +72,7 @@ const els = {
     prev: $('#btnPrevEp'),
     next: $('#btnNextEp'),
     nextServer: $('#btnNextServer'),
-    popupGuard: $('#btnPopupGuard'),
-    popupGuardText: $('#btnPopupGuardText'),
+    externalPlayer: $('#btnExternalPlayer'),
     recs: $('#recommendationGrid'),
 };
 
@@ -137,27 +136,58 @@ const SUBTITLE_TYPE_BADGE = { hard: 'Hardsub', soft: 'Softsub' };
 const SUBTITLE_TYPE_DESC = { hard: 'Jenis subtitle: hardsub', soft: 'Jenis subtitle: softsub' };
 
 /**
- * Tombol server = "Server 1, 2, …" sesuai urutan putar. Nama penyedia / situs sumber tidak
- * ditampilkan; yang terlihat hanya nomor + bahasa dan jenis subtitle bila tersedia (badge & tooltip).
- * @param {import('./api/streams.js').StreamServer[]} list
+ * Situs asal server backend: `backend:animeku` / `animeku~slug` → `animeku`.
+ * @param {{source?: string}|null} server
  */
-function numbered(list) {
-    return list.map((s, i) => ({
-        ...s,
-        name: `Server ${i + 1}`,
-        flag: '',
-        badge: [LANG_BADGE[s.lang], SUBTITLE_TYPE_BADGE[s.subtitleType]].filter(Boolean).join(' · '),
-        description: [LANG_DESC[s.lang], SUBTITLE_TYPE_DESC[s.subtitleType], s.source === 'static' ? 'server cadangan' : ''].filter(Boolean).join(' • ') || `Server ${i + 1}`,
-    }));
-}
+const siteOf = (server) => String(server?.source || '').replace(/^backend:/, '').split('~')[0].toLowerCase();
 /**
  * Server dari AnimeKu/Oploverz = situs yang katalognya Sub Indo (24 Okt 2026).
  * Server-server ini ditaruh paling depan supaya episode langsung diputar dengan Sub Indo
  * yang sudah tersedia di kedua situs itu — bukan server Multi Sub/Sub Eng lebih dulu.
  */
-const isSubIndoSource = (server) => SUB_INDO_SOURCES.includes(
-    String(server?.source || '').replace(/^backend:/, '').split('~')[0].toLowerCase(),
-);
+const isSubIndoSource = (server) => SUB_INDO_SOURCES.includes(siteOf(server));
+
+/**
+ * Isi daftar server untuk pemutaran.
+ *
+ * 24 Okt 2026 (putaran 8) — permintaan pengguna: *"untuk pilihan server sub indo tolong di buat 2
+ * dan tuliskan dari web Animeloverz dan animeku jadi ada tombol server terpisah"*. Karena itu:
+ *  - dua tombol Sub Indo memakai NAMA SITUS: "AnimeKu" dan "Animeloverz" (bukan "Server 1/2");
+ *  - satu tombol per situs (server pertama dari situs itu) supaya jumlahnya tepat dua;
+ *  - server lain tetap memakai nomor "Server N" seperti sebelumnya.
+ * @param {import('./api/streams.js').StreamServer[]} list
+ */
+function numbered(list) {
+    let counter = 0;
+    return list.map((s) => {
+        const site = isSubIndoSource(s) ? PLAYER.siteLabels[siteOf(s)] : '';
+        if (!site) counter += 1;
+        const name = site || `Server ${counter}`;
+        return {
+            ...s,
+            name,
+            flag: '',
+            badge: [LANG_BADGE[s.lang], SUBTITLE_TYPE_BADGE[s.subtitleType]].filter(Boolean).join(' · '),
+            description: [
+                LANG_DESC[s.lang],
+                SUBTITLE_TYPE_DESC[s.subtitleType],
+                site ? `diputar langsung dari ${site}` : '',
+                s.source === 'static' ? 'server cadangan' : '',
+            ].filter(Boolean).join(' • ') || name,
+        };
+    });
+}
+
+/** Satu server per situs Sub Indo (server pertama) supaya tombolnya tepat dua. */
+function firstPerSite(list) {
+    const seen = new Set();
+    return list.filter((server) => {
+        const site = siteOf(server);
+        if (seen.has(site)) return false;
+        seen.add(site);
+        return true;
+    });
+}
 
 /**
  * Urutan putar (24 Okt 2026):
@@ -168,7 +198,8 @@ const isSubIndoSource = (server) => SUB_INDO_SOURCES.includes(
 const servers = () => {
     const fallback = withProviderServers(staticServers(), providerResult);
     if (!scrapeFirst()) return numbered([...fallback, ...backendServers]);
-    const subIndo = backendServers.filter(isSubIndoSource);
+    // Dua tombol Sub Indo: AnimeKu & Animeloverz (satu server per situs).
+    const subIndo = firstPerSite(backendServers.filter(isSubIndoSource));
     const rest = backendServers.filter((server) => !isSubIndoSource(server));
     const multi = [...rest.filter((s) => s.lang === 'multi'), ...fallback.filter((s) => s.lang === 'multi')];
     const local = rest.filter((s) => s.lang !== 'en' && s.lang !== 'multi');
@@ -461,28 +492,27 @@ els.prev.addEventListener('click', () => goToEpisode(ep - 1));
 els.next.addEventListener('click', () => goToEpisode(ep + 1));
 els.nextServer.addEventListener('click', () => player.nextServer());
 
-/* Proteksi pop-up / tab baru dari iframe player (24 Okt 2026). */
-function renderPopupGuard(enabled = player.popupGuard()) {
-    if (!els.popupGuard) return;
-    els.popupGuard.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    els.popupGuard.classList.toggle('is-off', !enabled);
-    if (els.popupGuardText) els.popupGuardText.textContent = enabled ? 'Pop-up diblokir' : 'Pop-up diizinkan';
-    els.popupGuard.title = enabled
-        ? 'Mode ketat: pop-up & tab baru dari player diblokir. Sebagian player menolak mode ini — matikan bila video tidak muncul.'
-        : 'Player berjalan normal (tanpa sandbox). Klik untuk memblokir pop-up/tab baru dari embed.';
+/*
+ * Pemutar eksternal (24 Okt 2026, putaran 8).
+ *
+ * Permintaan pengguna: tombol "Pop Up block / Izinkan" dihapus karena tidak bekerja
+ * ("Sandbox Not Allowed"), dan iklan host streaming diusahakan tidak membuka tab baru.
+ * Sandbox iframe dihapus total (lihat js/ui/player.js); sebagai gantinya tombol ini membuka
+ * embed yang sedang diputar di TAB BARU. Di tab itu tidak ada halaman Kazanime yang bisa
+ * dibajak, dan pengguna bisa menutupnya kapan saja. Lapisan anti-iklan di dalam player
+ * menahan klik pertama supaya popunder tidak muncul.
+ */
+function openExternalPlayer() {
+    const url = player.externalUrl();
+    if (!url) {
+        showToast('Server ini tidak punya tautan pemutar eksternal.', 'info');
+        return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+    showToast('Pemutar dibuka di tab baru. Tutup tab itu bila sudah selesai.', 'success');
 }
-renderPopupGuard();
-els.popupGuard?.addEventListener('click', () => {
-    const enabled = player.setPopupGuard(!player.popupGuard());
-    renderPopupGuard(enabled);
-    showToast(
-        enabled
-            ? 'Mode blokir pop-up aktif. Bila video tidak muncul, klik tombol ini lagi.'
-            : 'Player berjalan normal tanpa sandbox (khusus browser ini).',
-        enabled ? 'success' : 'info',
-    );
-});
-player.on('guard', ({ enabled }) => renderPopupGuard(enabled));
+
+els.externalPlayer?.addEventListener('click', openExternalPlayer);
 
 /* ------------------------------------------------------------------ */
 /* Auto-next & riwayat tontonan                                        */

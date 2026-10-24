@@ -34,6 +34,15 @@
 .player-message-actions .btn-youtube{background:#ff0000}
 /* Tahap C: overlay "memuat" di atas iframe (dilepas saat iframe selesai dimuat) */
 .player-overlay{position:absolute;inset:0;z-index:2;height:auto}
+/* 24 Okt 2026 (putaran 8): lapisan anti-iklan — sekali klik, lalu hilang.
+   Klik pertama tidak diteruskan ke iframe (pola popunder paling umum di host streaming). */
+.player-ad-shield{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:20px;border:0;background:rgba(6,8,14,.55);backdrop-filter:blur(2px);color:#fff;font-family:inherit;cursor:pointer;transition:opacity .25s,visibility .25s}
+.player-ad-shield:hover{background:rgba(6,8,14,.45)}
+.player-ad-shield:focus-visible{outline:2px solid var(--primary);outline-offset:-4px}
+.player-ad-shield-pill{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;background:rgba(10,12,20,.82);border:1px solid rgba(var(--primary-rgb),.35);font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.player-ad-shield-pill .ic{width:16px;height:16px;color:var(--primary)}
+.player-ad-shield-pill small{font-weight:500;font-size:11px;opacity:.7}
+.player-ad-shield[hidden]{display:none}
 .streaming-player-wrapper .player-frame{background:#000}
 /* 22 Okt 2026: player video bawaan untuk server HLS (AniZone Multi Sub) */
 .player-video{display:block;width:100%;height:100%;object-fit:contain;background:#000;border:0}

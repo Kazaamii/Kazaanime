@@ -79,17 +79,12 @@
                     <option value="newest">Terbaru</option>
                 </select>
             </label>
-            <label class="genre-filter genre-filter--site" for="genreSite">
-                <span>Genre situs</span>
-                <select id="genreSite" aria-label="Genre dari AnimeKu atau Oploverz">
-                    <option value="">Semua genre situs</option>
-                </select>
-            </label>
             <button type="button" class="genre-filter-reset" id="genreFilterReset" hidden>Reset filter</button>
         </div>
         <div class="genre-tags" id="genreTags" role="toolbar" aria-label="Pilih genre"></div>
-        <!-- Genre situs (AnimeKu/Oploverz) memakai satu <select> di kartu filter di atas —
-             24 Okt 2026: ±80 tombol diganti pilihan ringkas agar beranda tidak berat. -->
+        <!-- 24 Okt 2026 (putaran 8): genre AnimeKu/Animeloverz TIDAK lagi di beranda.
+             Pemilih genre per situs ada di halaman Jelajah (katalog.html) yang sudah
+             punya kontrol genre sendiri, lengkap dengan tahun/musim/urutan. -->
         <div class="genre-results" id="genreResults" hidden>
             <div class="genre-results-head">
                 <h3 class="genre-results-title" id="genreResultsTitle">Genre</h3>

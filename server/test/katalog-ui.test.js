@@ -256,17 +256,18 @@ test('beranda: Jadwal & Genre di atas panel Sub Indo, tanpa paragraf pengantar (
     assert.match(homeHtml, /id="genreSeason"/);
     assert.match(homeHtml, /id="genreSort"/);
     assert.match(homeCss, /\.genre-filters\{/);
-    // Ronde 6: genre situs memakai <select> di kartu filter (bukan chip/grup terpisah).
-    assert.match(homeCss, /\.genre-filter--site select\{/);
+    // Ronde 8 (24 Okt 2026): genre situs tidak lagi di beranda — hanya di katalog.html.
+    assert.doesNotMatch(homeHtml, /id="genreSite"/, 'pemilih genre situs hanya ada di halaman katalog');
+    assert.match(read('katalog.html'), /<select id="katalogGenre"/);
 });
 
-test('home.js: sort Tahun/Musim + genre situs (Oploverz & AnimeKu) memakai data backend', () => {
-    assert.match(homeJs, /getSourceGenres\(\)/);
-    assert.match(homeJs, /getSourceBrowse\(source, \{\s*genre: id,\s*year: genreState\.year,\s*season: genreState\.season,/s);
-    assert.match(homeJs, /SITE_ORDER = \{ oploverz:/, 'urutan situs memakai token order Oploverz');
+test('home.js: sort Tahun/Musim genre memakai data backend (genre situs ada di katalog)', () => {
     assert.match(homeJs, /getGenreAnime\(genre, \{\s*year: genreState\.year,\s*season: genreState\.season,/s);
-    assert.match(homeJs, /<optgroup label="\$\{source\.name\}">/, 'genre situs dirender sebagai optgroup per situs');
-    assert.match(homeJs, /katalogUrl\(\{\s*source, genre: id, year: genreState\.year, season: genreState\.season,/s, 'Lihat Semua membuka katalog sumber+genre (tahun/musim ikut)');
+    assert.match(homeJs, /sort: genreState\.sort,/);
+    assert.doesNotMatch(homeJs, /getSourceGenres/, 'beranda tidak memuat genre situs');
+    // Katalog tetap memakai browse per sumber + filter genre/tahun/musim.
+    assert.match(read('js/katalog.js'), /switchGenre\(genreSelect\.value\)/);
+    assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', q = '', page = 1, year = '', season = '' \}/);
 });
 
 test('katalog: filter Tahun & Musim diteruskan ke browse dan disimpan di URL', () => {
