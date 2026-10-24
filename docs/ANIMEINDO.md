@@ -12,7 +12,7 @@ Example (preserve any existing sources you use):
 
 ~~~dotenv
 ANIMEINDO_BASE_URL=https://animeindo.cloud
-SCRAPER_SOURCES=animexin,samehadaku,anoboy,sakunime,anichin,otakudesu,hianime,kuramanime,animeindo
+SCRAPER_SOURCES=animexin,anoboy,hianime,animeku,oploverz,animeindo
 ~~~
 
 For Vercel, add the environment variables in Project Settings and redeploy. Never commit secret credentials or cookies.

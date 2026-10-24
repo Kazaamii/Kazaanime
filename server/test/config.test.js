@@ -52,16 +52,25 @@ test('Kusonime downloads default on, can be disabled, and keeps a normalized con
 });
 
 
-test('Kuramanime v9 is disabled by default but remains configurable', () => {
-    assert.equal(enabledSources().includes('kuramanime'), false, 'dimatikan default sejak 24 Okt 2026');
-
-    const configScript = "import { SOURCES } from './server/config.js'; console.log(JSON.stringify(SOURCES.kuramanime));";
-    const readConfig = (overrides = {}) => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', configScript], {
+test('Kuramanime & Anichin sudah dihapus total (putaran 20, 24 Okt 2026)', () => {
+    // Permintaan pengguna: "kuramanime dan anichin hapus saja karna memang tidak bekerja".
+    // Keduanya tidak boleh lagi ada di daftar aktif maupun di SOURCES.
+    const configScript = "import { SOURCES } from './server/config.js'; console.log(JSON.stringify({ enabled: SOURCES.enabled, keys: Object.keys(SOURCES) }));";
+    const readConfig = () => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', configScript], {
         cwd: process.cwd(),
-        env: { ...process.env, KURAMANIME_BASE_URL: '', KURAMANIME_RENDER_JAVASCRIPT: '', KURAMANIME_COOKIES: '', ...overrides },
+        env: { ...process.env, SCRAPER_SOURCES: '' },
         encoding: 'utf8',
     }));
 
-    assert.equal(readConfig().baseUrl, 'https://v9.kuramanime.work');
-    assert.equal(readConfig({ KURAMANIME_BASE_URL: 'https://example.test/' }).baseUrl, 'https://example.test');
+    const { enabled, keys } = readConfig();
+    // `enabled` hanya meneruskan isi env; registry yang membuang id tanpa factory (lihat
+    // network-runtime.test.js). Di sini cukup memastikan tidak ada konfigurasi tersisa.
+    for (const gone of ['kuramanime', 'anichin']) {
+        assert.equal(keys.includes(gone), false, `${gone} masih punya konfigurasi`);
+        assert.equal(enabled.includes(gone), false, `${gone} masih aktif`);
+    }
+    // Sumber yang memang masih dipakai tidak boleh ikut hilang.
+    for (const kept of ['animexin', 'anoboy', 'hianime', 'animeku', 'oploverz']) {
+        assert.ok(enabled.includes(kept), `${kept} hilang dari daftar default`);
+    }
 });

@@ -285,7 +285,7 @@ export const SCHEDULE = Object.freeze({
     utcOffsetHours: 7,
     /** Maks. anime berjam per hari (jadwal rilis Sub Indo / jadwal tayang). */
     perDay: 8,
-    /** Maks. donghua per hari (AnimeXin tanpa jam; Anichin dengan jam perkiraan). */
+    /** Maks. donghua per hari (AnimeXin, jam perkiraan bila situs menyediakannya). */
     perDayDonghua: 5,
 });
 

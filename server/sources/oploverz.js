@@ -304,10 +304,30 @@ export function parseEpisodePage($, base) {
  * order=update|popular|rating, status=ongoing|completed|upcoming, type=movie|drama|...
  * "Upcoming" tidak dipakai: saat dicek, halaman `?status=upcoming` tidak berisi kartu.
  */
-/** Jumlah judul donghua yang dicari & batas hasil per permintaan (24 Okt 2026). */
-const DONGHUA_QUERIES = 3;
+/**
+ * Jumlah judul donghua yang dicari & batas hasil per permintaan (24 Okt 2026).
+ * Sama banyak dengan `DONGHUA_SEEDS` supaya keempat benih benar-benar dicari, termasuk saat
+ * metadata AniList kosong (putaran 20).
+ */
+const DONGHUA_QUERIES = 4;
 const DONGHUA_CONCURRENCY = 3;
 const DONGHUA_LIMIT = 24;
+
+/**
+ * Benih judul donghua untuk Oploverz (putaran 20, 24 Okt 2026).
+ *
+ * Situsnya tidak punya kategori/negara donghua (dropdown Country di `/series/` kosong),
+ * jadi satu-satunya jalan adalah mencari judul lalu menyaring kartu yang cocok. Metadata
+ * AniList sering gagal dari IP pusat data; tanpa benih, panel Donghua Oploverz jadi kosong
+ * walaupun AnimeKu tetap terisi. Benih ini hanya kueri pencarian — kartu yang judulnya
+ * tidak cocok dibuang oleh aturan `related` di `browseDonghua`, jadi tidak ada judul palsu.
+ */
+export const DONGHUA_SEEDS = Object.freeze([
+    'Perfect World',
+    'Battle Through the Heavens',
+    'Soul Land',
+    'Renegade Immortal',
+]);
 
 export const BROWSE_FILTERS = Object.freeze([
     { id: 'update', label: 'Terbaru', params: { order: 'update' } },
@@ -508,13 +528,16 @@ export function createOploverz({ network, createClient, baseUrl }) {
                 .map(toAnime);
         },
 
+        /** Dipakai registry saat metadata donghua kosong/gagal (lihat browseDonghua). */
+        donghuaSeeds: DONGHUA_SEEDS,
+
         /**
          * Donghua di Oploverz (24 Okt 2026, permintaan pengguna: donghua harus ada di
          * Oploverz DAN AnimeKu). Situs tidak punya kategori donghua, jadi judul donghua yang
-         * sedang tayang (metadata AniList, negara CN) dicari lewat `?s=`, lalu hanya kartu
-         * seri yang judulnya cocok yang dipakai. Tidak ada klaim Sub Indo per judul.
+         * sedang tayang (metadata AniList, negara CN) + benih situs dicari lewat `?s=`, lalu
+         * hanya kartu seri yang judulnya cocok yang dipakai. Tidak ada klaim Sub Indo per judul.
          *
-         * @param {string[]} titles judul donghua dari metadata
+         * @param {string[]} titles judul donghua dari metadata / benih situs
          * @param {object} ctx
          */
         async browseDonghua(titles = [], ctx = {}) {

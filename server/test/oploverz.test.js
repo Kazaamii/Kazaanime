@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'cheerio';
 import {
-    createOploverz, episodeSlugFromUrl, isEpisodeSlug, nextPageHref, parseAnimePage,
+    createOploverz, DONGHUA_SEEDS, episodeSlugFromUrl, isEpisodeSlug, nextPageHref, parseAnimePage,
     parseCards, parseEpisodePage, parseGenreOptions, parseSeasonOptions, seriesSlugFromUrl,
 } from '../sources/oploverz.js';
 import { fixture, fixture$, fakeClientFactory } from './helpers.js';
@@ -213,6 +213,30 @@ test('oploverz: donghua dicari lewat ?s= dan hanya judul yang cocok dipakai (24 
     assert.equal(calls.length, 1, 'judul ganda cukup satu permintaan');
     assert.deepEqual(items.map((item) => item.slug), ['oploverz~perfect-world']);
     assert.equal(items[0].country, 'CN', 'donghua ditandai CN hanya karena cocok dengan judul metadata');
+});
+
+test('oploverz: donghua punya benih situs sendiri (putaran 20, tanpa metadata AniList)', async () => {
+    const card = (slug, title) => `<article class="bs"><div class="bsx">
+        <a href="${BASE}/series/${slug}/" title="${title}">
+            <div class="limit"><span class="epx">Ongoing</span><img src="${BASE}/img/${slug}.jpg"/></div>
+            <div class="tt">${title}<h2>${title}</h2></div>
+        </a></div></article>`;
+    const results = `<html><body>${card('perfect-world', 'Perfect World')}</body></html>`;
+    const { createClient, calls } = fakeClientFactory({
+        [`${BASE}/?s=Perfect+World`]: results,
+    });
+    const adapter = createOploverz({ network: null, createClient, baseUrl: BASE });
+
+    assert.deepEqual([...adapter.donghuaSeeds], [...DONGHUA_SEEDS], 'adapter wajib meneruskan benih');
+    assert.ok(adapter.donghuaSeeds.includes('Perfect World'));
+    assert.ok(adapter.donghuaSeeds.length >= 3, 'benih harus cukup untuk mengisi panel saat metadata mati');
+
+    // Dipanggil tanpa judul metadata sama sekali: benih tetap dipakai oleh registry.
+    const items = await adapter.browseDonghua([...adapter.donghuaSeeds]);
+    assert.equal(calls.length, 4, 'empat kueri = jumlah benih (DONGHUA_QUERIES)');
+    assert.ok(calls.every((url) => String(url).includes('/?s=')), 'semua kueri lewat pencarian situs');
+    // Kueri seed tanpa hasil / error tidak boleh menggagalkan panel selama ada hasil lain.
+    assert.deepEqual(items.map((item) => item.slug), ['oploverz~perfect-world']);
 });
 
 test('oploverz: filter tak dikenal memakai urutan Terbaru (bukan error)', async () => {

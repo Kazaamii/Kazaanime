@@ -186,13 +186,16 @@ const animeOnsenMediaHosts = list('ANIMEONSEN_MEDIA_HOSTS', []).map((s) => s.toL
 // dimatikan sebagai default — situsnya memblokir IP pusat data dan panel Sub Indo kini
 // hanya AnimeKu + Oploverz. Adapter-nya TETAP ada; aktifkan lagi lewat SCRAPER_SOURCES
 // bila akses situsnya sudah tersedia.
-const defaultSources = ['animexin', 'anichin', 'anoboy', 'hianime', 'animeku', 'oploverz'];
+// 24 Okt 2026 (putaran 20): Anichin dan Kuramanime DIHAPUS — keduanya gagal di beberapa
+// uji akses (Cloudflare/403) sehingga adapter, fixture, dan test-nya ikut dibuang.
+// Sisa sumber: AnimeXin (donghua), Anoboy, hianime, AnimeKu, Oploverz.
+const defaultSources = ['animexin', 'anoboy', 'hianime', 'animeku', 'oploverz'];
 // AnimeOnsen is opt-in: authorized runtime credentials + an operator-confirmed media allowlist.
 if (animeOnsenClientId && animeOnsenClientSecret && animeOnsenMediaHosts.length) defaultSources.push('animeonsen');
 
 export const SOURCES = Object.freeze({
     /** Urutan = prioritas. Hapus nama dari daftar untuk mematikan adapter. */
-    // Anoboy/Sakunime/Kuramanime: ToS unknown → hak akses mengikuti SCRAPER_ROBOTS_MODE (default off). Kuramanime memakai satu base URL tanpa failover.
+    // Anoboy/Sakunime: ToS unknown → hak akses mengikuti SCRAPER_ROBOTS_MODE (default off).
     enabled: list('SCRAPER_SOURCES', defaultSources).map((s) => s.toLowerCase()),
     animexin: Object.freeze({ baseUrl: (env.ANIMEXIN_BASE_URL || 'https://animexin.dev').replace(/\/+$/, '') }),
     // AnimeIndo opt-in only: add "animeindo" to SCRAPER_SOURCES after verifying robots.txt/terms.
@@ -207,16 +210,10 @@ export const SOURCES = Object.freeze({
     }),
     anoboy: Object.freeze({ baseUrl: (env.ANOBOY_BASE_URL || 'https://anoboy.be').replace(/\/+$/, '') }),
     sakunime: Object.freeze({ baseUrl: (env.SAKUNIME_BASE_URL || 'https://sakunime.com').replace(/\/+$/, '') }),
-    anichin: Object.freeze({ baseUrl: (env.ANICHIN_BASE_URL || 'https://anichin.moe').replace(/\/+$/, '') }),
     otakudesu: Object.freeze({
         baseUrl: (env.OTAKUDESU_BASE_URL || 'https://otakudesu.blog').replace(/\/+$/, ''),
         renderJavaScript: bool('OTAKUDESU_RENDER_JAVASCRIPT', false),
         cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('OTAKUDESU_COOKIES', true),
-    }),
-    kuramanime: Object.freeze({
-        baseUrl: (env.KURAMANIME_BASE_URL || 'https://v9.kuramanime.work').replace(/\/+$/, ''),
-        renderJavaScript: bool('KURAMANIME_RENDER_JAVASCRIPT', false),
-        cookiesEnabled: SCRAPER_RUNTIME.cookies.enabled && bool('KURAMANIME_COOKIES', true),
     }),
     hianime: Object.freeze({ baseUrl: (env.HIANIME_BASE_URL || 'https://hianime.ro').replace(/\/+$/, '') }),
     // AnimeKu: memblokir UA browser dari IP pusat data, menerima UA bot jujur (lihat adapter).

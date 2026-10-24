@@ -108,7 +108,7 @@ async function loadSection(kind) {
     showSkeleton(grid);
     setSectionNote(grid);
     const res = await getHomeSection(kind);
-    // "Baru Rilis" & donghua dari backend (rilis terbaru AnimeXin/Anichin): kartu langsung membuka
+    // "Baru Rilis" & donghua dari backend (rilis terbaru AnimeXin): kartu langsung membuka
     // episode yang baru tayang (label kartu "EP 9" → episode 9)
     const toLatest = kind === 'recent' || (kind === 'donghua' && res.source === 'backend');
     renderCards(grid, res.items, { isBookmarked, episodeOf: toLatest ? latestEpisodeOf : undefined });
@@ -932,7 +932,7 @@ const scheduleGrid = $('#scheduleGrid');
 const scheduleNote = $('#scheduleNote');
 
 const SCHEDULE_NOTES = {
-    backend: `Jadwal rilis Samehadaku dalam ${SCHEDULE.label} · donghua dari Anichin (jam perkiraan) & AnimeXin · klik judul untuk episode terbaru.`,
+    backend: `Jadwal rilis Samehadaku dalam ${SCHEDULE.label} · donghua dari AnimeXin · klik judul untuk episode terbaru.`,
     anilist: `Jam tayang dalam ${SCHEDULE.label} (UTC+7) · ${SCHEDULE.perDay} anime terpopuler per hari · sumber: AniList · klik judul untuk menonton.`,
 };
 

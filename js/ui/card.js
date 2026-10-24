@@ -30,10 +30,8 @@ const SOURCE_BADGES = {
     'backend:animeonsen': { cls: 'src-backend', label: 'AnimeOnsen' },
     'backend:anoboy': { cls: 'src-backend', label: 'Anoboy' },
     'backend:sakunime': { cls: 'src-backend', label: 'Sakunime' },
-    'backend:anichin': { cls: 'src-backend', label: 'Anichin' },
     'backend:otakudesu': { cls: 'src-backend', label: 'Otakudesu' },
     'backend:hianime': { cls: 'src-backend', label: 'HiAnime' },
-    'backend:kuramanime': { cls: 'src-backend', label: 'Kuramanime' },
 };
 const ratingHtml = (anime) => html`${icon('star', { cls: 'ic--rating' })}${scoreLabel(anime)}`;
 
