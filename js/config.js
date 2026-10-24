@@ -52,6 +52,10 @@ export const STORAGE_KEYS = Object.freeze({
     /** Sisa kunci mode sandbox lama (24 Okt 2026). Sandbox sudah dihapus total di putaran 8 —
      *  kuncinya hanya dipakai untuk membersihkan pilihan lama di perangkat pengguna. */
     popupGuard: 'kz:popup-guard',
+    /** Putaran 11 (24 Okt 2026): "Mode Aman" pemutar = sandbox tanpa pop-up (opt-in). */
+    safeFrame: 'kz:safe-frame',
+    /** Cache hasil pemeriksaan host iklan (AdGuard DNS via backend) — 24 jam. */
+    adCheckCache: 'kz:adcheck',
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */
@@ -438,6 +442,32 @@ export const PLAYER = Object.freeze({
      * Set `false` untuk mematikan lapisan ini.
      */
     adShield: true,
+    /**
+     * "Mode Aman" (putaran 11, 24 Okt 2026) — sandbox iframe TANPA `allow-popups` &
+     * `allow-top-navigation`, sehingga iklan di dalam embed tidak bisa membuka tab baru atau
+     * membajak halaman Kazanime.
+     *
+     * Sengaja **opt-in** (`defaultOn: false`): sebagian embed menolak berjalan di dalam sandbox
+     * ("Sandboxed our player is not allowed") — persis yang membuat putaran 8 menghapus sandbox.
+     * Pengguna menyalakannya lewat tombol "Mode Aman" di bawah player; pilihannya diingat.
+     * Bila video tidak muncul saat Mode Aman aktif, satu klik mematikannya (tanpa layar penolakan).
+     */
+    safeFrame: Object.freeze({
+        defaultOn: false,
+        /**
+         * Token sandbox untuk Mode Aman (opt-in). SENGAJA tanpa `allow-popups` dan
+         * `allow-top-navigation*`: iklan di dalam embed tidak bisa membuka tab baru atau
+         * mengalihkan tab Kazanime. `allow-same-origin` + `allow-scripts` tetap ada supaya
+         * pemutar yang butuh storage/worker tidak rusak.
+         */
+        policy: 'allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-downloads',
+    }),
+    /**
+     * Deteksi pembajakan iklan (putaran 11): bila iframe memuat ulang ke halaman lain lebih dari
+     * sekali (pola redirect iklan), pemutar menampilkan bilah pemulihan, bukan layar penuh.
+     * `maxTakeovers` = jumlah pembajakan sebelum server itu dianggap rusak dan server lain dicoba.
+     */
+    adTakeover: Object.freeze({ maxTakeovers: 2, ignoreWithinMs: 1200 }),
     /** Label singkat situs untuk tombol server Sub Indo (dipakai js/watch.js). */
     siteLabels: Object.freeze({ animeku: 'AnimeKu', oploverz: 'Animeloverz' }),
     /** Jumlah kartu rekomendasi. */

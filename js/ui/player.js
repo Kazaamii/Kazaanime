@@ -42,6 +42,14 @@
  *  - Subtitle lokal `.srt`/`.vtt` hanya untuk video HLS/native: dikonversi/dipasang di browser sebagai Blob URL,
  *    tidak diunggah; track & object URL dibersihkan saat source berganti dan file dilupakan saat episode berganti.
  *
+ * Putaran 11 (24 Okt 2026) — iklan yang memaksa tab baru:
+ *  - **Mode Aman** (opt-in) memasang sandbox TANPA `allow-popups`/`allow-top-navigation`, jadi
+ *    iklan di dalam embed tidak bisa membuka tab baru atau membajak halaman. Default MATI karena
+ *    sebagian embed menolak sandbox; toggle-nya ada di bawah player dan pilihannya diingat.
+ *  - **Deteksi pembajakan**: setiap navigasi ulang iframe dihitung. Bila iklan memindahkan
+ *    pemutar (mis. halaman JSON "iclick link error"), bilah pemulihan muncul dengan tombol
+ *    "Pulihkan pemutar" / "Server lain"; setelah beberapa kali server itu dianggap rusak.
+ *
  * Tidak ada fetch di sini. Daftar server (StreamServer[]) datang dari js/api.
  */
 import { PLAYER, LEGAL_PLATFORMS, STORAGE_KEYS } from '../config.js';
@@ -50,6 +58,8 @@ import { showToast } from './toast.js';
 import { icon, hasIcon } from './icons.js';
 import { createAiSubtitle, aiErrorText } from './ai-subtitle.js';
 import { attachLocalSubtitleTrack, readLocalSubtitleFile } from './local-subtitle.js';
+import { storage } from '../services/storage.js';
+import { filterAdServers } from '../services/adblock.js';
 
 /** @typedef {import('../api/streams.js').StreamServer} StreamServer */
 
@@ -104,6 +114,44 @@ function dropLegacyGuardFlag() {
     }
 }
 dropLegacyGuardFlag();
+
+/* ------------------------------------------------------------------ */
+/* Mode Aman & deteksi pembajakan iklan (putaran 11)                    */
+/* ------------------------------------------------------------------ */
+/**
+ * Apakah "Mode Aman" (sandbox tanpa pop-up) sedang aktif.
+ * Pilihan disimpan di perangkat; default `PLAYER.safeFrame.defaultOn` (mati).
+ * @returns {boolean}
+ */
+export function isSafeFrameOn() {
+    const raw = storage.getRaw(STORAGE_KEYS.safeFrame);
+    if (raw === '1') return true;
+    if (raw === '0') return false;
+    return Boolean(PLAYER.safeFrame?.defaultOn);
+}
+
+/** @param {boolean} on */
+export function saveSafeFrame(on) {
+    storage.setRaw(STORAGE_KEYS.safeFrame, on ? '1' : '0');
+}
+
+/**
+ * Pasang/lepas sandbox pada iframe sesuai Mode Aman.
+ *
+ * Sandbox sengaja tidak memuat `allow-popups` maupun `allow-top-navigation`: `window.open()`
+ * dari embed iklan gagal, dan tab Kazanime tidak bisa dialihkan. `allow-same-origin` +
+ * `allow-scripts` dipertahankan supaya pemutar yang membutuhkan storage/worker tetap jalan.
+ * @param {HTMLIFrameElement} iframe
+ * @param {boolean} on
+ */
+function applyFramePolicy(iframe, on) {
+    if (!on) {
+        iframe.removeAttribute('sandbox');
+        return;
+    }
+    // `iframe.sandbox` adalah DOMTokenList (PutForwards=value) → setara atribut sandbox.
+    iframe.sandbox.value = PLAYER.safeFrame.policy;
+}
 
 /** hls.js (Apache-2.0) disimpan lokal; dimuat sekali saat server HLS pertama diputar. */
 let hlsLoader = null;
@@ -201,7 +249,7 @@ export function createPlayer({
     localSubtitleInput = null,
 }) {
     /** @type {Record<string, Set<Function>>} */
-    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set() };
+    const handlers = { loaded: new Set(), complete: new Set(), progress: new Set(), exhausted: new Set(), retry: new Set(), servers: new Set(), adblock: new Set(), adguide: new Set(), safeFrame: new Set() };
     const emit = (name, detail) => handlers[name]?.forEach((fn) => {
         try { fn(detail); } catch (err) { console.error(`[player] handler "${name}" error:`, err); }
     });
@@ -232,6 +280,14 @@ export function createPlayer({
     let overlayTimer = 0;
     /** @type {HTMLElement|null} lapisan anti-iklan di atas iframe (putaran 8) */
     let adShield = null;
+    /** @type {HTMLElement|null} bilah pemulihan saat iklan memindahkan pemutar (putaran 11) */
+    let adRecovery = null;
+    /** Jumlah navigasi ulang iframe untuk server aktif (indikasi iklan membajak). */
+    let frameLoads = 0;
+    /** Waktu load terakhir (ms) — menahan event `load` ganda dari peramban. */
+    let lastFrameLoadAt = 0;
+    /** Mode Aman aktif? (sandbox tanpa pop-up) */
+    let safeFrame = isSafeFrameOn();
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -239,6 +295,21 @@ export function createPlayer({
     let state = 'idle';
     let completedFor = null;
 
+    /**
+     * Pengaman terakhir (putaran 11): buang server yang URL-nya jaringan iklan/gateway klik,
+     * apa pun pemanggilnya. Ini yang dulu menampilkan halaman JSON "iclick link error" di
+     * dalam pemutar. Server HLS/native tidak diperiksa (bukan iframe).
+     * @param {StreamServer[]} list
+     * @returns {StreamServer[]}
+     */
+    const keepPlayable = (list) => {
+        const { servers: kept, blocked } = filterAdServers(Array.isArray(list) ? list : []);
+        if (blocked.length) {
+            const names = blocked.map((item) => item.name).filter(Boolean).join(', ');
+            showToast(`${blocked.length} server dihapus karena mengarah ke jaringan iklan${names ? `: ${names}` : ''}.`, 'info', 7000);
+        }
+        return kept;
+    };
     const available = () => servers.filter((s) => s.available);
     const byId = (id) => servers.find((s) => s.id === id) || null;
     const current = () => byId(currentId);
@@ -363,6 +434,9 @@ export function createPlayer({
             video = null;
         }
         removeAdShield();
+        removeAdRecovery();
+        frameLoads = 0;
+        lastFrameLoadAt = 0;
     }
 
     /**
@@ -396,6 +470,107 @@ export function createPlayer({
         adShield = null;
     }
 
+    /**
+     * Terapkan Mode Aman ke iframe yang sedang tampil (opt-in, disimpan di perangkat).
+     * Dipakai tombol di halaman watch, tombol di bilah pemulihan, dan fallback saat timeout.
+     * @param {boolean} on
+     * @returns {boolean} nilai baru
+     */
+    function applySafeFrame(on) {
+        safeFrame = Boolean(on);
+        saveSafeFrame(safeFrame);
+        if (frame) {
+            applyFramePolicy(frame, safeFrame);
+            frame.dataset.safeFrame = safeFrame ? 'on' : 'off';
+            // Muat ulang dokumen supaya kebijakan sandbox benar-benar berlaku.
+            try {
+                frame.contentWindow?.location.reload();
+            } catch {
+                const src = frame.src;
+                frame.src = 'about:blank';
+                setTimeout(() => { if (frame) frame.src = src; }, 30);
+            }
+        }
+        emit('safeFrame', { on: safeFrame });
+        return safeFrame;
+    }
+
+    /**
+     * Bilah pemulihan TIDAK menutupi seluruh pemutar (bukan layar penolakan seperti versi lama):
+     * ia menempel di bawah area player supaya pengguna tetap bisa melihat apa yang sedang terjadi
+     * dan memilih tindakan. Muncul saat iframe memuat ulang ke halaman lain (pola redirect iklan).
+     * @param {number} my token pemutaran
+     */
+    function mountAdRecovery(my) {
+        removeAdRecovery();
+        if (my !== token) return;
+        const active = current();
+        const bar = document.createElement('div');
+        bar.className = 'player-ad-recovery';
+        bar.id = 'playerAdRecovery';
+        bar.setAttribute('role', 'status');
+        bar.innerHTML = String(html`
+            <span class="player-ad-recovery-text">${icon('shield-check')} Iklan memindahkan pemutar. Video bisa dipulihkan.</span>
+            <span class="player-ad-recovery-actions">
+                <button type="button" class="player-ad-recovery-btn" data-ad-action="restore">Pulihkan pemutar</button>
+                <button type="button" class="player-ad-recovery-btn" data-ad-action="next">Server lain</button>
+                <button type="button" class="player-ad-recovery-btn" data-ad-action="safe"${safeFrame ? ' hidden' : ''}>Aktifkan Mode Aman</button>
+                <button type="button" class="player-ad-recovery-btn player-ad-recovery-btn--ghost" data-ad-action="guide">Cara blokir iklan</button>
+            </span>`);
+        bar.addEventListener('click', (event) => {
+            const btn = event.target instanceof Element ? event.target.closest('[data-ad-action]') : null;
+            if (!btn) return;
+            const action = btn.getAttribute('data-ad-action');
+            if (action === 'restore') {
+                if (active) play(active);
+            } else if (action === 'next') {
+                nextServer();
+            } else if (action === 'safe') {
+                // Iklan membajak → tawarkan pelindung satu klik, lalu muat ulang server yang sama.
+                const on = applySafeFrame(true);
+                showToast('Mode Aman aktif — iklan tidak bisa membuka tab baru.', 'success', 5000);
+                if (on && active) play(active);
+            } else if (action === 'guide') {
+                emit('adguide', { server: active });
+            }
+        });
+        stage.append(bar);
+        adRecovery = bar;
+    }
+
+    function removeAdRecovery() {
+        if (!adRecovery) return;
+        adRecovery.remove();
+        adRecovery = null;
+    }
+
+    /**
+     * Navigasi ulang iframe = dugaan iklan membajak pemutar (mis. `/iclick?…` → halaman JSON).
+     * Reaksi:
+     *  - sekali  → tampilkan bilah pemulihan + kabari halaman (watch.js menampilkan toast);
+     *  - berulang → server dianggap rusak, server berikutnya dicoba otomatis.
+     * @param {number} my token pemutaran
+     */
+    function noteFrameReload(my) {
+        if (my !== token) return;
+        const now = Date.now();
+        // Sebagian peramban memicu `load` dua kali untuk dokumen yang sama → abaikan duplikat.
+        const duplicate = lastFrameLoadAt && now - lastFrameLoadAt < (PLAYER.adTakeover?.ignoreWithinMs || 1200);
+        lastFrameLoadAt = now;
+        if (duplicate) return;
+        frameLoads += 1; // 1 = navigasi pertama setelah halaman embed termuat
+        const active = current();
+        emit('adblock', { type: 'takeover', server: active, count: frameLoads });
+        mountAdRecovery(my);
+        if (frameLoads >= (PLAYER.adTakeover?.maxTakeovers || 2) && active) {
+            failed.add(active.id);
+            emit('adblock', { type: 'skipped', server: active, count: frameLoads });
+            const next = available().find((item) => item.id !== active.id && !failed.has(item.id));
+            if (next) play(next);
+            else setStatus('Iklan memindahkan pemutar. Coba server lain atau Pemutar Eksternal.', 'error');
+        }
+    }
+
     function renderServers() {
         if (!servers.length) {
             serverBox.innerHTML = '<p class="server-empty">Tidak ada server streaming yang dikonfigurasi.</p>';
@@ -409,7 +584,11 @@ export function createPlayer({
             const lock = s.pending
                 ? html` <span class="server-badge server-badge--pending">mencari…</span>`
                 : s.available ? '' : html` <span class="server-lock" aria-label="tidak tersedia">${ICON_LOCK}</span>`;
-            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available ? 'false' : 'true'}" title="${s.available ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge ? html` <span class="server-badge">${s.badge}</span>` : ''}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
+            // Putaran 11: host yang ada di daftar blokir iklan diberi tanda ⚠ (tetap bisa dipilih).
+            const adWarn = s.adRisk
+                ? html` <span class="server-badge server-badge--ad" title="Host server ini ada di daftar blokir iklan (AdGuard DNS)">⚠</span>`
+                : '';
+            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available ? 'false' : 'true'}" title="${s.available ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
         })}`);
         emit('servers', { count: available().length });
     }
@@ -473,9 +652,13 @@ export function createPlayer({
         iframe.allow = PLAYER.allow;
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
-        // TANPA atribut sandbox (putaran 8): embed yang menolak sandbox menampilkan
-        // "Sandboxed our player is not allowed" dan video tidak muncul sama sekali.
+        // Tanpa sandbox secara default (sejak putaran 8): sebagian embed menolak sandbox.
+        // Mode Aman (putaran 11) memasang sandbox tanpa allow-popups/allow-top-navigation.
         iframe.dataset.popupGuard = 'off';
+        iframe.dataset.safeFrame = safeFrame ? 'on' : 'off';
+        applyFramePolicy(iframe, safeFrame);
+        frameLoads = 0;
+        lastFrameLoadAt = 0;
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
@@ -488,7 +671,17 @@ export function createPlayer({
             emit('loaded', { ep, server });
         };
         markLoaded = loaded;
-        iframe.addEventListener('load', loaded);
+        let firstLoad = true;
+        iframe.addEventListener('load', () => {
+            if (my !== token) return;
+            if (firstLoad) {
+                firstLoad = false;
+                lastFrameLoadAt = Date.now();
+                loaded();
+                return;
+            }
+            noteFrameReload(my);
+        });
         iframe.src = urlOf(server); // src sebelum dipasang → event load hanya untuk dokumen embed
         stage.replaceChildren(iframe, overlay);
         frame = iframe;
@@ -712,6 +905,15 @@ export function createPlayer({
     }
 
     function fail(server, reason) {
+        // Mode Aman bisa membuat embed menolak tampil ("Sandboxed our player is not allowed").
+        // Playback tetap prioritas: pada kegagalan pertama, sandbox dilepas lalu server yang
+        // sama dicoba ulang — server tidak langsung dibuang.
+        if (reason === 'timeout' && safeFrame) {
+            applySafeFrame(false);
+            showToast('Mode Aman dimatikan otomatis: server ini tidak memuat video saat di-sandbox. Mencoba ulang tanpa Mode Aman.', 'info', 8000);
+            play(server);
+            return;
+        }
         const idx = mirror.get(server.id) || 0;
         if (server.mirrors && idx < server.mirrors.length - 1) {
             // Mirror lain dari penyedia yang sama (mis. ReAnime HD-2 → HD-1) dicoba dulu.
@@ -852,6 +1054,17 @@ export function createPlayer({
         /** Nama server aktif (untuk label tombol pemutar eksternal). */
         currentServerName: () => current()?.name || '',
 
+        /** Mode Aman (sandbox tanpa pop-up) sedang aktif? */
+        isSafeFrame: () => safeFrame,
+
+        /**
+         * Nyalakan/matikan Mode Aman. Iframe yang sedang tampil langsung diperbarui;
+         * bila embed menolak sandbox (video tidak muncul), panggil lagi dengan `false`.
+         * @param {boolean} on
+         * @returns {boolean} nilai baru
+         */
+        setSafeFrame: (on) => applySafeFrame(on),
+
         /**
          * Putar episode dengan daftar server baru. Server pilihan user sebelumnya
          * dipakai lebih dulu bila tersedia (pindah episode tidak mereset pilihan server).
@@ -861,7 +1074,7 @@ export function createPlayer({
         load(episode, list) {
             if (episode !== ep) forgetLocalSubtitle();
             ep = episode;
-            servers = list;
+            servers = keepPlayable(list);
             failed = new Set();
             mirror = new Map();
             const first = (currentId && byId(currentId)?.available ? byId(currentId) : null) || available()[0];
@@ -876,7 +1089,7 @@ export function createPlayer({
          * @param {StreamServer[]} list
          */
         setServers(list) {
-            servers = list;
+            servers = keepPlayable(list);
             if (state === 'loading' || state === 'playing') {
                 const cur = current();
                 if (cur?.available) {
@@ -931,7 +1144,7 @@ export function createPlayer({
         },
 
         /**
-         * @param {'loaded'|'complete'|'progress'|'exhausted'|'retry'|'servers'} name
+         * @param {'loaded'|'complete'|'progress'|'exhausted'|'retry'|'servers'|'adblock'|'adguide'|'safeFrame'} name
          * @param {(detail: any) => void} fn
          */
         on(name, fn) {

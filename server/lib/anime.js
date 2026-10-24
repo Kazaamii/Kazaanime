@@ -10,6 +10,7 @@
  * Field `id` sengaja TIDAK dikirim: frontend menghitungnya sendiri (anilist:… / animexin:…).
  */
 import { absoluteUrl, cleanText, clip } from './text.js';
+import { inspectAdUrl } from './adblock.js';
 
 const STATUSES = new Set(['ONGOING', 'COMPLETED', 'UPCOMING', 'UNKNOWN']);
 const FORMATS = new Set(['TV', 'MOVIE', 'ONA', 'OVA', 'SPECIAL', 'MUSIC', 'DONGHUA']);
@@ -121,7 +122,9 @@ export function makeEpisode({ episode, title = '', released = '', url = '', serv
                 ...(subtitles.length ? { subtitles } : {}),
             };
         })
-        .filter((s) => s.url && !seen.has(s.url) && seen.add(s.url))
+        // Putaran 11: URL bertanda jaringan iklan / gateway klik dibuang di sini supaya tidak
+        // pernah sampai ke iframe (dulu muncul halaman JSON "iclick link error" di pemutar).
+        .filter((s) => s.url && !inspectAdUrl(s.url).blocked && !seen.has(s.url) && seen.add(s.url))
         // Multi Sub didahulukan; setelahnya Hardsub eksplisit sebelum Softsub, urutan sumber stabil.
         .map((s, i) => ({ s, i }))
         .sort((a, b) => ((LANG_ORDER[a.s.lang] ?? 3) - (LANG_ORDER[b.s.lang] ?? 3))
