@@ -270,6 +270,25 @@ export const ADS = Object.freeze({
     guideUrl: env.ADS_GUIDE_URL || 'https://adguard-dns.io/',
 });
 
+/**
+ * Hitungan "suka" per episode (putaran 14, 24 Okt 2026).
+ * Diminta pengguna: tombol Like dengan hitungan langsung ("Count Live") sebagai jejak.
+ *
+ * `store` kosong = otomatis: redis (bila KV_REST_API_URL/TOKEN ada) → file (server sendiri)
+ * → memory (Vercel tanpa KV; hitungan hilang saat instance berhenti).
+ */
+export const REACTIONS = Object.freeze({
+    /** 'off' | 'file' | 'redis' | 'memory' (kosong = otomatis). */
+    store: (env.REACTION_STORE || '').toLowerCase(),
+    /** Folder data adapter 'file' (default: DATA_DIR akun, yaitu <proyek>/.data). */
+    dataDir: path.resolve(ROOT_DIR, env.REACTION_DATA_DIR || env.ACCOUNT_DATA_DIR || '.data'),
+    /** REST Redis (Upstash / Vercel KV) untuk hitungan lintas instance. */
+    redisUrl: env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL || '',
+    redisToken: env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN || '',
+    /** Batas POST/GET suka per IP per menit. */
+    rateLimitPerMinute: int('REACTION_RATE_LIMIT_PER_MIN', 60, { min: 0, max: 10000 }),
+});
+
 export const STREAMS = Object.freeze({
     enabled: list('STREAM_PROVIDERS', ['reanime', 'anizone']).map((s) => s.toLowerCase()),
     reanime: Object.freeze({

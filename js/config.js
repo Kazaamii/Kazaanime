@@ -60,6 +60,10 @@ export const STORAGE_KEYS = Object.freeze({
     legacyNoSandbox: 'kz:no-sandbox',
     /** Kunci "Mode Aman" putaran 11 — fiturnya dihapus (putaran 12); hanya dibersihkan saat start. */
     legacySafeFrame: 'kz:safe-frame',
+    /** Putaran 14: id pengunjung anonim untuk hitungan suka (tanpa nama/email). */
+    visitor: 'kz:visitor',
+    /** Putaran 14: jejak episode yang disukai di perangkat ini (`{ [key]: true }`). */
+    likes: 'kz:likes',
     /** Cache hasil pemeriksaan host iklan (AdGuard DNS via backend) — 24 jam. */
     adCheckCache: 'kz:adcheck',
 });

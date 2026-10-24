@@ -40,6 +40,7 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅞 putaran 9 (24 Okt 2026): **tata letak ponsel** — menu akun, tombol player, dan panel server dirapikan (server di bawah player, episode di bawahnya)
 🅟 putaran 10 (24 Okt 2026): **akun tahan banting** (nama tanpa beda huruf, cadangan otomatis, cadangan/pulihkan berkas + kode), **server akun opsional** (file/Redis), foto avatar terverifikasi, **judul di atas player**, tab **AnimeKu/Oploverz** di pencarian
 🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
+🅢 putaran 14 (24 Okt 2026): **baris “Cek pilihan subtitle” dihapus** (nomor episode kini chip kecil di bawah judul), **polesan tampilan desktop** halaman nonton (judul + aksi sejajar, panel server/details lebih lega), **tombol “Suka” dengan hitungan live (“Jejak”)** — satu suka per pengunjung per episode, `GET/POST /api/reactions`, penyimpanan file/Redis/off, tetap jalan dengan jejak lokal bila server mati
 🅡 putaran 13 (24 Okt 2026): **tawaran pelepas pengaman dihapus** (tautan “Muat ulang tanpa pengaman” + ingatan host `kz:no-sandbox` — sekali klik dulu membuat iklan bisa membuka tab lagi), **daftar blokir iklan diperluas** (70 host / 13 pola, klien = server), **server berisiko ditaruh paling belakang** supaya pemutaran otomatis memakai host bersih
 
 ```
@@ -142,6 +143,7 @@ kazanime/
     │   ├── challenge-handler.js deteksi CAPTCHA/403/429/security challenge dan cooldown tanpa solver/retry
     │   ├── stream-proxy.js    🅔 tanda tangan HMAC URL proxy, penulisan ulang playlist m3u8, konversi ASS/SRT → WebVTT
     │   ├── account-store.js   🅟 penyimpanan akun server: file JSON atomik / Redis REST (Upstash, Vercel KV) / memory; scrypt + token HMAC
+    │   ├── reaction-store.js  🅢 hitungan "Suka/Jejak" per episode: file JSON atomik / Redis REST / memory / off; satu suka per pengunjung
     │   ├── gemini.js          🅕 klien Gemini API (generateContent): model utama → cadangan, pendinginan kuota/key, thinking minimal
     │   ├── subtitle-ai.js     🅕 VTT → bagian (±2 per episode), prompt "nomor|teks", validasi jawaban, cache & dedupe per instance
     │   ├── robots.js          parser & pencocok robots.txt (RFC 9309) + cache; dipakai hanya saat mode enforce/warn
@@ -725,6 +727,10 @@ Vercel; tanpa ini secret proxy diturunkan dari ID deployment), `STREAM_PROXY_RAT
 `GEMINI_MODEL` (default `gemini-3.6-flash`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`; `none` = tanpa
 cadangan), `AI_SUBTITLES=0` (matikan walau key ada), `AI_SUBTITLE_PART_LINES` / `AI_SUBTITLE_PART_CHARS` /
 `AI_SUBTITLE_TIMEOUT_MS` / `AI_SUBTITLE_RATE_LIMIT_PER_MIN`.
+Hitungan “Suka/Jejak” (putaran 14): `REACTION_STORE` (`off` / `file` / `redis` / `memory`; kosong = otomatis
+redis bila `KV_REST_API_URL`/`UPSTASH_REDIS_REST_URL` ada, kalau tidak `file` — kecuali di Vercel yang memakai
+`memory`), `REACTION_DATA_DIR` (default `.data`, berkas `reactions.json`), `REACTION_RATE_LIMIT_PER_MIN` (default 60).
+Tanpa penyimpanan tetap, angka shared hilang saat instance berhenti — tombol tetap jalan dengan jejak lokal.
 Runtime scraper: `SCRAPER_PROXY_URLS` / `SCRAPER_PROXY_URL` (HTTP(S), SOCKS4a/5/5h; credentials URL-encoded; bila
 kosong, satu `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY` dikenali), `SCRAPER_PROXY_ROTATION` (`round-robin`/`sticky`/
 `disabled`), timeout/health/cooldown `SCRAPER_PROXY_*`, `SCRAPER_MAX_CONCURRENCY_PER_HOST`,
@@ -1456,6 +1462,52 @@ tombol mode aman saat ada di layar stream itu membuat iklan keluar lagi optimisa
    memakai sandbox; setelah **16 detik** tanpa `load` sandbox **masih terpasang**, server berganti ke
    server berikutnya; tidak ada elemen `#playerFrameHint`/`[data-frame-action]` dan tidak ada teks
    "tanpa pengaman" di DOM; 0 galat runtime di halaman `watch.html`.
+
+### Perubahan perilaku (24 Okt 2026 — putaran keempat belas: hapus baris subtitle, polesan desktop, tombol Suka “Jejak”)
+
+Permintaan pengguna: *"Untuk judul sudah benar dalam posisi. tapi ada kalimat Cek Pilihan Subtitle
+nya Tolong pindah kan ditempat yang benar baik nya dihapus/di pindahkan optimalkan juga untu
+tampilan desktop agar bagus lalu tambahkan tombol Like/Count Live Untuk Jejak jika memungkinkan dan
+optimalisasi lagi."*
+
+1. **Judul tidak dipindah lagi.** Posisi judul di atas player (putaran 10) **dipertahankan** —
+   string `class="watch-title-row watch-title-row--top"` dan selektornya tidak disentuh.
+2. **Baris “Cek pilihan subtitle” dihapus, bukan dipindah.** Kalimat itu dulu menempel di bawah
+   judul (`#watchEpisodeLabel` → `Episode 1 • Cek pilihan subtitle`) dan hanya mengulang hal yang
+   sudah dijelaskan panel server. Posisi yang benar untuk info episode adalah **chip kecil**
+   (`<span class="watch-ep-chip">Episode 1</span>`) tepat di bawah judul, tanpa kalimat tambahan.
+   Bila tautan episode tidak lengkap, chip berbunyi “Link tidak lengkap” dan tombol Suka dinonaktifkan.
+3. **Polesan desktop** (`@media(min-width:1025px)` di `css/watch.css`): judul + tombol aksi dalam
+   satu baris yang sejajar, `letter-spacing` judul dirapatkan, chip meta (status/rating/Tamat) jadi
+   pil yang lebih rapat, `.server-bar` dan `.player-statusbar` diberi padding lebih lega,
+   panel details/sidebar/episode diberi jarak napas, ringkasan lebih nyaman dibaca. Ponsel tetap
+   memakai tata letak putaran 9 (tombol suka menyusut jadi ikon + angka, label “Suka” disembunyikan
+   secara visual tapi tetap terbaca pembaca layar).
+4. **Tombol “Suka” + hitungan live (“Jejak”).** Di baris judul ada `#watchLikeBtn`
+   (`.ic-slot[data-icon="heart"]` + label “Suka” + `#watchLikeCount`), bersebelahan dengan tombol
+   simpan. Nilai disimpan **per episode** dengan kunci `slug~epN`, satu suka per pengunjung
+   (`localStorage kz:visitor`, id acak) per episode — klik berulang, refresh, atau dua perangkat
+   dengan pengunjung sama tidak menggandakan hitungan.
+5. **API `GET/POST /api/reactions`.** `GET /api/reactions?keys=a~ep1,b~ep2` → hitungan beberapa
+   episode sekaligus (maks 20 key), `GET /api/reactions/status` → mode penyimpanan,
+   `POST /api/reactions/<key>` body `{liked, visitor}` → hitungan terbaru. Semua `Cache-Control:
+   no-store`, batas 60 permintaan/menit/IP, body 8 kb. Penyimpanan dipilih lewat `REACTION_STORE`:
+   `file` (default di server sendiri, `.data/reactions.json`, tulis atomik + antrean), `redis`
+   (Upstash / Vercel KV otomatis bila `KV_REST_API_URL` + `KV_REST_API_TOKEN` ada), `memory`
+   (default di Vercel tanpa KV), atau `off`.
+6. **Tidak ada jalur gagal yang merusak halaman.** Bila server tidak tersedia atau
+   `REACTION_STORE=off`, tombol tetap bekerja dengan **jejak lokal** (`kz:likes`, batas 500 episode)
+   dan pengguna diberi tahu sekali lewat toast: *“Suka tersimpan di perangkat ini. Hitungan bersama
+   belum tersedia dari server.”* Hitungan diperbarui tiap **30 detik** saat tab terlihat
+   (`visibilitychange`), jadi angka terasa live tanpa membebani server.
+7. **Tes & verifikasi.** `server/test/round14-reactions.test.js` (15 tes baru) menjaga: normalisasi
+   key/pengunjung menolak path traversal, satu pengunjung hanya dihitung sekali, batal suka,
+   penyimpanan nonaktif tidak melempar galat, GET/POST/status + `no-store`, batas 20 key, validasi
+   body, dan pernyataan statis (tidak ada “Cek pilihan subtitle” di `watch.html`/`js/watch.js`; chip
+   episode + `#watchLikeBtn`/`#watchLikeCount` ada; CSS punya aturan desktop & ponsel untuk tombol
+   suka, kurung kurawal seimbang). Total `npm test` **507 tes lulus**. Uji runtime `happy-dom`:
+   label episode “Episode 2” (chip), hitungan awal 41 dari server, klik → 42 + `aria-pressed="true"`
+   + `is-on` + 1 POST, klik lagi → batal (`kz:likes` kosong), 0 galat runtime.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
