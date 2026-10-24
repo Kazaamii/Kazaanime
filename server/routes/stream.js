@@ -17,6 +17,7 @@
  */
 import { Readable } from 'node:stream';
 import { Router } from 'express';
+import { filterAdServers } from '../lib/adblock.js';
 import { AI_SUBS, SOURCES, STREAMS } from '../config.js';
 import { AppError, badRequest } from '../lib/errors.js';
 import { looksLikeChallenge, readBody } from '../lib/fetcher.js';
@@ -144,7 +145,10 @@ export function streamRouter({ providers, mediaClient, animeOnsenMediaClient = n
         const titles = readTitles(req.query.title);
         if (!anilist && !titles.length) throw badRequest('Butuh parameter anilist atau title.');
         const r = await providers.servers({ anilist, ep, titles, year }, { deadline: Date.now() + budgetMs });
-        const servers = r.servers.map((s) => (s.kind === 'hls'
+        // Putaran 11: server yang URL-nya jelas jaringan iklan/gateway klik tidak dikirim ke
+        // browser (dulu bisa memuat halaman JSON "iclick link error" di dalam pemutar).
+        const adFiltered = filterAdServers(r.servers);
+        const servers = adFiltered.servers.map((s) => (s.kind === 'hls'
             ? {
                 provider: s.provider,
                 kind: 'hls',
@@ -166,7 +170,12 @@ export function streamRouter({ providers, mediaClient, animeOnsenMediaClient = n
             stale: Object.values(r.status).includes('stale'),
             ...(r.errors.length ? { errors: r.errors } : {}),
             generatedAt: new Date().toISOString(),
-            data: { episode: ep, servers, status: r.status },
+            data: {
+                episode: ep,
+                servers,
+                status: r.status,
+                ...(adFiltered.blocked.length ? { blockedByAdFilter: adFiltered.blocked.length } : {}),
+            },
         });
     });
 

@@ -1306,6 +1306,53 @@ muncul hanya 2 anilist dan kitsu … tambahkan juga agar terorganisir"*.
    menampilkan judul siap-tonton (langsung ke episode) tanpa paginasi, dan subjudul menyebut jumlah
    per sumber: `Ditemukan N di katalog · AnimeKu (a) + Oploverz (b) — AniList (c) + Kitsu (d)`.
 
+### Perubahan perilaku (24 Okt 2026 — putaran kesebelas: iklan yang memaksa tab baru & DNS AdGuard)
+
+Permintaan pengguna: *"iklan masih saja muncul dan memaksa new tab tolong gunakan dns seperti ini
+atau terapkan di web saya agar tidak ada iklan muncul ++https://dns.adguard.com/dns-query++"*,
+dengan tangkapan layar player yang berubah menjadi halaman JSON
+`{"success":false,"reject_reason":"iclick link error"}`.
+
+1. **Kenapa masih ada iklan.** Iklan itu **bukan** elemen Kazanime: ia dimuat di dalam dokumen
+   iframe milik server video pihak ketiga (atau mengalihkan iframe ke gateway klik `…/iclick?…`
+   yang menjawab JSON di atas). Halaman web **tidak bisa** mengubah DNS perangkat pengunjung, jadi
+   tidak ada satu baris kode pun yang bisa "mematikan semua iklan" dari sisi situs. Yang bisa
+   dikerjakan — dan sekarang dikerjakan — ada empat lapis.
+2. **Lapis 1 — URL iklan tidak pernah dipasang.** `server/lib/adblock.js` berisi 57 domain jaringan
+   iklan/popunder/tracker dan 10 pola URL gateway klik (`iclick`, `adclick`, `popunder`,
+   `popads`, `directlink`, `/ad(s|v|vert)/click|…`, query `aff_id`/`zoneid`/…). Server membuang
+   server streaming yang URL-nya cocok (`/api/stream/servers` menyertakan `blockedByAdFilter`,
+   `makeEpisode` menyaring lebih awal), dan klien menyaring lagi di `player.load()`/`setServers()`
+   serta `js/api/sources.js` (muatan cache lama ikut bersih). Ini yang dulu menampilkan halaman
+   "iclick link error" di dalam player.
+3. **Lapis 2 — AdGuard DNS (DoH) benar-benar dipakai, tetapi sebagai *pemeriksa reputasi*.**
+   `server/lib/dns.js` menanyakan `https://dns.adguard.com/dns-query` (DoH JSON, `?name=host&type=A`)
+   untuk host server yang tampil. Jawaban `Status≠0`, tanpa `Answer`, atau `0.0.0.0`/`::` = host
+   ada di daftar blokir AdGuard → tombol server diberi tanda ⚠. **Server tetap bisa dipilih**
+   (host video sah kadang terdaftar; memblokir otomatis berisiko menghilangkan server yang
+   berfungsi). Cache 6 jam, cooldown 10 menit setelah gagal, **fail-open**: DoH tidak terjangkau →
+   `blocked: null` dan situs jalan seperti biasa. Endpoint: `GET /api/ads/status`,
+   `GET /api/ads/check?host=a,b` (maks 20), `GET /api/ads/blocklist`; `/api/health` menampilkan
+   `adFilter`. Env: `ADS_DNS_CHECK`, `ADS_DNS_ENDPOINT`, `ADS_DNS_TIMEOUT_MS`, `ADS_GUIDE_URL`.
+4. **Lapis 3 — Mode Aman (opt-in) supaya iklan tidak bisa membuka tab.** Tombol **Mode Aman**
+   (`#btnSafeMode`, di baris kontrol player) memasang sandbox tanpa `allow-popups` dan
+   `allow-top-navigation*` pada iframe — `window.open()` iklan gagal dan tab Kazanime tidak bisa
+   dialihkan. **Default mati** (pelajaran putaran 3/8: sebagian embed menolak sandbox dan hanya
+   menampilkan "Sandboxed our player is not allowed"); pilihan disimpan di `kz:safe-frame`. Bila
+   embed menolak tampil, video yang tidak termuat dalam 15 detik membuat Mode Aman **dilepas
+   otomatis** lalu server yang sama dicoba ulang (server tidak dibuang) — jadi tidak pernah
+   mengorbankan pemutaran.
+5. **Lapis 4 — pemulihan saat iklan membajak pemutar.** Setiap navigasi ulang iframe dihitung
+   (event `load` ganda dalam 1,2 detik diabaikan). Navigasi kedua → bilah **"Iklan memindahkan
+   pemutar"** muncul di bawah area video (bukan layar penuh yang menutupi player) dengan tombol
+   **Pulihkan pemutar · Server lain · Aktifkan Mode Aman · Cara blokir iklan**. Navigasi berulang
+   (`PLAYER.adTakeover.maxTakeovers = 2`) menandai server itu gagal dan pindah otomatis.
+6. **Panduan AdGuard DNS di aplikasi** (`js/ui/ad-guide.js`, tombol **Panduan blokir iklan** di
+   bawah daftar server). Berisi langkah Android (DNS Pribadi `dns.adguard-dns.com`), iPhone/iPad,
+   Windows 11 (DoH `https://dns.adguard.com/dns-query`), macOS, router, dan ekstensi peramban, plus
+   tombol **Salin** untuk DoH / DoT / IPv4 (`94.140.14.14`, `94.140.15.15`) / IPv6. Ditulis jujur:
+   DNS diatur di perangkat/router, bukan oleh halaman web, dan iklan hardsub tidak bisa dihapus.
+
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
 - "Streaming page" di dalam homepage → menjadi `watch.html` (punya URL, bisa di-share, tombol Back browser bekerja)

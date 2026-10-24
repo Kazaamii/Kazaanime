@@ -26,7 +26,9 @@
  * Tidak ada fetch di sini: data dari js/api, tampilan dari js/ui.
  */
 import { initLayout } from './ui/layout.js';
-import { createPlayer } from './ui/player.js';
+import { createPlayer, isSafeFrameOn } from './ui/player.js';
+import { openAdGuide } from './ui/ad-guide.js';
+import { filterAdServers, checkHosts } from './services/adblock.js';
 import { createEpisodeList } from './ui/episode-list.js';
 import { renderDownloads } from './ui/download-list.js';
 import { renderCards, bindCardActions, syncBookmarkButtons, gridMessage } from './ui/card.js';
@@ -158,8 +160,11 @@ const isSubIndoSource = (server) => SUB_INDO_SOURCES.includes(siteOf(server));
  * @param {import('./api/streams.js').StreamServer[]} list
  */
 function numbered(list) {
+    // Putaran 11: SEMUA daftar server melewati titik ini sebelum tampil, jadi di sini pula
+    // URL jaringan iklan dibuang dan host berisiko ditandai ⚠ (tetap bisa dipilih).
+    const safe = guardAdServers(list);
     let counter = 0;
-    return list.map((s) => {
+    return safe.map((s) => {
         const site = isSubIndoSource(s) ? PLAYER.siteLabels[siteOf(s)] : '';
         if (!site) counter += 1;
         const name = site || `Server ${counter}`;
@@ -195,6 +200,15 @@ function firstPerSite(list) {
  *                 → hasil scraping bahasa lain → server cadangan → server Sub Eng.
  *   static-first: server cadangan dulu, lalu semua server hasil scraping
  */
+/** Host yang ada di daftar blokir iklan (hasil /api/ads/check) — hanya penanda, bukan blokir. */
+let adRiskHosts = new Set();
+/** Ringkasan jumlah server yang dibuang karena URL-nya iklan (ditampilkan sekali per episode). */
+let adBlockedCount = 0;
+
+const hostOf = (value) => {
+    try { return new URL(String(value || '')).hostname.toLowerCase(); } catch { return ''; }
+};
+
 const servers = () => {
     const fallback = withProviderServers(staticServers(), providerResult);
     if (!scrapeFirst()) return numbered([...fallback, ...backendServers]);
@@ -207,6 +221,48 @@ const servers = () => {
     const english = [...rest.filter((s) => s.lang === 'en'), ...fallback.filter((s) => s.lang === 'en')];
     return numbered([...subIndo, ...multi, ...local, ...otherFallback, ...english]);
 };
+
+/**
+ * Putaran 11: buang server yang URL-nya jaringan iklan/gateway klik (mis. `…/iclick?…`
+ * yang dulu memunculkan halaman JSON di dalam pemutar) dan beri tanda pada host yang ada di
+ * daftar blokir AdGuard DNS. Server bertanda TETAP bisa dipilih — host video sah kadang
+ * terdaftar, jadi memblokir otomatis berisiko menghilangkan server yang berfungsi.
+ * @param {any[]} list
+ */
+function guardAdServers(list) {
+    const { servers: kept, blocked } = filterAdServers(list);
+    if (blocked.length && blocked.length !== adBlockedCount) {
+        adBlockedCount = blocked.length;
+        showToast(`${blocked.length} server disembunyikan karena mengarah ke jaringan iklan.`, 'info');
+    } else if (!blocked.length) {
+        adBlockedCount = 0;
+    }
+    if (!adRiskHosts.size) return kept;
+    return kept.map((server) => (adRiskHosts.has(hostOf(server.url)) ? { ...server, adRisk: true } : server));
+}
+
+/**
+ * Tanyakan backend (yang menanyakan DNS AdGuard) reputasi host server yang tampil.
+ * Hanya menandai; tidak pernah memblokir atau menghentikan pemutaran.
+ */
+let adRiskBusy = false;
+async function refreshAdRisk() {
+    if (adRiskBusy) return;
+    const hosts = [...new Set(servers().map((server) => hostOf(server.url)).filter(Boolean))];
+    if (!hosts.length) return;
+    adRiskBusy = true;
+    try {
+        const result = await checkHosts(hosts);
+        const next = new Set(Object.entries(result).filter(([, blocked]) => blocked).map(([host]) => host));
+        const changed = next.size !== adRiskHosts.size || [...next].some((host) => !adRiskHosts.has(host));
+        if (changed) {
+            adRiskHosts = next;
+            if (player.state !== 'message') player.setServers(servers());
+        }
+    } finally {
+        adRiskBusy = false;
+    }
+}
 /** Semua judul yang diketahui (URL + detail) untuk mencari padanan di situs sumber. */
 const scrapeTitles = () => [ref.title, ref.alt, anime.title, anime.titleAlt];
 /** Kunci himpunan judul (untuk tahu apakah detail membawa judul yang belum dicari). */
@@ -293,6 +349,8 @@ function holdForScrape(n) {
 const player = createPlayer({
     stage: $('#playerStage'),
     serverBox: $('#serverButtons'),
+    safeModeBtn: $('#btnSafeMode'),
+    adGuideBtn: $('#btnAdGuide'),
     status: $('#playerStatus'),
     statusText: $('#playerStatusText'),
     getTitle: () => anime.title,
@@ -549,6 +607,43 @@ player.on('complete', ({ ep: done }) => {
 });
 
 player.on('servers', ({ count }) => { els.nextServer.disabled = count === 0; });
+
+/* Putaran 11: iklan yang memindahkan pemutar & panduan DNS AdGuard. */
+player.on('adblock', ({ type, server }) => {
+    if (type === 'takeover') {
+        showToast('Iklan memindahkan pemutar. Klik "Pulihkan pemutar" di bawah player, atau pilih server lain.', 'info', 7000);
+    } else if (type === 'skipped') {
+        showToast(`Server ${server?.name || ''} dilewati karena iklan membajak pemutarnya. Coba server lain.`, 'info', 7000);
+    }
+});
+player.on('adguide', () => openAdGuide());
+player.on('safeFrame', ({ on }) => syncSafeModeButton(on));
+
+/** Sinkronkan tampilan tombol Mode Aman dengan status player. */
+function syncSafeModeButton(on = isSafeFrameOn()) {
+    if (!els.safeModeBtn) return;
+    els.safeModeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    els.safeModeBtn.classList.toggle('is-on', on);
+    els.safeModeBtn.title = on
+        ? 'Mode Aman aktif: pop-up/tab baru dari iklan diblokir. Bila video tidak muncul, klik untuk mematikan.'
+        : 'Mode Aman memasang sandbox pada pemutar: iklan tidak bisa membuka tab baru. Matikan bila video tidak muncul.';
+}
+
+els.safeModeBtn?.addEventListener('click', () => {
+    const on = player.setSafeFrame(!player.isSafeFrame());
+    syncSafeModeButton(on);
+    showToast(
+        on
+            ? 'Mode Aman aktif — iklan tidak bisa membuka tab baru. Bila video tidak muncul, matikan lewat tombol yang sama.'
+            : 'Mode Aman mati — pemutar kembali seperti biasa (iklan bisa membuka tab baru).',
+        on ? 'success' : 'info',
+        6000,
+    );
+    if (on) refreshAdRisk();
+});
+
+els.adGuideBtn?.addEventListener('click', () => openAdGuide());
+syncSafeModeButton();
 player.on('retry', () => {
     retrySourcesNow();
     loadDetail();
@@ -620,6 +715,7 @@ const providerKeyFor = () => `${anime.ids?.anilist || ref.anilist || ''}|${title
 function refreshServers() {
     if (total === 0 || player.state === 'message' || holdFor === ep) return;
     player.setServers(servers());
+    refreshAdRisk();
 }
 
 /** Server ReAnime + AniZone untuk episode n (lewat backend /api/stream/servers). */

@@ -21,6 +21,8 @@ import { ipRateLimit } from './lib/rate-limit.js';
 import { createSigner } from './lib/stream-proxy.js';
 import { createDefaultStreamProviders } from './providers/index.js';
 import { accountRouter } from './routes/accounts.js';
+import { adsRouter } from './routes/ads.js';
+import { adFilterSummary } from './lib/adblock.js';
 import { createAccountStore } from './lib/account-store.js';
 import { animeRouter } from './routes/anime.js';
 import { streamRouter } from './routes/stream.js';
@@ -194,6 +196,8 @@ export function createApp({
     aiConfig = AI_SUBS,
     animeOnsenMediaHosts = SOURCES.animeonsen.mediaHosts,
     accountStore = createAccountStore(),
+    /** @type {ReturnType<typeof import('./lib/dns.js').createDnsFilter>|null} pemeriksa DNS iklan (tes bisa menyuntik) */
+    adDns = null,
     serveStatic = false,
     rateLimitPerMinute = SERVER.rateLimitPerMinute,
     proxyRateLimitPerMinute = STREAMS.proxyRateLimitPerMinute,
@@ -287,6 +291,7 @@ export function createApp({
                 ...registry.health(),
                 streams: providers.health(),
                 aiSubtitles: streamApi.aiHealth(),
+                adFilter: adFilterSummary(),
             },
         });
     });
@@ -294,6 +299,8 @@ export function createApp({
     /* Akun server (opsional). Body JSON dibatasi 1 MB: avatar data URL ≤ 400 KB. */
     const accounts = accountRouter({ store: accountStore });
     app.use('/api/accounts', express.json({ limit: '1mb' }), ipRateLimit({ limit: ACCOUNTS.rateLimitPerMinute }), accounts);
+    /* Penyaring iklan (putaran 11): daftar pola + cek reputasi host lewat DNS AdGuard. */
+    app.use('/api/ads', ipRateLimit({ limit: SERVER.rateLimitPerMinute }), adsRouter(adDns ? { dns: adDns } : {}));
     if (log && ACCOUNTS.store === 'off') {
         console.log('[accounts] server akun nonaktif (ACCOUNT_STORE kosong) — frontend memakai akun lokal + berkas cadangan.');
     }

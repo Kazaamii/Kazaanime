@@ -244,6 +244,23 @@ export const SOURCES = Object.freeze({
  *   anizone : server "Multi Sub" (HLS) yang diputar lewat proxy /api/stream/hls
  */
 const STREAM_SECRET_ENV = env.STREAM_SECRET && env.STREAM_SECRET.length >= 16 ? env.STREAM_SECRET : '';
+/**
+ * Penyaring iklan (putaran 11, 24 Okt 2026).
+ *  - `dnsCheck`      : tanya daftar blokir AdGuard DNS (DoH) untuk host embed yang tidak
+ *                      dikenal. Hanya untuk PEMBERITAHUAN/urutan server, tidak memblokir
+ *                      otomatis (host video sah kadang ada di daftar blokir).
+ *  - `dohEndpoint`   : resolver DoH yang diminta pengguna.
+ *  - `blockedHosts`  : pola domain iklan dipakai server/lib/adblock.js (statis, tanpa jaringan).
+ * Semua fail-open: bila DoH tidak terjangkau, hasilnya "tidak diketahui" dan situs tetap jalan.
+ */
+export const ADS = Object.freeze({
+    dnsCheck: bool('ADS_DNS_CHECK', true),
+    dohEndpoint: (env.ADS_DNS_ENDPOINT || 'https://dns.adguard.com/dns-query').replace(/\/+$/, ''),
+    dnsTimeoutMs: int('ADS_DNS_TIMEOUT_MS', 3500, { min: 500, max: 15000 }),
+    /** Bagian dari judul/hint UI yang boleh dikonfigurasi operator. */
+    guideUrl: env.ADS_GUIDE_URL || 'https://adguard-dns.io/',
+});
+
 export const STREAMS = Object.freeze({
     enabled: list('STREAM_PROVIDERS', ['reanime', 'anizone']).map((s) => s.toLowerCase()),
     reanime: Object.freeze({

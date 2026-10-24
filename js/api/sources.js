@@ -41,6 +41,7 @@ import { API_CONFIG, CACHE_TTL, PLAYER } from '../config.js';
 import { fetchJSON, ApiError } from './http.js';
 import { withAutoRetry } from './retry.js';
 import { createAnime, originOf, toHttpUrl } from './normalize.js';
+import { inspectAdUrl } from '../services/adblock.js';
 
 const cfg = API_CONFIG.backend;
 
@@ -369,7 +370,8 @@ function toEpisodeMedia(json) {
                 origins: [originOf(url)].filter(Boolean),
             };
         })
-        .filter(Boolean);
+        // Putaran 11: muatan cache lama pun tidak boleh memuat URL jaringan iklan.
+        .filter((server) => server && !inspectAdUrl(server.url).blocked);
     const downloads = (Array.isArray(d.downloads) ? d.downloads : [])
         .map((g) => ({
             quality: clip(g?.quality, 12, 'SD'),
