@@ -17,6 +17,10 @@ import path from 'node:path';
  *   3. **lapisan anti-iklan** menahan klik pertama di atas iframe (popunder tidak terjadi);
  *   4. tombol **Pemutar Eksternal** membuka embed di tab baru (noopener, noreferrer).
  *
+ * Putaran 12: sandbox kembali DIPAKAI, tetapi otomatis (tanpa tombol/mode) dan dengan pelepas
+ * per host (`kz:no-sandbox`) sehingga pemutaran tidak pernah dikorbankan. Tes di bawah menjaga
+ * dua hal sekaligus: tidak ada mode/tombol sandbox, dan tidak ada sandbox paksa tanpa pelepas.
+ *
  * Batas jujur: tanpa sandbox, tab baru dari klik SETELAH lapisan dilepas tidak bisa dicegah
  * browser-level dari halaman induk — karena itu pemutar eksternal disediakan.
  */
@@ -36,11 +40,23 @@ test('config: sandbox dihapus, lapisan anti-iklan & label situs tersedia', () =>
     assert.match(configJs, /siteLabels: Object\.freeze\(\{ animeku: 'AnimeKu', oploverz: 'Animeloverz' \}\)/);
 });
 
-test('player: tidak pernah memasang sandbox pada iframe', () => {
-    assert.doesNotMatch(playerJs, /setAttribute\('sandbox'/);
-    assert.doesNotMatch(playerJs, /PLAYER\.sandbox/);
-    assert.doesNotMatch(playerJs, /sandboxFor|sandboxRefused|popupGuardEnabled|setPopupGuard/);
-    assert.match(playerJs, /iframe\.dataset\.popupGuard = 'off';/);
+test('player: penahan pop-up OTOMATIS (tanpa mode) & tetap tanpa sandbox paksa yang mematikan playback', () => {
+    // Putaran 12 (24 Okt 2026): pengguna meminta "hapus saja mode aman dan block iklan nya dengan
+    // cara melarang new tab". Jadi tidak ada tombol/mode: setiap iframe embed dipasang dengan
+    // sandbox tanpa allow-popups/allow-top-navigation, dengan pelepas otomatis per host.
+    assert.doesNotMatch(playerJs, /PLAYER\.sandbox/, 'tidak ada config sandbox lama');
+    assert.doesNotMatch(playerJs, /isSafeFrameOn|saveSafeFrame|applySafeFrame|setSafeFrame|isSafeFrame\b/,
+        'Mode Aman (putaran 11) sudah dihapus seluruhnya');
+    assert.match(playerJs, /function applyFramePolicy\(iframe, guard\)/);
+    assert.match(playerJs, /iframe\.sandbox\.value = PLAYER\.frameGuard\.policy;/);
+    assert.match(playerJs, /const guarded = !hostRefusesSandbox\(urlOf\(server\)\);/);
+    assert.match(playerJs, /function releaseFrameGuard\(reason\)/);
+    assert.match(playerJs, /PLAYER\.frameGuard\.releaseAfterMs/, 'sandbox dilepas bila embed tidak memuat apa pun');
+    // Kebijakan sandbox: pop-up & navigasi tab atas DILARANG.
+    const policy = configJs.match(/frameGuard: Object\.freeze\(\{[\s\S]{0,600}?policy: '([^']+)'/)?.[1] || '';
+    assert.ok(policy.includes('allow-scripts') && policy.includes('allow-same-origin'), 'pemutar tetap bisa berjalan');
+    assert.ok(!policy.includes('allow-popups'), 'iklan tidak bisa membuka tab baru');
+    assert.ok(!policy.includes('allow-top-navigation'), 'iklan tidak bisa membajak tab Kazanime');
 });
 
 test('player: sisa pilihan sandbox lama dibersihkan dari perangkat', () => {

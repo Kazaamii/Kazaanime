@@ -26,7 +26,7 @@
  * Tidak ada fetch di sini: data dari js/api, tampilan dari js/ui.
  */
 import { initLayout } from './ui/layout.js';
-import { createPlayer, isSafeFrameOn } from './ui/player.js';
+import { createPlayer } from './ui/player.js';
 import { openAdGuide } from './ui/ad-guide.js';
 import { filterAdServers, checkHosts } from './services/adblock.js';
 import { createEpisodeList } from './ui/episode-list.js';
@@ -110,6 +110,10 @@ let holdTimer = 0;
 let scrapedTitles = '';
 /** Pencarian/permintaan server backend sedang berjalan. */
 let extrasBusy = false;
+/** Pernah dapat server Sub Indo (AnimeKu/Animeloverz) untuk anime ini? */
+let subIndoSeen = false;
+/** Sudah mencoba ulang karena Sub Indo hilang pada episode ini? */
+let subIndoRetryFor = null;
 /** Detail membawa judul baru saat pencarian masih berjalan → cari lagi bila hasilnya kosong. */
 let rescrapePending = false;
 /**
@@ -349,7 +353,7 @@ function holdForScrape(n) {
 const player = createPlayer({
     stage: $('#playerStage'),
     serverBox: $('#serverButtons'),
-    safeModeBtn: $('#btnSafeMode'),
+    fullscreenBtn: $('#btnFullscreen'),
     adGuideBtn: $('#btnAdGuide'),
     status: $('#playerStatus'),
     statusText: $('#playerStatusText'),
@@ -514,6 +518,7 @@ function showUpcoming() {
 function playEpisode(n, { initial = false, announce = true } = {}) {
     ep = n;
     backendServers = [];
+    subIndoRetryFor = null;
     providerResult = null;
     holdFor = null;
     scrapeDoneFor = null;
@@ -617,33 +622,24 @@ player.on('adblock', ({ type, server }) => {
     }
 });
 player.on('adguide', () => openAdGuide());
-player.on('safeFrame', ({ on }) => syncSafeModeButton(on));
+player.on('fullscreen', ({ on }) => syncFullscreenButton(on));
 
-/** Sinkronkan tampilan tombol Mode Aman dengan status player. */
-function syncSafeModeButton(on = isSafeFrameOn()) {
-    if (!els.safeModeBtn) return;
-    els.safeModeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    els.safeModeBtn.classList.toggle('is-on', on);
-    els.safeModeBtn.title = on
-        ? 'Mode Aman aktif: pop-up/tab baru dari iklan diblokir. Bila video tidak muncul, klik untuk mematikan.'
-        : 'Mode Aman memasang sandbox pada pemutar: iklan tidak bisa membuka tab baru. Matikan bila video tidak muncul.';
+/** Sinkronkan tombol Layar Penuh dengan status peramban (termasuk saat Esc ditekan). */
+function syncFullscreenButton(on = player.isFullscreen()) {
+    if (!els.fullscreenBtn) return;
+    els.fullscreenBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    els.fullscreenBtn.classList.toggle('is-on', on);
+    els.fullscreenBtn.title = on
+        ? 'Keluar dari layar penuh'
+        : 'Layar penuh: video mengisi layar dan otomatis berputar ke lanskap bila peramban mendukung';
 }
 
-els.safeModeBtn?.addEventListener('click', () => {
-    const on = player.setSafeFrame(!player.isSafeFrame());
-    syncSafeModeButton(on);
-    showToast(
-        on
-            ? 'Mode Aman aktif — iklan tidak bisa membuka tab baru. Bila video tidak muncul, matikan lewat tombol yang sama.'
-            : 'Mode Aman mati — pemutar kembali seperti biasa (iklan bisa membuka tab baru).',
-        on ? 'success' : 'info',
-        6000,
-    );
-    if (on) refreshAdRisk();
+els.fullscreenBtn?.addEventListener('click', () => {
+    player.toggleFullscreen().then((on) => syncFullscreenButton(on));
 });
+syncFullscreenButton(false);
 
 els.adGuideBtn?.addEventListener('click', () => openAdGuide());
-syncSafeModeButton();
 player.on('retry', () => {
     retrySourcesNow();
     loadDetail();
@@ -852,6 +848,25 @@ async function loadExtras(n) {
             loadExtras(n);
             return;
         }
+        const hasSubIndo = res.servers.some((server) => server.lang === 'id');
+        if (hasSubIndo) subIndoSeen = true;
+        // "Episode 1 ada Sub Indo, episode lain cuma Sub Inggris": bila sumber Sub Indo yang
+        // dikenal gagal dimuat untuk episode ini, coba sekali lagi setelah jeda singkat.
+        const lostSubIndo = !hasSubIndo && (res.failedSubIndo?.length || subIndoSeen);
+        const willRetry = lostSubIndo && subIndoRetryFor !== n && !res.disabled;
+        if (willRetry) {
+            subIndoRetryFor = n;
+            const waiting = holdFor === n;
+            if (!waiting) {
+                showToast('Server Sub Indo belum termuat — mencoba sekali lagi…', 'info', 4000);
+            }
+            setTimeout(() => {
+                if (n === ep && !ctrl.signal.aborted) {
+                    if (waiting) armHoldTimer(n, Math.round(PLAYER.scrapeWaitMs / 2));
+                    loadExtras(n);
+                }
+            }, 1600);
+        }
         if (res.servers.length) {
             backendServers = res.servers;
             if (holdFor === n) releaseHold(n, { force: true }); // server scraping dulu, cadangan di belakangnya
@@ -861,7 +876,7 @@ async function loadExtras(n) {
                 player.setServers(servers());
                 if (wasPlaying && scrapeFirst()) showToast(`${res.servers.length} server tambahan tersedia — pilih di daftar server.`, 'info');
             }
-        } else scrapeFinished(n);
+        } else if (!willRetry) scrapeFinished(n);
         const realError = res.error && res.error.kind !== 'empty' ? res.error : null;
         renderDownloads(els.downloads, {
             items: res.downloads,

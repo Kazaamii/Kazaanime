@@ -12,7 +12,8 @@
  *    lintas-domain). Penyaring DNS di perangkat/router adalah satu-satunya cara memblokirnya
  *    secara menyeluruh.
  *  - Yang sudah dilakukan Kazanime sendiri: menolak URL jaringan iklan (server/lib/adblock.js),
- *    Mode Aman (sandbox tanpa pop-up), serta pemulihan otomatis saat iklan membajak pemutar.
+ *    penahan pop-up yang selalu aktif (tanpa mode/tombol), pemulihan otomatis bila iklan
+ *    membajak pemutar, serta layar penuh + rotasi lanskap standar player.
  *
  * Modal ini memberi langkah konkret + tombol salin untuk DNS AdGuard yang diminta pengguna.
  */
@@ -83,8 +84,8 @@ function build() {
                 <h3 class="ad-guide-h3">3 · Yang sudah dilakukan Kazanime</h3>
                 <ul class="ad-guide-checklist">
                     <li><strong>URL iklan ditolak</strong> — host jaringan iklan &amp; tautan “klik iklan” tidak pernah dipasang di pemutar.</li>
-                    <li><strong>Mode Aman</strong> — tombol di bawah player memasang sandbox tanpa pop-up, sehingga iklan tidak bisa membuka tab baru.</li>
-                    <li><strong>Pemulihan otomatis</strong> — bila iklan memindahkan pemutar ke halaman lain, bilah “Pulihkan pemutar” muncul dan server itu dilewati.</li>
+                    <li><strong>Penahan pop-up selalu aktif</strong> — pemutar dipasang dengan sandbox tanpa <code>allow-popups</code>, jadi klik iklan tidak bisa membuka tab baru atau membajak tab Kazanime (tombol/mode tidak perlu dinyalakan).</li>
+                    <li><strong>Pemulihan otomatis</strong> — bila iklan memindahkan pemutar ke halaman lain, bilah “Pulihkan pemutar” muncul dan server itu dilewati; layar penuh + rotasi lanskap tersedia lewat tombol <strong>Layar Penuh</strong>.</li>
                     <li><strong>Cek daftar blokir</strong> — server yang host-nya ada di daftar blokir AdGuard DNS diberi tanda ⚠ dan ditaruh di urutan belakang.</li>
                 </ul>
                 <p class="account-note">Iklan yang menempel pada video (hardsub) atau yang dimuat di dalam dokumen pemutar pihak ketiga tidak bisa dihapus dari sini — hanya DNS/ekstensi di perangkat yang bisa memblokirnya.</p>

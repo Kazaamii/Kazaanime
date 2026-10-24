@@ -39,6 +39,7 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅝 putaran 8 (24 Okt 2026): **genre situs pindah ke Jelajah saja**, **sandbox/pop-up dihapus** → lapisan anti-iklan + pemutar eksternal, **2 server Sub Indo berlabel** (AnimeKu & Animeloverz), status backend bisa dites ulang
 🅞 putaran 9 (24 Okt 2026): **tata letak ponsel** — menu akun, tombol player, dan panel server dirapikan (server di bawah player, episode di bawahnya)
 🅟 putaran 10 (24 Okt 2026): **akun tahan banting** (nama tanpa beda huruf, cadangan otomatis, cadangan/pulihkan berkas + kode), **server akun opsional** (file/Redis), foto avatar terverifikasi, **judul di atas player**, tab **AnimeKu/Oploverz** di pencarian
+🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`, pelepas per host otomatis/manual), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
 
 ```
 kazanime/
@@ -423,8 +424,12 @@ foto, atau video.
 
 **🛡️ Penahan iklan player + pemutar eksternal (24 Okt 2026, putaran 8).** Sandbox iframe dan
 tombol **Pop-up diblokir/Pop-up diizinkan** sudah **dihapus** — justru sandbox itulah yang membuat
-host menampilkan *“Sandbox Not Allowed”* dan video tidak jalan. Iframe sekarang dipasang tanpa
-`sandbox`, lalu di atasnya diberi lapisan bening `#playerAdShield` yang menangkap klik pertama
+host menampilkan *“Sandbox Not Allowed”* dan video tidak jalan. **Putaran 12 mengembalikan sandbox
+sebagai penahan tab baru yang selalu aktif** (tanpa `allow-popups`/`allow-top-navigation*`, dengan
+pelepas per host otomatis setelah 12 detik serta tautan *“Muat ulang tanpa pengaman”*), supaya
+`window.open()` iklan tidak pernah menghasilkan tab baru. Lihat
+bagian **putaran kedua belas** di bawah.
+Selain itu, di atas iframe diberi lapisan bening `#playerAdShield` yang menangkap klik pertama
 (`preventDefault` + `stopPropagation`, `{once:true}`) supaya klik iklan di area player tidak
 membuka tab baru. Lapisan dilepas setelah satu klik, jadi **klik berikutnya diteruskan ke player** —
 iklan lanjutan di dalam iframe tetap di luar kendali halaman (batas jujur). Karena itu tersedia
@@ -1008,7 +1013,8 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
 - **Efek tema** tidak lagi menembus konten: `.visual-effects` di `z-index: 0`, `.main-content`/`.footer` di `z-index: 1`.
 - **Proteksi pop-up player**: iframe embed memakai sandbox tanpa `allow-popups`/`allow-top-navigation`, dengan tombol
   pelepas (tersimpan per browser) bila player menolak diputar. (**Diganti putaran 8**: sandbox + tombol itu dihapus,
-  lihat “Penahan iklan player + pemutar eksternal”.)
+  lihat “Penahan iklan player + pemutar eksternal”. **Putaran 12**: penahan tab baru aktif lagi tanpa tombol —
+  sandbox dipasang otomatis dengan pelepas per host.)
 
 ### Perubahan perilaku (24 Okt 2026 — putaran kedua)
 - **Urutan beranda**: **Jadwal Rilis → Jelajahi Genre** langsung di bawah hero; panel **Anime Jepang Sub Indo**
@@ -1031,7 +1037,7 @@ Setiap `git push` ke `main` otomatis deploy ulang; branch lain (mis. `tahap-c`) 
   arsip situs untuk genre situs) — bukan tombol dekoratif.
 
 ### Perubahan perilaku (24 Okt 2026 — putaran ketiga: player, subtitle, badge per episode)
-- **Sandbox iframe player DEFAULT MATI** (*sejak putaran 8 sandbox dihapus total, bagian ini hanya catatan sejarah*). Sejak mode blokir pop-up dinyalakan, banyak embed menolak
+- **Sandbox iframe player DEFAULT MATI** (*putaran 8 sandbox dihapus total; **putaran 12 dipasang lagi sebagai penahan tab baru yang selalu aktif**, lihat bagian putaran kedua belas — catatan di bawah hanya sejarah*). Sejak mode blokir pop-up dinyalakan, banyak embed menolak
   berjalan di dalam sandbox dan hanya menampilkan pesannya sendiri —
   *“Opss! Sandboxed our player is not allowed. Remove sandbox to use it.”* — sehingga area player hitam,
   tanpa video dan tanpa subtitle. Sekarang iframe dimuat **tanpa** `sandbox` secara default, dan tombol di
@@ -1209,7 +1215,7 @@ membuka tab baru"*, *"pilihan server sub indo tolong dibuat 2 dan tuliskan dari 
    bagian bawah kini menguji ulang sumber berstatus **`unknown` *atau* `offline`** — sebelumnya hanya
    `unknown`, sehingga sumber yang sudah dicap offline tidak pernah diuji lagi dan label "Offline" menetap
    walau backend hidup.
-3. **Sandbox & tombol pop-up dihapus, diganti penahan iklan.** Atribut `sandbox` dan tombol
+3. **Sandbox & tombol pop-up dihapus, diganti penahan iklan.** *(Putaran 12: sandbox dipasang lagi otomatis sebagai penahan tab baru, tanpa tombol mode — lihat putaran kedua belas.)* Atribut `sandbox` dan tombol
    **Pop-up diblokir/Pop-up diizinkan** (`#btnPopupGuard`, `PLAYER.sandbox`, `storePopupGuard`) hilang.
    Sebagai gantinya `#playerAdShield` (`css/watch.css`) menutup area player setelah iframe `load` dan
    menelan **satu** klik pertama supaya klik iklan tidak membuka tab baru; setelah itu lapisan dilepas dan
@@ -1339,24 +1345,76 @@ dengan tangkapan layar player yang berubah menjadi halaman JSON
    `GET /api/ads/check?host=a,b` (maks 20), `GET /api/ads/blocklist`; `/api/health` menampilkan
    `adFilter`. Env: `ADS_DNS_CHECK`, `ADS_DNS_ENDPOINT`, `ADS_DNS_JSON_ENDPOINT`,
    `ADS_DNS_TIMEOUT_MS`, `ADS_GUIDE_URL`.
-4. **Lapis 3 — Mode Aman (opt-in) supaya iklan tidak bisa membuka tab.** Tombol **Mode Aman**
-   (`#btnSafeMode`, di baris kontrol player) memasang sandbox tanpa `allow-popups` dan
-   `allow-top-navigation*` pada iframe — `window.open()` iklan gagal dan tab Kazanime tidak bisa
-   dialihkan. **Default mati** (pelajaran putaran 3/8: sebagian embed menolak sandbox dan hanya
-   menampilkan "Sandboxed our player is not allowed"); pilihan disimpan di `kz:safe-frame`. Bila
-   embed menolak tampil, video yang tidak termuat dalam 15 detik membuat Mode Aman **dilepas
-   otomatis** lalu server yang sama dicoba ulang (server tidak dibuang) — jadi tidak pernah
-   mengorbankan pemutaran.
+4. **Lapis 3 — sandbox penahan tab baru.** *Putaran 11 memakai tombol **Mode Aman** opt-in;
+   **putaran 12 menghapus tombol itu** dan memasang sandbox tanpa `allow-popups` /
+   `allow-top-navigation*` secara **otomatis untuk semua embed** (lihat putaran kedua belas).*
+   `window.open()` iklan gagal dan tab Kazanime tidak bisa dialihkan; embed yang menolak sandbox
+   dilepas per host pada sesi itu juga (otomatis setelah 12 detik atau lewat tautan manual).
 5. **Lapis 4 — pemulihan saat iklan membajak pemutar.** Setiap navigasi ulang iframe dihitung
    (event `load` ganda dalam 1,2 detik diabaikan). Navigasi kedua → bilah **"Iklan memindahkan
    pemutar"** muncul di bawah area video (bukan layar penuh yang menutupi player) dengan tombol
-   **Pulihkan pemutar · Server lain · Aktifkan Mode Aman · Cara blokir iklan**. Navigasi berulang
+   **Pulihkan pemutar · Server lain · Cara blokir iklan**. Navigasi berulang
    (`PLAYER.adTakeover.maxTakeovers = 2`) menandai server itu gagal dan pindah otomatis.
 6. **Panduan AdGuard DNS di aplikasi** (`js/ui/ad-guide.js`, tombol **Panduan blokir iklan** di
    bawah daftar server). Berisi langkah Android (DNS Pribadi `dns.adguard-dns.com`), iPhone/iPad,
    Windows 11 (DoH `https://dns.adguard.com/dns-query`), macOS, router, dan ekstensi peramban, plus
    tombol **Salin** untuk DoH / DoT / IPv4 (`94.140.14.14`, `94.140.15.15`) / IPv6. Ditulis jujur:
    DNS diatur di perangkat/router, bukan oleh halaman web, dan iklan hardsub tidak bisa dihapus.
+
+### Perubahan perilaku (24 Okt 2026 — putaran kedua belas: penahan tab baru, layar penuh, Sub Indo)
+
+Permintaan pengguna: *"iklan masih ada terbukti tidak bekerja lalu untuk logika eps tidak konsisten
+Saat eps 1 dia ada pilihan sub indo namun saat pindah ke eps lain kadang hanya sub inggris tolong di
+perbaiki hapus saja mode aman dan block iklan nya dengan cara melarang new tab block nya sekilaa
+langsung menutup lalu saat full screen dia tidak rotate tolong perbaiki lalu untuk mode full screen
+nya harus benar standar player."*
+
+1. **Mode Aman dihapus, penahan tab baru selalu aktif.** `#btnSafeMode`, `PLAYER.safeFrame`,
+   `STORAGE_KEYS.safeFrame`, `syncSafeModeButton`, dan event `safeFrame` hilang. Setiap iframe embed
+   kini otomatis dipasang `sandbox` **tanpa** `allow-popups`, `allow-popups-to-escape-sandbox`, dan
+   `allow-top-navigation*` (`PLAYER.frameGuard.policy`, lihat `js/config.js`) — `window.open()` iklan
+   **tidak menghasilkan tab baru sama sekali** (lebih tegas daripada "menutup tab": tidak ada tab
+   yang sempat terbuka), dan tab Kazanime tidak bisa dialihkan ke situs iklan. Izin yang dibutuhkan
+   pemutar sah tetap ada: `allow-scripts`, `allow-same-origin`, `allow-forms`, `allow-presentation`,
+   `allow-orientation-lock`, `allow-downloads`, `allow-fullscreen`.
+2. **Tidak ada regresi pemutaran (pelajaran putaran 3/8).** Host yang terbukti menolak sandbox
+   diingat **per host selama sesi** (`sessionStorage` `kz:no-sandbox`, maks 20 host) dan dimuat tanpa
+   sandbox sejak awal. Bila iframe tidak memuat apa pun dalam **12 detik**, sandbox dilepas dan URL
+   yang sama dimuat ulang otomatis (host diingat, server tidak dibuang). Tautan kecil
+   **“Video tidak muncul? Muat ulang tanpa pengaman”** muncul setelah 6 detik sebagai jalan keluar
+   manual. Tidak ada layar penolakan permanen, dan pemutaran tetap prioritas.
+3. **Layar penuh standar pemutar.** Tombol baru **Layar Penuh** (`#btnFullscreen`, di antara *Server
+   Lain* dan *Pemutar Eksternal*). `requestFullscreen({ navigationUI: 'hide' })` dipanggil pada
+   **wadah player** (`.streaming-player-wrapper`, bukan iframe) sehingga video mengisi layar tanpa
+   letterbox 16:9; CSS `:fullscreen` menambahkan `inset:0`, `object-fit:contain`, dan menyembunyikan
+   navbar/footer/sidebar. **Rotasi:** `screen.orientation.lock('landscape')` dikunci saat masuk
+   (Android Chrome/Firefox) dan dilepas saat keluar/Esc; bila peramban menolak kunci orientasi
+   (iOS Safari, Samsung Internet), panggung **diputar 90°** lewat kelas `.is-fs-rotated` selama
+   perangkat tegak dan kembali normal saat perangkat diputar. Tombol **Keluar** (`#playerFsExit`,
+   `z-index: 10001`) tersedia karena peramban ponsel kadang menyembunyikan UI-nya; `Esc` juga
+   menutup (event `fullscreenchange` menyinkronkan tombol halaman). Tidak ada API `screen.orientation`
+   di iOS → fallback fullscreen bawaan `<video>` (`webkitEnterFullscreen`).
+4. **Sub Indo konsisten di setiap episode.** Dua penyebab ditutup:
+   - **Cache padanan per sesi** (`js/api/streams.js`, `sessionStorage` `kz:matches:v1`, TTL 30 menit):
+     daftar situs (AnimeKu/Animeloverz/dll.) yang pernah cocok dipakai ulang untuk episode berikutnya.
+     Bila semua pencarian gagal (throttle/offline), daftar tersimpan tetap dipakai — Sub Indo tidak
+     "hilang" hanya karena pencarian ulang gagal.
+   - **Coba ulang sumber Sub Indo** (satu kali, jeda 700 ms): sumber asal (AnimeKu/Animeloverz) dan
+     situs padanan yang gagal dimuat dicoba lagi; `getEpisodeExtras()` mengembalikan `failedSubIndo`
+     (daftar situs) sehingga `js/watch.js` tahu kapan harus **memuat ulang sekali lagi** setelah
+     1,6 detik. Status `subIndoSeen`/`subIndoRetryFor` memastikan percobaan ulang hanya sekali per
+     episode dan direset saat pindah episode.
+   - Urutan server tetap: AnimeKu → Animeloverz → Multi Sub → Sub Indo lain → Sub Inggris, dengan dua
+     tombol berlabel situs di paling depan.
+5. **Panduan iklan tetap ada.** Tombol **Cara blokir iklan** (`#btnAdGuide`) dan `js/ui/ad-guide.js`
+   dipertahankan (isi diperbarui: penahan pop-up selalu aktif, tidak ada lagi tombol Mode Aman), dan
+   bilah pemulihan iklan memakai tombol **Pulihkan pemutar · Server lain · Cara blokir iklan**.
+6. **Tes.** `server/test/round12-ads-fullscreen.test.js` (11 tes) menjaga kebijakan sandbox, pelepas
+   per host, layar penuh + rotasi, cache padanan Sub Indo, dan percobaan ulang. Total `npm test`
+   **481 tes lulus**. Uji runtime `happy-dom` memverifikasi: sandbox tanpa `allow-popups`; tautan
+   pelepas muncul setelah 6,3 dtk; fullscreen menargetkan wadah + `lock('landscape')`; rotasi CSS
+   aktif saat kunci orientasi tidak ada; pelepas manual menghapus sandbox dan host diingat untuk
+   episode berikutnya.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
