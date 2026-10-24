@@ -409,6 +409,19 @@ export function createAnimexin({ network, createClient, baseUrl }) {
             return ref.slug.replace(/-episode-\d+.*$/, '').replace(/-/g, ' ');
         },
 
+        /**
+         * AnimeXin adalah situs **donghua**: seluruh katalog `latest()` memang donghua China
+         * (`country: 'CN'`, jadwal rilis donghua di /schedule/). Bagian "Donghua di AnimeXin"
+         * (24 Oktober 2026) karena itu memakai daftar yang sama — tanpa kueri pencarian tambahan,
+         * jadi tidak ada beban request baru ke situs.
+         */
+        donghuaSeeds: Object.freeze([]),
+
+        async browseDonghua(_titles = [], ctx = {}) {
+            const items = await this.latest(ctx);
+            return items.slice(0, 24);
+        },
+
         async latest(ctx = {}) {
             const [home, list] = await Promise.allSettled([
                 client.html(`${base}/`, ctx),

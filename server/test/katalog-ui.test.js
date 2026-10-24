@@ -94,7 +94,11 @@ test('katalog.js: bagian Donghua AnimeKu dijelaskan sebagai deteksi, bukan kateg
 });
 
 test('katalog.js: tab Donghua memakai feed Donghua Kazanime (bukan kategori karangan)', () => {
-    assert.deepEqual(sectionIds('donghua'), ['donghua']);
+    // Putaran 23 (24 Okt 2026): tab ini berisi feed + empat bagian per sumber
+    // (HiAnime, AnimeXin, AnimeKu, Oploverz) — semuanya tetap memakai filter "donghua".
+    const ids = sectionIds('donghua');
+    assert.ok(ids.length >= 5, 'feed + empat bagian sumber');
+    assert.ok(ids.every((id) => id === 'donghua'), 'semua bagian memakai token filter donghua');
     assert.match(pageJs, /loader: 'donghua'/);
     assert.match(pageJs, /browseAnime\('donghua', \{ page: runtime\.page \+ 1 \}\)/);
     const indexJs = read('js/api/index.js');
@@ -121,7 +125,11 @@ test('katalog.js: ringkas 6 kartu + tombol Tampilkan lebih banyak + Lihat Semua'
     assert.match(pageJs, /: `Tampilkan lebih banyak \(\$\{runtime\.items\.length\}\$\{runtime\.hasNext \? '\+' : ''\}\)`/);
     assert.match(pageJs, /runtime\.expanded = !runtime\.expanded;/);
     // Tautan bergaya section beranda tetap ada untuk daftar penuh.
-    assert.match(pageJs, /class="see-all" data-see-all href="\$\{katalogUrl\(\{ source: state\.source, filter: def\.id, genre: state\.genre \}\)\}"/);
+    // Bagian boleh menunjuk sumber lain (tab Donghua → HiAnime/AnimeXin/…), jadi tautan memakai
+    // `def.source` bila ada dan jatuh ke tab aktif bila tidak.
+    // Putaran 23: bagian boleh menunjuk tab lain untuk "Lihat Semua" (`seeAll: 'animeku'`) atau
+    // tidak punya halaman itu sama sekali (`seeAll: false`).
+    assert.match(pageJs, /class="see-all" data-see-all href="\$\{katalogUrl\(\{ source: typeof def\.seeAll === 'string' \? def\.seeAll : state\.source, filter: def\.id, genre: state\.genre \}\)\}"/);
     assert.match(pageJs, /Lihat Semua \$\{icon\('chevron-right'\)\}/);
     assert.match(pageJs, /filter: state\.query \? '' : runtime\.def\.id/);
     // Ronde 5: "Coba Lagi" tetap memaksa refresh; percobaan ulang otomatis juga melewati circuit.
@@ -142,7 +150,7 @@ test('katalog.html: kolom pencarian mencari DI DALAM sumber (AnimeKu & Oploverz)
     assert.match(sourcesJs, /if \(keyword\) q\.set\('q', keyword\)/);
     assert.match(sourcesJs, /query: String\(data\.query \|\| ''\)/);
     assert.match(pageJs, /searchInput\.reportValidity\(\)/, 'kata kunci < 2 karakter ditolak di klien');
-    assert.match(pageJs, /getSourceBrowse\(state\.source, \{/);
+    assert.match(pageJs, /getSourceBrowse\(browseSource, \{/);
 });
 
 test('beranda: tiap panel sumber punya kolom cari yang membuka Jelajah', () => {
@@ -194,7 +202,9 @@ test('katalog.js: state sumber & genre disimpan di URL', () => {
 });
 
 test('katalog.js: genre hanya muncul bila backend mengirim daftarnya', () => {
-    assert.match(pageJs, /if \(!paged && \(res\.genres\.length \|\| res\.seasons\.length\)\)/);
+    // Putaran 23: bagian yang menunjuk sumber lain (tab Donghua → HiAnime/AnimeXin/…) tidak
+    // menyerap daftar genre situs itu ke kartu filter tab.
+    assert.match(pageJs, /if \(!paged && !crossSource && \(res\.genres\.length \|\| res\.seasons\.length\)\)/);
     assert.match(pageJs, /if \(\(!state\.genres\.length && !state\.seasons\.length\) \|\| state\.query\) \{/,
         'pemilih genre disembunyikan saat mode pencarian');
     assert.match(pageJs, /genreWrap\.hidden = true/);
@@ -237,7 +247,8 @@ test('css/katalog.css: blok bagian + pemilih genre memakai variabel tema', () =>
 test('katalog: filter Tahun & Musim diteruskan ke browse dan disimpan di URL', () => {
     assert.match(pageHtml, /id="katalogYear"/);
     assert.match(pageHtml, /id="katalogSeason"/);
-    assert.match(pageJs, /year: state\.year,\s*season: state\.season,/s);
+    // Tahun/Musim tetap diteruskan; hanya bagian lintas sumber yang mengosongkannya.
+    assert.match(pageJs, /year: crossSource \? '' : state\.year,\s*season: crossSource \? '' : state\.season,/s);
     assert.match(pageJs, /if \(state\.year\) q\.set\('year', state\.year\)/);
     assert.match(pageJs, /if \(state\.season\) q\.set\('season', state\.season\)/);
     assert.match(pageJs, /yearSelect\?\.addEventListener\('change'/);
@@ -273,7 +284,8 @@ test('home.js: sort Tahun/Musim genre memakai data backend (genre situs ada di k
 test('katalog: filter Tahun & Musim diteruskan ke browse dan disimpan di URL', () => {
     assert.match(pageHtml, /id="katalogYear"/);
     assert.match(pageHtml, /id="katalogSeason"/);
-    assert.match(pageJs, /year: state\.year,\s*season: state\.season,/s);
+    // Tahun/Musim tetap diteruskan; hanya bagian lintas sumber yang mengosongkannya.
+    assert.match(pageJs, /year: crossSource \? '' : state\.year,\s*season: crossSource \? '' : state\.season,/s);
     assert.match(routesJs, /export function katalogUrl\(\{ source = 'animeku', filter = '', genre = '', q = '', page = 1, year = '', season = '' \}/);
     assert.match(routesJs, /if \(\/\^\\d\{4\}\$\/\.test\(String\(year \|\| ''\)\)\) p\.set\('year'/);
     assert.match(routesJs, /winter\|spring\|summer\|fall/);

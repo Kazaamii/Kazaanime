@@ -93,13 +93,46 @@ const SOURCES = Object.freeze([
     {
         id: 'donghua',
         label: 'Donghua',
-        hint: 'Donghua per situs ada di tab AnimeKu dan Oploverz (bagian "Donghua di …"); feed metadata AniList (negara CN) dipakai untuk melengkapi judul yang belum ada di katalog situs.',
+        hint: 'Lima bagian: feed Donghua Kazanime, lalu Donghua di HiAnime, AnimeXin, AnimeKu, dan Oploverz. Tiap bagian menjelaskan batas situsnya masing-masing.',
         sections: [
             {
                 id: 'donghua',
                 label: 'Donghua Baru Upload',
                 loader: 'donghua',
                 hint: 'Rilis donghua terbaru beserta nomor episode terakhir.',
+            },
+            // Sumber donghua paling kaya (dicek 24 Okt 2026): 7 benih judul donghua China,
+            // semuanya mengembalikan seri yang cocok. Tidak ada tab HiAnime tersendiri, jadi
+            // tautan "Lihat Semua" dimatikan — daftarnya sudah penuh di bagian ini.
+            {
+                id: 'donghua',
+                label: 'Donghua di HiAnime',
+                source: 'hianime',
+                seeAll: false,
+                hint: 'HiAnime punya donghua yang banyak: Soul Land (5 seri), Battle Through the Heavens (3), Douluo Dalu (4), Perfect World (2), Renegade Immortal (2), Throne of Seal, dan Shaonian Ge Xing: Anhe Zhuan. Bagian ini mencari tujuh judul itu dan hanya menampilkan kartu yang judulnya cocok. Subtitle HiAnime berbahasa Inggris.',
+            },
+            // AnimeXin = situs donghua; seluruh katalognya memang donghua China.
+            {
+                id: 'donghua',
+                label: 'Donghua di AnimeXin',
+                source: 'animexin',
+                seeAll: false,
+                hint: 'AnimeXin adalah situs donghua Sub Indo — seluruh daftar rilisnya donghua China, jadi bagian ini memakai katalog terbarunya apa adanya (tanpa kueri tambahan).',
+            },
+            {
+                id: 'donghua',
+                label: 'Donghua di AnimeKu',
+                source: 'animeku',
+                // Tab AnimeKu juga punya bagian ini → "Lihat Semua" menuju ke sana.
+                seeAll: 'animeku',
+                hint: 'AnimeKu tidak punya kategori donghua (genre donghua 404, negara China kosong), jadi bagian ini hanya berisi judul donghua yang benar-benar ada di pencarian situs — saat ini varian Douluo Dalu. Judul donghua aplikasi lain (Aiyou de Mishi, Aishang Ta de Liyou) tidak ada di AnimeKu.',
+            },
+            {
+                id: 'donghua',
+                label: 'Donghua di Oploverz',
+                source: 'oploverz',
+                seeAll: 'oploverz',
+                hint: 'Oploverz tidak memuat donghua sejak 24 Okt 2026 (genres/donghua 404; Perfect World, Soul Land, Battle Through the Heavens, Renegade Immortal → 0 hasil), jadi bagian ini wajar kosong — itu batas situsnya, bukan data yang disembunyikan.',
             },
         ],
     },
@@ -162,9 +195,12 @@ const state = {
 };
 
 /** Bagian runtime: data + status muat, bukan bagian dari definisi sumber. */
-function makeRuntime(def) {
+function makeRuntime(def, index = 0) {
     return {
         def,
+        // Kunci DOM unik: beberapa bagian boleh memakai id filter yang sama (mis. lima
+        // bagian "donghua" dari sumber berbeda) tanpa saling menimpa.
+        key: `${def.id}-${index}`,
         items: [],
         page: 0,
         hasNext: false,
@@ -306,7 +342,7 @@ function renderHeader() {
 function sectionHTML(runtime, index) {
     const def = runtime.def;
     return html`
-        <section class="katalog-block" data-section="${def.id}" aria-labelledby="katalog-block-${index}">
+        <section class="katalog-block" data-section="${runtime.key}" aria-labelledby="katalog-block-${index}">
             <div class="katalog-block-head">
                 <div class="katalog-block-title">
                     <h3 id="katalog-block-${index}">${def.label}</h3>
@@ -314,7 +350,7 @@ function sectionHTML(runtime, index) {
                 </div>
                 <div class="katalog-block-actions">
                     <span class="katalog-block-count" data-count hidden></span>
-                    <a class="see-all" data-see-all href="${katalogUrl({ source: state.source, filter: def.id, genre: state.genre })}" hidden>
+                    <a class="see-all" data-see-all href="${katalogUrl({ source: typeof def.seeAll === 'string' ? def.seeAll : state.source, filter: def.id, genre: state.genre })}" hidden>
                         Lihat Semua ${icon('chevron-right')}
                     </a>
                     <button type="button" class="katalog-expand" data-expand aria-expanded="false" hidden>Tampilkan lebih banyak</button>
@@ -328,7 +364,7 @@ function sectionHTML(runtime, index) {
 }
 
 function sectionNode(runtime) {
-    return sectionsEl?.querySelector(`[data-section="${runtime.def.id}"]`) || null;
+    return sectionsEl?.querySelector(`[data-section="${runtime.key}"]`) || null;
 }
 
 /** Gambar ulang satu bagian sesuai status (cuplikan/daftar penuh/error/kosong). */
@@ -355,7 +391,9 @@ function paintSection(runtime) {
         countEl.textContent = runtime.loaded ? `${runtime.items.length}${runtime.hasNext ? '+' : ''} judul` : '';
     }
     if (seeAll) {
-        seeAll.hidden = focused || searching || !runtime.loaded || !hasMore;
+        // `seeAll: false` = bagian ini tidak punya halaman "Lihat Semua" (mis. HiAnime/AnimeXin,
+        // yang tidak punya tab sendiri di Jelajah).
+        seeAll.hidden = runtime.def.seeAll === false || focused || searching || !runtime.loaded || !hasMore;
         seeAll.setAttribute('aria-label', `Lihat semua ${runtime.def.label}`);
     }
     if (expandBtn) {
@@ -379,7 +417,7 @@ function paintSection(runtime) {
             icon: 'triangle-alert',
             title: `${runtime.def.label} belum bisa dimuat`,
             text: runtime.error,
-            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-retry="${runtime.def.id}">Coba Lagi</button>`,
+            actions: html`<button type="button" class="btn-ext btn-ext--retry" data-retry="${runtime.key}">Coba Lagi</button>`,
         });
         return;
     }
@@ -430,18 +468,25 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
         //  - donghua  : rilis donghua dari feed Donghua Kazanime.
         // Keduanya mengembalikan objek Anime yang sudah dinormalisasi.
         const mode = runtime.def.loader || 'browse';
+        // Bagian "Donghua" boleh menunjuk sumber lain (HiAnime, AnimeXin, …) selain tab aktif.
+        // Tanpa `def.source`, perilakunya sama seperti sebelumnya (mengikuti tab).
+        const browseSource = runtime.def.source || state.source;
+        // Bagian itu memakai sumber berbeda dari tabnya: genre/tahun/musim tab tidak berlaku di
+        // sana (dan filter= donghua di backend memang mengabaikannya), jadi jangan dikirim dan
+        // jangan menyerap daftar genre situs lain ke kartu filter tab ini.
+        const crossSource = browseSource !== state.source;
         // Auto refresh (24 Okt 2026): kegagalan sementara (timeout/jaringan/5xx/circuit)
         // dicoba sekali lagi sebelum panel menampilkan "Coba Lagi".
         const res = mode === 'metadata'
             ? await withAutoRetry(() => getUpcomingAnime({ page: runtime.page + 1, perPage: PREVIEW * 2 }))
             : mode === 'donghua'
                 ? await withAutoRetry(() => browseAnime('donghua', { page: runtime.page + 1 }))
-                : await withAutoRetry((attempt) => getSourceBrowse(state.source, {
+                : await withAutoRetry((attempt) => getSourceBrowse(browseSource, {
                     // Saat mencari, id bagian sintetis ("hasil") bukan filter situs — jangan dikirim.
                     filter: state.query ? '' : runtime.def.id,
-                    genre: state.genre,
-                    year: state.year,
-                    season: state.season,
+                    genre: crossSource ? '' : state.genre,
+                    year: crossSource ? '' : state.year,
+                    season: crossSource ? '' : state.season,
                     q: state.query,
                     page: runtime.page + 1,
                     // "Coba Lagi" melewati cache + circuit breaker frontend, sama seperti panel beranda.
@@ -456,7 +501,7 @@ async function loadSection(runtime, { reset = false, refresh = false } = {}) {
         runtime.hasNext = Boolean(res.hasNext);
         runtime.loaded = true;
         runtime.error = paged && !res.items.length && res.error ? friendlyError(res.error) : '';
-        if (!paged && (res.genres.length || res.seasons.length)) {
+        if (!paged && !crossSource && (res.genres.length || res.seasons.length)) {
             const grew = (res.genres.length && !state.genres.length) || (res.seasons.length && !state.seasons.length);
             if (res.genres.length) state.genres = res.genres;
             if (res.seasons.length) state.seasons = res.seasons;
@@ -487,7 +532,7 @@ const observer = typeof window !== 'undefined' && 'IntersectionObserver' in wind
     ? new IntersectionObserver((entries) => {
         for (const entry of entries) {
             if (!entry.isIntersecting) continue;
-            const runtime = state.sections.find((item) => item.def.id === entry.target.dataset.section);
+            const runtime = state.sections.find((item) => item.key === entry.target.dataset.section);
             if (runtime && !runtime.loaded && !runtime.loading) loadSection(runtime);
             observer.unobserve(entry.target);
         }
@@ -505,7 +550,7 @@ function buildSections() {
         }]
         : source.sections;
     const focused = state.filter ? defs.filter((section) => section.id === state.filter) : defs;
-    state.sections = (focused.length ? focused : defs).map(makeRuntime);
+    state.sections = (focused.length ? focused : defs).map((def, index) => makeRuntime(def, index));
     sectionsEl.innerHTML = String(html`${state.sections.map((runtime, index) => sectionHTML(runtime, index))}`);
     sectionsEl.setAttribute('aria-busy', 'false');
     state.sections.forEach((runtime) => {
@@ -633,7 +678,7 @@ if (sectionsEl) {
     });
     delegate(sectionsEl, 'click', '[data-retry]', (event, button) => {
         event.preventDefault();
-        const runtime = state.sections.find((item) => item.def.id === button.dataset.retry);
+        const runtime = state.sections.find((item) => item.key === button.dataset.retry);
         if (runtime) loadSection(runtime, { reset: true, refresh: true });
     });
     bindCardActions(sectionsEl, (anime) => ctx.toggleBookmark(anime));

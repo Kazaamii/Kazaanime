@@ -19,8 +19,10 @@ import { load } from 'cheerio';
 import { makeAnime, makeEpisode, makeEpisodeList } from '../lib/anime.js';
 import { SourceError, notFound } from '../lib/errors.js';
 import { encodeSlug } from '../lib/slug.js';
+import { mapLimit } from '../lib/concurrency.js';
 import {
-    absoluteUrl, cleanText, decodeBase64, parseDurationMinutes, parseEpisodeNumber, parseFormat, parseScore10, parseStatus,
+    absoluteUrl, cleanText, decodeBase64, parseDurationMinutes, parseEpisodeNumber, parseFormat, parseScore10,
+    parseStatus, stripSeason, titleKey,
 } from '../lib/text.js';
 
 export const ID = 'hianime';
@@ -39,6 +41,32 @@ export const POLICY = Object.freeze({
 });
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,118}$/;
+
+/**
+ * Benih donghua untuk bagian "Donghua di HiAnime" (24 Oktober 2026).
+ *
+ * HiAnime tidak punya kategori "donghua" di halaman daftarnya: `?s=<judul>` adalah satu-satunya
+ * jalan yang stabil. Ketujuh benih di bawah sudah dicoba ke situs aslinya lewat API produksi
+ * pada 24 Okt 2026 dan SEMUANYA mengembalikan judul yang cocok:
+ *   Soul Land (5), Battle Through the Heavens (3), Perfect World (2), Douluo Dalu (4),
+ *   Throne of Seal (1), Renegade Immortal (2), Shaonian Ge Xing / Anhe Zhuan (1).
+ * Benih hanya kueri pencarian — kartu yang judulnya tidak cocok dibuang oleh aturan `related`,
+ * jadi tidak ada judul palsu dan tidak ada klaim bahasa.
+ */
+export const DONGHUA_SEEDS = Object.freeze([
+    'Soul Land',
+    'Battle Through the Heavens',
+    'Perfect World',
+    'Douluo Dalu',
+    'Throne of Seal',
+    'Renegade Immortal',
+    'Shaonian Ge Xing',
+]);
+
+/** Batas kueri & hasil bagian donghua (tiap kueri = satu request ke situs, jeda ~1 dtk/host). */
+const DONGHUA_QUERIES = 6;
+const DONGHUA_CONCURRENCY = 3;
+const DONGHUA_LIMIT = 24;
 /** Host embed yang sudah disediakan server cadangan statis (dibangun dari id AniList) — tidak diulang. */
 export const STATIC_EMBED_HOSTS = ['megaplay.buzz', 'tryembed.us.cc', 'vidnest.fun'];
 
@@ -239,6 +267,61 @@ export function createHianime({ network, createClient, baseUrl }) {
 
         titleHint(ref) {
             return ref.slug.replace(/-/g, ' ');
+        },
+
+        /** Dipakai registry saat metadata donghua kosong/gagal (lihat browseDonghua). */
+        donghuaSeeds: DONGHUA_SEEDS,
+
+        /**
+         * Donghua yang ada di HiAnime (24 Oktober 2026, permintaan pengguna).
+         *
+         * Situlah satu-satunya sumber donghua yang benar-benar lengkap dari ketiga situs:
+         * `?s=Soul Land` → 5 seri, `?s=Battle Through the Heavens` → 3, `?s=Perfect World` → 2,
+         * `?s=Renegade Immortal` → 2, `?s=Throne of Seal` → 1, `?s=Shaonian Ge Xing` → 1
+         * (dicek 24 Okt 2026). Hanya kartu yang judulnya cocok dengan kueri yang dipakai.
+         *
+         * @param {string[]} titles judul dari benih situs + metadata
+         * @param {object} ctx
+         */
+        async browseDonghua(titles = [], ctx = {}) {
+            const queries = [...new Set((Array.isArray(titles) ? titles : [])
+                .map((title) => cleanText(title))
+                .filter((title) => title.length >= 4))]
+                .slice(0, DONGHUA_QUERIES);
+            const fetched = await mapLimit(queries, DONGHUA_CONCURRENCY, async (query) => {
+                const url = new URL(`${base}/`);
+                url.searchParams.set('s', query);
+                try {
+                    const page = await client.html(url.href, ctx);
+                    return { query, cards: parseCards(page.$, base).filter((c) => c.slug), error: null };
+                } catch (error) {
+                    return { query, cards: [], error };
+                }
+            });
+            const items = [];
+            const seen = new Set();
+            let firstError = null;
+            for (const { query, cards, error } of fetched) {
+                if (error) {
+                    firstError = firstError || error;
+                    continue;
+                }
+                const key = titleKey(stripSeason(query));
+                if (!key) continue;
+                for (const card of cards) {
+                    const cardKey = titleKey(stripSeason(card.title));
+                    const related = cardKey === key
+                        || (key.length >= 5 && cardKey.includes(key))
+                        || (cardKey.length >= 5 && key.includes(cardKey));
+                    if (!related) continue;
+                    const slug = encodeSlug(ID, card.slug, card.animeId);
+                    if (!slug || seen.has(slug)) continue;
+                    seen.add(slug);
+                    items.push(toAnime(card));
+                }
+            }
+            if (!items.length && firstError) throw firstError;
+            return items.slice(0, DONGHUA_LIMIT);
         },
 
         async latest(ctx = {}) {
