@@ -24,7 +24,7 @@ Dokumen ini menggantikan "analisis API Oploverz" yang tidak ada di paket
 | Klaim Sub Indo | hanya dari halaman episode itu sendiri |
 | robots.txt | Yoast, mengizinkan semua path (dicek 23 Okt 2026) |
 | ToS/DMCA | tidak ada halaman yang tertaut → `verdict: 'unknown'` |
-| Country/kategori donghua | **tidak ada** (dropdown Country kosong; `/donghua/` 404) |
+| Country/kategori donghua | **tidak ada** (dropdown Country kosong; `/donghua/` 404; `/genres/donghua/` **404**, dan tiga judul donghua dari aplikasi Animeloverz → **0 hasil** saat probe 24 Okt 2026 — bukti lengkap: `docs/DONGHUA.md`) |
 
 ---
 

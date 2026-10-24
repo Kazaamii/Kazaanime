@@ -25,7 +25,8 @@
  * slug Indonesia yang benar-benar 200 dan berisi kartu. Genre di luar daftar → bad_request.
  *
  * Donghua: situs mengunggah donghua Sub Indo (mis. seri Douluo Dalu), tetapi TIDAK punya
- * kategori donghua. `/negara/china-n5z6n97/` balas 200 dengan 0 kartu, dan halaman seri
+ * kategori donghua (`/genre/donghua/` 404, kata "donghua" 0 kemunculan di HTML — probe
+ * 24 Okt 2026, bukti di `docs/DONGHUA.md`). `/negara/china-n5z6n97/` balas 200 dengan 0 kartu, dan halaman seri
  * donghua pun diberi label "Negara: Japan". Karena itu daftar donghua AnimeKu di sini
  * disusun dengan mencari judul donghua yang sedang tayang (metadata AniList, negara CN)
  * di pencarian situs lalu hanya memakai kartu yang judulnya cocok — bukan kategori situs.
