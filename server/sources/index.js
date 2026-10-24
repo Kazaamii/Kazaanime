@@ -13,7 +13,7 @@
  * Alur & fallback:
  *   latest / search : scraper yang mendukung method dipanggil paralel → digabung (selang-seling) & dedupe judul.
  *                     latest: adapter `supportsLatest: false` (mis. AnimeOnsen: popular, bukan latest) dilewati;
- *                     dedupe lintas sumber (kartu donghua AnimeXin & Anichin tidak dobel);
+ *                     dedupe lintas sumber (kartu donghua AnimeXin tidak dobel);
  *                     search: dedupe PER SUMBER (22 Okt 2026) — judul yang sama dari Samehadaku &
  *                     Otakudesu tetap dikirim agar halaman nonton bisa menggabungkan server keduanya.
  *                     Semua gagal → API metadata publik (fallback: true).
@@ -31,14 +31,12 @@ import { createClient, createNetwork } from '../lib/fetcher.js';
 import { decodeSlug } from '../lib/slug.js';
 import { textShowsIndonesianSubtitle } from '../lib/subtitle-evidence.js';
 import { titleKey } from '../lib/text.js';
-import { createAnichin } from './anichin.js';
 import { createAnimeku } from './animeku.js';
 import { createAnimeIndo } from './animeindo.js';
 import { createAnoboy } from './anoboy.js';
 import { createAnimeOnsen } from './animeonsen.js';
 import { createAnimexin } from './animexin.js';
 import { createHianime } from './hianime.js';
-import { createKuramanime } from './kuramanime.js';
 import { createKusonimeDownloader } from './kusonime.js';
 import { createMetadata, hasCjk } from './metadata.js';
 import { createOploverz } from './oploverz.js';
@@ -80,10 +78,8 @@ export const FACTORIES = Object.freeze({
     animeonsen: createAnimeOnsen,
     anoboy: createAnoboy,
     sakunime: createSakunime,
-    anichin: createAnichin,
     otakudesu: createOtakudesu,
     hianime: createHianime,
-    kuramanime: createKuramanime,
 });
 
 /** Prefix slug untuk anime dari API metadata (kitsu~123, mal~456, anilist~789). */
@@ -91,11 +87,11 @@ const METADATA_KINDS = new Set(['kitsu', 'mal', 'anilist']);
 const NOT_FOUND = Symbol('notFound');
 // Latest feed dari sumber anime Jepang Sub Indo. URUTAN = urutan panel di beranda.
 // AnimeKu & Oploverz diletakkan lebih dulu (23 Okt 2026) supaya panel yang paling sering
-// bisa diakses tetap tampil walau Samehadaku/Sakunime/Otakudesu/Kuramanime sedang gagal.
+// bisa diakses tetap tampil walau Samehadaku/Sakunime/Otakudesu sedang gagal.
 // AnimeIndo masih lookup-only; Anoboy belum punya rute latest terverifikasi;
-// Anichin/AnimeXin tampil pada section Donghua yang terpisah.
+// AnimeXin tampil pada section Donghua; AnimeKu & Oploverz punya panel Donghua per situs.
 // 23 Okt 2026: hanya AnimeKu & Oploverz yang tampil di panel beranda (pilihan pengguna).
-// Samehadaku/Sakunime/Otakudesu/Kuramanime tetap aktif sebagai adapter untuk pencarian
+// Samehadaku/Sakunime/Otakudesu tetap aktif sebagai adapter untuk pencarian
 // halaman nonton, tetapi tidak lagi menjadi panel Sub Indo.
 const SUB_INDO_LATEST_SOURCE_ORDER = ['animeku', 'oploverz'];
 const SUB_INDO_LATEST_SOURCE_IDS = new Set(SUB_INDO_LATEST_SOURCE_ORDER);

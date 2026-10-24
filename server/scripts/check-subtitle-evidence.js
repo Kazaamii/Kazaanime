@@ -21,7 +21,6 @@ import { load } from 'cheerio';
 import { parseEpisodePage as parseSamehadaku } from '../sources/samehadaku.js';
 import { parseEpisodePage as parseOtakudesu } from '../sources/otakudesu.js';
 import { parseEpisodePage as parseSakunime } from '../sources/sakunime.js';
-import { parseEpisodePage as parseKuramanime } from '../sources/kuramanime.js';
 import { parseEpisodePage as parseAnoboy } from '../sources/anoboy.js';
 import { parseEpisodePage as parseAnimexin } from '../sources/animexin.js';
 import { parseEpisodePage as parseAnimeku } from '../sources/animeku.js';
@@ -48,19 +47,12 @@ export const CASES = Object.freeze([
     },
     { source: 'otakudesu', file: 'otakudesu-episode.html', base: 'https://otakudesu.blog/', parse: parseOtakudesu },
     { source: 'sakunime', file: 'sakunime-episode.html', base: 'https://sakunime.com/', parse: parseSakunime },
-    { source: 'kuramanime', file: 'kuramanime-episode.html', base: 'https://v9.kuramanime.work/', parse: parseKuramanime },
-    {
-        source: 'kuramanime', file: 'kuramanime-episode-public.html', base: 'https://v9.kuramanime.work/', parse: parseKuramanime,
-        note: 'server publik; halaman tidak menyebut bahasa',
-    },
     { source: 'anoboy', file: 'anoboy-episode.html', base: 'https://anoboy07.com/', parse: parseAnoboy },
     { source: 'animexin', file: 'animexin-episode.html', base: 'https://animexin.dev/', parse: parseAnimexin },
     {
         source: 'animexin', file: 'animexin-mirror-variants.html', base: 'https://animexin.dev/', parse: parseAnimexin,
         note: 'label "Direct (Sub Indo)" vs mirror tanpa label',
     },
-    // Anichin memakai parser AnimeStream yang sama dengan AnimeXin.
-    { source: 'anichin', file: 'anichin-episode.html', base: 'https://anichin.moe/', parse: parseAnimexin },
     { source: 'animeku', file: 'animeku-episode.html', base: 'https://ww2.animeku.lol', parse: parseAnimeku },
     {
         source: 'animeku',

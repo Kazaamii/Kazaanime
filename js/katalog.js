@@ -86,14 +86,14 @@ const SOURCES = Object.freeze([
             {
                 id: 'donghua',
                 label: 'Donghua di Oploverz',
-                hint: 'Oploverz tidak punya kategori Donghua dan pencarian situsnya fuzzy (kueri "Battle Through the Heavens" menjawab "Kingdom"), jadi bagian ini bisa kosong — itu batas situsnya, bukan data yang disembunyikan. Kalau Oploverz mengunggah donghua, judulnya ikut dicari di sini.',
+                hint: 'Oploverz tidak punya kategori Donghua, jadi bagian ini dicari lewat judul: 4 benih situs (Perfect World, Battle Through the Heavens, Soul Land, Renegade Immortal) + judul donghua tayang dari metadata, dan hanya kartu yang judulnya cocok yang ditampilkan. Pencarian situsnya fuzzy (kueri "Battle Through the Heavens" bisa menjawab "Kingdom"), jadi daftar ini bisa tidak lengkap — itu batas situsnya, bukan data yang disembunyikan.',
             },
         ],
     },
     {
         id: 'donghua',
         label: 'Donghua',
-        hint: 'Feed donghua Kazanime: AniList (negara CN) → backend AnimeXin/Anichin. Donghua khusus per situs ada di tab AnimeKu dan Oploverz (bagian "Donghua di …").',
+        hint: 'Donghua per situs ada di tab AnimeKu dan Oploverz (bagian "Donghua di …"); feed metadata AniList (negara CN) dipakai untuk melengkapi judul yang belum ada di katalog situs.',
         sections: [
             {
                 id: 'donghua',

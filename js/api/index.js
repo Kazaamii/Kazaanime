@@ -7,9 +7,9 @@
  * Rantai fallback metadata:  AniList → Kitsu → data statis
  *   (Jikan/MyAnimeList dihapus 22 Okt 2026 atas permintaan pemilik proyek; id MAL dari AniList/Kitsu
  *    tetap disimpan di anime.ids.mal untuk tautan lama.)
- * Section Donghua (Tahap D):  backend scraper (rilis terbaru AnimeXin + Anichin) → AniList CN → Kitsu (judul pinyin) → data statis
- * Section Anime Sub Indo: backend latest per-situs (Samehadaku/Sakunime/Otakudesu/Kuramanime), lalu cek episode terbaru untuk metadata subtitle Indonesia; panel dan judul lintas sumber tetap terpisah, tanpa fallback metadata.
- * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin + Anichin) → AniList → data statis
+ * Section Donghua (Tahap D):  backend scraper (rilis terbaru AnimeXin) + panel per situs AnimeKu/Oploverz → AniList CN → Kitsu (judul pinyin) → data statis
+ * Section Anime Sub Indo: backend latest per-situs (AnimeKu/Oploverz), tanpa fallback metadata.
+ * Jadwal rilis (22 Okt 2026): backend (Samehadaku jam rilis Sub Indo + AnimeXin) → AniList → data statis
  *  - Sumber yang baru gagal "diistirahatkan" sementara (circuit breaker di
  *    http.js), jadi kunjungan berikutnya langsung ke sumber yang hidup.
  *  - Hasil memberi tahu sumber yang dipakai (`source`) dan apakah data cadangan
@@ -444,7 +444,7 @@ const wibClock = (sec) => {
 
 /**
  * Jadwal dari backend → per hari: anime Jepang berjam (maks SCHEDULE.perDay, urut jam) lalu donghua
- * (maks SCHEDULE.perDayDonghua; berjam dulu — Anichin punya jam perkiraan — lalu tanpa jam).
+ * (maks SCHEDULE.perDayDonghua; berjam dulu — AnimeXin punya jam perkiraan — lalu tanpa jam).
  * Anime tanpa jam (mis. Otakudesu) hanya mengisi sisa kuota anime. Tautan item = episode terbaru.
  * Dipisah per negara asal supaya donghua berjam tidak menggeser jatah anime Sub Indo.
  */
@@ -473,7 +473,7 @@ async function backendSchedule() {
 
 /**
  * Jadwal 7 hari ke depan (mulai hari ini) dalam WIB.
- * Urutan: backend (jadwal rilis Sub Indo Samehadaku + donghua AnimeXin/Anichin — situs yang memang
+ * Urutan: backend (jadwal rilis Sub Indo Samehadaku + donghua AnimeXin — situs yang memang
  * dipakai untuk memutar) → AniList (jam tayang Jepang) → data contoh.
  * @returns {Promise<{byDay: Record<number, Array<{time:string|null,title:string,episode:number|null,aired:boolean,latest?:boolean,anime?:Anime}>|Array<[string,string]>>, today:number, source:'backend'|'anilist'|'fallback', error?: ApiError}>}
  */

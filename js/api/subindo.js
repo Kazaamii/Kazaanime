@@ -15,8 +15,8 @@ import { SUB_INDO } from '../config.js';
  * Panel yang boleh tampil di beranda: AnimeKu & Oploverz saja (23 Okt 2026).
  * Backend sudah menentukan daftar panel lewat `SUB_INDO_LATEST_SOURCE_ORDER`; filter ini
  * adalah jaring pengaman untuk respons lama yang masih tersimpan di cache CDN/browser
- * (atau panel yang diminta manual) supaya Samehadaku/Sakunime/Otakudesu/Kuramanime
- * tidak muncul lagi.
+ * (atau panel yang diminta manual) supaya sumber lama (Samehadaku/Sakunime/Otakudesu,
+ * serta Kuramanime/Anichin yang sudah dihapus) tidak muncul lagi.
  */
 export const PANEL_SOURCE_IDS = Object.freeze(['animeku', 'oploverz']);
 const PANEL_SOURCE_SET = new Set(PANEL_SOURCE_IDS);
