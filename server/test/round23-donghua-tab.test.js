@@ -146,4 +146,6 @@ test('katalog UI: tab Donghua menampilkan HiAnime & AnimeXin, tiap bagian punya 
     assert.match(source, /item\.key === entry\.target\.dataset\.section/);
     // Pesan jujur untuk sumber yang memang kosong.
     assert.match(source, /Oploverz tidak memuat donghua sejak 24 Okt 2026/);
+    // AnimeKu: sebut dua franchise yang benar-benar ada (romanisasi China), bukan janji kosong.
+    assert.match(source, /Douluo Dalu \(7 seri\) dan Doupo Cangqiong/);
 });

@@ -109,11 +109,16 @@ const DONGHUA_LIMIT = 24;
  * itu tetap berisi judul nyata yang memang ada di AnimeKu (mis. Douluo Dalu → 7 seri).
  */
 export const DONGHUA_SEEDS = Object.freeze([
-    // Terverifikasi ada di AnimeKu (pencarian "Douluo" → 7 seri, 24 Okt 2026).
+    // Terverifikasi ada di AnimeKu: pencarian "Douluo Dalu" → 7 seri (24 Okt 2026).
     'Douluo Dalu',
-    // Dicoba berikutnya; kartu yang tidak cocok dibuang oleh aturan `related`.
+    // Terverifikasi ada di AnimeKu: pencarian "Doupo Cangqiong" (judul asli Battle Through the
+    // Heavens) → 5 seri. Judul Inggrisnya **tidak** ditemukan — situs memakai romanisasi China
+    // (dicek 24 Okt 2026: "Battle Through the Heavens" → daftar umum, bukan hasil cari).
+    'Doupo Cangqiong',
+    // Belum ada di situs saat dicek ("Wanmei Shijie"/"Perfect World" → daftar umum). Tetap
+    // dipertahankan sebagai kueri murah: kalau situs menambahkannya, kartunya muncul sendiri;
+    // kartu yang tidak cocok dibuang oleh aturan `related`.
     'Perfect World',
-    'Battle Through the Heavens',
 ]);
 
 function siteUrl(value, base) {
