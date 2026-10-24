@@ -79,14 +79,17 @@ for (const target of TARGETS) {
     results.push(await probe(target));
 }
 
-for (const r of results) {
-    console.log(`\n=== ${r.id} ===`);
-    if (r.error) {
-        console.log(`error: ${r.error}`);
-        continue;
-    }
-    console.log(`status: ${r.status} | final: ${r.finalUrl} | bytes: ${r.bytes} | "donghua" di HTML: ${r.mentionsDonghua}`);
-    console.log(`kartu: article=${r.cards.article} aku-sel=${r.cards.akuSel} aku-rel-sel=${r.cards.akuRel} bs=${r.cards.bs}`);
-    console.log(`judul: ${JSON.stringify(r.titles)}`);
-    console.log(`genre link: ${JSON.stringify(r.genreLinks)}`);
-}
+const lines = results.map((r) => {
+    if (r.error) return `${r.id} -> ERROR ${r.error}`;
+    const cards = `article=${r.cards.article}/aku-sel=${r.cards.akuSel}/bs=${r.cards.bs}`;
+    const titles = r.titles.slice(0, 5).map((t) => t.slice(0, 48)).join(' | ');
+    const genres = r.genreLinks.slice(0, 10).map((g) => g.slice(0, 48)).join(' | ');
+    return `${r.id} -> ${r.status} ${r.finalUrl} cards[${cards}] donghua=${r.mentionsDonghua} titles[${titles}] genres[${genres}]`;
+});
+
+for (const line of lines) console.log(line);
+
+// Anotasi Actions: satu baris ringkas yang bisa dibaca lewat `gh run view`
+// (log mentah tidak bisa diunduh dari sandbox ini). Maks 10 anotasi per langkah.
+const compact = lines.join(' %0A ').replace(/%/g, '%25').replace(/\r/g, '').replace(/\n/g, ' ');
+console.log(`::error::${compact}`);
