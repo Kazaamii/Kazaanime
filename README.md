@@ -541,6 +541,16 @@ Sejak 22 Okt 2026 (bagian 3) section Jadwal ada **di atas** beranda (setelah Gen
 - Dulu jadwal hanya dari AniList; karena API AniList sedang menolak semua request, yang tampil selalu "Jadwal contoh".
 
 ### 🐉 Donghua & poster (perbaikan 22 Okt 2026)
+
+> **Kenapa katalog donghua di aplikasi Animeku/Animeloverz terlihat berbeda?**
+> Kedua aplikasi itu tidak membaca situs publik yang kita scraping. Probe 24 Okt 2026 (dijalankan di
+> GitHub Actions, UA bot jujur) menunjukkan `ww2.animeku.lol/genre/donghua/` → **404**,
+> `/negara/china-*` → 200 tapi **0 kartu**, `oploverz.ch/genres/donghua/` → **404**, dan tiga judul
+> donghua dari aplikasi (*Summer Punch*, *Divine Manifestation*, *King of Loose Cultivators*) →
+> **0 hasil** di Oploverz. API aplikasi Animeku (`apps.animekita.org`) membalas **403** bahkan dari
+> Actions. Jadi katalog donghua aplikasi berasal dari API khusus aplikasi yang menolak kita — bukan
+> dari situs yang bisa di-scrape. Rincian bukti + pilihan lanjutan: **`docs/DONGHUA.md`**.
+
 - Rantai section Donghua: panel **Donghua di AnimeKu** + **Donghua di Oploverz** (katalog situs, 24 Okt 2026) → backend (rilis terbaru AnimeXin; Anichin dihapus di putaran 20) → AniList CN → **Kitsu** (ONA/TV yang sedang tayang dan
   berjudul pinyin — bekerja tanpa backend & saat AniList mati) → data cadangan. Data cadangan kini **bergambar**
   (poster Kitsu/Bangumi yang dicek HTTP 200), bukan kotak gradasi.
