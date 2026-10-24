@@ -305,6 +305,26 @@
 .avatar-upload-area .upload-text strong{color:var(--primary)}
 .avatar-upload-area input[type=file]{display:none}
 
+/* ---------- Modal Cadangkan / Pulihkan akun (putaran 10) ---------- */
+.account-container{max-width:520px}
+.account-status{margin:0 0 12px;font-size:12px;line-height:1.6;color:var(--text-secondary)}
+.account-status--preview{padding:10px 12px;border-radius:10px;background:rgba(var(--accent-rgb),.08);border:1px solid rgba(var(--accent-rgb),.2);color:var(--accent)}
+.account-list{list-style:none;margin:0 0 14px;padding:0;max-height:170px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.account-list-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:10px;background:var(--bg-dark);border:1px solid rgba(255,255,255,.06)}
+.account-list-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.account-list-meta{font-size:11px;color:var(--text-secondary);text-align:right}
+.account-list-empty,.account-list-item.account-list-empty{font-size:12px;color:var(--text-secondary);padding:10px 2px}
+.account-note{margin-top:12px;font-size:11px;line-height:1.6;color:var(--text-secondary);opacity:.85}
+.account-code-btn{margin-top:10px;width:100%;justify-content:center}
+.account-code-box{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg-dark);border:1px solid rgba(var(--primary-rgb),.18)}
+.account-code-box label{display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+.account-code-box textarea,.account-field textarea,.account-field input[type=file]{width:100%;padding:10px 12px;background:var(--bg-dark);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.5;resize:vertical;outline:0}
+.account-code-box textarea:focus,.account-field textarea:focus{border-color:var(--primary)}
+.account-code-box .btn-ext{margin-top:8px}
+.account-field{display:block;margin-bottom:12px;font-size:12px;font-weight:600;color:var(--text-secondary)}
+.account-field input[type=file]{margin-top:6px;font-family:inherit;font-size:12px;padding:8px}
+.account-field textarea{margin-top:6px;font-weight:400}
+
 /* ---------- Theme picker ---------- */
 .theme-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:3000;align-items:center;justify-content:center;padding:20px}
 .theme-modal.active{display:flex}

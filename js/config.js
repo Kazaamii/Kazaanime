@@ -36,7 +36,13 @@ export const APP = Object.freeze({
 export const STORAGE_KEYS = Object.freeze({
     theme: 'kazanime-theme',
     users: 'kazanime-users',
+    /** Salinan cadangan otomatis (putaran 10): dipakai bila data utama korup/hilang. */
+    usersBackup: 'kazanime-users-backup',
+    /** Penghitung versi data akun — mendeteksi perubahan dari tab/perangkat lain. */
+    usersVersion: 'kazanime-users-version',
     currentUser: 'kazanime-current-user',
+    /** Token sesi server akun opsional (lihat js/services/account-sync.js). */
+    accountToken: 'kazanime-account-token',
     apiCachePrefix: 'kz:cache:',            // sessionStorage — cache respons API (sudah dinormalisasi)
     apiHealth: 'kz:health',                 // sessionStorage — status & circuit breaker tiap sumber
     apiStatusShown: 'kz:status-shown',      // sessionStorage — widget status API sudah tampil di sesi ini
@@ -118,43 +124,76 @@ export const GENRES = Object.freeze([
 export const DAY_NAMES = Object.freeze(['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']);
 
 /**
- * 25 avatar. Di file asli SEMUA url-nya 404 (selalu jatuh ke emoji).
- * 16 diganti gambar valid dari Kitsu (sudah dicek HTTP 200).
- * `img: null` = karakter belum ada di database Kitsu → otomatis pakai avatar emoji
- * (perilaku sama seperti sebelumnya). Isi dengan URL valid kapan saja.
+ * 25 avatar preset.
+ *
+ * Sejarah: di file asli SEMUA url-nya 404 (selalu jatuh ke emoji). Sekarang:
+ *  - 14 karakter memakai foto resmi dari CDN Kitsu (URL diverifikasi lewat
+ *    `GET /api/edge/characters/<id>?fields[characters]=image` — 24 Okt 2026).
+ *  - 7 karakter yang tidak punya foto resmi di Kitsu memakai **kartu avatar lokal**
+ *    (`assets/avatars/*.svg`, ikut repo) — selalu tampil, tanpa request jaringan,
+ *    jadi tidak pernah jatuh ke ikon emoji bawaan.
+ *  - `fallback` = URL kedua yang dicoba bila gambar utama gagal dimuat sebelum
+ *    akhirnya memakai kartu lokal/emoji (lihat installImageFallback di ui/dom.js).
  */
-const KITSU_CHAR = (id) => `https://media.kitsu.app/characters/images/${id}/original.jpg`;
+/**
+ * Foto avatar preset.
+ *
+ * Putaran 10 (24 Okt 2026) — keluhan "beberapa foto profil tidak terdeteksi, hanya icon
+ * bawaan". Penyebabnya: URL disusun otomatis (`.../characters/images/<id>/original.jpg`)
+ * padahal Kitsu memakai akhiran berbeda per karakter (Zero Two `.jpeg`, Marin ber-hash) dan
+ * beberapa ID tidak ada → 404 → yang tampil hanya emoji bawaan.
+ *
+ * Aturan sekarang:
+ *  - SETIAP URL di bawah sudah diverifikasi lewat `GET /api/edge/characters?filter[id]=…`
+ *    pada 24 Okt 2026 dan memakai berkas yang benar-benar dilayani Kitsu (`large`, 500×600).
+ *  - Karakter yang tidak ada di basis data Kitsu memakai ilustrasi lokal 320×320 di
+ *    `assets/avatars/` (tanpa jaringan, selalu tampil) + kartu SVG sebagai cadangan.
+ *  - `card` = cadangan lokal bila foto gagal dimuat (js/ui/dom.js: rantai data-fallback).
+ *  - Jangan menyusun URL Kitsu secara otomatis; salin dari respons API.
+ */
+const LOCAL_AVATAR = (file) => `assets/avatars/${file}`;
 export const AVATARS = Object.freeze([
-    { id: 1,  name: 'Rem',      img: KITSU_CHAR(62134) },
-    { id: 2,  name: 'Emilia',   img: KITSU_CHAR(62258) },
-    { id: 3,  name: 'Zero Two', img: null },
-    { id: 4,  name: 'Mai S.',   img: KITSU_CHAR(66744) },
-    { id: 5,  name: 'Marin K.', img: null },
-    { id: 6,  name: 'Yor F.',   img: null },
-    { id: 7,  name: 'Makima',   img: null },
-    { id: 8,  name: 'Power',    img: null },
-    { id: 9,  name: 'Nezuko',   img: KITSU_CHAR(74558) },
-    { id: 10, name: 'Mikasa',   img: KITSU_CHAR(38505) },
-    { id: 11, name: 'Hinata',   img: KITSU_CHAR(350) },
-    { id: 12, name: 'Asuna',    img: KITSU_CHAR(35731) },
-    { id: 13, name: 'Megumin',  img: KITSU_CHAR(59254) },
-    { id: 14, name: 'Aqua',     img: KITSU_CHAR(88093) },
-    { id: 15, name: 'Chika',    img: KITSU_CHAR(76736) },
-    { id: 16, name: 'Gojo',     img: null },
-    { id: 17, name: 'Levi',     img: KITSU_CHAR(39556) },
-    { id: 18, name: 'Tanjiro',  img: KITSU_CHAR(75716) },
-    { id: 19, name: 'Goku',     img: KITSU_CHAR(4119) },
-    { id: 20, name: 'Naruto',   img: KITSU_CHAR(221) },
-    { id: 21, name: 'Anya',     img: null },
-    { id: 22, name: 'Frieren',  img: null },
-    { id: 23, name: 'Ai H.',    img: null },
-    { id: 24, name: 'Yumeko',   img: KITSU_CHAR(92508) },
-    { id: 25, name: 'Kurumi',   img: KITSU_CHAR(38200) },
+    // ——— Kitsu (terverifikasi) ———
+    { id: 1,  name: 'Rem',      img: 'https://media.kitsu.app/character/62134/image/large-f77b2d0e41882fd1d8759058674fb650.jpeg' },
+    { id: 2,  name: 'Emilia',   img: 'https://media.kitsu.app/character/62258/image/large-9a5a8386582d090e711082bbb3708c03.jpeg' },
+    { id: 3,  name: 'Zero Two', img: 'https://media.kitsu.app/character/95090/image/large-1aa59bd3aec687fa1cf98fa146c0a97d.jpeg' },
+    { id: 4,  name: 'Mai S.',   img: 'https://media.kitsu.app/character/66744/image/large-8b5546c063483445771deeebe6aed791.jpeg' },
+    { id: 5,  name: 'Marin K.', img: 'https://media.kitsu.app/character/105861/image/large-1ce67f1b9cd796d8d61d824bf0f9430e.jpeg' },
+    // ——— Ilustrasi lokal (tidak ada di Kitsu; selalu tampil, juga offline) ———
+    { id: 6,  name: 'Yor F.',   img: LOCAL_AVATAR('photo-6-yor-forger.jpg'),   card: LOCAL_AVATAR('6-yor-forger.svg') },
+    { id: 7,  name: 'Makima',   img: LOCAL_AVATAR('photo-7-makima.jpg'),       card: LOCAL_AVATAR('7-makima.svg') },
+    { id: 8,  name: 'Power',    img: LOCAL_AVATAR('photo-8-power.jpg'),        card: LOCAL_AVATAR('8-power.svg') },
+    // ——— Kitsu (terverifikasi) ———
+    { id: 9,  name: 'Nezuko',   img: 'https://media.kitsu.app/character/74558/image/large-7ef0358ec024b712f60d79a5bd81d6d2.jpeg' },
+    { id: 10, name: 'Mikasa',   img: 'https://media.kitsu.app/character/38505/image/large-b5f914a557b487179e3b93fbc73f4371.jpeg' },
+    { id: 11, name: 'Hinata',   img: 'https://media.kitsu.app/character/350/image/large-6def4b9973b90cfa20f54e7f7e7fd020.jpeg' },
+    { id: 12, name: 'Asuna',    img: 'https://media.kitsu.app/character/35731/image/large-f362af0c8e6552a4e11e5c418a4e4f81.jpeg' },
+    { id: 13, name: 'Megumin',  img: 'https://media.kitsu.app/character/59254/image/large-120a12666549b7ca668cab18e38a89bd.jpeg' },
+    { id: 14, name: 'Aqua',     img: 'https://media.kitsu.app/character/88093/image/large-fe7bc459b184bc6ea71d9800c4b7bb23.jpeg' },
+    { id: 15, name: 'Chika',    img: 'https://media.kitsu.app/character/76736/image/large-adbbdb42ef3cf7cdd6154b445e6117cd.jpeg' },
+    { id: 16, name: 'Gojo',     img: LOCAL_AVATAR('photo-16-satoru-gojo.jpg'), card: LOCAL_AVATAR('16-satoru-gojo.svg') },
+    { id: 17, name: 'Levi',     img: 'https://media.kitsu.app/character/39556/image/large-a9a0df71df0655fc58450f17a97b9f41.jpeg' },
+    { id: 18, name: 'Tanjiro',  img: 'https://media.kitsu.app/character/75716/image/large-ae410f9ef35db0c5c7b3947a0512c5ae.jpeg' },
+    { id: 19, name: 'Goku',     img: 'https://media.kitsu.app/character/4119/image/large-caa42df1ee38c94427d3a3b764b567c9.jpeg' },
+    { id: 20, name: 'Naruto',   img: 'https://media.kitsu.app/character/221/image/large-c1fc8267b7061dfbef126d7f30110fe9.jpeg' },
+    { id: 21, name: 'Anya',     img: LOCAL_AVATAR('photo-21-anya-forger.jpg'), card: LOCAL_AVATAR('21-anya-forger.svg') },
+    { id: 22, name: 'Frieren',  img: LOCAL_AVATAR('photo-22-frieren.jpg'),      card: LOCAL_AVATAR('22-frieren.svg') },
+    { id: 23, name: 'Ai H.',    img: LOCAL_AVATAR('photo-23-ai-hoshino.jpg'),   card: LOCAL_AVATAR('23-ai-hoshino.svg') },
+    { id: 24, name: 'Yumeko',   img: 'https://media.kitsu.app/character/92508/image/large-4504521426907174cd6f0123c1f9eb6b.jpeg' },
+    { id: 25, name: 'Kurumi',   img: 'https://media.kitsu.app/character/38200/image/large-ab5874eff98c5bbf1dec2ab729fc1485.jpeg' },
 ]);
-/** Emoji + warna gradient untuk avatar fallback (index = id - 1) — identik dengan getFallbackAvatar asli. */
+
+
+/** Gambar utama satu avatar preset: foto → kartu lokal → null (emoji). */
+export function avatarImage(avatar) {
+    return avatar?.img || avatar?.card || null;
+}
 export const AVATAR_EMOJIS = Object.freeze(['🌸','🎭','💜','🎪','🌺','🎨','🌙','✨','🎀','💫','🌟','🎯','🔮','💎','🎪','🌈','🎭','💝','🌸','💖','🎀','🌺','💫','🎨','✨']);
 export const AVATAR_COLORS = Object.freeze(['#ff6b9d','#c084fc','#67e8f9','#f59e0b','#10b981','#ec4899','#8b5cf6','#06b6d4','#ef4444','#f97316','#d946ef','#14b8a6','#6366f1','#a855f7','#22d3ee','#e67e22','#f472b6','#34d399','#fbbf24','#818cf8','#fb7185','#2dd4bf','#c084fc','#fb923c','#a78bfa']);
-export const AVATAR_UPLOAD = Object.freeze({ maxBytes: 2 * 1024 * 1024, size: 200, quality: 0.8 });
+/** Batas upload avatar. Foto kamera ponsel 3–12 MB diterima lalu DIKECILKAN otomatis
+ *  (putaran 10) — dulu >2 MB langsung ditolak sehingga pengguna berakhir dengan avatar
+ *  bawaan tanpa sadar. */
+export const AVATAR_UPLOAD = Object.freeze({ maxBytes: 12 * 1024 * 1024, size: 200, quality: 0.82, maxDataUrlBytes: 180 * 1024 });
 
 /** Aturan akun (sama dengan file asli: username ≥ 3, password ≥ 6). */
 export const AUTH_RULES = Object.freeze({ usernameMin: 3, usernameMax: 24, passwordMin: 6 });

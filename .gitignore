@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 .vercel/
 .scraper-data/
+# Data server akun (ACCOUNT_STORE=file) — jangan di-commit
+.data/

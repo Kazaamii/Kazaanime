@@ -38,6 +38,7 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅜 putaran 7 (24 Okt 2026): pencarian header & halaman hasil juga memakai **AnimeKu & Oploverz** (bukan hanya AniList/Kitsu)
 🅝 putaran 8 (24 Okt 2026): **genre situs pindah ke Jelajah saja**, **sandbox/pop-up dihapus** → lapisan anti-iklan + pemutar eksternal, **2 server Sub Indo berlabel** (AnimeKu & Animeloverz), status backend bisa dites ulang
 🅞 putaran 9 (24 Okt 2026): **tata letak ponsel** — menu akun, tombol player, dan panel server dirapikan (server di bawah player, episode di bawahnya)
+🅟 putaran 10 (24 Okt 2026): **akun tahan banting** (nama tanpa beda huruf, cadangan otomatis, cadangan/pulihkan berkas + kode), **server akun opsional** (file/Redis), foto avatar terverifikasi, **judul di atas player**, tab **AnimeKu/Oploverz** di pencarian
 
 ```
 kazanime/
@@ -50,10 +51,12 @@ kazanime/
 ├── package.json               🅓🅔 dependency backend (cheerio/Express/Undici/fetch-socks/tough-cookie; Playwright opsional), skrip dev/start/test/check:sources
 ├── package-lock.json          🅓
 ├── vercel.json                ✅🅓🅕 header keamanan + rewrite /api/* → Function + maxDuration 60 dtk (bagian subtitle AI)
-├── .env.example               🅔🅕 semua environment variable (opsional) beserta default-nya (+ GEMINI_*, nilai kosong)
-├── .gitignore                 🅔 (node_modules, .env, .vercel, .scraper-data)
+├── .env.example               🅔🅕🅟 semua environment variable (opsional) beserta default-nya (+ GEMINI_*, ACCOUNT_STORE, nilai kosong)
+├── .gitignore                 🅔🅟 (node_modules, .env, .vercel, .scraper-data, .data)
 ├── api/
 │   └── index.js               🅓 Vercel Function: `export default createApp()`
+├── assets/
+│   └── avatars/               🅟 7 ilustrasi avatar 320×320 (JPG) + 7 kartu SVG cadangan; dipakai bila foto Kitsu tidak tersedia/offline
 ├── css/
 │   ├── base.css               ✅🅔 reset, variabel (+ --font-body/--font-display), 7 tema, ikon .ic, keyframes, partikel tema
 │   ├── components.css         ✅ navbar, dropdown, card, skeleton, modal, toast, API status, footer, keterangan section, panel Sub Indo per sumber (+ status & retry)
@@ -77,6 +80,7 @@ kazanime/
 │   │   ├── sources.js         ✅🅓🅔🅕 klien backend /api/anime/* + /api/stream/servers + /api/stream/subai (aktif; mati otomatis bila /api tidak ada) + normalisasi server/download
 │   │   ├── streams.js         🅒🅓🅔 server streaming per episode (config + slot penyedia + SEMUA situs backend yang cocok), link download
 │   │   ├── subindo.js         ✅🅗 katalog Sub Indo per sumber tanpa verifikasi episode (24 Okt 2026): pengelompokan, dedupe, `sourceIds`, batas 24
+│   │   ├── accounts.js        🅟 klien `/api/accounts/*` — status, register, login, me, sync; token Bearer di localStorage
 │   │   └── index.js           ✅🅓 FASAD untuk UI: rantai fallback (donghua: backend → AniList CN) + getWatchData + getSubIndoHomeSources
 │   ├── services/
 │   │   ├── storage.js         ✅ localStorage aman
@@ -84,6 +88,8 @@ kazanime/
 │   │   ├── hash.js            ✅ SHA-256 (Web Crypto + cadangan JS murni untuk akses via IP LAN)
 │   │   ├── auth.js            ✅ login/daftar/avatar (kompatibel data lama, password di-hash + migrasi otomatis)
 │   │   ├── bookmark.js        ✅ bookmark per akun (format lama tetap terbaca) + event lintas tab
+│   │   ├── account-backup.js  🅟 cadangkan/pulihkan akun: bundel .json + kode sinkron KZ1-/KZ1Z- (batas 50 akun, 5 MB)
+│   │   ├── account-sync.js    🅟 lokal dulu → server bila aktif: dorong/tarik bookmark & avatar, tombol Sinkron Sekarang
 │   │   └── history.js         🅒 riwayat tontonan lokal (penanda episode yang sudah ditonton)
 │   ├── ui/
 │   │   ├── dom.js             ✅ html`` ber-escape otomatis, delegate, fallback gambar
@@ -93,6 +99,7 @@ kazanime/
 │   │   ├── modal.js           ✅ manajer modal (Esc, backdrop, focus trap)
 │   │   ├── theme-modal.js     ✅
 │   │   ├── auth-modal.js      ✅ UI modal masuk/daftar/ganti avatar
+│   │   ├── account-modal.js   🅟 modal Cadangkan/Pulihkan akun (unduh berkas, kode sinkron, pratinjau pemulihan)
 │   │   ├── toast.js           ✅
 │   │   ├── card.js            ✅🅒 (+ episode tujuan per kartu: "Baru Rilis" → episode terbaru)
 │   │   ├── hero.js            ✅
@@ -121,7 +128,8 @@ kazanime/
     ├── config.js              semua konstanta backend (+ override lewat env; AI_SUBS 🅕)
     ├── routes/
     │   ├── anime.js           5 endpoint + validasi + header cache CDN
-    │   └── stream.js          🅔🅕 /api/stream/servers (ReAnime + AniZone) · /hls (proxy HLS bertanda tangan) · /sub (ASS/SRT → WebVTT) · /subai (Subtitle Indonesia AI)
+    │   ├── stream.js          🅔🅕 /api/stream/servers (ReAnime + AniZone) · /hls (proxy HLS bertanda tangan) · /sub (ASS/SRT → WebVTT) · /subai (Subtitle Indonesia AI)
+    │   └── accounts.js        🅟 /api/accounts/status|register|login|me|sync|logout (503 + alasan bila ACCOUNT_STORE kosong)
     ├── lib/
     │   ├── fetcher.js         SATU-SATUNYA request keluar: allowlist+redirect aman, robots, proxy, throttle/concurrency, cookies, timeout/retry terbatas; challenge berhenti tanpa retry
     │   ├── proxy-manager.js   proxy HTTP(S)/SOCKS4a/5/5h, health TCP, rotasi terkonfigurasi, cooldown; tanpa direct fallback bila proxy mati
@@ -131,6 +139,7 @@ kazanime/
     │   ├── request-manager.js cache TTL yang ada, backoff terbatas, throttle + semaphore per host
     │   ├── challenge-handler.js deteksi CAPTCHA/403/429/security challenge dan cooldown tanpa solver/retry
     │   ├── stream-proxy.js    🅔 tanda tangan HMAC URL proxy, penulisan ulang playlist m3u8, konversi ASS/SRT → WebVTT
+    │   ├── account-store.js   🅟 penyimpanan akun server: file JSON atomik / Redis REST (Upstash, Vercel KV) / memory; scrypt + token HMAC
     │   ├── gemini.js          🅕 klien Gemini API (generateContent): model utama → cadangan, pendinginan kuota/key, thinking minimal
     │   ├── subtitle-ai.js     🅕 VTT → bagian (±2 per episode), prompt "nomor|teks", validasi jawaban, cache & dedupe per instance
     │   ├── robots.js          parser & pencocok robots.txt (RFC 9309) + cache; dipakai hanya saat mode enforce/warn
@@ -633,6 +642,9 @@ server/routes/stream.js ── /api/stream/hls  : proxy HLS AniZone (URL ditanda
 | `GET /api/stream/hls?u=&s=&p=` | proxy media bertanda tangan (HLS, MP4/WebM). Tanpa `p` = provider AniZone; `p=animeonsen` hanya untuk URL yang ditandatangani adapter dan exact hostname dalam `ANIMEONSEN_MEDIA_HOSTS`. Playlist ditulis ulang, segmen/key diteruskan; AnimeOnsen memakai `private, no-store` dan robots gate per URL. |
 | `GET /api/stream/sub?u=&f=&s=&p=` | ASS/SSA/SRT/VTT dikonversi ke WebVTT. `p=animeonsen` diverifikasi dalam tanda tangan, hostname exact + robots gate; respons no-store. |
 | `GET /api/stream/subai?u=&f=&l=&v=&s=&p=` | **(Tahap F)** `{ part, parts, ranges: [[mulai, akhir]…], lang: 'id', label: 'Indonesia (AI)', model, untranslated, cues: [[mulai, akhir, teks, pengaturan]…] }` — hanya URL bertanda tangan dari `ai.url`; parameter lain ditolak. Error: `503 AI_DISABLED` / `AI_QUOTA` (+ `Retry-After`) / `AI_CONFIG`, `504 AI_TIMEOUT`, `502 AI_UPSTREAM` / `AI_BAD_OUTPUT` / `AI_BLOCKED`, `409 AI_STALE` |
+| `GET /api/accounts/status` | 🅟 `{ data: { enabled, provider: 'file'\|'redis'\|'memory'\|'none', persistent, accounts, reason } }` — `no-store`; tidak pernah melempar error walau fitur mati |
+| `POST /api/accounts/register` \| `login` | 🅟 body `{ username, password, avatar?, bookmarks? }` → `{ data: { token, user } }`. Password di-hash **scrypt + salt**; `409` username server sudah dipakai, `401` password salah, `404` tidak ada (pesan tidak membocorkan hash). `503` bila `ACCOUNT_STORE` kosong |
+| `GET /api/accounts/me` \| `POST /api/accounts/sync` | 🅟 `Authorization: Bearer <token>` (HMAC-SHA256, 30 hari). `sync` menggabungkan bookmark (union by id/judul+episode) dan memakai avatar dengan `updatedAt` terbaru; `401` token kedaluwarsa/palsu |
 | `GET /api/health` | status backend, User-Agent, TTL/cache, robots/circuit, concurrency, status proxy (tanpa host/kredensial), ringkasan cookie (tanpa nilai), status browser & `aiSubtitles` (key tidak ditampilkan) |
 | `GET /api/bot` | penjelasan bot **jujur sesuai mode robots aktif** (mode `off` menyatakan bahwa robots.txt tidak ditegakkan dan meminta admin memakai alamat kontak) |
 
@@ -1242,6 +1254,57 @@ sinopsis"*, *"urutanya Server dlu dibawahnya baru eps"*.
    chip info (rating, Tamat, TV, musim, jumlah episode, durasi, studio, Multi Sub, Multi-Server) →
    **daftar episode** → sinopsis → download → platform legal → rekomendasi. Jadi chip info tetap
    **di atas sinopsis** dan server selalu **di atas daftar episode**.
+
+### Perubahan perilaku (24 Okt 2026 — putaran kesepuluh: akun, cadangan, server akun, judul, tab pencarian)
+
+Permintaan pengguna: *"kadang pengguna tidak ditemukan tolong perbaiki lagi"*, *"beberapa foto profil
+tidak terdeteksi hanya icon bawaan"*, *"tombol Cadangkan/Pulihkan akun"*, *"cari solusi agar ada server
+akun … alternative agar tetap terpakai"*, *"posisi judul anime sebaiknya pindah keatas"*, *"kategori yg
+muncul hanya 2 anilist dan kitsu … tambahkan juga agar terorganisir"*.
+
+1. **"Pengguna tidak ditemukan" — akar masalah & perbaikan.** Tiga bug berbeda diperbaiki:
+   (a) `getCurrentUser()` dulu mencari kunci **persis**, sementara register menyimpan nama asli →
+   akun `"Rully"` bisa "hilang" setelah reload ketika pointer berisi `"rully"`; sekarang semua
+   pembacaan memakai `findKey()` (trim + lowercase) dan pointer lama dirapikan otomatis.
+   (b) `register`/`login` membaca daftar akun → `await` hash → **menulis ulang seluruh objek**; bila
+   tab lain menyimpan bookmark di sela itu, akun baru tertimpa. Sekarang data **dibaca ulang setelah
+   await** sebelum ditulis. (c) Kegagalan `localStorage` (kuota penuh/mode privat) dulu ditelan diam-diam;
+   sekarang dilaporkan dan kuota dibersihkan dari cache API. Ditambah **cadangan otomatis**
+   (`kazanime-users-backup`): data utama korup/hilang → dipulihkan otomatis, salinan rusak disimpan di
+   `kazanime-users-corrupt`. Sinkron antar-tab memakai `storage` + `visibilitychange`/`pageshow`/`focus`
+   karena event `storage` tidak selalu datang di Chrome Android.
+2. **Foto profil tidak muncul.** URL avatar dulu **disusun otomatis**
+   (`.../characters/images/<id>/original.jpg`), padahal Kitsu memakai akhiran berbeda per karakter
+   (Zero Two `.jpeg`, Marin ber-hash) dan sebagian ID tidak ada → 404 → yang tampil hanya emoji bawaan.
+   Sekarang setiap URL **disalin dari respons API** (`filter[id]=…`) dan sudah diverifikasi; tujuh
+   karakter yang tidak ada di Kitsu memakai ilustrasi lokal 320×320 di `assets/avatars/` (tanpa
+   jaringan). Urutan cadangan: **foto → kartu SVG lokal → emoji** (`data-fallback` berantai), dan
+   unggahan foto kini menerima **sampai 12 MB** (foto kamera ponsel) lalu dikecilkan ±180 KB dengan
+   orientasi EXIF dihormati.
+3. **Cadangkan / Pulihkan akun** (menu profil → tiga item baru). *Cadangkan*: unduh `kazanime-akun-YYYY-MM-DD.json`
+   **atau** buat **kode sinkron** `KZ1-…` / `KZ1Z-…` (base64url, dipadatkan `deflate-raw`) untuk
+   disalin lewat chat. *Pulihkan*: unggah berkas atau tempel kode, lihat pratinjau jumlah akun,
+   konfirmasi, lalu akun digabung (**yang lebih baru menang**, bookmark digabung, akun lama tidak
+   dihapus) dan langsung masuk. Batas: 50 akun/berkas 5 MB. Kode/berkas memuat hash password —
+   UI memperingatkan agar disimpan seperti kata sandi.
+4. **Server akun opsional (jalur nyata, bukan janji).** Backend Kazanime tetap **tanpa basis data**,
+   jadi ditambahkan `server/lib/account-store.js` + `server/routes/accounts.js`:
+   `ACCOUNT_STORE=file` (server sendiri, JSON atomik di `.data/`), `ACCOUNT_STORE=redis`
+   (Upstash/Vercel KV lewat REST — **satu-satunya pilihan untuk Vercel**, filesystem-nya read-only),
+   atau `memory` (demo). Endpoint: `GET /api/accounts/status`, `POST /register|login|sync|logout`,
+   `GET /me`; password di-hash **scrypt + salt**, token sesi **HMAC-SHA256** (30 hari, `ACCOUNTS_SECRET`).
+   Frontend **lokal dulu**: register mengirim salinan ke server (best-effort), login lokal yang gagal
+   mencoba server, tombol **"Sinkron Sekarang"** hanya tampil bila `/api/accounts/status` menjawab
+   `enabled:true`, dan bila `ACCOUNT_STORE` kosong semua endpoint tulis menjawab **503 + alasan** tanpa
+   mengganggu fitur lokal. Sinkronisasi menggabungkan bookmark (union, tanpa duplikat) dan memakai
+   avatar dengan stempel terbaru.
+5. **Judul di atas player.** Blok judul + label episode + tombol bookmark dipindah dari dalam
+   `.streaming-main` ke **atas `#playerWrapper`** (`watch-title-row--top`), dengan padding mengikuti
+   player di desktop (40px) dan ponsel (16px).
+6. **Tab pencarian AnimeKu & Oploverz.** Halaman pencarian kini punya lima tab berurutan
+   **Semua · AnimeKu · Oploverz · AniList · Kitsu**, masing-masing dengan **hitungan**; tab situs
+   menampilkan judul siap-tonton (langsung ke episode) tanpa paginasi, dan subjudul menyebut jumlah
+   per sumber: `Ditemukan N di katalog · AnimeKu (a) + Oploverz (b) — AniList (c) + Kitsu (d)`.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

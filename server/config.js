@@ -32,6 +32,24 @@ function bool(name, fallback) {
 /** Folder proyek (tempat index.html, css/, js/). */
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * Akun server (opsional, putaran 10). Lihat server/lib/account-store.js.
+ * Frontend tetap bisa dipakai tanpa ini (akun lokal + berkas/kode cadangan).
+ */
+export const ACCOUNTS = Object.freeze({
+    /** 'off' | 'file' | 'redis' | 'memory' */
+    store: (env.ACCOUNT_STORE || '').toLowerCase() || 'off',
+    /** Folder data untuk adapter 'file' (default: <proyek>/.data). */
+    dataDir: path.resolve(ROOT_DIR, env.ACCOUNT_DATA_DIR || '.data'),
+    /** REST Redis (Upstash / Vercel KV). */
+    redisUrl: env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL || '',
+    redisToken: env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN || '',
+    /** Secret HMAC token sesi. Kosong = STREAM_SECRET, lalu nilai pengembangan. */
+    secret: env.ACCOUNTS_SECRET || env.STREAM_SECRET || '',
+    /** Batas request akun per IP per menit. */
+    rateLimitPerMinute: int('ACCOUNT_RATE_LIMIT_PER_MIN', 20, { min: 0, max: 10000 }),
+});
+
 export const SERVER = Object.freeze({
     port: int('PORT', 3000, { min: 1, max: 65535 }),
     host: env.HOST || '0.0.0.0',

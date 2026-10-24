@@ -57,6 +57,8 @@ const SITE_SEARCH_LIMIT = 8;
 
 const BROWSE_TITLES = { ongoing: 'Ongoing Anime', popular: 'Anime Populer', new: 'Baru Rilis', donghua: 'Donghua (Anime China)' };
 const SHORT_NAMES = { kitsu: 'Kitsu', anilist: 'AniList' };
+const isSiteTab = (source) => String(source || '').startsWith('backend:');
+const siteOfTab = (source) => (isSiteTab(source) ? String(source).slice('backend:'.length) : '');
 const LOAD_MORE_TEXT = 'Muat Lebih Banyak ↓';
 
 const params = parseSearchParams();
@@ -178,17 +180,34 @@ function resetSearch() {
 }
 
 function visibleSearchList() {
+    if (isSiteTab(state.source)) {
+        const site = siteOfTab(state.source);
+        return state.siteItems.filter((anime) => siteOfSuggestion(anime) === site);
+    }
     return state.source === 'all' ? state.merged : state.bySource[state.source] || [];
 }
 
 function searchHasMore() {
+    // Hasil situs tidak punya paginasi → tab situs tidak pernah menampilkan "Muat Lebih Banyak".
+    if (isSiteTab(state.source)) return false;
     return state.source === 'all'
         ? SEARCH_SOURCE_ORDER.some((s) => state.hasNext[s])
         : Boolean(state.hasNext[state.source]);
 }
 
 function renderSearchEmpty() {
+    if (state.loading) {
+        showSkeleton(grid, 6);
+        return;
+    }
     const failed = SEARCH_SOURCE_ORDER.filter((s) => state.errors[s]);
+    if (isSiteTab(state.source)) {
+        const site = SITE_LABELS[siteOfTab(state.source)] || 'situs';
+        gridMessage(grid, state.siteError
+            ? { icon: 'triangle-alert', title: `Pencarian ${site} gagal`, text: friendlyError(state.siteError), actions: retryButton }
+            : { icon: 'inbox', title: `Tidak ada hasil di ${site}`, text: `Judul "${state.q}" belum ada di ${site}. Coba kata kunci lain atau lihat tab AniList/Kitsu.` });
+        return;
+    }
     if (state.source !== 'all') {
         const err = state.errors[state.source];
         gridMessage(grid, err
@@ -222,8 +241,9 @@ function renderSearchEmpty() {
  */
 function renderSiteResults() {
     if (!siteWrap || !siteGrid) return;
-    const items = mode === 'search' ? state.siteItems : [];
-    const problem = mode === 'search' ? state.siteError : null;
+    const items = mode === 'search' && !isSiteTab(state.source) ? state.siteItems : [];
+    const problem = mode === 'search' && !isSiteTab(state.source) ? state.siteError : null;
+    // Saat tab situs dipilih, grid utama sudah menampilkan judulnya → panel ini disembunyikan.
     siteWrap.hidden = items.length === 0 && !problem;
     if (!items.length) {
         siteGrid.innerHTML = '';
@@ -243,14 +263,31 @@ function renderSiteResults() {
 function renderSearch({ append = null } = {}) {
     $$('[data-count]', tabsEl).forEach((el) => {
         const key = el.dataset.count;
-        el.textContent = String(key === 'all' ? state.merged.length : (state.bySource[key] || []).length);
+        let value;
+        if (key === 'all') value = state.merged.length + state.siteItems.length;
+        else if (isSiteTab(key)) value = state.siteItems.filter((anime) => siteOfSuggestion(anime) === siteOfTab(key)).length;
+        else value = (state.bySource[key] || []).length;
+        el.textContent = String(value);
     });
 
     const failed = SEARCH_SOURCE_ORDER.filter((s) => state.errors[s]);
     const counts = SEARCH_SOURCE_ORDER.map((s) => `${SHORT_NAMES[s]} (${state.bySource[s].length})`).join(' + ');
-    const siteCount = state.siteItems.length ? ` · situs (${state.siteItems.length})` : '';
-    subtitleEl.textContent = `Ditemukan ${state.merged.length} anime — ${counts}${siteCount}`
-        + (failed.length ? ` · ${failed.map((s) => SHORT_NAMES[s]).join(', ')} tidak merespons` : '');
+    const perSite = SITE_SOURCES
+        .map((site) => `${SITE_LABELS[site]} (${state.siteItems.filter((anime) => siteOfSuggestion(anime) === site).length})`)
+        .join(' + ');
+    const siteCount = state.siteItems.length ? ` · ${perSite}` : '';
+    if (isSiteTab(state.source)) {
+        // Tab situs: dahulukan yang sedang dilihat, katalog tetap disebut sebagai ringkasan.
+        const site = SITE_LABELS[siteOfTab(state.source)] || 'situs';
+        subtitleEl.textContent = `${site} — ${visibleSearchList().length} judul siap tonton · katalog: ${counts}`
+            + (failed.length ? ` · ${failed.map((s) => SHORT_NAMES[s]).join(', ')} tidak merespons` : '');
+    } else {
+        subtitleEl.textContent = `Ditemukan ${state.merged.length} di katalog${siteCount} — ${counts}`
+            + (failed.length ? ` · ${failed.map((s) => SHORT_NAMES[s]).join(', ')} tidak merespons` : '');
+    }
+
+    // Urutan/format hanya berlaku untuk AniList & Kitsu → sembunyikan saat tab situs aktif.
+    if (filtersEl) filtersEl.hidden = mode === 'search' && isSiteTab(state.source);
 
     renderSiteResults();
 
@@ -259,6 +296,9 @@ function renderSearch({ append = null } = {}) {
         renderSearchEmpty();
     } else if (append && grid.querySelector('.anime-card')) {
         appendCards(grid, append[state.source] || [], { variant: 'search', isBookmarked });
+    } else if (isSiteTab(state.source)) {
+        // Kartu situs langsung memutar episode dari situs (sama seperti bagian situs).
+        renderCards(grid, list, { variant: 'source', isBookmarked, episodeOf: latestEpisodeOf });
     } else {
         renderCards(grid, list, { variant: 'search', isBookmarked });
     }
@@ -275,7 +315,7 @@ async function runSearch({ append = false } = {}) {
         resetSearch();
         showSkeleton(grid, 8);
         setSectionNote(grid);
-        subtitleEl.textContent = 'Mencari dari AniList + Kitsu...';
+        subtitleEl.textContent = 'Mencari dari AniList, Kitsu, AnimeKu & Oploverz...';
         loadMoreWrap.hidden = true;
     }
     setLoading(true, append);
