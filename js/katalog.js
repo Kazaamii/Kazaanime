@@ -109,7 +109,7 @@ const SOURCES = Object.freeze([
                 label: 'Donghua di HiAnime',
                 source: 'hianime',
                 seeAll: false,
-                hint: 'HiAnime punya donghua yang banyak: Soul Land (5 seri), Battle Through the Heavens (3), Douluo Dalu, Perfect World, Renegade Immortal (2), Throne of Seal, dan Shaonian Ge Xing (3, termasuk Anhe Zhuan). Bagian ini mencari tujuh judul itu dan hanya menampilkan kartu yang judulnya cocok — hasil produksi 24 Okt 2026: 17 judul. Subtitle HiAnime berbahasa Inggris.',
+                hint: 'HiAnime punya donghua yang banyak: Soul Land (5 seri), Battle Through the Heavens (3), Douluo Dalu, Perfect World, Renegade Immortal (2), Throne of Seal, dan Shaonian Ge Xing (4, termasuk Anhe Zhuan). Bagian ini mencari tujuh judul itu dan hanya menampilkan kartu yang judulnya cocok — hasil produksi 24 Okt 2026: 17 judul. Subtitle HiAnime berbahasa Inggris.',
             },
             // AnimeXin = situs donghua; seluruh katalognya memang donghua China.
             {
