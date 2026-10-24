@@ -102,6 +102,8 @@ test('player: iklan tidak bisa membuka tab baru dan pemutar tetap bisa pulih', (
     assert.match(playerJs, /bar\.id = 'playerFrameHint'/);
     assert.match(watchCss, /\.player-frame-hint\{/);
     assert.match(playerJs, /releaseFrameGuard\('manual'\)/);
+    // Batas waktu pemutar: server TIDAK dibuang, sandbox dilepas lalu URL sama dimuat ulang.
+    assert.match(playerJs, /if \(iframe\.dataset\.frameGuard === 'on'\) \{\s*\n\s*releaseFrameGuard\('timeout'\);\s*\n\s*return;/);
     // Bukti pengguna: iklan memindahkan pemutar → bilah pemulihan, bukan halaman JSON mati.
     assert.match(playerJs, /function mountAdRecovery\(/);
     assert.match(playerJs, /function noteFrameReload\(my\)/);
