@@ -156,7 +156,7 @@ Tab **Donghua** di `katalog.html` kini berisi lima bagian:
 
 Detail teknis:
 
-* `browseDonghua(titles)` di `server/sources/hianime.js` mencari 6 kueri pertama (maks 3 paralel,
+* `browseDonghua(titles)` di `server/sources/hianime.js` mencari ketujuh benih (maks 3 paralel,
   jeda 1 dtk/host dari `lib/fetcher.js`), lalu **hanya** memakai kartu yang judulnya cocok
   (`titleKey` setelah `stripSeason`). Benih: `Soul Land`, `Battle Through the Heavens`,
   `Perfect World`, `Douluo Dalu`, `Throne of Seal`, `Renegade Immortal`, `Shaonian Ge Xing`.

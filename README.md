@@ -423,9 +423,9 @@ tercakup.
 **🐉 Tab Donghua diperluas (24 Okt 2026).** Tab **Donghua** di Jelajah kini berisi lima bagian:
 feed Donghua Kazanime, **Donghua di HiAnime**, **Donghua di AnimeXin**, Donghua di AnimeKu, dan
 Donghua di Oploverz. HiAnime dilayani `browseDonghua()` baru (`server/sources/hianime.js`) yang
-mencari **6 kueri pertama** dari 7 benih (`Soul Land`, `Battle Through the Heavens`,
-`Perfect World`, `Douluo Dalu`, `Throne of Seal`, `Renegade Immortal`, `Shaonian Ge Xing`) dengan
-`mapLimit(…, 3)` — jadi tidak lebih dari 6 request per 10 menit (di-cache) — lalu **hanya** kartu
+mencari **ketujuh benih** (`Soul Land`, `Battle Through the Heavens`, `Perfect World`,
+`Douluo Dalu`, `Throne of Seal`, `Renegade Immortal`, `Shaonian Ge Xing`) dengan
+`mapLimit(…, 3)` — jadi tidak lebih dari 7 request per 10 menit (di-cache) — lalu **hanya** kartu
 yang judulnya cocok yang dipakai, tanpa judul karangan. AnimeXin memakai `latest()` apa adanya
 (situsnya memang khusus donghua; tanpa request tambahan). Detail: [`docs/DONGHUA.md`](docs/DONGHUA.md)
 §5. Bagian yang menunjuk sumber lain tidak mewarisi genre/tahun/musim tab, dan tautan
