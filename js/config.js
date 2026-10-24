@@ -71,6 +71,13 @@ export const STORAGE_KEYS = Object.freeze({
      * pengguna — `{ [serverId]: true }`. Pilihan diingat supaya tidak perlu diulang.
      */
     adBlockOff: 'kz:adblock-off',
+    /**
+     * Putaran 19 (24 Okt 2026): situs yang iklannya terbukti berulang, diingat antar-halaman
+     * — `{ [site]: kadaluarsa(detik) }`. Isinya hanya situs dari `adTakeover.persistSources`
+     * (AnimeKu) dan dibersihkan otomatis setelah `persistMs` atau saat pengguna menekan
+     * "Coba lagi"/berhasil memutar server itu.
+     */
+    adRepeatBlock: 'kz:adrepeat',
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */
@@ -475,6 +482,18 @@ export const PLAYER = Object.freeze({
          * tanpa sandbox supaya tidak menolak berjalan ("Sandboxed our player is not allowed").
          */
         subIndoSources: Object.freeze(['animeku', 'oploverz']),
+        /**
+         * Putaran 19 (24 Okt 2026) — permintaan pengguna: *"perkuat lagi untuk yang di animeku"*.
+         *
+         * Situs di sini memakai `strictPolicy` (sandbox lebih ketat) SELAIN kebijakan dasar di atas.
+         * `allow-forms` & `allow-downloads` dibuang: formulir tersembunyi (`<form target="_blank">`)
+         * dan unduhan otomatis adalah jalur yang dipakai lapisan iklan untuk membuka jendela/tab
+         * baru. Token yang dibutuhkan pemutar (scripts, same-origin, presentation, orientasi)
+         * tetap ada supaya video tidak berhenti berputar. Daftar pola iklan TIDAK diubah dan
+         * tetap satu untuk AnimeKu & Oploverz.
+         */
+        strictSources: Object.freeze(['animeku']),
+        strictPolicy: 'allow-scripts allow-same-origin allow-presentation allow-orientation-lock',
     }),
     /**
      * Server luar (bukan AnimeKu/Oploverz) — putaran 15.
@@ -521,6 +540,42 @@ export const PLAYER = Object.freeze({
         repeatWindowMs: 120000,
         /** Server ber-popup berulang tidak dipilih otomatis lagi (klik manual tetap boleh). */
         blockRepeatServer: true,
+        /**
+         * Putaran 19 (24 Okt 2026) — *"perkuat lagi untuk yang di animeku"*.
+         *
+         * AnimeKu mendapat batas lebih ketat: pembajakan/popup PERTAMA sudah cukup untuk
+         * melewati server itu (tanpa memberi kesempatan kedua pada popup yang sama).
+         */
+        strictSources: Object.freeze(['animeku']),
+        strictMaxTakeovers: 1,
+        /** Setelah pembajakan, lapisan anti-iklan dipasang lagi untuk situs ketat. */
+        strictRemountShield: true,
+        /** Situs yang ingatannya disimpan antar-halaman (permintaan pengguna: AnimeKu). */
+        persistSources: Object.freeze(['animeku']),
+        /** Lama ingatan antar-halaman (6 jam). */
+        persistMs: 21600000,
+        /** Putar situs bertanda selama ini tanpa pembajakan → tanda dilepas (tidak menghukum selamanya). */
+        healthyClearMs: 20000,
+    }),
+    /**
+     * Putaran 19 (24 Okt 2026): pengawas popup lewat kehilangan fokus.
+     *
+     * Popup iklan yang lolos sebagai jendela baru selalu mencuri fokus tab ini, lalu
+     * mengembalikannya saat ditutup. Pola `blur → focus` singkat pada saat pemutar memuat
+     * dihitung sebagai popup untuk situs di `sources` (AnimeKu). Tab yang benar-benar
+     * ditinggalkan (`document.visibilityState !== 'visible'`) TIDAK dihitung, dan tanda hanya
+     * dipasang setelah `maxEvents` kejadian dalam `windowMs`.
+     */
+    popupWatch: Object.freeze({
+        enabled: true,
+        sources: Object.freeze(['animeku']),
+        maxEvents: 2,
+        windowMs: 120000,
+        /** Hanya dihitung bila terjadi dalam rentang ini setelah pemutaran dimulai. */
+        startWindowMs: 45000,
+        /** Abaikan blur sekejap (klik UI peramban) dan blur yang terlalu lama (pindah aplikasi). */
+        minBlurMs: 350,
+        maxBlurMs: 60000,
     }),
     /** Label singkat situs untuk tombol server Sub Indo (dipakai js/watch.js). */
     siteLabels: Object.freeze({ animeku: 'AnimeKu', oploverz: 'Animeloverz' }),

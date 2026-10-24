@@ -700,6 +700,8 @@ function openExternalPlayer() {
         showToast('Server ini tidak punya tautan pemutar eksternal.', 'info');
         return;
     }
+    // Putaran 19: tab ini memang kita buka sendiri → jangan dihitung sebagai popup iklan.
+    player.noteOwnTabOpen();
     window.open(url, '_blank', 'noopener,noreferrer');
     showToast('Pemutar dibuka di tab baru. Tutup tab itu bila sudah selesai.', 'success');
 }
@@ -743,18 +745,26 @@ player.on('complete', ({ ep: done }) => {
 player.on('servers', ({ count }) => { els.nextServer.disabled = count === 0; });
 
 /* Putaran 11: iklan yang memindahkan pemutar & panduan DNS AdGuard. */
-player.on('adblock', ({ type, server, next, repeat }) => {
+player.on('adblock', ({ type, server, next, repeat, popup, name }) => {
     if (type === 'takeover') {
         // Putaran 18: popup yang sama muncul lagi setelah ditutup → "Pulihkan" memindahkan server.
         showToast('Iklan memindahkan pemutar. Klik "Pulihkan pemutar" di bawah player, atau pilih server lain.', 'info', 7000);
     } else if (type === 'skipped') {
-        showToast(repeat
-            ? `Iklan yang sama muncul lagi di ${server?.name || 'server ini'} — server itu tidak dicoba otomatis lagi. Coba server lain.`
-            : `Server ${server?.name || ''} dilewati karena iklan membajak pemutarnya. Coba server lain.`, 'info', 8000);
+        if (popup) {
+            // Putaran 19: popup yang mencuri fokus (jendela baru) — AnimeKu langsung dilewati.
+            showToast(`Popup iklan terbuka dari ${server?.name || 'server ini'} — server itu dilewati otomatis supaya popup yang sama tidak muncul lagi.`, 'info', 9000);
+        } else {
+            showToast(repeat
+                ? `Iklan yang sama muncul lagi di ${server?.name || 'server ini'} — server itu tidak dicoba otomatis lagi. Coba server lain.`
+                : `Server ${server?.name || ''} dilewati karena iklan membajak pemutarnya. Coba server lain.`, 'info', 8000);
+        }
     } else if (type === 'recover') {
         showToast(next
             ? `Iklan muncul lagi di ${server?.name || 'server ini'}. Beralih ke ${next.name} supaya popup yang sama tidak terulang.`
             : `Iklan muncul lagi di ${server?.name || 'server ini'}. Pilih server lain atau Pemutar Eksternal.`, 'info', 8000);
+    } else if (type === 'remembered') {
+        // Putaran 19: ingatan antar-halaman — tombolnya tetap ada dan tetap bisa diklik.
+        showToast(`${name || 'AnimeKu'} dilewati otomatis karena iklannya berulang di perangkat ini. Klik tombol ${name || 'AnimeKu'} bila ingin mencoba lagi.`, 'info', 9000);
     }
 });
 player.on('adguide', () => openAdGuide());
