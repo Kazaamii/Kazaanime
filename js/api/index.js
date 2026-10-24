@@ -31,7 +31,7 @@ import {
 import { loadSubIndoSources } from './subindo.js';
 
 export { ApiError, friendlyError, getAllHealth, getHealth, onHealthChange, pendingRequests };
-export { listStreamServers, getEpisodeExtras, withProviderServers, SUB_INDO_SOURCES } from './streams.js';
+export { listStreamServers, getEpisodeExtras, SUB_INDO_SOURCES } from './streams.js';
 export { getStreamServers, getAiSubtitlePart, getKusonimeDownloads, getEpisodeSubtitles } from './sources.js';
 /** Dipakai tombol "Coba lagi": izinkan semua sumber dicoba lagi sekarang juga. */
 export const retrySourcesNow = resetCircuits;

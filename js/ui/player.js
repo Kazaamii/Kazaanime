@@ -33,7 +33,7 @@
  *    bawaan. AniZone HLS: Safari/iOS dapat memakai URL direct; browser lain memakai hls.js lewat proxy.
  *    AnimeOnsen HLS/native video memakai proxy backend bertanda tangan. Soft subtitle = <track> WebVTT;
  *    Indonesia dipilih otomatis bila ada.
- *  - Server dengan `mirrors` (ReAnime HD-2/HD-1) mencoba mirror berikutnya sebelum pindah server.
+ *  - Server dengan `mirrors` (beberapa URL penyedia yang sama) mencoba mirror berikutnya sebelum pindah server.
  *  - Slot penyedia yang belum selesai dicari (`pending`) tampil "mencari…".
  *  - "Subtitle Indonesia (AI)": bila server HLS tidak punya subtitle Indonesia dan backend menawarkannya
  *    (`server.ai`), subtitle Inggris diterjemahkan Gemini saat video mulai diputar (ui/ai-subtitle.js).
@@ -62,7 +62,7 @@
  *    ada sandbox … untuk semua server selain dari anime ku dan oploverz ada tombol matikan fitur
  *    block nya khusus server luar seperti anilist dan kitsu"*.
  *  - Jadi sandbox dipasang **hanya** untuk server dari AnimeKu & Oploverz (Sub Indo). Server luar
- *    (AniList/Kitsu: MegaPlay, Vidnest, TryEmbed; juga ReAnime & AniZone) dimuat **tanpa sandbox**
+ *    (AniList/Kitsu: MegaPlay, Vidnest, TryEmbed; juga embed scraping lain) dimuat **tanpa sandbox**
  *    supaya embed yang menolak sandbox tetap bisa diputar.
  *  - Sebagai gantinya, server luar mendapat tombol **"Matikan blokir"** di baris kontrol player:
  *    mematikan lapisan anti-iklan untuk server itu saja (diingat di `kz:adblock-off`). Tombol ini
@@ -157,9 +157,9 @@ dropLegacyGuardFlag();
  * jadi host memory `kz:no-sandbox` dan tautan pelepas dibuang. Untuk server Sub Indo sandbox tetap
  * dipasang dan tetap tidak bisa dilepas.
  *
- * Putaran 15 (24 Okt 2026): fungsi ini TIDAK dipanggil untuk server luar (AniList/Kitsu, ReAnime,
- * AniZone) — mereka dimuat tanpa sandbox karena embed Sub Eng menolak sandbox. Penggantinya tombol
- * "Matikan blokir" per server (lihat `syncAdBlockToggle`).
+ * Putaran 15 (24 Okt 2026): fungsi ini TIDAK dipanggil untuk server luar (AniList/Kitsu: MegaPlay,
+ * Vidnest, TryEmbed) — mereka dimuat tanpa sandbox karena embed Sub Eng menolak sandbox. Penggantinya
+ * tombol "Matikan blokir" per server (lihat `syncAdBlockToggle`).
  * @param {HTMLIFrameElement} iframe
  */
 function applyFramePolicy(iframe) {
@@ -187,7 +187,7 @@ function isSubIndoServer(server) {
 
 /**
  * Server luar (bukan AnimeKu/Oploverz) yang tampil sebagai iframe — AniList/Kitsu (MegaPlay,
- * Vidnest, TryEmbed), ReAnime, dan embed scraping bahasa lain. Server HLS/native tidak dihitung
+ * Vidnest, TryEmbed) dan embed scraping bahasa lain. Server HLS/native tidak dihitung
  * karena tidak memakai iframe maupun sandbox.
  * @param {{source?: string, kind?: string}|null} server
  */
@@ -899,7 +899,7 @@ export function createPlayer({
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
         // Putaran 15: sandbox HANYA untuk server Sub Indo (AnimeKu/Oploverz) — server luar
-        // (AniList/Kitsu, ReAnime, AniZone) menolak sandbox, jadi dimuat tanpa sandbox dan
+        // (AniList/Kitsu: MegaPlay, Vidnest, TryEmbed) menolak sandbox, jadi dimuat tanpa sandbox dan
         // mendapat tombol "Matikan blokir" di baris kontrol.
         const guarded = isSubIndoServer(server) || PLAYER.externalGuard?.sandbox === true;
         if (guarded) applyFramePolicy(iframe);
@@ -1158,7 +1158,7 @@ export function createPlayer({
     function fail(server, reason) {
         const idx = mirror.get(server.id) || 0;
         if (server.mirrors && idx < server.mirrors.length - 1) {
-            // Mirror lain dari penyedia yang sama (mis. ReAnime HD-2 → HD-1) dicoba dulu.
+            // Mirror lain dari penyedia yang sama (HD-2 → HD-1) dicoba dulu.
             mirror.set(server.id, idx + 1);
             console.warn(`[player] ${server.name} mirror ${idx + 1} gagal (${reason}) — mencoba mirror ${idx + 2}`);
             play(server);
