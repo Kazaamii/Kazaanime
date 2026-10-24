@@ -84,7 +84,8 @@ function build() {
                 <h3 class="ad-guide-h3">3 · Yang sudah dilakukan Kazanime</h3>
                 <ul class="ad-guide-checklist">
                     <li><strong>URL iklan ditolak</strong> — host jaringan iklan &amp; tautan “klik iklan” tidak pernah dipasang di pemutar.</li>
-                    <li><strong>Penahan pop-up selalu aktif</strong> — pemutar dipasang dengan sandbox tanpa <code>allow-popups</code>, jadi klik iklan tidak bisa membuka tab baru atau membajak tab Kazanime (tombol/mode tidak perlu dinyalakan).</li>
+                    <li><strong>Penahan pop-up selalu aktif &amp; tidak bisa dimatikan</strong> — setiap pemutar dipasang sandbox tanpa <code>allow-popups</code>, jadi klik iklan tidak bisa membuka tab baru atau membajak tab Kazanime. Tidak ada tombol maupun tautan untuk melepas pengaman.</li>
+                    <li><strong>Server yang menolak pengaman diganti</strong> — embed yang tidak mau berjalan dengan penahan pop-up dianggap gagal dan server berikutnya dicoba (pengaman tetap aktif).</li>
                     <li><strong>Pemulihan otomatis</strong> — bila iklan memindahkan pemutar ke halaman lain, bilah “Pulihkan pemutar” muncul dan server itu dilewati; layar penuh + rotasi lanskap tersedia lewat tombol <strong>Layar Penuh</strong>.</li>
                     <li><strong>Cek daftar blokir</strong> — server yang host-nya ada di daftar blokir AdGuard DNS diberi tanda ⚠ dan ditaruh di urutan belakang.</li>
                 </ul>

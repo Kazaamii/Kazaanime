@@ -17,9 +17,11 @@ import path from 'node:path';
  *   3. **lapisan anti-iklan** menahan klik pertama di atas iframe (popunder tidak terjadi);
  *   4. tombol **Pemutar Eksternal** membuka embed di tab baru (noopener, noreferrer).
  *
- * Putaran 12: sandbox kembali DIPAKAI, tetapi otomatis (tanpa tombol/mode) dan dengan pelepas
- * per host (`kz:no-sandbox`) sehingga pemutaran tidak pernah dikorbankan. Tes di bawah menjaga
- * dua hal sekaligus: tidak ada mode/tombol sandbox, dan tidak ada sandbox paksa tanpa pelepas.
+ * Putaran 12: sandbox kembali DIPAKAI, otomatis (tanpa tombol/mode).
+ * Putaran 13 (24 Okt 2026): pengguna meminta tawaran pelepasnya dihapus — *"hapus tawaran buka
+ * tombol mode aman saat ada di layar stream itu membuat iklan keluar lagi"*. Jadi sandbox kini
+ * TIDAK PERNAH dilepas (tidak ada tautan/ingatan host); embed yang menolak sandbox diganti server
+ * berikutnya. Tes di bawah menjaga: tidak ada mode, tidak ada jalur pelepasan.
  *
  * Batas jujur: tanpa sandbox, tab baru dari klik SETELAH lapisan dilepas tidak bisa dicegah
  * browser-level dari halaman induk — karena itu pemutar eksternal disediakan.
@@ -47,11 +49,12 @@ test('player: penahan pop-up OTOMATIS (tanpa mode) & tetap tanpa sandbox paksa y
     assert.doesNotMatch(playerJs, /PLAYER\.sandbox/, 'tidak ada config sandbox lama');
     assert.doesNotMatch(playerJs, /isSafeFrameOn|saveSafeFrame|applySafeFrame|setSafeFrame|isSafeFrame\b/,
         'Mode Aman (putaran 11) sudah dihapus seluruhnya');
-    assert.match(playerJs, /function applyFramePolicy\(iframe, guard\)/);
+    assert.match(playerJs, /function applyFramePolicy\(iframe\)/);
     assert.match(playerJs, /iframe\.sandbox\.value = PLAYER\.frameGuard\.policy;/);
-    assert.match(playerJs, /const guarded = !hostRefusesSandbox\(urlOf\(server\)\);/);
-    assert.match(playerJs, /function releaseFrameGuard\(reason\)/);
-    assert.match(playerJs, /PLAYER\.frameGuard\.releaseAfterMs/, 'sandbox dilepas bila embed tidak memuat apa pun');
+    assert.match(playerJs, /function applyFramePolicy\(iframe\) \{/);
+    // Putaran 13: tidak ada jalur yang melepas sandbox (tanpa tautan, tanpa ingatan host).
+    assert.doesNotMatch(playerJs, /releaseFrameGuard|mountFrameHint|hostRefusesSandbox|rememberNoSandboxHost/);
+    assert.doesNotMatch(playerJs, /removeAttribute\('sandbox'\)/);
     // Kebijakan sandbox: pop-up & navigasi tab atas DILARANG.
     const policy = configJs.match(/frameGuard: Object\.freeze\(\{[\s\S]{0,600}?policy: '([^']+)'/)?.[1] || '';
     assert.ok(policy.includes('allow-scripts') && policy.includes('allow-same-origin'), 'pemutar tetap bisa berjalan');

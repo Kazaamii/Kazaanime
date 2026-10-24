@@ -42,6 +42,9 @@ const root = process.cwd();
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const playerJs = read('js/ui/player.js');
+/** Kode tanpa komentar — supaya catatan sejarah ("…dihapus") tidak dianggap fitur. */
+const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+const playerCode = stripComments(playerJs);
 const watchJs = read('js/watch.js');
 const watchHtml = read('watch.html');
 const watchCss = read('css/watch.css');
@@ -383,42 +386,44 @@ test('config: penahan pop-up selalu aktif (tanpa mode) & kebijakan tanpa pop-up'
     // Putaran 12: tombol/mode "Mode Aman" dihapus; penahan pop-up kini otomatis.
     assert.doesNotMatch(configJs, /safeFrame: Object\.freeze\(\{/, 'config Mode Aman sudah tidak ada');
     assert.match(configJs, /frameGuard: Object\.freeze\(\{/);
-    assert.match(configJs, /releaseAfterMs:\s*\d+/);
-    assert.match(configJs, /hintAfterMs:\s*\d+/);
+    // Putaran 13: tidak ada lagi pelepasan otomatis/manual.
+    assert.doesNotMatch(configJs, /releaseAfterMs|hintAfterMs/, 'tanpa tawaran pelepas sandbox');
     const policy = configJs.match(/frameGuard: Object\.freeze\(\{[\s\S]{0,800}?policy: '([^']+)'/)?.[1] || '';
     assert.ok(policy.includes('allow-scripts') && policy.includes('allow-same-origin'));
     assert.ok(!policy.includes('allow-popups'), 'iklan tidak boleh membuka tab baru');
     assert.ok(!policy.includes('allow-top-navigation'), 'iklan tidak boleh membajak tab Kazanime');
-    assert.match(configJs, /noSandboxHosts: 'kz:no-sandbox'/);
+    assert.match(configJs, /legacyNoSandbox: 'kz:no-sandbox'/, 'sisa daftar lama hanya untuk dibersihkan');
     assert.match(configJs, /adCheckCache: 'kz:adcheck'/);
     // Layar penuh standar player (putaran 12).
     assert.match(configJs, /fullscreen: Object\.freeze\(\{/);
     assert.match(configJs, /orientation: 'landscape'/);
 });
 
-test('player: penahan pop-up dipasang otomatis + pelepas per host (bukan tombol)', () => {
-    assert.match(playerJs, /const guarded = !hostRefusesSandbox\(urlOf\(server\)\);/);
-    assert.match(playerJs, /iframe\.dataset\.frameGuard = guarded \? 'on' : 'off';/);
-    assert.match(playerJs, /function releaseFrameGuard\(reason\)/);
-    assert.match(playerJs, /rememberNoSandboxHost\(hostOf\(urlOf\(active\)\)\)/);
-    assert.match(playerJs, /sessionStorage\.getItem\(STORAGE_KEYS\.noSandboxHosts\)/);
-    // Jalan keluar manual di bawah player (bukan mode yang harus dinyalakan).
-    assert.match(playerJs, /function mountFrameHint\(my\)/);
-    assert.match(playerJs, /Muat ulang tanpa pengaman/);
-    assert.doesNotMatch(playerJs, /btnSafeMode|isSafeFrameOn|saveSafeFrame/);
+test('player: penahan pop-up dipasang otomatis TANPA tawaran pelepas (putaran 13)', () => {
+    // Pengguna: "hapus tawaran buka tombol mode aman saat ada di layar stream itu membuat iklan
+    // keluar lagi" → sandbox selalu aktif, tidak ada jalur pelepasan sama sekali.
+    assert.match(playerJs, /iframe\.dataset\.frameGuard = 'on';/);
+    assert.match(playerJs, /function applyFramePolicy\(iframe\) \{/);
+    assert.match(playerJs, /iframe\.sandbox\.value = PLAYER\.frameGuard\.policy;/);
+    // Tidak ada tombol/mode, tidak ada tautan pelepas, tidak ada ingatan host tanpa sandbox.
+    assert.doesNotMatch(playerCode, /btnSafeMode|isSafeFrameOn|saveSafeFrame/);
+    assert.doesNotMatch(playerCode, /releaseFrameGuard|mountFrameHint|Muat ulang tanpa pengaman|playerFrameHint/);
+    assert.doesNotMatch(playerCode, /hostRefusesSandbox|rememberNoSandboxHost|noSandboxHosts/);
+    assert.doesNotMatch(playerCode, /guardTimer|hintTimer|frameHint/);
+    assert.doesNotMatch(playerCode, /removeAttribute\('sandbox'\)/, 'sandbox tidak pernah dilepas');
+    assert.doesNotMatch(watchCss, /player-frame-hint/, 'gaya tautan pelepas dihapus');
+    assert.doesNotMatch(watchHtml, /playerFrameHint/);
 });
 
-test('player: sandbox tetap aktif saat timeout; pelepasan hanya manual', () => {
-    const releaseBlock = playerJs.slice(playerJs.indexOf('function releaseFrameGuard'), playerJs.indexOf('function releaseFrameGuard') + 1200);
-    assert.match(releaseBlock, /applyFramePolicy\(frame, false\)/);
-    assert.match(releaseBlock, /play\(active\)/, 'pelepasan manual memuat ulang server yang sama');
-    assert.match(releaseBlock, /reason === 'manual'/);
-    const timeoutBlock = playerJs.slice(playerJs.indexOf('// Jangan melepas sandbox otomatis'), playerJs.indexOf('// Jangan melepas sandbox otomatis') + 500);
+test('player: embed yang menolak sandbox diganti server lain (pengaman tetap aktif)', () => {
+    const timeoutBlock = playerJs.slice(playerJs.indexOf('Putaran 13: sandbox tidak pernah dilepas'), playerJs.indexOf('Putaran 13: sandbox tidak pernah dilepas') + 500);
+    assert.ok(timeoutBlock, 'catatan perilaku timeout ada');
     assert.match(timeoutBlock, /fail\(server, 'timeout'\)/, 'timeout mencoba server berikutnya dengan sandbox tetap aktif');
-    assert.doesNotMatch(timeoutBlock, /releaseFrameGuard\('timeout'\)/);
-    const guardTimerBlock = playerJs.slice(playerJs.indexOf('guardTimer = setTimeout'));
-    assert.match(guardTimerBlock.slice(0, 250), /Tidak ada pelepasan otomatis/);
-    assert.doesNotMatch(guardTimerBlock.slice(0, 250), /releaseFrameGuard\('timeout'\)/);
+    assert.doesNotMatch(playerJs, /guardTimer|hintTimer|frameHint/);
+    // Sisa kunci lama dibersihkan supaya host yang dulu pernah dilepas tidak bebas iklan lagi.
+    const drop = playerJs.slice(playerJs.indexOf('function dropLegacyGuardFlag'), playerJs.indexOf('function dropLegacyGuardFlag') + 900);
+    assert.match(drop, /STORAGE_KEYS\.legacyNoSandbox/);
+    assert.match(drop, /removeItem/);
 });
 
 test('player: deteksi iklan yang memindahkan pemutar + bilah pemulihan', () => {
@@ -469,16 +474,17 @@ test('watch: tombol layar penuh, panduan iklan, dan penyaringan server', () => {
 
     assert.match(watchJs, /import \{ createPlayer \} from '\.\/ui\/player\.js';/);
     assert.match(watchJs, /import \{ openAdGuide \} from '\.\/ui\/ad-guide\.js';/);
-    assert.match(watchJs, /import \{ filterAdServers, checkHosts \} from '\.\/services\/adblock\.js';/);
+    assert.match(watchJs, /import \{ filterAdServers, checkHosts, adHostMatch, demoteAdRisk \} from '\.\/services\/adblock\.js';/);
     assert.match(watchJs, /player\.toggleFullscreen\(\)\.then/);
     assert.match(watchJs, /player\.on\('fullscreen'/);
     assert.doesNotMatch(watchJs, /safeFrame|setSafeFrame|btnSafeMode|syncSafeModeButton/);
     assert.match(watchJs, /player\.on\('adblock'/);
     assert.match(watchJs, /player\.on\('adguide', \(\) => openAdGuide\(\)\)/);
     assert.match(watchJs, /els\.adGuideBtn\?\.addEventListener\('click', \(\) => openAdGuide\(\)\)/);
-    // Server bertanda hanya diberi peringatan; tidak diblokir otomatis.
+    // Server bertanda hanya diberi peringatan + ditaruh paling belakang; tidak diblokir otomatis.
     assert.match(watchJs, /adRisk: true/);
     assert.doesNotMatch(watchJs, /filter\(\(server\) => !adRiskHosts/);
+    assert.match(watchJs, /demoteAdRisk\(flagged, \(server\) => Boolean\(server\.adRisk\)\)/, 'host berisiko ditaruh di belakang');
 });
 
 test('css: bilah pemulihan, tanda server berisiko, layar penuh', () => {
@@ -493,7 +499,6 @@ test('css: bilah pemulihan, tanda server berisiko, layar penuh', () => {
     // Layar penuh: wadah player mengisi layar & tombol keluar tersedia.
     assert.match(watchCss, /\.streaming-player-wrapper:fullscreen/);
     assert.match(watchCss, /\.player-fs-exit\{/);
-    assert.match(watchCss, /\.player-frame-hint\{/);
 });
 
 /* ------------------------------------------------------------------ */

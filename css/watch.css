@@ -95,14 +95,6 @@
 html.player-fullscreen,html.player-fullscreen body{overflow:hidden;background:#000}
 html.player-fullscreen .navbar,html.player-fullscreen .footer,html.player-fullscreen .streaming-sidebar{display:none}
 
-/* Di layar penuh, tautan pelepas sandbox ikut terlihat di atas video. */
-.streaming-player-wrapper:fullscreen .player-frame-hint,
-.streaming-player-wrapper:-webkit-full-screen .player-frame-hint{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:10000;margin:0;background:rgba(10,12,20,.86)}
-
-/* Tautan pelepas sandbox (hanya muncul bila pengaman aktif & video diduga tidak tampil). */
-.player-frame-hint{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 0;padding:6px 10px;border-radius:9px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);font-size:11.5px;color:var(--text-secondary)}
-.player-frame-hint-btn{padding:4px 10px;border-radius:7px;border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.14);color:#fbbf24;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
-.player-frame-hint-btn:hover{background:rgba(245,158,11,.24);color:#fde68a}
 .streaming-player-wrapper .player-frame{background:#000}
 /* 22 Okt 2026: player video bawaan untuk server HLS (AniZone Multi Sub) */
 .player-video{display:block;width:100%;height:100%;object-fit:contain;background:#000;border:0}

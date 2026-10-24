@@ -53,10 +53,11 @@ export const STORAGE_KEYS = Object.freeze({
      *  kuncinya hanya dipakai untuk membersihkan pilihan lama di perangkat pengguna. */
     popupGuard: 'kz:popup-guard',
     /**
-     * Host pemutar yang terbukti menolak sandbox ("Sandboxed our player is not allowed").
-     * Disimpan per sesi agar episode berikutnya langsung dimuat tanpa sandbox.
+     * Sisa daftar host "tanpa sandbox" dari putaran 12 (fiturnya dihapus di putaran 13).
+     * Kunci ini hanya dibaca sekali saat halaman dibuka untuk dibersihkan — kalau tidak,
+     * host yang dulu pernah dilepas tetap dimuat tanpa penahan pop-up (iklan bisa muncul lagi).
      */
-    noSandboxHosts: 'kz:no-sandbox',
+    legacyNoSandbox: 'kz:no-sandbox',
     /** Kunci "Mode Aman" putaran 11 — fiturnya dihapus (putaran 12); hanya dibersihkan saat start. */
     legacySafeFrame: 'kz:safe-frame',
     /** Cache hasil pemeriksaan host iklan (AdGuard DNS via backend) — 24 jam. */
@@ -448,20 +449,18 @@ export const PLAYER = Object.freeze({
      */
     adShield: true,
     /**
-     * Penahan pop-up SELALU AKTIF (putaran 12, 24 Okt 2026).
+     * Penahan pop-up SELALU AKTIF dan TIDAK BISA DIMATIKAN (putaran 12–13, 24 Okt 2026).
      *
      * Permintaan pengguna: *"hapus saja mode aman dan block iklan nya dengan cara melarang new
-     * tab"*. Jadi tidak ada lagi tombol/mode: setiap iframe embed dipasang dengan sandbox yang
-     * TIDAK memuat `allow-popups` maupun `allow-top-navigation*` → `window.open()` dari iklan
-     * gagal (tidak ada tab baru sama sekali) dan tab Kazanime tidak bisa dialihkan.
+     * tab"*, lalu putaran 13: *"hapus tawaran buka tombol mode aman … itu membuat iklan keluar
+     * lagi"*. Jadi tidak ada tombol/mode **dan tidak ada tautan pelepas**: setiap iframe embed
+     * dipasang dengan sandbox yang TIDAK memuat `allow-popups` maupun `allow-top-navigation*`
+     * → `window.open()` dari iklan gagal (tidak ada tab baru sama sekali) dan tab Kazanime tidak
+     * bisa dialihkan.
      *
-     * Playback tetap prioritas:
-     *  - host yang sudah terbukti menolak sandbox (`noSandboxHosts`, ingat per sesi) dimuat tanpa
-     *    sandbox sejak awal;
-     *  - bila iframe tidak memuat apa pun dalam `releaseAfterMs`, sandbox dilepas & URL yang sama
-     *    dimuat ulang otomatis (host diingat);
-     *  - tautan kecil `hintAfterMs` (\`#playerFrameHint\`) memberi jalan keluar manual tanpa
-     *    mengorbankan pemutaran: "video tidak muncul? muat ulang tanpa pengaman".
+     * Embed yang menolak sandbox ("Sandboxed our player is not allowed") tidak mengirim `load`
+     * dalam `PLAYER.loadTimeout` → server itu dianggap gagal dan server berikutnya dicoba dengan
+     * sandbox tetap aktif. Tidak ada jalur kode yang menghapus atribut sandbox.
      */
     frameGuard: Object.freeze({
         /**
@@ -470,12 +469,6 @@ export const PLAYER = Object.freeze({
          * pemutar yang butuh storage/worker tetap jalan.
          */
         policy: 'allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-downloads',
-        /** Batas menunggu `load` sebelum sandbox dilepas (ms). */
-        releaseAfterMs: 12000,
-        /** Setelah sekian ms pemutaran berjalan, tampilkan tautan pelepas manual. */
-        hintAfterMs: 6000,
-        /** Maksimal host yang diingat sebagai "menolak sandbox" (per sesi). */
-        memoryLimit: 20,
     }),
     /**
      * Layar penuh buatan sendiri (putaran 12): `requestFullscreen` pada wadah player + kunci

@@ -45,10 +45,13 @@
  * Putaran 12 (24 Okt 2026) — iklan, tab baru, dan layar penuh:
  *  - **Penahan pop-up selalu aktif** (bukan mode/tombol): iframe embed dipasang dengan sandbox
  *    tanpa `allow-popups`/`allow-top-navigation*` → `window.open()` iklan gagal total (tidak ada
- *    tab baru) dan tab Kazanime tidak bisa dibajak. Bila embed menolak sandbox, host diingat
- *    (`kz:no-sandbox`, per sesi) lalu dimuat tanpa sandbox; bila iframe tidak memuat apa pun
- *    dalam `PLAYER.loadTimeout`, server dianggap gagal dan sistem mencoba server berikutnya
- *    dengan sandbox tetap aktif. Pelepas sandbox hanya tersedia melalui tindakan manual pengguna.
+ *    tab baru) dan tab Kazanime tidak bisa dibajak.
+ *  - **Tidak ada tawaran melepas pengaman** (putaran 13, 24 Okt 2026): tautan
+ *    "Muat ulang tanpa pengaman" dihapus karena sekali diklik iklan langsung bisa membuka tab
+ *    lagi (dan host itu diingat tanpa sandbox sampai tab ditutup). Sekarang sandbox TIDAK PERNAH
+ *    dilepas: bila sebuah embed menolak berjalan di dalam sandbox, iframe tidak mengirim `load`
+ *    dalam `PLAYER.loadTimeout` → server itu dianggap gagal dan server berikutnya dicoba dengan
+ *    perlindungan tetap aktif. Tidak ada jalur kode yang menghapus atribut sandbox.
  *  - **Layar penuh standar player**: `requestFullscreen` pada wadah player + kunci orientasi
  *    lanskap (Android), fallback fullscreen `<video>` (iOS). Tombol keluar + kontrol tetap
  *    tersedia; `Esc`/gestur peramban tetap bekerja.
@@ -122,6 +125,14 @@ function dropLegacyGuardFlag() {
     } catch {
         // sama: tidak ada yang rusak bila gagal
     }
+    try {
+        // Putaran 13: daftar host "tanpa sandbox" dari versi sebelumnya dibuang. Kalau tidak,
+        // host yang dulu pernah dilepas tetap dimuat tanpa penahan pop-up → iklan kembali muncul.
+        window.localStorage?.removeItem(STORAGE_KEYS.legacyNoSandbox);
+        window.sessionStorage?.removeItem(STORAGE_KEYS.legacyNoSandbox);
+    } catch {
+        // sama: tidak ada yang rusak bila gagal
+    }
 }
 dropLegacyGuardFlag();
 
@@ -129,55 +140,14 @@ dropLegacyGuardFlag();
 /* Penahan pop-up (selalu aktif) & layar penuh                         */
 /* ------------------------------------------------------------------ */
 /**
- * Host pemutar yang terbukti menolak sandbox ("Sandboxed our player is not allowed").
- * Disimpan per sesi: episode berikutnya memuat host itu langsung tanpa sandbox.
- * @returns {string[]}
- */
-function readNoSandboxHosts() {
-    try {
-        const raw = sessionStorage.getItem(STORAGE_KEYS.noSandboxHosts);
-        const list = raw ? JSON.parse(raw) : [];
-        return Array.isArray(list) ? list.filter((h) => typeof h === 'string' && h) : [];
-    } catch {
-        return [];
-    }
-}
-
-/** @param {string} host */
-function rememberNoSandboxHost(host) {
-    const name = String(host || '').toLowerCase();
-    if (!name) return;
-    const limit = PLAYER.frameGuard?.memoryLimit || 20;
-    const list = [name, ...readNoSandboxHosts().filter((h) => h !== name)].slice(0, limit);
-    try {
-        sessionStorage.setItem(STORAGE_KEYS.noSandboxHosts, JSON.stringify(list));
-    } catch {
-        // mode privat / kuota penuh: sandbox tetap dipakai, tidak ada yang rusak
-    }
-}
-
-/** @param {string} url */
-function hostOf(url) {
-    try {
-        return new URL(String(url || '')).hostname.toLowerCase();
-    } catch {
-        return '';
-    }
-}
-
-/** Host ini pernah menolak sandbox pada sesi ini? */
-const hostRefusesSandbox = (url) => readNoSandboxHosts().includes(hostOf(url));
-
-/**
- * Terapkan kebijakan iframe: sandbox penahan pop-up, atau tanpa sandbox untuk host yang menolak.
+ * Terapkan kebijakan iframe. SELALU dipasang — tidak ada jalur yang menghapus atribut sandbox.
+ *
+ * Putaran 13 (24 Okt 2026): pengguna meminta tawaran pelepas dihapus ("hapus tawaran buka tombol
+ * mode aman … itu membuat iklan keluar lagi"). Karena itu host memory `kz:no-sandbox` dan
+ * tautan "Muat ulang tanpa pengaman" dihapus; embed yang menolak sandbox diganti server lain.
  * @param {HTMLIFrameElement} iframe
- * @param {boolean} guard
  */
-function applyFramePolicy(iframe, guard) {
-    if (!guard) {
-        iframe.removeAttribute('sandbox');
-        return;
-    }
+function applyFramePolicy(iframe) {
     // `iframe.sandbox` adalah DOMTokenList (PutForwards=value) → setara atribut sandbox.
     iframe.sandbox.value = PLAYER.frameGuard.policy;
 }
@@ -365,12 +335,6 @@ export function createPlayer({
     let frameLoads = 0;
     /** Waktu load terakhir (ms) — menahan event `load` ganda dari peramban. */
     let lastFrameLoadAt = 0;
-    /** Tautan pelepas sandbox di bawah status (hanya bila guard aktif). */
-    let frameHint = null;
-    /** Timer tautan pelepas sandbox. */
-    let hintTimer = 0;
-    /** Timer pelepasan sandbox otomatis (embed tidak memuat apa pun). */
-    let guardTimer = 0;
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -496,8 +460,6 @@ export function createPlayer({
         clearTimeout(overlayTimer);
         timer = 0;
         overlayTimer = 0;
-        clearTimeout(guardTimer);
-        guardTimer = 0;
         markLoaded = null;
         if (frame) {
             frame.remove(); // melepas iframe = video/audio benar-benar berhenti
@@ -520,7 +482,6 @@ export function createPlayer({
         }
         removeAdShield();
         removeAdRecovery();
-        removeFrameHint();
         frameLoads = 0;
         lastFrameLoadAt = 0;
     }
@@ -554,60 +515,6 @@ export function createPlayer({
         if (!adShield) return;
         adShield.remove();
         adShield = null;
-    }
-
-    /**
-     * Tautan pelepas sandbox di bawah status player. Tidak menutupi video dan tidak memaksa
-     * apa pun: hanya jalan keluar bila embed menolak sandbox tetapi tetap mengirim `load`
-     * (halaman "Sandboxed our player is not allowed").
-     * @param {number} my token pemutaran
-     */
-    function mountFrameHint(my) {
-        removeFrameHint();
-        if (my !== token || !frame || frame.dataset.frameGuard !== 'on') return;
-        const bar = document.createElement('div');
-        bar.className = 'player-frame-hint';
-        bar.id = 'playerFrameHint';
-        bar.innerHTML = String(html`
-            <span>Video tidak muncul?</span>
-            <button type="button" class="player-frame-hint-btn" data-frame-action="release">Muat ulang tanpa pengaman</button>`);
-        bar.addEventListener('click', (event) => {
-            const btn = event.target instanceof Element ? event.target.closest('[data-frame-action]') : null;
-            if (!btn || my !== token) return;
-            releaseFrameGuard('manual');
-        });
-        stage.insertAdjacentElement('afterend', bar);
-        frameHint = bar;
-    }
-
-    function removeFrameHint() {
-        clearTimeout(hintTimer);
-        hintTimer = 0;
-        if (!frameHint) return;
-        frameHint.remove();
-        frameHint = null;
-    }
-
-    /**
-     * Lepas sandbox untuk host server aktif lalu muat ulang server yang sama.
-     * Dipakai otomatis (tidak ada `load` dalam batas waktu) dan manual (tautan di bawah player).
-     * @param {'timeout'|'manual'} reason
-     */
-    function releaseFrameGuard(reason) {
-        const active = current();
-        if (!active || !frame || frame.dataset.frameGuard !== 'on') return;
-        rememberNoSandboxHost(hostOf(urlOf(active)));
-        removeFrameHint();
-        applyFramePolicy(frame, false);
-        frame.dataset.frameGuard = 'off';
-        showToast(
-            reason === 'timeout'
-                ? 'Pengaman pop-up dilepas untuk server ini: video tidak termuat dengan pengaman. Dimuat ulang tanpa sandbox.'
-                : 'Pengaman pop-up dilepas untuk server ini. Tab baru bisa terbuka lagi — gunakan Pemutar Eksternal bila mengganggu.',
-            'info',
-            8000,
-        );
-        play(active);
     }
 
     /**
@@ -854,28 +761,22 @@ export function createPlayer({
         iframe.allow = PLAYER.allow;
         iframe.allowFullscreen = true;
         iframe.referrerPolicy = PLAYER.referrerPolicy;
-        // Penahan pop-up SELALU AKTIF (putaran 12): sandbox tanpa allow-popups/allow-top-navigation.
-        // Host yang sudah terbukti menolak sandbox (sesi ini) langsung dimuat tanpa sandbox.
-        const guarded = !hostRefusesSandbox(urlOf(server));
-        iframe.dataset.frameGuard = guarded ? 'on' : 'off';
-        applyFramePolicy(iframe, guarded);
+        // Penahan pop-up SELALU AKTIF (putaran 12) dan TIDAK BISA dilepas (putaran 13):
+        // sandbox tanpa allow-popups/allow-top-navigation, selalu dipasang pada setiap iframe.
+        iframe.dataset.frameGuard = 'on';
+        applyFramePolicy(iframe);
         frameLoads = 0;
         lastFrameLoadAt = 0;
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
             clearTimeout(timer);
             clearTimeout(overlayTimer);
-            clearTimeout(guardTimer);
             state = 'playing';
             overlay.remove();
             setStatus(`${server.name} | Episode ${ep}${langSuffix(server)}`, 'ok');
             renderServers();
             mountAdShield(my);
             emit('loaded', { ep, server });
-            // Pengaman aktif tapi halaman "tidak diizinkan" tetap mengirim `load` → beri jalan keluar.
-            if (iframe.dataset.frameGuard === 'on') {
-                hintTimer = setTimeout(() => mountFrameHint(my), PLAYER.frameGuard.hintAfterMs);
-            }
         };
         markLoaded = loaded;
         let firstLoad = true;
@@ -903,12 +804,11 @@ export function createPlayer({
                 loaded();
                 return;
             }
-            // Jangan melepas sandbox otomatis: timeout bukan bukti bahwa embed menolaknya.
-            // Coba server lain dengan perlindungan tetap aktif; pengguna dapat memilih pelepas
-            // manual bila halaman secara eksplisit menampilkan "Sandbox not allowed".
+            // Putaran 13: sandbox tidak pernah dilepas. Embed yang menolak berjalan di dalam
+            // sandbox tidak mengirim `load`; server ini dianggap gagal dan server berikutnya
+            // dicoba dengan perlindungan tetap aktif (tanpa tawaran mematikan pengaman).
             fail(server, 'timeout');
         }, PLAYER.loadTimeout);
-        // Tidak ada pelepasan otomatis. Pelepas sandbox hanya dipicu tindakan manual pengguna.
     }
 
     /**
