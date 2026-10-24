@@ -228,6 +228,19 @@ export const SOURCES = Object.freeze({
         // Exact media CDN hostnames are not hard-coded; the operator must confirm and allowlist them.
         mediaHosts: Object.freeze(animeOnsenMediaHosts),
     }),
+    // Anime X Nonton (API JSON aplikasi Miku Moe 3.6). Sumber anime yang dipakai APK tersebut,
+    // dan satu-satunya dari tiga sumbernya yang mungkin dipakai: Animeku (apps.animekita.org)
+    // dan Pencarinafkah sudah mati (403 / body 0 byte). Default `off` → adapter tidak
+    // mendaftar, situs berjalan persis seperti sebelumnya.
+    //   mode 'capture' = baca snapshot hasil tangkapan perangkat sendiri (ANX_CAPTURE_FILE)
+    //   mode 'live'    = panggil API langsung; ditolak sampai ANX_CANONICAL_TEMPLATE diisi
+    // Lihat server/lib/anx-signer.js untuk status protokol AnxGuard.
+    animexnonton: Object.freeze({
+        baseUrl: (env.ANX_BASE_URL || 'https://api.wincamp.web.id/animexnonton').replace(/\/+$/, ''),
+        mode: (env.ANX_MODE || 'off').toLowerCase(),
+        captureFile: env.ANX_CAPTURE_FILE || '',
+        canonicalTemplate: env.ANX_CANONICAL_TEMPLATE || '',
+    }),
     // Kusonime hanya dipanggil dari panel download; setiap halaman wajib lolos robots gate.
     kusonimeDownloads: Object.freeze({
         enabled: bool('KUSONIME_DOWNLOADS_ENABLED', true),

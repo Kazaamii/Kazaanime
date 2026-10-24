@@ -34,6 +34,7 @@ import { titleKey } from '../lib/text.js';
 import { createAnimeku } from './animeku.js';
 import { createAnimeIndo } from './animeindo.js';
 import { createAnoboy } from './anoboy.js';
+import { createAnimeXnonton } from './animexnonton.js';
 import { createAnimeOnsen } from './animeonsen.js';
 import { createAnimexin } from './animexin.js';
 import { createHianime } from './hianime.js';
@@ -72,6 +73,8 @@ async function forEachLimit(items, limit, run) {
 export const FACTORIES = Object.freeze({
     animexin: createAnimexin,
     animeindo: createAnimeIndo,
+    // Mode `off` (default) membuat factory ini mengembalikan null → tidak terdaftar.
+    animexnonton: createAnimeXnonton,
     animeku: createAnimeku,
     oploverz: createOploverz,
     samehadaku: createSamehadaku,
