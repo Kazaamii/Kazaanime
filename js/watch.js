@@ -743,11 +743,18 @@ player.on('complete', ({ ep: done }) => {
 player.on('servers', ({ count }) => { els.nextServer.disabled = count === 0; });
 
 /* Putaran 11: iklan yang memindahkan pemutar & panduan DNS AdGuard. */
-player.on('adblock', ({ type, server }) => {
+player.on('adblock', ({ type, server, next, repeat }) => {
     if (type === 'takeover') {
+        // Putaran 18: popup yang sama muncul lagi setelah ditutup → "Pulihkan" memindahkan server.
         showToast('Iklan memindahkan pemutar. Klik "Pulihkan pemutar" di bawah player, atau pilih server lain.', 'info', 7000);
     } else if (type === 'skipped') {
-        showToast(`Server ${server?.name || ''} dilewati karena iklan membajak pemutarnya. Coba server lain.`, 'info', 7000);
+        showToast(repeat
+            ? `Iklan yang sama muncul lagi di ${server?.name || 'server ini'} — server itu tidak dicoba otomatis lagi. Coba server lain.`
+            : `Server ${server?.name || ''} dilewati karena iklan membajak pemutarnya. Coba server lain.`, 'info', 8000);
+    } else if (type === 'recover') {
+        showToast(next
+            ? `Iklan muncul lagi di ${server?.name || 'server ini'}. Beralih ke ${next.name} supaya popup yang sama tidak terulang.`
+            : `Iklan muncul lagi di ${server?.name || 'server ini'}. Pilih server lain atau Pemutar Eksternal.`, 'info', 8000);
     }
 });
 player.on('adguide', () => openAdGuide());

@@ -507,7 +507,21 @@ export const PLAYER = Object.freeze({
      * sekali (pola redirect iklan), pemutar menampilkan bilah pemulihan, bukan layar penuh.
      * `maxTakeovers` = jumlah pembajakan sebelum server itu dianggap rusak dan server lain dicoba.
      */
-    adTakeover: Object.freeze({ maxTakeovers: 2, ignoreWithinMs: 1200 }),
+    adTakeover: Object.freeze({
+        maxTakeovers: 2,
+        ignoreWithinMs: 1200,
+        /**
+         * Putaran 18 (24 Okt 2026) — permintaan pengguna: *"iklan cukup pola yang sama … sedikit
+         * perkuat agar popup yg sama tidak muncul"* (popup muncul lagi setelah ditutup).
+         *
+         * Dua pembajakan pada server yang sama dalam jendela ini dianggap "popup yang sama".
+         * Setelah itu server ditandai dan tidak dipilih otomatis lagi selama sesi (tetap bisa
+         * dipilih manual dari daftar tombol). Pola host/URL iklan TIDAK diubah.
+         */
+        repeatWindowMs: 120000,
+        /** Server ber-popup berulang tidak dipilih otomatis lagi (klik manual tetap boleh). */
+        blockRepeatServer: true,
+    }),
     /** Label singkat situs untuk tombol server Sub Indo (dipakai js/watch.js). */
     siteLabels: Object.freeze({ animeku: 'AnimeKu', oploverz: 'Animeloverz' }),
     /** Jumlah kartu rekomendasi. */

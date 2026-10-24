@@ -419,10 +419,17 @@ export function createPlayer({
     let adShield = null;
     /** @type {HTMLElement|null} bilah pemulihan saat iklan memindahkan pemutar (putaran 11) */
     let adRecovery = null;
-    /** Jumlah navigasi ulang iframe untuk server aktif (indikasi iklan membajak). */
-    let frameLoads = 0;
     /** Waktu load terakhir (ms) — menahan event `load` ganda dari peramban. */
     let lastFrameLoadAt = 0;
+    /**
+     * Putaran 18: server yang iklannya terbukti muncul BERULANG (popup yang sama kembali setelah
+     * ditutup). Server tetap tampil di daftar dan bisa dipilih manual, tetapi tidak dipilih
+     * otomatis lagi selama sesi ini — supaya popup yang sama tidak muncul lagi.
+     * @type {Set<string>}
+     */
+    const adBlocked = new Set();
+    /** id server → waktu (ms) pembajakan iklan; dipakai mengenali "popup yang sama". */
+    const adTakeovers = new Map();
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -448,6 +455,33 @@ export function createPlayer({
     const available = () => servers.filter((s) => s.available);
     const byId = (id) => servers.find((s) => s.id === id) || null;
     const current = () => byId(currentId);
+
+    /* ---------------- ingatan popup iklan (putaran 18) ---------------- */
+    /** Jendela waktu untuk menganggap dua pembajakan sebagai "popup yang sama". */
+    const adRepeatWindow = () => PLAYER.adTakeover?.repeatWindowMs || 120000;
+
+    /** Catat pembajakan untuk satu server; hasilnya = jumlah pembajakan dalam jendela waktu. */
+    function noteAdTakeover(serverId) {
+        const now = Date.now();
+        const list = (adTakeovers.get(serverId) || []).filter((at) => now - at < adRepeatWindow());
+        list.push(now);
+        adTakeovers.set(serverId, list.slice(-8));
+        return list.length;
+    }
+
+    /** Server ini sudah membajak pemutar dalam jendela waktu sekarang? */
+    const adRepeatSeen = (serverId) => (adTakeovers.get(serverId) || []).some((at) => Date.now() - at < adRepeatWindow());
+
+    /**
+     * Pilih server otomatis: lewati server ber-popup berulang **dan** server yang sudah gagal.
+     * Server yang ditandai tetap bisa dipilih manual lewat tombolnya.
+     * @param {StreamServer[]} list
+     * @param {{skipFailed?: boolean, afterId?: string}} [opts]
+     */
+    function pickAuto(list, { skipFailed = false } = {}) {
+        const usable = list.filter((s) => !adBlocked.has(s.id));
+        return usable.find((s) => !skipFailed || !failed.has(s.id)) || null;
+    }
 
     /* ---------------------------------------------------------------- */
     /* Tampilan                                                          */
@@ -570,7 +604,6 @@ export function createPlayer({
         }
         removeAdShield();
         removeAdRecovery();
-        frameLoads = 0;
         lastFrameLoadAt = 0;
     }
 
@@ -633,7 +666,20 @@ export function createPlayer({
             if (!btn) return;
             const action = btn.getAttribute('data-ad-action');
             if (action === 'restore') {
-                if (active) play(active);
+                if (!active) return;
+                // Putaran 18: memuat ulang embed yang sudah membajak = memunculkan popup yang sama.
+                // Bila server ini sudah membajak sekali, pindah ke server lain yang belum ditandai.
+                if (adRepeatSeen(active.id) || adBlocked.has(active.id)) {
+                    adBlocked.add(active.id);
+                    failed.add(active.id);
+                    const clean = available().find((item) => item.id !== active.id && !adBlocked.has(item.id) && !failed.has(item.id));
+                    emit('adblock', { type: 'recover', server: active, next: clean || null });
+                    if (clean) {
+                        play(clean);
+                        return;
+                    }
+                }
+                play(active);
             } else if (action === 'next') {
                 nextServer();
             } else if (action === 'guide') {
@@ -655,6 +701,13 @@ export function createPlayer({
      * Reaksi:
      *  - sekali  → tampilkan bilah pemulihan + kabari halaman (watch.js menampilkan toast);
      *  - berulang → server dianggap rusak, server berikutnya dicoba otomatis.
+     *
+     * Putaran 18 (24 Okt 2026) — permintaan pengguna untuk AnimeKu & Oploverz: popup yang sama
+     * muncul lagi setelah ditutup. Karena itu pembajakan dihitung PER SERVER dalam jendela waktu
+     * (`PLAYER.adTakeover.repeatWindowMs`): begitu batas tercapai, server ditandai `adBlocked`,
+     * bilah pemulihan dilepas, dan pemutar pindah ke server lain. Server bertanda tidak dipilih
+     * otomatis lagi selama sesi (bisa dipilih manual) dan tombol "Pulihkan pemutar" tidak lagi
+     * memuat ulang embed yang sama — memuat ulang justru memunculkan popup yang sama.
      * @param {number} my token pemutaran
      */
     function noteFrameReload(my) {
@@ -664,17 +717,32 @@ export function createPlayer({
         const duplicate = lastFrameLoadAt && now - lastFrameLoadAt < (PLAYER.adTakeover?.ignoreWithinMs || 1200);
         lastFrameLoadAt = now;
         if (duplicate) return;
-        frameLoads += 1; // 1 = navigasi pertama setelah halaman embed termuat
         const active = current();
-        emit('adblock', { type: 'takeover', server: active, count: frameLoads });
-        mountAdRecovery(my);
-        if (frameLoads >= (PLAYER.adTakeover?.maxTakeovers || 2) && active) {
-            failed.add(active.id);
-            emit('adblock', { type: 'skipped', server: active, count: frameLoads });
-            const next = available().find((item) => item.id !== active.id && !failed.has(item.id));
-            if (next) play(next);
-            else setStatus('Iklan memindahkan pemutar. Coba server lain atau Pemutar Eksternal.', 'error');
+        if (!active) return;
+        // Putaran 18: hitung pembajakan per server. "Popup yang sama" = server yang sama membajak
+        // lagi dalam jendela waktu — jangan pernah memuat ulang embed itu otomatis.
+        const count = noteAdTakeover(active.id);
+        const limit = PLAYER.adTakeover?.maxTakeovers || 2;
+        // Server yang sudah pernah memunculkan popup (dipilih manual oleh pengguna) langsung
+        // dipindahkan pada pembajakan pertama — popup yang sama tidak diberi kesempatan kedua.
+        if (!adBlocked.has(active.id) && count < limit) {
+            emit('adblock', { type: 'takeover', server: active, count });
+            mountAdRecovery(my);
+            return;
         }
+        // Popup kembali setelah ditutup (atau membajak berulang) → tandai server, jangan ulangi.
+        removeAdRecovery();
+        failed.add(active.id);
+        if (PLAYER.adTakeover?.blockRepeatServer !== false) adBlocked.add(active.id);
+        adTakeovers.delete(active.id);
+        emit('adblock', { type: 'skipped', server: active, count, repeat: true });
+        const next = available().find((item) => item.id !== active.id && !failed.has(item.id) && !adBlocked.has(item.id));
+        if (next) {
+            play(next);
+            return;
+        }
+        setStatus('Iklan muncul lagi di server ini. Pilih server lain atau Pemutar Eksternal.', 'error');
+        mountAdRecovery(my);
     }
 
     function renderServers() {
@@ -905,7 +973,6 @@ export function createPlayer({
         if (guarded) applyFramePolicy(iframe);
         else iframe.dataset.frameGuard = 'off';
         syncAdBlockToggle();
-        frameLoads = 0;
         lastFrameLoadAt = 0;
         const loaded = () => {
             if (my !== token || state !== 'loading') return;
@@ -1146,7 +1213,8 @@ export function createPlayer({
 
     /** Server berikutnya (melingkar) yang tersedia & belum gagal di episode ini. */
     function nextCandidate(afterId) {
-        const list = available();
+        // Putaran 18: server ber-popup berulang tidak dicoba otomatis lagi (popup sama muncul terus).
+        const list = available().filter((s) => !adBlocked.has(s.id));
         const start = list.findIndex((s) => s.id === afterId);
         for (let i = 1; i <= list.length; i++) {
             const s = list[(start + i + list.length) % list.length];
@@ -1197,6 +1265,9 @@ export function createPlayer({
 
     function retry() {
         failed = new Set();
+        // Tindakan eksplisit: pengguna minta mencoba lagi, jadi ingatan popup ikut direset.
+        adBlocked.clear();
+        adTakeovers.clear();
         const first = available()[0];
         if (first) play(first);
         else emit('retry', { ep }); // tidak ada id → watch.js mencari ulang data anime
@@ -1282,6 +1353,8 @@ export function createPlayer({
         get serverId() { return currentId; },
         get episode() { return ep; },
         hasServers: () => available().length > 0,
+        /** Putaran 18: id server yang iklannya berulang (tidak dipilih otomatis lagi). */
+        adBlockedServers: () => [...adBlocked],
 
         /**
          * URL pemutar eksternal untuk server yang sedang dipakai (putaran 8).
@@ -1323,7 +1396,9 @@ export function createPlayer({
             servers = keepPlayable(list);
             failed = new Set();
             mirror = new Map();
-            const first = (currentId && byId(currentId)?.available ? byId(currentId) : null) || available()[0];
+            // Putaran 18: jangan memilih otomatis server yang iklannya berulang (popup sama).
+            const keepCurrent = currentId && byId(currentId)?.available && !adBlocked.has(currentId) ? byId(currentId) : null;
+            const first = keepCurrent || pickAuto(available()) || available()[0];
             if (first) play(first);
             else exhaust();
         },
@@ -1344,7 +1419,8 @@ export function createPlayer({
                 }
             }
             if (state === 'loading' || state === 'playing' || state === 'waiting' || state === 'idle' || state === 'exhausted') {
-                const next = available().find((s) => !failed.has(s.id));
+                // Putaran 18: server ber-popup berulang tidak dipilih otomatis lagi.
+                const next = pickAuto(available(), { skipFailed: true });
                 if (next) play(next);
                 else if (state !== 'exhausted') exhaust();
                 else renderServers();

@@ -1666,6 +1666,53 @@ headless/stealth). Jadi tombolnya memang tidak berguna.
    tanpa `anizone`/`reanime`; klik Server 1 memuat iframe **tanpa `sandbox`** (`data-frame-guard="off"`),
    tombol “Matikan blokir” tampil, klik → label “Nyalakan blokir” + `kz:adblock-off = {"megaplay-anilist":true}`.
 
+### Perubahan perilaku (24 Okt 2026 — putaran kedelapan belas: popup iklan yang sama tidak muncul lagi)
+
+Permintaan pengguna: *"Perbaiki Bagian Untuk Block ads yg Animeku dan Oploverz iklan cukup pola yang
+sama setelah saya test kita perbaiki lagi dengan sedikit perkuat agar popup yg sama tidak muncul"*.
+Setelah diuji, pengguna memastikan gejalanya: **"(a) muncul setelah di tutup"** — popup iklan yang
+sama kembali lagi setelah ditutup, bukan hanya saat pindah episode.
+
+**Akar masalah.** Embed AnimeKu & Oploverz tetap memuat halaman yang sama; setiap **muat ulang**
+iframe menjalankan lagi skrip iklannya, sehingga popup yang sudah ditutup muncul kembali. Penanganan
+lama berhenti di bilah **“Pulihkan pemutar”**; menekannya memuat ulang embed yang sama (popup yang sama
+kembali), dan pembajakan berulang hanya menandai server *gagal* untuk satu episode — episode berikutnya
+memilih server itu lagi.
+
+**Pola iklan tidak diubah** (sesuai permintaan “cukup pola yang sama”): `AD_HOSTS` tetap 70 entri dan
+`AD_URL_PATTERNS` tetap 13 pola di `js/services/adblock.js` (cerminnya `server/lib/adblock.js`), DoH
+AdGuard tetap dipakai. Yang diperkuat adalah perilaku saat popup **berulang**:
+
+1. **Hitung per server** (`js/ui/player.js`): `adTakeovers` menyimpan waktu pembajakan per `server.id`
+   dalam jendela `PLAYER.adTakeover.repeatWindowMs` (120 dtk, maks 8 entri per server). Pembajakan
+   pertama tetap menampilkan bilah pemulihan; begitu jumlahnya mencapai `maxTakeovers` (2) dalam
+   jendela itu, server ditandai `adBlocked` + `failed` dan bilah dilepas.
+2. **Pindah server, bukan muat ulang.** Server bertanda tidak dipilih otomatis lagi selama sesi
+   (`pickAuto()`, `nextCandidate()`, `load()`, `setServers()`); pemutar langsung pindah ke server bersih
+   berikutnya. Bila tidak ada, status berbunyi *“Iklan muncul lagi di server ini. Pilih server lain atau
+   Pemutar Eksternal.”* Tombol server bertanda **tetap ada dan tetap bisa dipilih manual** (permintaan
+   putaran 16) — tetapi bila dipilih manual dan membajak lagi, pembajakan pertama langsung memindahkan
+   pemutar (tidak ada kesempatan kedua untuk popup yang sama).
+3. **“Pulihkan pemutar” tidak lagi memuat ulang embed yang sudah membajak** (`adRepeatSeen()`/
+   `adBlocked`): aksi itu menandai server dan memutar server bersih lain, lalu mengirim
+   `adblock {type:'recover', server, next}`. `retry()` (tindakan eksplisit pengguna) mengosongkan
+   `adBlocked`/`adTakeovers`.
+4. **Halaman nonton** (`js/watch.js`) memberi pesan khusus: *“Iklan yang sama muncul lagi di … — server
+   itu tidak dicoba otomatis lagi.”* dan *“Beralih ke … supaya popup yang sama tidak terulang.”* Petunjuk
+   panel server (`watch.html`) menjelaskan aturan ini.
+5. **Tidak ada pelonggaran pengaman.** Sandbox Sub Indo (putaran 15) tidak berubah: tidak ada
+   `removeAttribute('sandbox')`, tidak ada `allow-popups`/`allow-top-navigation`, dan tombol
+   “Matikan blokir” tetap tersembunyi untuk AnimeKu/Oploverz. Daftar host/pola iklan tidak dilebarkan.
+6. **Tes & verifikasi.** `server/test/round18-adblock-repeat.test.js` (9 tes) mengunci: pola tetap
+   70/13, `repeatWindowMs`/`blockRepeatServer` ada, penghitungan per server, perpindahan otomatis,
+   penyaringan `adBlocked` pada pemilihan otomatis (manual tetap boleh), aksi “Pulihkan” yang tidak
+   memuat ulang, `retry()` yang membersihkan ingatan, serta pesan UI. Total `npm test` **544 tes lulus**.
+   Smoke `happy-dom` (19 pemeriksaan pada modul pemutar): pembajakan pertama → bilah pemulihan; klik
+   “Pulihkan” → pindah ke Animeloverz + AnimeKu bertanda; Animeloverz membajak 2× → pindah ke MegaPlay;
+   episode berikutnya tidak memakai server bertanda; memilih manual server bertanda → pembajakan
+   pertama langsung pindah. Smoke halaman `watch.html` (8 pemeriksaan): 5 tombol, sandbox aktif untuk
+   AnimeKu, server Inggris tetap tanpa sandbox, hint tampil.
+
 ### Sengaja dihapus (mati / palsu / duplikat)
 
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)
