@@ -1817,10 +1817,14 @@ jika memungkinkan untuk di terapkan maka terapkan juga"* (lanjutan `docs/OPLOVER
 2. **Yang diterapkan: adapter `animexnonton`, default `off`.** `server/sources/animexnonton.js` +
    `server/lib/anx-signer.js` (HKDF `h91b`, AES-256-GCM, cert-lock, render string kanonik). Mode
    `off` mengembalikan `null` sehingga `/api/health`, pencarian, dan `?source=animexnonton` **persis
-   seperti sebelum fitur ini ada** — diverifikasi: `/api/health` tetap 6 entri
-   (`animexin, anoboy, hianime, animeku, oploverz, kusonime-downloads`), dan
-   `/api/anime/browse?source=animexnonton` → **404** `"Sumber \"animexnonton\" tidak dikenal atau
-   sedang dimatikan."`.
+   seperti sebelum fitur ini ada** — diverifikasi dua kali:
+   - **lokal** (`PORT=8097 npm start`): `/api/health` 6 entri
+     (`animexin, anoboy, hianime, animeku, oploverz, kusonime-downloads`), dan
+     `/api/anime/browse?source=animexnonton` → **404** `"Sumber \"animexnonton\" tidak dikenal
+     atau sedang dimatikan."`;
+   - **produksi Vercel** setelah PR #43 di-merge (24 Okt 2026): `/api/health` → **200**, `version
+     1.6.0`, daftar sumber **sama** (tanpa `animexnonton`); `/api/anime/browse?source=animexnonton`
+     → **404** dengan pesan yang sama. Jadi merge tidak mengubah perilaku situs yang sudah jalan.
 3. **Tidak ada tebakan yang dikirim ke server orang lain.** Urutan/pemisah string kanonik dan
    konstruksi IV AES-GCM **belum** berhasil direkonstruksi dari `libmikumoe.so`; karena itu mode
    `live` **menolak jalan** (error `config`) sampai `ANX_CANONICAL_TEMPLATE` diisi, dan detail judul
