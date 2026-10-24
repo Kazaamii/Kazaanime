@@ -168,7 +168,7 @@ kazanime/
     │   ├── sakunime.js        adapter Sakunime — anime Jepang, `data-default` eksplisit; `serverId` opaque diabaikan; bukti dari judul episode
     │   ├── otakudesu.js       🅔 adapter Otakudesu — anime Jepang Hardsub Indonesia (diblokir Cloudflare untuk IP pusat data, lihat batasan)
     │   ├── animeku.js         adapter AnimeKu — kartu rilis terbaru → slug seri; judul episode tanpa "Sub Indo" tidak diklaim Indonesia
-    │   ├── oploverz.js        adapter Oploverz (Animeloverz) — kartu `article.bs`, daftar episode `.eplister`, server `#embed_holder`; tanpa klaim bahasa otomatis
+    │   ├── oploverz.js        adapter Oploverz (Animeloverz) — kartu `article.bs`, daftar episode `.eplister`, server `#embed_holder`; tanpa klaim bahasa otomatis — peta lengkap: `docs/OPLOVERZ.md`
     │   ├── hianime.js         🅔 adapter hianime.ro — anime Jepang, subtitle Inggris (REST otakuthemes)
     │   └── metadata.js        fallback API publik Kitsu → AniList (Jikan dihapus) + poster Kitsu → Bangumi → MangaBaka
     ├── providers/             🅔 penyedia server berbasis id/judul (bukan katalog)
@@ -1788,17 +1788,18 @@ tambahkan donghua dari sana"*.
    - `GET /api/anime/browse?source=animeku&filter=donghua` → **200, 7 judul** (Douluo Dalu + 6
      spin-off: Hanhai Qian Kun, Xiaowu Juebie, Hao Tian Yang Wei, Qian Hua Xi Jin, Xingdou Xian Ji
      Pian, Jingying Sai). AnimeKu memang punya donghua.
-   - `GET /api/anime/browse?source=oploverz&filter=donghua` → **200, 0 judul**. Dicek langsung ke
+   - `GET /api/anime/browse?source=oploverz&filter=donghua` → **200, 0 judul** (peta sumber lengkap:
+     `docs/OPLOVERZ.md`). Dicek langsung ke
      situsnya: `/series/perfect-world/` → 404, `?s=Douluo` → "Not Found", `?s=Martial Universe` →
      "Not Found", `?s=Perfect World` → hasil tak nyambung (Tenmaku no Jaadugar, dll.),
      `?s=Battle Through the Heavens` → "Kingdom 6th Season". Jadi **oploverz.ch (yang di aplikasi
      disebut Animeloverz) saat ini hanya memuat anime Jepang**, bukan donghua.
    - Sandbox pengembangan tetap tidak bisa menjangkau kedua situs (502 `UPSTREAM_UNREACHABLE`);
      angka di atas berasal dari deployment Vercel, bukan dari sandbox.
-6. **Tes.** `server/test/round20-sources-donghua.test.js` (4 tes) mengunci: adapter/fixture/test
+6. **Tes.** `server/test/round20-sources-donghua.test.js` (6 tes) mengunci: adapter/fixture/test
    Anichin & Kuramanime benar-benar tidak ada, sumber yang bekerja tetap lengkap, kedua adapter
    punya benih donghua, dan beranda/katalog tetap menautkan kedua panel. `server/test/oploverz.test.js`
-   menambah 1 tes benih Oploverz. Total `npm test` **546 tes lulus**.
+   menambah 1 tes benih Oploverz. Total `npm test` **548 tes lulus**.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 
