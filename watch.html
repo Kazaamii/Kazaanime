@@ -71,6 +71,10 @@
                 <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled aria-label="Episode sebelumnya"><span class="ic-slot" data-icon="chevron-left"></span><span class="ctrl-long">Episode </span>Sebelumnya</button>
                 <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled aria-label="Episode berikutnya"><span class="ctrl-long">Episode </span>Berikutnya<span class="ic-slot" data-icon="chevron-right"></span></button>
                 <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled title="Coba server streaming berikutnya"><span class="ic-slot" data-icon="refresh-cw"></span>Server Lain</button>
+                <!-- Putaran 15: khusus server LUAR (AniList/Kitsu, ReAnime, AniZone). Server Sub Indo
+                     (AnimeKu/Oploverz) tetap ber-sandbox tanpa tombol pelepas, jadi tombol ini
+                     disembunyikan untuk mereka oleh ui/player.js. -->
+                <button type="button" class="player-ctrl-btn player-ctrl-btn--adblock" id="btnAdBlockToggle" aria-pressed="true" hidden title="Server luar dimuat tanpa sandbox. Matikan blokir iklan bila video tidak muncul."><span class="ic-slot" data-icon="shield-off"></span><span data-toggle-label>Matikan blokir</span></button>
                 <button type="button" class="player-ctrl-btn player-ctrl-btn--fullscreen" id="btnFullscreen" aria-pressed="false" title="Layar penuh: video mengisi layar dan otomatis berputar ke lanskap bila peramban mendukung"><span class="ic-slot" data-icon="maximize"></span>Layar Penuh</button>
                 <button type="button" class="player-ctrl-btn player-ctrl-btn--external" id="btnExternalPlayer" title="Buka server ini di tab baru — iklan embed tidak bisa membuka/membajak tab Kazanime"><span class="ic-slot" data-icon="external-link"></span><span class="ctrl-ext-long">Pemutar Eksternal</span><span class="ctrl-ext-short">Eksternal</span></button>
                 <div class="player-local-subtitle-tools" id="localSubtitleTools" hidden>
@@ -86,7 +90,7 @@
             <!-- SERVER STREAMING — tepat di bawah player, tombol berjejer ke samping (putaran 9) -->
             <section class="server-selector server-bar" aria-labelledby="serverHeading">
                 <h4 id="serverHeading"><span class="ic-slot" data-icon="server"></span>Server Streaming</h4>
-                <p class="server-hint"><button type="button" class="server-hint-link" id="btnAdGuide">Panduan blokir iklan</button> · Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Server <strong>Multi Sub</strong>: pilih bahasa lewat tombol CC; pemutar HLS bawaan juga menerima subtitle lokal <strong>.srt/.vtt</strong> (berkas tetap di perangkat, tidak diunggah).</p>
+                <p class="server-hint"><button type="button" class="server-hint-link" id="btnAdGuide">Panduan blokir iklan</button> · Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Server <strong>Sub Indo (AnimeKu &amp; Animeloverz)</strong> memakai penahan pop-up; server <strong>luar</strong> (AniList/Kitsu) dimuat tanpa sandbox — bila video tetap kosong, tekan <strong>Matikan blokir</strong>. Server <strong>Multi Sub</strong>: pilih bahasa lewat tombol CC; pemutar HLS bawaan juga menerima subtitle lokal <strong>.srt/.vtt</strong> (berkas tetap di perangkat, tidak diunggah).</p>
                 <div class="server-buttons" id="serverButtons"></div>
             </section>
 

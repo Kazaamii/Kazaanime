@@ -366,6 +366,7 @@ const player = createPlayer({
     serverBox: $('#serverButtons'),
     fullscreenBtn: $('#btnFullscreen'),
     adGuideBtn: $('#btnAdGuide'),
+    adBlockBtn: $('#btnAdBlockToggle'),
     status: $('#playerStatus'),
     statusText: $('#playerStatusText'),
     getTitle: () => anime.title,

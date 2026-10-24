@@ -66,6 +66,11 @@ export const STORAGE_KEYS = Object.freeze({
     likes: 'kz:likes',
     /** Cache hasil pemeriksaan host iklan (AdGuard DNS via backend) — 24 jam. */
     adCheckCache: 'kz:adcheck',
+    /**
+     * Putaran 15: server luar (bukan AnimeKu/Oploverz) yang blokir iklannya dimatikan
+     * pengguna — `{ [serverId]: true }`. Pilihan diingat supaya tidak perlu diulang.
+     */
+    adBlockOff: 'kz:adblock-off',
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */
@@ -473,6 +478,32 @@ export const PLAYER = Object.freeze({
          * pemutar yang butuh storage/worker tetap jalan.
          */
         policy: 'allow-scripts allow-same-origin allow-forms allow-presentation allow-orientation-lock allow-downloads',
+        /**
+         * Putaran 15 (24 Okt 2026) — permintaan pengguna: *"server Yang sub English tidak boleh ada
+         * sandbox … untuk semua server selain dari anime ku dan oploverz ada tombol matikan fitur
+         * block nya khusus server luar seperti anilist dan kitsu"*.
+         *
+         * Artinya: sandbox HANYA dipasang pada server Sub Indo (AnimeKu & Oploverz). Server luar
+         * — termasuk AniList/Kitsu (MegaPlay, Vidnest, TryEmbed), ReAnime, dan AniZone — dimuat
+         * tanpa sandbox supaya tidak menolak berjalan ("Sandboxed our player is not allowed").
+         */
+        subIndoSources: Object.freeze(['animeku', 'oploverz']),
+    }),
+    /**
+     * Server luar (bukan AnimeKu/Oploverz) — putaran 15.
+     *
+     * Sandbox dimatikan untuk kelompok ini (lihat `frameGuard.subIndoSources`), jadi embed bisa
+     * membuka tab baru. Sebagai gantinya pengguna mendapat tombol per server untuk mematikan
+     * sisa proteksi (lapisan anti-iklan / ad shield) bila video tetap tidak muncul. Pilihan
+     * disimpan di localStorage `kz:adblock-off` supaya tidak perlu diulang tiap episode.
+     */
+    externalGuard: Object.freeze({
+        /** Server luar TIDAK memakai sandbox (penyebab embed Sub Eng gagal diputar). */
+        sandbox: false,
+        /** Lapisan anti-iklan tetap dipasang sampai pengguna mematikannya untuk server itu. */
+        shieldDefault: true,
+        /** Batas jumlah server yang pilihannya diingat (localStorage tetap kecil). */
+        maxServers: 40,
     }),
     /**
      * Layar penuh buatan sendiri (putaran 12): `requestFullscreen` pada wadah player + kunci
