@@ -163,7 +163,15 @@ Detail teknis:
 * `browseDonghua()` di `server/sources/animexin.js` memakai `latest()` — tidak ada request baru.
 * Di `js/katalog.js`, bagian boleh menunjuk sumber lain lewat `source:`; tiap bagian mendapat
   kunci DOM unik (`key`) karena lima bagian memakai id filter `donghua` yang sama.
-* Tes: `server/test/round23-donghua-tab.test.js` (5 tes).
+* Tes: `server/test/round23-donghua-tab.test.js` (6 tes).
+
+**Hasil produksi (24 Okt 2026, setelah merge PR #46 & #47):**
+
+| Permintaan | Hasil |
+|---|---|
+| `GET /api/anime/browse?source=hianime&filter=donghua` | **200, 17 judul** — Soul Land (5 seri), Battle Through the Heavens (3), Perfect World, Douluo Dalu Movie: Jiandao Chen Xin, Throne of Seal, Renegade Immortal (2), Shaonian Ge Xing (3: asli, *Anhe Zhuan Part 2*, *Feng Hua Xue Yue Pian Part 2*) |
+| `GET /api/anime/browse?source=animeku&filter=donghua` | 200, 7 judul (Douluo Dalu + 6 varian) — tidak berubah |
+| `GET /api/anime/browse?source=animexin&filter=donghua` | **`SOURCE_BLOCKED`** — animexin.dev membalas **challenge 403** ke IP Vercel; circuit breaker mengistirahatkan sumbernya ±5 menit (`/api/anime/latest` melaporkan `retryAfter`). Situsnya sendiri hidup (dicek dari IP lain: beranda + jadwal normal), jadi ini pembatasan bot di sisi situs, bukan kerusakan adapter. Tidak ada upaya menembus challenge. |
 
 ---
 
