@@ -57,7 +57,7 @@ test('hianime: browseDonghua hanya mengambil kartu yang judulnya cocok dengan be
 });
 
 test('hianime: benih donghua adalah judul yang sudah diverifikasi ada (24 Okt 2026)', () => {
-    assert.ok(HIANIME_SEEDS.length >= 6);
+    assert.equal(HIANIME_SEEDS.length, 7, 'tujuh benih = semua dipakai (DONGHUA_QUERIES = 7)');
     for (const title of ['Soul Land', 'Battle Through the Heavens', 'Perfect World', 'Douluo Dalu', 'Renegade Immortal', 'Throne of Seal']) {
         assert.ok(HIANIME_SEEDS.includes(title), `${title} harus ada di benih`);
     }
@@ -107,6 +107,17 @@ test('registry: browse filter=donghua melayani hianime lewat jalur generik', asy
     });
     const res2 = await registry2.browse({ source: 'hianime', filter: 'donghua', q: 'One Piece' });
     assert.equal(res2.data.items.length, 4, 'pencarian dalam sumber tetap bekerja');
+});
+
+test('hianime: tujuh benih semuanya dicari (Shaonian Ge Xing / Anhe Zhuan tidak terpotong)', async () => {
+    const routes = Object.fromEntries(HIANIME_SEEDS.map((title) => [
+        `${HIANIME_BASE}/?s=${new URLSearchParams({ s: title }).toString().slice(2)}`,
+        fixture('hianime-search.html'),
+    ]));
+    const { adapter, calls } = hianime(routes);
+    await adapter.browseDonghua(HIANIME_SEEDS);
+    assert.equal(calls.length, 7, 'satu request per benih, termasuk benih ketujuh');
+    assert.ok(calls.some((url) => url.includes('Shaonian+Ge+Xing')));
 });
 
 test('katalog UI: tab Donghua menampilkan HiAnime & AnimeXin, tiap bagian punya kunci unik', () => {

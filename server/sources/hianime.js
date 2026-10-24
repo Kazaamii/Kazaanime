@@ -63,8 +63,11 @@ export const DONGHUA_SEEDS = Object.freeze([
     'Shaonian Ge Xing',
 ]);
 
-/** Batas kueri & hasil bagian donghua (tiap kueri = satu request ke situs, jeda ~1 dtk/host). */
-const DONGHUA_QUERIES = 6;
+/**
+ * Batas kueri & hasil bagian donghua (tiap kueri = satu request ke situs, jeda ~1 dtk/host).
+ * 7 = semua benih dipakai; registry mengirim benih lebih dulu, lalu judul metadata (maks 12).
+ */
+const DONGHUA_QUERIES = 7;
 const DONGHUA_CONCURRENCY = 3;
 const DONGHUA_LIMIT = 24;
 /** Host embed yang sudah disediakan server cadangan statis (dibangun dari id AniList) — tidak diulang. */
