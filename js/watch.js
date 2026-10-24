@@ -45,6 +45,7 @@ import {
 } from './api/index.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { getWatchedEpisodes, markWatched } from './services/history.js';
+import { episodeKey, getReactionCounts, isLiked, likedCount, setReaction } from './services/reactions.js';
 import { storage } from './services/storage.js';
 import { icon } from './ui/icons.js';
 
@@ -61,6 +62,8 @@ const els = {
     epLabel: $('#watchEpisodeLabel'),
     meta: $('#watchMeta'),
     bookmarkBtn: $('#watchBookmarkBtn'),
+    likeBtn: $('#watchLikeBtn'),
+    likeCount: $('#watchLikeCount'),
     info: $('#watchInfo'),
     poster: $('#watchPoster'),
     synopsis: $('#watchSynopsis'),
@@ -395,11 +398,121 @@ function formatWib(sec) {
 /* ------------------------------------------------------------------ */
 /* Render: judul, meta, info, platform, bookmark                       */
 /* ------------------------------------------------------------------ */
+/**
+ * Chip episode di samping judul (putaran 14).
+ * Dulu baris ini berbunyi "Episode 1 • Cek pilihan subtitle" — kalimat itu dihapus karena
+ * menggantung tanpa konteks; nomor episode cukup ditampilkan sebagai chip kecil.
+ */
 function renderEpisodeLabel() {
-    els.epLabel.textContent = `Episode ${ep} • Cek pilihan subtitle`;
+    if (els.epLabel) {
+        els.epLabel.innerHTML = String(html`<span class="watch-ep-chip">Episode ${ep}</span>`);
+    }
     document.title = anime.title ? `${anime.title} - Episode ${ep} | Kazanime` : 'Nonton Anime - Kazanime';
 }
 
+/* ------------------------------------------------------------------ */
+/* Tombol Suka + hitungan langsung (putaran 14)                        */
+/* ------------------------------------------------------------------ */
+/** Key episode untuk hitungan suka (mis. `animeku~judul~ep3`). */
+const likeKeyFor = (n = ep) => episodeKey({ slug: ref.slug || anime.slug, title: anime.title || ref.title, ep: n });
+/** Angka ringkas: 999 → "999", 1200 → "1,2 rb", 1500000 → "1,5 jt". */
+function formatLikeCount(value) {
+    const n = Number(value) || 0;
+    if (n < 1000) return String(n);
+    const short = (div, unit) => `${(n / div).toFixed(n / div < 10 ? 1 : 0).replace('.', ',')} ${unit}`;
+    if (n < 1_000_000) return short(1000, 'rb');
+    return short(1_000_000, 'jt');
+}
+
+/** Key episode yang tampil sekarang + hitungan (null = belum tahu / tanpa server). */
+let likeKey = '';
+let likeTotal = null;
+let likeRequest = 0;
+let likeBusy = false;
+let likeTimer = 0;
+let likeOfflineNoticed = false;
+
+/** Tampilkan tombol suka sesuai jejak lokal + hitungan terakhir. */
+function syncLikeButton() {
+    if (!els.likeBtn || !els.likeCount) return;
+    const on = Boolean(likeKey) && isLiked(likeKey);
+    const total = likeTotal ?? (on ? 1 : 0);
+    els.likeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    els.likeBtn.classList.toggle('is-on', on);
+    els.likeCount.textContent = formatLikeCount(total);
+    els.likeBtn.title = on
+        ? `Kamu menyukai episode ${ep}. Klik lagi untuk membatalkan (jejak: ${likedCount()} episode).`
+        : `Suka episode ${ep} — hitungan diperbarui langsung (jejak: ${likedCount()} episode di perangkat ini).`;
+}
+
+/**
+ * Ambil hitungan bersama untuk episode aktif. Gagal/backend mati → jejak lokal saja.
+ * @param {{force?: boolean}} [opts]
+ */
+async function refreshLikes({ force = false } = {}) {
+    const key = likeKeyFor();
+    if (!key || (key === likeKey && !force)) {
+        if (key !== likeKey) {
+            likeKey = key;
+            likeTotal = null;
+        }
+        syncLikeButton();
+        return;
+    }
+    likeKey = key;
+    likeTotal = null;
+    syncLikeButton();
+    const mine = ++likeRequest;
+    const counts = await getReactionCounts([key]);
+    if (mine !== likeRequest || key !== likeKey) return; // episode sudah berganti
+    if (Object.prototype.hasOwnProperty.call(counts, key)) {
+        // Hitungan bersama tidak boleh lebih kecil dari jejak lokal (mis. server baru diisi).
+        likeTotal = Math.max(counts[key], isLiked(key) ? 1 : 0);
+        syncLikeButton();
+    }
+}
+
+/** Polling ringan: hitungan "live" saat tab terlihat, berhenti saat disembunyikan. */
+function startLikePolling() {
+    stopLikePolling();
+    likeTimer = setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
+        refreshLikes({ force: true });
+    }, 30000);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') refreshLikes({ force: true });
+    });
+}
+function stopLikePolling() {
+    clearInterval(likeTimer);
+    likeTimer = 0;
+}
+
+els.likeBtn?.addEventListener('click', async () => {
+    if (!likeKey || likeBusy) return;
+    const key = likeKey;
+    const next = !isLiked(key);
+    likeBusy = true;
+    // Optimistic: jejak lokal ditulis lebih dulu (sinkron), jadi hati + angka berubah seketika;
+    // jawaban server sesudahnya hanya mengoreksi jumlahnya.
+    const reaction = setReaction(key, next);
+    likeTotal = Math.max(0, (likeTotal ?? (next ? 0 : 1)) + (next ? 1 : -1));
+    syncLikeButton();
+    els.likeBtn.classList.add('is-pop');
+    setTimeout(() => els.likeBtn?.classList.remove('is-pop'), 320);
+    try {
+        const result = await reaction;
+        if (key !== likeKey) return;
+        if (result.count !== null) likeTotal = Math.max(result.count, isLiked(key) ? 1 : 0);
+        if (!result.shared && next && !likeOfflineNoticed) {
+            likeOfflineNoticed = true;
+            showToast('Suka tersimpan di perangkat ini. Hitungan bersama belum tersedia dari server.', 'info', 6000);
+        }
+    } finally {
+        likeBusy = false;
+        syncLikeButton();
+    }
+});
 function renderMeta() {
     const a = anime;
     const parts = [];
@@ -533,6 +646,7 @@ function playEpisode(n, { initial = false, announce = true } = {}) {
     rescrapePending = false;
     clearTimeout(holdTimer);
     renderEpisodeLabel();
+    refreshLikes();
     episodes.setCurrent(n);
     updateNav();
     if (!initial) replaceUrl();
@@ -659,6 +773,7 @@ player.on('retry', () => {
 function applyDetail(data) {
     anime = data.anime;
     detailLoaded = true;
+    refreshLikes(); // slug/nama situs baru diketahui → key suka lebih tepat
     void loadKusonimeDownloads(); // full-series packs follow title metadata, not the active episode
     total = computeTotal();
 
@@ -939,7 +1054,9 @@ onBookmarksChange(() => {
 function renderNotFound() {
     document.title = 'Anime tidak ditemukan - Kazanime';
     els.title.textContent = 'Anime tidak ditemukan';
-    els.epLabel.textContent = 'Link tidak lengkap';
+    els.epLabel.innerHTML = String(html`<span class="watch-ep-chip">Link tidak lengkap</span>`);
+    els.likeBtn?.setAttribute('disabled', '');
+    els.likeBtn?.setAttribute('aria-pressed', 'false');
     els.meta.replaceChildren();
     syncWatchBookmark();
     els.prev.disabled = true;
@@ -963,6 +1080,8 @@ function renderNotFound() {
 
 function start() {
     renderHeader();
+    refreshLikes();
+    startLikePolling();
     renderPlatforms();
     syncWatchBookmark();
     subtitleMapKey = '';

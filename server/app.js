@@ -13,7 +13,7 @@
  */
 import path from 'node:path';
 import express from 'express';
-import { ACCOUNTS, AI_SUBS, BOT, CACHE, ROOT_DIR, SCRAPER, SERVER, SOURCES, STREAMS } from './config.js';
+import { ACCOUNTS, AI_SUBS, BOT, CACHE, REACTIONS, ROOT_DIR, SCRAPER, SERVER, SOURCES, STREAMS } from './config.js';
 import { AppError } from './lib/errors.js';
 import { createClient, createNetwork } from './lib/fetcher.js';
 import { createGemini } from './lib/gemini.js';
@@ -22,8 +22,10 @@ import { createSigner } from './lib/stream-proxy.js';
 import { createDefaultStreamProviders } from './providers/index.js';
 import { accountRouter } from './routes/accounts.js';
 import { adsRouter } from './routes/ads.js';
+import { reactionsRouter } from './routes/reactions.js';
 import { adFilterSummary } from './lib/adblock.js';
 import { createAccountStore } from './lib/account-store.js';
+import { createReactionStore } from './lib/reaction-store.js';
 import { animeRouter } from './routes/anime.js';
 import { streamRouter } from './routes/stream.js';
 import { createDefaultRegistry } from './sources/index.js';
@@ -196,6 +198,8 @@ export function createApp({
     aiConfig = AI_SUBS,
     animeOnsenMediaHosts = SOURCES.animeonsen.mediaHosts,
     accountStore = createAccountStore(),
+    /** @type {ReturnType<typeof createReactionStore>} hitungan suka per episode (tes bisa menyuntik) */
+    reactionStore = createReactionStore(),
     /** @type {ReturnType<typeof import('./lib/dns.js').createDnsFilter>|null} pemeriksa DNS iklan (tes bisa menyuntik) */
     adDns = null,
     serveStatic = false,
@@ -299,8 +303,18 @@ export function createApp({
     /* Akun server (opsional). Body JSON dibatasi 1 MB: avatar data URL ≤ 400 KB. */
     const accounts = accountRouter({ store: accountStore });
     app.use('/api/accounts', express.json({ limit: '1mb' }), ipRateLimit({ limit: ACCOUNTS.rateLimitPerMinute }), accounts);
+    /* Hitungan suka per episode (putaran 14): live count + jejak suka per perangkat. */
+    app.use(
+        '/api/reactions',
+        express.json({ limit: '8kb' }),
+        ipRateLimit({ limit: REACTIONS.rateLimitPerMinute }),
+        reactionsRouter({ store: reactionStore }),
+    );
     /* Penyaring iklan (putaran 11): daftar pola + cek reputasi host lewat DNS AdGuard. */
     app.use('/api/ads', ipRateLimit({ limit: SERVER.rateLimitPerMinute }), adsRouter(adDns ? { dns: adDns } : {}));
+    if (log && !reactionStore.enabled) {
+        console.log(`[reactions] hitungan suka nonaktif — ${reactionStore.reason || 'penyimpanan tidak tersedia'}`);
+    }
     if (log && ACCOUNTS.store === 'off') {
         console.log('[accounts] server akun nonaktif (ACCOUNT_STORE kosong) — frontend memakai akun lokal + berkas cadangan.');
     }
