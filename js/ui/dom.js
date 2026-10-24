@@ -150,34 +150,78 @@ export function emojiAvatar(id) {
 /**
  * Satu listener global untuk semua <img data-fallback="...">
  * (pengganti onerror inline yang membawa data URI panjang di tiap kartu).
- *   data-fallback=""            → poster placeholder dari alt
- *   data-fallback="avatar:12"   → avatar emoji #12
- *   data-fallback="emoji:🎴"    → ganti <img> dengan teks emoji
- *   data-fallback="<url>"       → pakai URL lain
+ *   data-fallback=""                 → poster placeholder dari alt
+ *   data-fallback="avatar:12"        → avatar emoji #12
+ *   data-fallback="emoji:🎴"         → ganti <img> dengan teks emoji
+ *   data-fallback="<url>"            → pakai URL lain
+ *   data-fallback="<url>|avatar:12"  → RANTAI: coba URL lain, lalu emoji (putaran 10)
+ *
+ * Putaran 10: rantai dipakai avatar preset — foto Kitsu → kartu lokal → emoji,
+ * jadi satu URL yang mati tidak langsung membuat avatar jadi ikon bawaan.
  */
 let fallbackInstalled = false;
+
+/** Ambil langkah berikutnya dari rantai `data-fallback`, atau null bila habis. */
+function nextFallback(img) {
+    const chain = String(img.dataset.fallback || '').split('|').map((part) => part.trim());
+    const used = Number(img.dataset.fallbackStep || 0);
+    return used < chain.length ? { spec: chain[used], step: used + 1 } : null;
+}
+
+/** Terapkan satu langkah fallback. @returns {boolean} masih ada langkah berikutnya */
+function applyFallback(img, spec) {
+    if (spec.startsWith('emoji:')) {
+        img.replaceWith(document.createTextNode(spec.slice(6)));
+        return false;
+    }
+    if (spec.startsWith('avatar:')) {
+        img.src = emojiAvatar(spec.slice(7));
+        return true;
+    }
+    if (spec) {
+        img.src = spec;
+        return true;
+    }
+    img.src = placeholderImage(img.alt || 'Kazanime', img.dataset.color);
+    return true;
+}
+
 export function installImageFallback() {
     if (fallbackInstalled) return;
     fallbackInstalled = true;
     document.addEventListener('error', (event) => {
         const img = event.target;
-        if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-fallback') || img.dataset.failed) return;
-        img.dataset.failed = '1';
-        const spec = img.dataset.fallback || '';
-        if (spec.startsWith('emoji:')) {
-            img.replaceWith(document.createTextNode(spec.slice(6)));
-        } else if (spec.startsWith('avatar:')) {
-            img.src = emojiAvatar(spec.slice(7));
-        } else if (spec) {
-            img.src = spec;
-        } else {
-            img.src = placeholderImage(img.alt || 'Kazanime', img.dataset.color);
+        if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-fallback')) return;
+        const next = nextFallback(img);
+        if (!next) {
+            img.dataset.failed = '1';
+            return;
         }
+        img.dataset.fallbackStep = String(next.step);
+        delete img.dataset.failed;
+        if (applyFallback(img, next.spec)) return;
+        img.dataset.failed = '1';
     }, true); // capture: event 'error' tidak bubble
 }
 
-/** URL gambar avatar user (custom upload / pilihan grid / fallback emoji). */
+/**
+ * Rantai fallback untuk satu avatar: foto → kartu lokal → emoji.
+ * @param {object|null} avatar
+ * @returns {string}
+ */
+export function avatarFallbackChain(avatar) {
+    const id = Number(avatar?.id) || 1;
+    const steps = [];
+    if (avatar?.card) steps.push(avatar.card);
+    steps.push(`avatar:${id}`);
+    return steps.join('|');
+}
+
+/**
+ * URL gambar avatar user (custom upload / foto preset / kartu lokal / emoji).
+ * `card` dipakai bila preset tidak punya foto (putaran 10).
+ */
 export function avatarSrc(avatar) {
     if (!avatar) return emojiAvatar(1);
-    return avatar.img || emojiAvatar(avatar.id || 1);
+    return avatar.img || avatar.card || emojiAvatar(avatar.id || 1);
 }

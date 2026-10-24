@@ -15,16 +15,18 @@
 import { installImageFallback } from './dom.js';
 import { hydrateIcons } from './icons.js';
 import { initTheme } from '../services/theme.js';
-import { renderNavbar, setNavUser, getSearchElements } from './navbar.js';
+import { renderNavbar, setNavUser, getSearchElements, setNavSyncAvailable } from './navbar.js';
 import { renderFooter } from './footer.js';
 import { openThemeModal } from './theme-modal.js';
 import { mountAuthModals, openAuthModal, openAvatarModal } from './auth-modal.js';
+import { openAccountModal } from './account-modal.js';
 import { initSearchDropdown } from './search-dropdown.js';
 import { initApiStatus, showApiStatus } from './api-status.js';
 import { showToast } from './toast.js';
 import { currentPage } from '../routes.js';
 import * as auth from '../services/auth.js';
 import * as bookmarks from '../services/bookmark.js';
+import * as accountSync from '../services/account-sync.js';
 
 /** Anime yang ingin di-bookmark sebelum user login (diselesaikan setelah login). */
 let pendingBookmark = null;
@@ -73,11 +75,23 @@ function completePendingBookmark() {
 async function handleLogin(data) {
     const res = await auth.login(data);
     if (!res.ok) {
+        // Putaran 10: akun mungkin dibuat di perangkat lain → coba server akun
+        // (hanya bila server aktif; kalau tidak, tetap pesan lokal yang jelas).
+        const remote = await accountSync.loginRemote(data);
+        if (remote.ok) {
+            syncNav();
+            refreshSyncAvailability();
+            showToast(`Masuk sebagai ${data.username} — akun dipulihkan dari server.`, 'success');
+            completePendingBookmark();
+            return true;
+        }
         showToast(res.error, 'error');
         return false;
     }
     showToast(`Selamat datang kembali, ${res.user.username}!`, 'success');
     if (res.migrated) console.info('[auth] password akun lama dikonversi ke hash SHA-256.');
+    refreshSyncAvailability();
+    accountSync.push().catch(() => {});
     completePendingBookmark();
     return true;
 }
@@ -95,6 +109,13 @@ async function handleRegister(data) {
             : `Selamat datang, ${res.user.username}! Avatar ${avatar?.name || ''} telah dipilih.`,
         'success',
     );
+    // Sinkron ke server akun bila operator mengaktifkannya (best-effort, tidak memblokir).
+    accountSync.registerRemote({ username: data.username, password: data.password, avatar }).then((remote) => {
+        if (!remote.skipped) refreshSyncAvailability();
+        if (remote.skipped) return;
+        if (remote.ok) showToast('Akun juga tersimpan di server — bisa dipakai di perangkat lain.', 'info');
+        else if (remote.error) showToast(`Akun lokal tersimpan, tetapi sinkron server gagal: ${remote.error}`, 'info');
+    }).catch(() => {});
     completePendingBookmark();
     return true;
 }
@@ -111,8 +132,54 @@ function handleAvatarSave(avatar) {
 
 function handleLogout() {
     pendingBookmark = null;
+    accountSync.logoutRemote();
     auth.logout();
     showToast('Berhasil keluar. Sampai jumpa!', 'info');
+}
+
+/* Putaran 10: cadangkan / pulihkan / sinkron akun dari menu profil. */
+function handleBackup() {
+    openAccountModal('backup');
+}
+
+function handleRestore() {
+    openAccountModal('restore');
+}
+
+/**
+ * Perbarui visibilitas tombol "Sinkron Sekarang".
+ * @param {{force?: boolean}} [opts]
+ * @returns {Promise<boolean>}
+ */
+function refreshSyncAvailability({ force = false } = {}) {
+    if (!auth.getCurrentUser() && !accountSync.hasToken()) {
+        setNavSyncAvailable(false);
+        return Promise.resolve(false);
+    }
+    return accountSync.serverStatus({ force })
+        .then((status) => {
+            setNavSyncAvailable(Boolean(status.enabled));
+            return Boolean(status.enabled);
+        })
+        .catch(() => {
+            setNavSyncAvailable(false);
+            return false;
+        });
+}
+
+async function handleSync() {
+    const res = await accountSync.syncNow();
+    if (res.disabled) {
+        showToast(res.reason || 'Server akun belum diaktifkan operator — gunakan Cadangkan Akun.', 'info');
+        return;
+    }
+    if (res.noToken) {
+        showToast('Masuk dulu untuk sinkron dengan server akun.', 'info');
+        return;
+    }
+    syncNav();
+    if (res.ok) showToast(`Sinkron selesai${res.updated ? ` — ${res.updated} data diperbarui` : ''}.`, 'success');
+    else showToast(`Sinkron gagal: ${res.error || 'server tidak merespons'}`, 'error');
 }
 
 /* ------------------------------------------------------------------ */
@@ -139,6 +206,9 @@ export function initLayout() {
         onTheme: () => openThemeModal(),
         onAvatar: () => openAvatarModal(auth.getCurrentUser()?.avatar || null),
         onLogout: handleLogout,
+        onBackup: handleBackup,
+        onRestore: handleRestore,
+        onSync: handleSync,
     });
     renderFooter(document.getElementById('app-footer'), {
         onApiStatus: () => showApiStatus({ recheck: true }),
@@ -155,6 +225,13 @@ export function initLayout() {
     syncNav();
     auth.onAuthChange(syncNav);
     bookmarks.onBookmarksChange(syncNav);
+
+    /* Putaran 10: sinkron server akun (opsional) — tombol "Sinkron Sekarang" hanya
+       tampil bila server akun benar-benar aktif, supaya menu tidak menjanjikan hal
+       yang tidak tersedia. Status hanya diminta bila ada sesi/token: pengunjung yang
+       belum masuk tidak perlu request tambahan di setiap halaman. */
+    refreshSyncAvailability();
+    accountSync.bootstrap().catch(() => {});
 
     initApiStatus();
 

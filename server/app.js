@@ -13,13 +13,15 @@
  */
 import path from 'node:path';
 import express from 'express';
-import { AI_SUBS, BOT, CACHE, ROOT_DIR, SCRAPER, SERVER, SOURCES, STREAMS } from './config.js';
+import { ACCOUNTS, AI_SUBS, BOT, CACHE, ROOT_DIR, SCRAPER, SERVER, SOURCES, STREAMS } from './config.js';
 import { AppError } from './lib/errors.js';
 import { createClient, createNetwork } from './lib/fetcher.js';
 import { createGemini } from './lib/gemini.js';
 import { ipRateLimit } from './lib/rate-limit.js';
 import { createSigner } from './lib/stream-proxy.js';
 import { createDefaultStreamProviders } from './providers/index.js';
+import { accountRouter } from './routes/accounts.js';
+import { createAccountStore } from './lib/account-store.js';
 import { animeRouter } from './routes/anime.js';
 import { streamRouter } from './routes/stream.js';
 import { createDefaultRegistry } from './sources/index.js';
@@ -40,7 +42,8 @@ function cors(origins) {
         const origin = req.headers.origin;
         if (origin && origins.includes(origin)) {
             res.set('Access-Control-Allow-Origin', origin);
-            res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+            res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
             res.set('Access-Control-Max-Age', '600');
             res.vary('Origin');
         }
@@ -119,9 +122,13 @@ function mountStatic(app) {
     const opts = { index: false, fallthrough: true, maxAge: 0, etag: true };
     app.use('/css', express.static(path.join(ROOT_DIR, 'css'), opts));
     app.use('/js', express.static(path.join(ROOT_DIR, 'js'), opts));
+    // Putaran 10: avatar preset lokal (assets/avatars/*.jpg|svg) — sebelumnya 404 di
+    // pratinjau lokal sehingga foto profil tampak "tidak terdeteksi".
+    app.use('/assets', express.static(path.join(ROOT_DIR, 'assets'), opts));
     const page = (file) => (req, res) => res.sendFile(path.join(ROOT_DIR, file));
     app.get('/', page('index.html'));
-    for (const file of ['index.html', 'watch.html', 'search.html', 'katalog.html']) app.get(`/${file}`, page(file));
+    // bookmark.html ikut dilayani (sebelumnya hanya ada di hosting statis).
+    for (const file of ['index.html', 'watch.html', 'search.html', 'katalog.html', 'bookmark.html']) app.get(`/${file}`, page(file));
     app.get('/favicon.ico', (req, res) => res.status(204).end());
     app.use((req, res) => res.status(404).type('text/plain; charset=utf-8').send('404 — halaman tidak ditemukan.'));
 }
@@ -186,6 +193,7 @@ export function createApp({
     gemini,
     aiConfig = AI_SUBS,
     animeOnsenMediaHosts = SOURCES.animeonsen.mediaHosts,
+    accountStore = createAccountStore(),
     serveStatic = false,
     rateLimitPerMinute = SERVER.rateLimitPerMinute,
     proxyRateLimitPerMinute = STREAMS.proxyRateLimitPerMinute,
@@ -283,6 +291,12 @@ export function createApp({
         });
     });
     app.get('/api/bot', botInfo);
+    /* Akun server (opsional). Body JSON dibatasi 1 MB: avatar data URL ≤ 400 KB. */
+    const accounts = accountRouter({ store: accountStore });
+    app.use('/api/accounts', express.json({ limit: '1mb' }), ipRateLimit({ limit: ACCOUNTS.rateLimitPerMinute }), accounts);
+    if (log && ACCOUNTS.store === 'off') {
+        console.log('[accounts] server akun nonaktif (ACCOUNT_STORE kosong) — frontend memakai akun lokal + berkas cadangan.');
+    }
     app.use('/api/anime', ipRateLimit({ limit: rateLimitPerMinute }), animeRouter(registry, { budgetMs, signer, animeOnsenMediaHosts }));
     const serversLimit = ipRateLimit({ limit: rateLimitPerMinute });
     const proxyLimit = ipRateLimit({ limit: proxyRateLimitPerMinute });

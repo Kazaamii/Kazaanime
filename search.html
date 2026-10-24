@@ -33,8 +33,12 @@
         <!-- Tab sumber data (hanya untuk mode pencarian) -->
         <div class="search-source-tabs" id="searchSourceTabs" role="tablist" aria-label="Sumber data">
             <button type="button" class="search-source-tab active" role="tab" aria-selected="true" data-source="all"><span class="ic-slot" data-icon="library"></span>Semua <span class="count" data-count="all">0</span></button>
-            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="kitsu"><span class="src-dot src-dot--kitsu" aria-hidden="true"></span>Kitsu <span class="count" data-count="kitsu">0</span></button>
+            <!-- Putaran 10 (24 Okt 2026): hasil AnimeKu & Oploverz punya tab sendiri,
+                 supaya bisa difilter dan tidak tercampur dengan metadata. -->
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="backend:animeku"><span class="src-dot src-dot--animeku" aria-hidden="true"></span>AnimeKu <span class="count" data-count="backend:animeku">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="backend:oploverz"><span class="src-dot src-dot--oploverz" aria-hidden="true"></span>Oploverz <span class="count" data-count="backend:oploverz">0</span></button>
             <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="anilist"><span class="src-dot src-dot--anilist" aria-hidden="true"></span>AniList <span class="count" data-count="anilist">0</span></button>
+            <button type="button" class="search-source-tab" role="tab" aria-selected="false" data-source="kitsu"><span class="src-dot src-dot--kitsu" aria-hidden="true"></span>Kitsu <span class="count" data-count="kitsu">0</span></button>
         </div>
 
         <!-- Urutan (eksklusif) + format (bisa lebih dari satu) -->

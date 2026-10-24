@@ -12,7 +12,7 @@
  * Autocomplete pencarian dipasang terpisah oleh ui/search-dropdown.js (Tahap B).
  */
 import { APP, NAV_LINKS, UI } from '../config.js';
-import { html, raw, $, avatarSrc } from './dom.js';
+import { html, raw, $, avatarSrc, avatarFallbackChain } from './dom.js';
 import { homeSectionUrl, searchUrl } from '../routes.js';
 import { icon } from './icons.js';
 
@@ -20,6 +20,11 @@ const ICON_SEARCH = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1
 const ICON_BOOKMARK = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>');
 const ICON_USER = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>');
 const ICON_THEME = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>');
+// Ikon dropdown diisi dengan `fill:currentColor` (lihat css/components.css), jadi memakai
+// path Material yang memang solid — bukan garis, supaya tidak tampil sebagai bentuk aneh.
+const ICON_BACKUP = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>');
+const ICON_RESTORE = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zM5 18h14v2H5v-2z"/></svg>');
+const ICON_SYNC = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>');
 const ICON_LOGOUT = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>');
 
 /** Markup logo (dipakai navbar & footer). */
@@ -80,6 +85,10 @@ function navbarHTML(page) {
                         <button type="button" class="dropdown-item" role="menuitem" data-action="avatar">${ICON_USER} Ganti Avatar</button>
                         <button type="button" class="dropdown-item" role="menuitem" data-action="theme">${ICON_THEME} Ganti Tema</button>
                         <div class="dropdown-divider" role="separator"></div>
+                        <button type="button" class="dropdown-item" role="menuitem" data-action="backup">${ICON_BACKUP} Cadangkan Akun</button>
+                        <button type="button" class="dropdown-item" role="menuitem" data-action="restore">${ICON_RESTORE} Pulihkan Akun</button>
+                        <button type="button" class="dropdown-item" role="menuitem" data-action="sync" hidden>${ICON_SYNC} <span>Sinkron Sekarang</span></button>
+                        <div class="dropdown-divider" role="separator"></div>
                         <button type="button" class="dropdown-item danger" role="menuitem" data-action="logout">${ICON_LOGOUT} Keluar</button>
                     </div>
                 </div>
@@ -128,7 +137,7 @@ function closeProfile() {
  *   onBookmarks?: () => void,
  * }} opts
  */
-export function renderNavbar(mount, { page, onLogin, onTheme, onAvatar, onLogout, onBookmarks } = {}) {
+export function renderNavbar(mount, { page, onLogin, onTheme, onAvatar, onLogout, onBackup, onRestore, onSync, onBookmarks } = {}) {
     if (!mount) return null;
     mount.innerHTML = String(navbarHTML(page));
     navEl = mount.querySelector('.navbar');
@@ -200,6 +209,9 @@ export function renderNavbar(mount, { page, onLogin, onTheme, onAvatar, onLogout
         if (action === 'bookmarks') onBookmarks?.();
         else if (action === 'avatar') onAvatar?.();
         else if (action === 'theme') onTheme?.();
+        else if (action === 'backup') onBackup?.();
+        else if (action === 'restore') onRestore?.();
+        else if (action === 'sync') onSync?.();
         else if (action === 'logout') onLogout?.();
     });
     document.addEventListener('click', (e) => {
@@ -240,16 +252,24 @@ export function setNavUser(user, { bookmarkCount = 0 } = {}) {
         closeProfile();
         return;
     }
-    const fallback = `avatar:${user.avatar?.id || 1}`;
+    // Putaran 10: rantai cadangan — foto → kartu lokal → emoji (bukan langsung ikon bawaan).
+    const fallback = avatarFallbackChain(user.avatar);
     for (const id of ['#navAvatar', '#dropdownAvatar']) {
         const img = $(id, navEl);
         img.dataset.fallback = fallback;
         delete img.dataset.failed;
+        delete img.dataset.fallbackStep;
         img.src = avatarSrc(user.avatar);
     }
     $('#navUsername', navEl).textContent = user.username;
     $('#dropdownUsername', navEl).textContent = user.username;
     $('#bookmarkCountBadge', navEl).textContent = String(bookmarkCount);
+}
+
+/** Tampilkan/sembunyikan tombol "Sinkron Sekarang" (server akun opsional). */
+export function setNavSyncAvailable(available) {
+    const btn = navEl?.querySelector('[data-action="sync"]');
+    if (btn) btn.hidden = !available;
 }
 
 /** Elemen pencarian untuk dipasangi autocomplete (Tahap B). */

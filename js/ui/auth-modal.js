@@ -15,7 +15,7 @@
  *    dirender ulang tiap buka + 25 canvas fallback dibuat tiap render).
  */
 import { AVATARS, AVATAR_UPLOAD } from '../config.js';
-import { html, raw, $, delegate, emojiAvatar } from './dom.js';
+import { html, raw, $, delegate, emojiAvatar, avatarFallbackChain } from './dom.js';
 import { registerModal, openModal, closeModal } from './modal.js';
 import { showToast } from './toast.js';
 import { icon } from './icons.js';
@@ -50,7 +50,7 @@ function avatarGridHTML(scope) {
     return html`${AVATARS.map((a) => html`
         <div>
             <button type="button" class="avatar-option" data-scope="${scope}" data-id="${a.id}" aria-pressed="false" aria-label="Avatar ${a.name}">
-                <img src="${a.img || emojiAvatar(a.id)}" alt="" loading="lazy" data-fallback="avatar:${a.id}">
+                <img src="${a.img || emojiAvatar(a.id)}" alt="" loading="lazy" data-fallback="${avatarFallbackChain(a)}">
             </button>
             <div class="avatar-name">${a.name}</div>
         </div>`)}`;
@@ -86,7 +86,7 @@ function buildAuthModal() {
                 <div class="form-group"><label for="loginUsername">Username</label><input type="text" id="loginUsername" name="username" placeholder="Masukkan username" autocomplete="username" required></div>
                 <div class="form-group"><label for="loginPassword">Password</label><input type="password" id="loginPassword" name="password" placeholder="Masukkan password" autocomplete="current-password" required></div>
                 <button type="submit" class="btn-auth">Masuk</button>
-                <p class="auth-note">Akun disimpan lokal di browser ini (localStorage).</p>
+                <p class="auth-note">Akun disimpan di browser ini. Pindah perangkat? Menu profil → <strong>Cadangkan Akun</strong> / <strong>Pulihkan Akun</strong>.</p>
             </form>
 
             <form class="auth-form" id="registerForm" novalidate hidden>
@@ -164,29 +164,85 @@ function selectedAvatar(scope) {
     return a ? { id: a.id, name: a.name, img: a.img } : null;
 }
 
-/** Crop tengah → 200×200 JPEG (logika sama dengan handleAvatarUpload asli). */
-function readAndCrop(file) {
-    return new Promise((resolve, reject) => {
-        if (!file.type.startsWith('image/')) return reject(new Error('File harus berupa gambar!'));
-        if (file.size > AVATAR_UPLOAD.maxBytes) return reject(new Error('Ukuran file maksimal 2MB!'));
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('Gagal membaca file.'));
-        reader.onload = () => {
+/**
+ * Crop tengah → 200×200 JPEG.
+ *
+ * Putaran 10 (24 Okt 2026) — keluhan "foto profil tidak terdeteksi, hanya ikon bawaan":
+ *  - Batas lama 2 MB menolak foto kamera ponsel (3–12 MP), dan pengguna hanya melihat
+ *    toast singkat lalu tetap memakai avatar bawaan. Sekarang foto besar DITERIMA
+ *    dan dikecilkan (batas 12 MB; 0 berarti batas bawaan peramban).
+ *  - Orientasi EXIF dihormati (`imageOrientation: 'from-image'` / `img.decode()`),
+ *    jadi foto potret dari kamera tidak lagi tampil miring.
+ *  - Hasil JPEG dicek ukurannya: bila > `maxDataUrlBytes`, kualitas diturunkan
+ *    bertahap supaya localStorage tidak penuh (penyebab lain avatar gagal tersimpan).
+ *  - Pesan galat dibuat spesifik (HEIC, file rusak, canvas tidak tersedia).
+ * @param {File} file
+ * @returns {Promise<string>} data URL JPEG
+ */
+async function readAndCrop(file) {
+    if (!file || !String(file.type || '').startsWith('image/')) {
+        throw new Error('File harus berupa gambar (JPG/PNG/WebP).');
+    }
+    if (file.size > AVATAR_UPLOAD.maxBytes) {
+        throw new Error(`Ukuran file maksimal ${Math.round(AVATAR_UPLOAD.maxBytes / (1024 * 1024))} MB.`);
+    }
+
+    // 1) Dekode gambar (bitmap lebih hemat & menghormati orientasi).
+    let source = null;
+    let width = 0;
+    let height = 0;
+    let release = () => {};
+    if (typeof createImageBitmap === 'function') {
+        try {
+            source = await createImageBitmap(file, { imageOrientation: 'from-image' });
+            width = source.width;
+            height = source.height;
+            release = () => source.close?.();
+        } catch {
+            source = null; // HEIC/format tak didukung → coba jalur <img> di bawah
+        }
+    }
+    if (!source) {
+        const url = URL.createObjectURL(file);
+        try {
             const img = new Image();
-            img.onerror = () => reject(new Error('Gambar tidak valid.'));
-            img.onload = () => {
-                const size = AVATAR_UPLOAD.size;
-                const canvas = document.createElement('canvas');
-                canvas.width = size;
-                canvas.height = size;
-                const min = Math.min(img.width, img.height);
-                canvas.getContext('2d').drawImage(img, (img.width - min) / 2, (img.height - min) / 2, min, min, 0, 0, size, size);
-                resolve(canvas.toDataURL('image/jpeg', AVATAR_UPLOAD.quality));
-            };
-            img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-    });
+            img.decoding = 'async';
+            const loaded = new Promise((resolve, reject) => {
+                img.onload = () => resolve();
+                img.onerror = () => reject(new Error('Format foto ini tidak didukung peramban. Simpan ulang sebagai JPG lalu coba lagi.'));
+            });
+            img.src = url;
+            await loaded;
+            if (img.decode) await img.decode().catch(() => {});
+            source = img;
+            width = img.naturalWidth || img.width;
+            height = img.naturalHeight || img.height;
+        } finally {
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+    }
+
+    if (!width || !height) throw new Error('Gambar tidak valid atau kosong.');
+
+    // 2) Crop tengah + perkecil.
+    const size = AVATAR_UPLOAD.size;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Peramban tidak bisa mengolah gambar (canvas diblokir).');
+    ctx.imageSmoothingQuality = 'high';
+    const min = Math.min(width, height);
+    ctx.drawImage(source, (width - min) / 2, (height - min) / 2, min, min, 0, 0, size, size);
+    release();
+
+    // 3) Kompres sampai muat di localStorage.
+    const limit = AVATAR_UPLOAD.maxDataUrlBytes || 180 * 1024;
+    for (const quality of [AVATAR_UPLOAD.quality, 0.7, 0.6, 0.5, 0.4]) {
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        if (dataUrl.length <= limit) return dataUrl;
+    }
+    throw new Error('Foto terlalu detail untuk disimpan. Pilih foto lain atau avatar bawaan.');
 }
 
 /* ------------------------------------------------------------------ */

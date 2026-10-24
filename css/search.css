@@ -22,6 +22,15 @@
 .search-source-tab:hover{border-color:rgba(var(--primary-rgb),.3)}
 .search-source-tab.active{background:rgba(var(--primary-rgb),.1);border-color:var(--primary);color:var(--primary)}
 .search-source-tab .count{background:var(--gradient-1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+/* Putaran 10: titik warna per sumber data (dot situs memakai warna aksen Sub Indo). */
+.src-dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px;display:inline-block}
+.src-dot--kitsu{background:#f59e0b}
+.src-dot--anilist{background:#3b82f6}
+.src-dot--animeku{background:var(--accent);box-shadow:0 0 6px rgba(var(--accent-rgb),.6)}
+.src-dot--oploverz{background:var(--primary);box-shadow:0 0 6px rgba(var(--primary-rgb),.6)}
+/* Tab situs sedikit berbeda supaya jelas ini hasil "siap tonton". */
+.search-source-tab[data-source^="backend:"] .count{background:rgba(var(--accent-rgb),.22);color:var(--accent)}
+.search-source-tab[data-source^="backend:"].active{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-rgb),.1)}
 
 /* ---------- Muat lebih banyak ---------- */
 .search-load-more{text-align:center;margin-top:25px}

@@ -44,7 +44,9 @@ export function katalogUrl({ source = 'animeku', filter = '', genre = '', q = ''
 export const BROWSE_KINDS = Object.freeze(['ongoing', 'popular', 'new', 'donghua']);
 export const SEARCH_SORTS = Object.freeze(['relevance', 'score', 'popularity', 'newest']);
 export const SEARCH_FORMATS = Object.freeze(['TV', 'MOVIE', 'OVA', 'ONA']);
-export const SEARCH_SOURCES = Object.freeze(['all', 'kitsu', 'anilist']);
+/** Sumber tab halaman pencarian. `backend:<situs>` = hasil langsung AnimeKu/Oploverz
+ *  (putaran 10: tab situs ditambahkan supaya hasil Sub Indo bisa difilter). */
+export const SEARCH_SOURCES = Object.freeze(['all', 'backend:animeku', 'backend:oploverz', 'kitsu', 'anilist']);
 
 const toPositiveInt = (v) => {
     const n = Number.parseInt(v, 10);
