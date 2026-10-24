@@ -64,11 +64,15 @@ test('player: tidak ada tautan, tombol, atau fungsi pelepas sandbox', () => {
     assert.doesNotMatch(watchJs, /frameHint|releaseFrameGuard/);
 });
 
-test('player: sandbox dipasang untuk SETIAP iframe dan tidak pernah dilepas', () => {
+test('player: sandbox server Sub Indo tidak pernah dilepas (putaran 15: hanya Sub Indo)', () => {
     assert.match(playerJs, /function applyFramePolicy\(iframe\) \{/);
     assert.match(playerCode, /iframe\.sandbox\.value = PLAYER\.frameGuard\.policy;/);
     assert.doesNotMatch(playerCode, /removeAttribute\('sandbox'\)/);
     assert.doesNotMatch(playerCode, /hostRefusesSandbox|rememberNoSandboxHost/);
+    // Putaran 15: keputusan pengguna — server luar (AniList/Kitsu) TIDAK boleh ber-sandbox.
+    assert.match(playerCode, /isSubIndoServer\(server\) \|\| PLAYER\.externalGuard\?\.sandbox === true/);
+    assert.match(playerCode, /if \(guarded\) applyFramePolicy\(iframe\);/);
+    assert.match(playerCode, /else iframe\.dataset\.frameGuard = 'off';/);
     // Kebijakan tetap tanpa pop-up / top-navigation.
     const policy = configJs.match(/frameGuard: Object\.freeze\(\{[\s\S]{0,600}?policy: '([^']+)'/)?.[1] || '';
     assert.ok(policy.length > 0, 'policy sandbox ada');

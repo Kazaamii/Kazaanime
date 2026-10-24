@@ -41,12 +41,13 @@ Tanda: ✅ sudah ada & berfungsi · 🅒 baru/diubah di Tahap C · 🅓 baru/diu
 🅟 putaran 10 (24 Okt 2026): **akun tahan banting** (nama tanpa beda huruf, cadangan otomatis, cadangan/pulihkan berkas + kode), **server akun opsional** (file/Redis), foto avatar terverifikasi, **judul di atas player**, tab **AnimeKu/Oploverz** di pencarian
 🅠 putaran 12 (24 Okt 2026): **Mode Aman dihapus** → **penahan tab baru selalu aktif** (sandbox tanpa `allow-popups`), **layar penuh standar pemutar** (berputar lanskap + rotasi CSS bila kunci orientasi ditolak), **Sub Indo konsisten tiap episode** (cache padanan per sesi + coba ulang sumber Sub Indo)
 🅢 putaran 14 (24 Okt 2026): **baris “Cek pilihan subtitle” dihapus** (nomor episode kini chip kecil di bawah judul), **polesan tampilan desktop** halaman nonton (judul + aksi sejajar, panel server/details lebih lega), **tombol “Suka” dengan hitungan live (“Jejak”)** — satu suka per pengunjung per episode, `GET/POST /api/reactions`, penyimpanan file/Redis/off, tetap jalan dengan jejak lokal bila server mati
+🅣 putaran 15 (24 Okt 2026): **sandbox hanya untuk server Sub Indo** (AnimeKu & Oploverz) — server luar (AniList/Kitsu, ReAnime, AniZone) dimuat **tanpa sandbox** supaya video Sub English muncul, dan tiap server luar punya tombol **“Matikan blokir”** (`#btnAdBlockToggle`, diingat di `kz:adblock-off`)
 🅡 putaran 13 (24 Okt 2026): **tawaran pelepas pengaman dihapus** (tautan “Muat ulang tanpa pengaman” + ingatan host `kz:no-sandbox` — sekali klik dulu membuat iklan bisa membuka tab lagi), **daftar blokir iklan diperluas** (70 host / 13 pola, klien = server), **server berisiko ditaruh paling belakang** supaya pemutaran otomatis memakai host bersih
 
 ```
 kazanime/
 ├── index.html                 ✅🅔🅚🅝 homepage: hero, JADWAL, GENRE (filter Tahun/Musim/Urutan + hasil + 19 genre AniList; genre situs hanya di katalog.html), SUB INDO (per sumber, + kolom cari), ongoing, populer, baru rilis, donghua
-├── watch.html                 ✅🅒🅞 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=] (panel server `.server-bar` di bawah player, daftar episode di sidebar)
+├── watch.html                 ✅🅒🅞🅣 halaman nonton: watch.html?title=...&ep=1&mal=...&anilist=...[&kitsu=][&slug=&src=] (panel server `.server-bar` di bawah player, daftar episode di sidebar, tombol **Matikan blokir** `#btnAdBlockToggle` khusus server luar)
 ├── search.html                ✅ ?q=... · ?browse=ongoing|popular|new|donghua · ?genre=Action (+ &sort= &format= &source=)
 ├── katalog.html               ✅🅘🅙🅚 Jelajah: ?source=…&genre=<slug>&year=<yyyy>&season=<winter|spring|summer|fall>&filter=<bagian>&q=<kata kunci>; bagian berurutan + expand + Lihat Semua + kolom cari
 ├── bookmark.html              🅙 halaman Bookmark sendiri: cari, urutkan, hapus dari daftar (menggantikan section beranda & tautan navbar)
@@ -112,7 +113,7 @@ kazanime/
 │   │   ├── search-dropdown.js ✅🅔🅜 autocomplete AniList + Kitsu + **AnimeKu & Oploverz** (bertahap, bisa dibatalkan, keyboard, ARIA)
 │   │   ├── search-suggest.js  🅜 pengelompokan saran pencarian (metadata vs situs) — murni, bisa diuji tanpa DOM
 │   │   ├── api-status.js      ✅ widget status sumber data
-│   │   ├── player.js          🅒🅔🅕🅖🅝 SATU player: iframe TANPA sandbox ATAU video HLS (hls.js / HLS native), lapisan anti-iklan `#playerAdShield`, `externalUrl()`/`currentServerName()`, mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI & lokal
+│   │   ├── player.js          🅒🅔🅕🅖🅝🅣 SATU player: iframe (sandbox HANYA untuk server Sub Indo; server luar tanpa sandbox) ATAU video HLS (hls.js / HLS native), lapisan anti-iklan `#playerAdShield` + tombol **Matikan blokir** khusus server luar (`#btnAdBlockToggle`), `externalUrl()`/`currentServerName()`, mirror, status, tombol server, fallback otomatis, postMessage, subtitle AI & lokal
 │   │   ├── ai-subtitle.js     🅕 "Subtitle Indonesia (AI)": track AI (TextTrack/VTTCue) per bagian, subtitle bawaan disembunyikan, pilihan pengguna dihormati
 │   │   ├── local-subtitle.js  🅖 pilih .srt/.vtt lokal, konversi SRT→WebVTT, track browser + cleanup object URL; tanpa upload
 │   │   ├── icons.js           🅔 ikon garis Lucide (ISC) pengganti emoji: icon() + hydrateIcons() untuk HTML statis
@@ -425,12 +426,14 @@ dan `.footer` naik ke `z-index: 1` (player tetap `z-index: 2` + `isolation: isol
 kelopak/salju/gelembung tetap terlihat di ruang kosong, tetapi **tidak pernah** menembus kartu,
 foto, atau video.
 
-**🛡️ Penahan iklan player + pemutar eksternal (24 Okt 2026, putaran 8).** Sandbox iframe dan
+**🛡️ Penahan iklan player + pemutar eksternal (24 Okt 2026, putaran 8–15).** Sandbox iframe dan
 tombol **Pop-up diblokir/Pop-up diizinkan** sudah **dihapus** — justru sandbox itulah yang membuat
 host menampilkan *“Sandbox Not Allowed”* dan video tidak jalan. **Putaran 12 mengembalikan sandbox
-sebagai penahan tab baru yang selalu aktif** (tanpa `allow-popups`/`allow-top-navigation*`) dan
-**tanpa tawaran pelepas** (putaran 13), supaya `window.open()` iklan tidak pernah menghasilkan tab
-baru. Lihat bagian **putaran kedua belas** dan **putaran ketiga belas** di bawah.
+sebagai penahan tab baru** (tanpa `allow-popups`/`allow-top-navigation*`) dan **tanpa tawaran pelepas**
+(putaran 13). **Putaran 15 membatasinya: sandbox hanya untuk server Sub Indo (AnimeKu & Oploverz).**
+Server luar — AniList/Kitsu (MegaPlay, Vidnest, TryEmbed), ReAnime, AniZone — dimuat **tanpa sandbox**
+supaya embed Sub English bisa diputar, dan mendapat tombol **Matikan blokir** per server. Lihat bagian
+**putaran kedua belas**, **ketiga belas**, dan **kelima belas** di bawah.
 Selain itu, di atas iframe diberi lapisan bening `#playerAdShield` yang menangkap klik pertama
 (`preventDefault` + `stopPropagation`, `{once:true}`) supaya klik iklan di area player tidak
 membuka tab baru. Lapisan dilepas setelah satu klik, jadi **klik berikutnya diteruskan ke player** —
@@ -1508,6 +1511,48 @@ optimalisasi lagi."*
    suka, kurung kurawal seimbang). Total `npm test` **507 tes lulus**. Uji runtime `happy-dom`:
    label episode “Episode 2” (chip), hitungan awal 41 dari server, klik → 42 + `aria-pressed="true"`
    + `is-on` + 1 POST, klik lagi → batal (`kz:likes` kosong), 0 galat runtime.
+
+### Perubahan perilaku (24 Okt 2026 — putaran kelima belas: sandbox hanya Sub Indo, tombol “Matikan blokir” untuk server luar)
+
+Permintaan pengguna: *"oke dah ketemu kesalahan dimana server Yang sub English tidak boleh ada
+sandbox saya sarankan untuk semua server selain dari anime ku dan oploverz ada tombol matikan fitur
+block nya khusus server luar seperti anilist dan kitsu. perbaiki. lagi"*.
+
+1. **Sandbox hanya untuk AnimeKu & Oploverz.** `PLAYER.frameGuard.subIndoSources =
+   ['animeku','oploverz']`. Player memeriksa situs asal server (`source` → `siteOf()`): dua situs itu
+   tetap memakai sandbox tanpa `allow-popups`/`allow-top-navigation*` dan **tanpa tombol pelepas**
+   (aturan putaran 13 tetap berlaku). Semua server lain — **AniList/Kitsu** (MegaPlay, Vidnest,
+   TryEmbed), **ReAnime**, **AniZone**, dan hasil scraping bahasa lain — dimuat **tanpa atribut
+   `sandbox`** (`iframe.dataset.frameGuard = 'off'`) supaya embed yang menolak sandbox tidak lagi
+   menampilkan *“Sandboxed our player is not allowed”*.
+2. **Tombol “Matikan blokir” khusus server luar** (`#btnAdBlockToggle`, ikon `shield-off`). Tombol
+   muncul di baris kontrol **hanya** saat server yang diputar bukan AnimeKu/Oploverz dan bukan
+   pemutar HLS/native. Menekannya mematikan **lapisan anti-iklan** (`#playerAdShield`) untuk server
+   itu saja — klik pertama kembali diteruskan ke embed — lalu menyimpannya di localStorage
+   `kz:adblock-off` (`{ "server-id": true }`, maks 40 entri). Menekan lagi menyalakan proteksi dan
+   memasang lapisan kembali tanpa memuat ulang video. Server HLS/native (AniZone) tidak diberi
+   tombol karena memang tidak memakai iframe/lapisan.
+3. **Batas yang jujur.** Tanpa sandbox, embed server luar **bisa** membuka tab baru — itu konsekuensi
+   teknis yang tidak bisa dihindari browser. Karena itu: (a) toast memperingatkan saat blokir
+   dimatikan/dinyalakan, (b) petunjuk di panel server menjelaskan aturan ini, dan (c) tombol
+   **Pemutar Eksternal** tetap jadi jalan paling aman (embed dibuka di tab baru, tab Kazanime tidak
+   bisa dibajak).
+4. **Tidak ada regresi pengaman Sub Indo.** AnimeKu & Oploverz tetap ber-sandbox penuh; fungsi
+   `applyFramePolicy` tetap satu-satunya pemasang sandbox dan **tidak ada** `removeAttribute('sandbox')`
+   di mana pun. Server luar juga tetap melewati penyaring URL iklan (`filterAdServers`) dan penanda
+   host berisiko (⚠), jadi server yang URL-nya jaringan iklan tetap dibuang.
+5. **Tes & verifikasi.** `server/test/round15-external-sandbox.test.js` (9 tes baru) menjaga: daftar
+   sumber ber-sandbox tepat dua (AnimeKu & Oploverz), kebijakan `externalGuard` (tanpa sandbox,
+   lapisan tetap, `maxServers: 40`), jalur kode `if (isSubIndoServer(server)) applyFramePolicy(iframe)`
+   vs `else iframe.dataset.frameGuard = 'off'`, tombol yang hanya tampil untuk server luar,
+   penyimpanan `kz:adblock-off`, serta tidak kembalinya tautan pelepas gaya putaran 12–13. Dua tes
+   lama (putaran 12 & 13) diperbarui agar menyatakan aturan baru, bukan “sandbox untuk setiap iframe”.
+   Total `npm test` **516 tes lulus**. Uji runtime `happy-dom` memakai `createPlayer().load()`:
+   server Sub Indo → atribut `sandbox` ada, tombol tersembunyi, lapisan anti-iklan terpasang;
+   server luar (MegaPlay) → `sandbox` **null**, `frameGuard="off"`, tombol “Matikan blokir” tampil;
+   klik → label “Nyalakan blokir”, `aria-pressed="false"`, `kz:adblock-off` terisi, lapisan hilang;
+   muat ulang server yang sama → tetap tanpa lapisan (pilihan diingat); klik lagi → lapisan kembali
+   dan penyimpanan kosong; kembali ke server Sub Indo → sandbox kembali dan tombol tersembunyi.
 
 ### Sengaja dihapus (mati / palsu / duplikat)
 - Modal player lama `#playerModal` → digabung ke `watch.html` (satu implementasi)

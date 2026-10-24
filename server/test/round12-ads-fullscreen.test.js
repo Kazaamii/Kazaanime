@@ -73,9 +73,11 @@ test('config: kunci lama dibersihkan supaya host tidak dimuat tanpa penahan pop-
     assert.match(drop, /legacyNoSandbox/);
 });
 
-test('player: sandbox dipasang otomatis tanpa tombol mode', () => {
+test('player: sandbox dipasang otomatis untuk server Sub Indo (tanpa Mode Aman)', () => {
     assert.match(playerJs, /iframe\.sandbox\.value = PLAYER\.frameGuard\.policy/);
     assert.match(playerJs, /iframe\.dataset\.frameGuard = 'on';/);
+    // Putaran 15: server luar (AniList/Kitsu) dimuat tanpa sandbox — lihat round15 test.
+    assert.match(playerJs, /if \(guarded\) applyFramePolicy\(iframe\)/);
     // Tidak ada lagi tombol/status Safe Mode di halaman nonton.
     assert.doesNotMatch(watchHtml, /btnSafeMode/);
     assert.doesNotMatch(watchJs, /safeFrame|SafeMode|syncSafeModeButton/);

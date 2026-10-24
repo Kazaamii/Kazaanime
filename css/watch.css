@@ -117,6 +117,13 @@ html.player-fullscreen .navbar,html.player-fullscreen .footer,html.player-fullsc
 .player-ctrl-btn:disabled{opacity:.4;cursor:not-allowed}
 /* Status proteksi pop-up (24 Okt 2026): kuning = pengguna mengizinkan pop-up player. */
 .player-ctrl-btn.is-off{color:#fbbf24;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+/* Putaran 15: tombol "Matikan blokir" — hanya untuk server luar (AniList/Kitsu, ReAnime, AniZone).
+   Server Sub Indo (AnimeKu/Oploverz) tidak pernah menampilkannya. */
+.player-ctrl-btn--adblock{color:var(--text-secondary)}
+.player-ctrl-btn--adblock:hover:not(:disabled){background:rgba(251,191,36,.14);border-color:#fbbf24;color:#fde68a}
+.player-ctrl-btn--adblock .ic{width:15px;height:15px}
+/* Saat blokir dimatikan, tombol memakai .is-off (kuning) — tanda proteksi sedang nonaktif. */
+.player-ctrl-btn--adblock.is-off{color:#fbbf24;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
 .player-ctrl-btn[hidden],.player-local-subtitle-tools[hidden]{display:none}
 .player-local-subtitle-tools{display:inline-flex;align-items:center;gap:6px}
 .player-ctrl-btn--clear-subtitle{min-width:32px;padding:6px 9px;font-size:17px;line-height:1}
