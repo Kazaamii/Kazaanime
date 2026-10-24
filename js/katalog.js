@@ -86,7 +86,7 @@ const SOURCES = Object.freeze([
             {
                 id: 'donghua',
                 label: 'Donghua di Oploverz',
-                hint: 'Oploverz tidak punya kategori Donghua, jadi bagian ini dicari lewat judul: 4 benih situs (Perfect World, Battle Through the Heavens, Soul Land, Renegade Immortal) + judul donghua tayang dari metadata, dan hanya kartu yang judulnya cocok yang ditampilkan. Pencarian situsnya fuzzy (kueri "Battle Through the Heavens" bisa menjawab "Kingdom"), jadi daftar ini bisa tidak lengkap — itu batas situsnya, bukan data yang disembunyikan.',
+                hint: 'Oploverz tidak punya kategori/negara Donghua, jadi bagian ini dicari lewat judul: 4 benih situs (Perfect World, Battle Through the Heavens, Soul Land, Renegade Immortal) + judul donghua tayang dari metadata, dan hanya kartu yang judulnya cocok yang ditampilkan. Dicek 24 Okt 2026: oploverz.ch tidak memuat judul-judul itu (Perfect World → 404, Douluo/Martial Universe → "Not Found") dan pencarian situsnya fuzzy ("Battle Through the Heavens" menjawab "Kingdom"), jadi bagian ini wajar kosong — itu batas situsnya, bukan data yang disembunyikan.',
             },
         ],
     },
