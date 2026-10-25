@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   probe:
@@ -22,4 +22,15 @@ jobs:
         with:
           node-version: '22.22.3'
       - name: Probe aniwaves (honest bot UA, read-only)
+        env:
+          KAZ_PROBE_DIR: server/test/fixtures/_probe
         run: node server/scripts/probe-aniwaves.js
+      - name: Commit raw probe output for local analysis
+        run: |
+          git config user.name "kazanime-probe"
+          git config user.email "probe@kazanime.invalid"
+          git add server/test/fixtures/_probe
+          if git diff --cached --quiet; then echo "no changes"; else
+            git commit -m "chore(probe): raw aniwaves html for inspection"
+            git push origin HEAD:arena/418f4738-kazaanime
+          fi
