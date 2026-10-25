@@ -265,6 +265,8 @@ export function parseEpisodePage($, base) {
         const url = absoluteUrl(value, base);
         if (!url || seen.has(url)) return;
         seen.add(url);
+        // Putaran 25: nama server tetap dibawa apa adanya (`HD-1`, `HD-2`, …) — dipakai halaman
+        // nonton sebagai label opsi saat satu situs mengirim lebih dari satu server.
         servers.push({ name: clip(name, 40) || `Server ${servers.length + 1}`, url });
     };
 

@@ -83,7 +83,8 @@ export function makeEpisodeList(list = []) {
         .slice(0, 5000);
 }
 
-const LANG_ORDER = { multi: 0, id: 1, en: 2 };
+// Putaran 25: `dub` (sulih suara) selalu setelah semua jenis subtitle.
+const LANG_ORDER = { multi: 0, id: 1, en: 2, dub: 3 };
 const SUBTITLE_TYPE_ORDER = { hard: 0, soft: 1 };
 
 /**
@@ -120,10 +121,16 @@ export function makeEpisode({ episode, title = '', released = '', url = '', serv
                 ...(s.subtitleType === 'hard' || s.subtitleType === 'soft' ? { subtitleType: s.subtitleType } : {}),
                 ...(kind ? { kind } : {}),
                 ...(subtitles.length ? { subtitles } : {}),
+                // Putaran 25: baris/kelompok server dari sumber (mis. Aniwaves: SUB / S-Sub / DUB)
+                // supaya halaman nonton bisa memisahkan tombolnya per baris.
+                ...(s.group ? { group: clip(s.group, 20) } : {}),
+                ...(s.groupHint ? { groupHint: clip(s.groupHint, 40) } : {}),
             };
         })
         // Putaran 11: URL bertanda jaringan iklan / gateway klik dibuang di sini supaya tidak
         // pernah sampai ke iframe (dulu muncul halaman JSON "iclick link error" di pemutar).
+        // Putaran 25: URL & nama dibiarkan apa adanya; dedupe tetap per URL karena dua server
+        // dengan URL identik memutar berkas yang sama (Oploverz HD-1/HD-2 berbeda URL).
         .filter((s) => s.url && !inspectAdUrl(s.url).blocked && !seen.has(s.url) && seen.add(s.url))
         // Multi Sub didahulukan; setelahnya Hardsub eksplisit sebelum Softsub, urutan sumber stabil.
         .map((s, i) => ({ s, i }))

@@ -505,9 +505,39 @@ export function createPlayer({
     /** Melepas track lokal + object URL video aktif saat source berganti. */
     let disposeLocalSubtitleTrack = null;
     let localSubtitleToolsVisible = false;
-    /** id server → indeks mirror yang sedang dicoba (direset per episode). */
+    /**
+     * id server → indeks opsi (mirror) yang dipakai.
+     *
+     * Putaran 25 (25 Okt 2026): pilihan opsi situs (mis. Oploverz `HD-1` / `HD-2`) **diingat**
+     * per server di localStorage `kz:mirror`, jadi berpindah episode tidak mengembalikannya ke
+     * opsi pertama. Nilai di memori tetap dipakai lebih dulu (perubahan sesi ini).
+     */
+    const MIRROR_LIMIT = PLAYER.externalGuard?.maxServers || 40;
+    function readMirrorChoice() {
+        const raw = storage.get(STORAGE_KEYS.mirrorChoice, {});
+        return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    }
+    function writeMirrorChoice(serverId, index) {
+        if (!serverId) return;
+        const all = readMirrorChoice();
+        if (Number.isInteger(index) && index > 0) all[serverId] = index;
+        else delete all[serverId];
+        const keys = Object.keys(all);
+        if (keys.length > MIRROR_LIMIT) {
+            for (const stale of keys.slice(0, keys.length - MIRROR_LIMIT)) delete all[stale];
+        }
+        storage.set(STORAGE_KEYS.mirrorChoice, all);
+    }
+    /** Indeks opsi satu server (memori sesi → localStorage → 0). */
+    function optionIndex(server) {
+        if (!server) return 0;
+        if (mirror.has(server.id)) return mirror.get(server.id) || 0;
+        const saved = Number(readMirrorChoice()[server.id]);
+        const max = Array.isArray(server.options) ? server.options.length : Array.isArray(server.mirrors) ? server.mirrors.length : 1;
+        return Number.isInteger(saved) && saved >= 0 && saved < max ? saved : 0;
+    }
     let mirror = new Map();
-    const urlOf = (server) => server.mirrors?.[mirror.get(server.id) || 0] || server.url;
+    const urlOf = (server) => server.mirrors?.[optionIndex(server)] || server.url;
     let timer = 0;
     let overlayTimer = 0;
     /** @type {HTMLElement|null} lapisan anti-iklan di atas iframe (putaran 8) */
@@ -986,35 +1016,93 @@ export function createPlayer({
         }
     }
 
+    /**
+     * Tombol satu server.
+     * @param {StreamServer} s
+     */
+    function serverButton(s, currentIdValue) {
+        const active = s.id === currentIdValue && (state === 'loading' || state === 'playing');
+        const isFailed = failed.has(s.id);
+        // Putaran 16: placeholder Sub Indo (sumber tidak terjangkau) tetap tampil & bisa diklik.
+        const offline = Boolean(s.placeholder);
+        const cls = ['server-btn', active ? 'active' : '', s.available ? '' : 'is-disabled', isFailed ? 'is-failed' : '', offline ? 'is-offline' : ''].filter(Boolean).join(' ');
+        const lock = s.pending
+            ? html` <span class="server-badge server-badge--pending">mencari…</span>`
+            : s.available || offline ? '' : html` <span class="server-lock" aria-label="tidak tersedia">${ICON_LOCK}</span>`;
+        const offlineBadge = offline
+            ? html` <span class="server-badge server-badge--offline" title="Klik untuk mencari ulang">tidak terjangkau</span>`
+            : '';
+        // Putaran 11: host yang ada di daftar blokir iklan diberi tanda ⚠ (tetap bisa dipilih).
+        const adWarn = s.adRisk
+            ? html` <span class="server-badge server-badge--ad" title="Host server ini ada di daftar blokir iklan (AdGuard DNS)">⚠</span>`
+            : '';
+        // Putaran 19: server yang iklannya berulang diberi tanda, tetapi tombolnya tetap ada
+        // dan tetap bisa diklik (permintaan putaran 16).
+        const repeatBadge = autoBlocked(s) && !offline
+            ? html` <span class="server-badge server-badge--adblock" title="Iklan server ini berulang — dilewati otomatis. Klik untuk tetap mencoba.">iklan</span>`
+            : '';
+        return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available || offline ? 'false' : 'true'}" title="${s.available || offline ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge && !offline ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${repeatBadge}${offlineBadge}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
+    }
+
+    /**
+     * Baris opsi server situs (putaran 25).
+     *
+     * Permintaan pengguna: *"untuk Oploverz bisa di upayakan agar tidak bertabrakan kasih tombol
+     * opsi saja jadi oploverz punya 2 server"*. Server yang punya lebih dari satu opsi (mis.
+     * Oploverz `HD-1`/`HD-2`) tidak menambah tombol situs baru: pilihannya ada di dropdown ini.
+     * @param {StreamServer[]} list
+     */
+    function optionRow(list) {
+        const withOptions = list.filter((s) => Array.isArray(s.options) && s.options.length > 1 && s.available);
+        if (!withOptions.length) return '';
+        return html`<div class="server-options" role="group" aria-label="Pilihan server situs">
+            ${withOptions.map((s) => {
+                const active = optionIndex(s);
+                return html`<label class="server-option">
+                    <span class="server-option-label">${s.name} <small>opsi</small></span>
+                    <select data-server-option="${s.id}" aria-label="Pilih server ${s.name}">
+                        ${s.options.map((option, i) => html`<option value="${i}"${i === active ? ' selected' : ''}>${option.label}</option>`)}
+                    </select>
+                </label>`;
+            })}
+        </div>`;
+    }
+
+    /**
+     * Kelompokkan server per baris bila sumbernya mengirim `group` (putaran 25, sumber baru
+     * Aniwaves: SUB / S-Sub / DUB). Sumber lain tetap tampil datar seperti sebelumnya.
+     * @param {StreamServer[]} list
+     */
+    function serverRows(list) {
+        const rows = [];
+        for (const server of list) {
+            const key = String(server.group || '');
+            const last = rows[rows.length - 1];
+            if (last && last.key === key) last.list.push(server);
+            else rows.push({ key, hint: key ? String(server.groupHint || '') : '', list: [server] });
+        }
+        return rows;
+    }
+
     function renderServers() {
         if (!servers.length) {
             serverBox.innerHTML = '<p class="server-empty">Tidak ada server streaming yang dikonfigurasi.</p>';
             emit('servers', { count: 0 });
             return;
         }
-        serverBox.innerHTML = String(html`${servers.map((s) => {
-            const active = s.id === currentId && (state === 'loading' || state === 'playing');
-            const isFailed = failed.has(s.id);
-            // Putaran 16: placeholder Sub Indo (sumber tidak terjangkau) tetap tampil & bisa diklik.
-            const offline = Boolean(s.placeholder);
-            const cls = ['server-btn', active ? 'active' : '', s.available ? '' : 'is-disabled', isFailed ? 'is-failed' : '', offline ? 'is-offline' : ''].filter(Boolean).join(' ');
-            const lock = s.pending
-                ? html` <span class="server-badge server-badge--pending">mencari…</span>`
-                : s.available || offline ? '' : html` <span class="server-lock" aria-label="tidak tersedia">${ICON_LOCK}</span>`;
-            const offlineBadge = offline
-                ? html` <span class="server-badge server-badge--offline" title="Klik untuk mencari ulang">tidak terjangkau</span>`
-                : '';
-            // Putaran 11: host yang ada di daftar blokir iklan diberi tanda ⚠ (tetap bisa dipilih).
-            const adWarn = s.adRisk
-                ? html` <span class="server-badge server-badge--ad" title="Host server ini ada di daftar blokir iklan (AdGuard DNS)">⚠</span>`
-                : '';
-            // Putaran 19: server yang iklannya berulang diberi tanda, tetapi tombolnya tetap ada
-            // dan tetap bisa diklik (permintaan putaran 16).
-            const repeatBadge = autoBlocked(s) && !offline
-                ? html` <span class="server-badge server-badge--adblock" title="Iklan server ini berulang — dilewati otomatis. Klik untuk tetap mencoba.">iklan</span>`
-                : '';
-            return html`<button type="button" class="${cls}${s.pending ? ' is-pending' : ''}" data-server="${s.id}" aria-pressed="${active ? 'true' : 'false'}" aria-disabled="${s.available || offline ? 'false' : 'true'}" title="${s.available || offline ? s.description : s.reason}">${s.flag ? `${s.flag} ` : ''}${s.name}${s.badge && !offline ? html` <span class="server-badge">${s.badge}</span>` : ''}${adWarn}${repeatBadge}${offlineBadge}${lock}${isFailed ? html` <span class="server-badge server-badge--failed">gagal</span>` : ''}</button>`;
-        })}`);
+        if (!servers.some((s) => s.group)) {
+            serverBox.innerHTML = String(html`${servers.map((s) => serverButton(s, currentId))}${optionRow(servers)}`);
+            emit('servers', { count: available().length });
+            syncAdBlockToggle();
+            return;
+        }
+        // Ada sumber yang memisahkan baris (Aniwaves): judul baris + tombolnya sendiri-sendiri.
+        serverBox.innerHTML = String(html`${serverRows(servers).map((row) => (row.key
+            ? html`<div class="server-group">
+                    <p class="server-group-title">${row.key}${row.hint ? html` <small>${row.hint}</small>` : ''}</p>
+                    <div class="server-group-buttons">${row.list.map((s) => serverButton(s, currentId))}</div>
+                </div>`
+            : row.list.map((s) => serverButton(s, currentId))))}${optionRow(servers)}`);
         emit('servers', { count: available().length });
         // Putaran 15: tombol blokir hanya muncul untuk server luar yang sedang diputar.
         syncAdBlockToggle();
@@ -1486,11 +1574,11 @@ export function createPlayer({
     }
 
     function fail(server, reason) {
-        const idx = mirror.get(server.id) || 0;
+        const idx = optionIndex(server);
         if (server.mirrors && idx < server.mirrors.length - 1) {
-            // Mirror lain dari penyedia yang sama (HD-2 → HD-1) dicoba dulu.
+            // Opsi lain dari penyedia yang sama (HD-1 → HD-2) dicoba dulu.
             mirror.set(server.id, idx + 1);
-            console.warn(`[player] ${server.name} mirror ${idx + 1} gagal (${reason}) — mencoba mirror ${idx + 2}`);
+            console.warn(`[player] ${server.name} opsi ${idx + 1} gagal (${reason}) — mencoba opsi ${idx + 2}`);
             play(server);
             return;
         }
@@ -1593,6 +1681,41 @@ export function createPlayer({
     /* ---------------------------------------------------------------- */
     /* Klik tombol server                                                */
     /* ---------------------------------------------------------------- */
+    /**
+     * Pilih opsi (mirror) satu server — putaran 25.
+     *
+     * Dipakai dropdown `opsi` di panel server (Oploverz `HD-1`/`HD-2`). Bila server itu yang
+     * sedang diputar, pemutar memuat ulang URL opsi terpilih; bila belum, pilihan disimpan
+     * supaya saat server diputar nanti langsung memakai opsi tersebut.
+     * @param {string} serverId
+     * @param {number} index
+     * @returns {boolean} true bila pilihan diterima
+     */
+    function setOption(serverId, index) {
+        const s = byId(serverId);
+        if (!s) return false;
+        const total = Array.isArray(s.options) ? s.options.length : Array.isArray(s.mirrors) ? s.mirrors.length : 1;
+        if (!Number.isInteger(index) || index < 0 || index >= total) return false;
+        mirror.set(serverId, index);
+        writeMirrorChoice(serverId, index);
+        if (serverId === currentId && (state === 'loading' || state === 'playing')) {
+            failed.delete(serverId);
+            play(s);
+        } else {
+            renderServers();
+        }
+        const label = s.options?.[index]?.label || s.mirrorLabels?.[index] || `Opsi ${index + 1}`;
+        showToast(`${s.name}: ${label}`, 'info');
+        return true;
+    }
+
+    delegate(serverBox, 'change', 'select[data-server-option]', (_event, select) => {
+        const id = select?.dataset?.serverOption;
+        const index = Number(select?.value);
+        if (!id || !Number.isInteger(index)) return;
+        setOption(id, index);
+    });
+
     delegate(serverBox, 'click', '.server-btn[data-server]', (_event, btn) => {
         const s = byId(btn.dataset.server);
         if (!s) return;
@@ -1606,7 +1729,8 @@ export function createPlayer({
             return;
         }
         failed.delete(s.id);
-        mirror.delete(s.id);
+        // Putaran 25: pilihan opsi (HD-1/HD-2) TIDAK direset saat tombol server diklik — pilihan
+        // pengguna di dropdown opsi harus dihormati.
         play(s);
         showToast(`Server: ${s.name}`, 'success');
     });
@@ -1626,6 +1750,18 @@ export function createPlayer({
         adBlockedSites: () => [...adBlockedSites],
         /** Putaran 19: batas pembajakan untuk server (AnimeKu = 1). */
         adTakeoverLimit: (server) => adTakeoverLimit(server),
+        /**
+         * Putaran 25: opsi (mirror) satu server — indeks yang dipakai sekarang dan daftar opsinya.
+         * Ditampilkan halaman nonton sebagai dropdown "opsi" pada tombol situs Sub Indo.
+         * @param {string} serverId
+         */
+        serverOptions(serverId) {
+            const s = byId(serverId);
+            if (!s) return { index: 0, options: [] };
+            return { index: optionIndex(s), options: Array.isArray(s.options) ? s.options.map((option) => ({ ...option })) : [] };
+        },
+        /** Putaran 25: pilih opsi server (dipakai dropdown opsi & tes). */
+        setOption,
         /**
          * Putaran 19: beri tahu pemutar bahwa tab baru dibuka oleh Kazanime sendiri (tombol
          * Pemutar Eksternal), supaya kehilangan fokus sesudahnya tidak dihitung sebagai popup iklan.

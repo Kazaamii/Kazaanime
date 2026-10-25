@@ -237,7 +237,8 @@ export async function findBackendMatches(anime, { titles: extra, signal } = {}) 
     return out.sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source));
 }
 
-const LANG_RANK = { multi: 0, id: 1, en: 2 };
+// Putaran 25: dub (sulih suara) selalu setelah semua jenis subtitle.
+const LANG_RANK = { multi: 0, id: 1, en: 2, dub: 3 };
 
 /**
  * Dua situs yang katalognya memang Sub Indo (24 Okt 2026). Server dari situs ini

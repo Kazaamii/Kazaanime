@@ -166,10 +166,11 @@ test('halaman nonton: urutan tombol server menaruh Sub Indo lebih dulu', () => {
     assert.match(watchJs, /const subIndo = firstPerSite\(backendServers\.filter\(isSubIndoSource\)\);/,
         'tepat dua tombol Sub Indo (satu per situs)');
     // Putaran 16: slot Sub Indo diisi placeholder bila sumber tidak terjangkau — urutan tidak berubah.
-    assert.match(watchJs, /return numbered\(\[\.\.\.fillSubIndoServers\(subIndo\), \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english\]\)/,
-        'Sub Indo → Multi Sub → bahasa lain → cadangan → Sub Eng');
+    // Putaran 25: `dub` ditambahkan di paling akhir (sulih suara setelah semua subtitle).
+    assert.match(watchJs, /return numbered\(\[\.\.\.fillSubIndoServers\(subIndo\), \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english, \.\.\.dub\]\)/,
+        'Sub Indo → Multi Sub → bahasa lain → cadangan → Sub Eng → Dub');
     // Server statis ber-Sub Eng juga di urutan akhir (bukan terselip di blok cadangan).
-    assert.match(watchJs, /const otherFallback = fallback\.filter\(\(s\) => s\.lang !== 'multi' && s\.lang !== 'en'\);/);
+    assert.match(watchJs, /const otherFallback = fallback\.filter\(\(s\) => !\['multi', 'en', 'dub'\]\.includes\(s\.lang\)\);/);
     assert.match(watchJs, /const english = \[\.\.\.rest\.filter\(\(s\) => s\.lang === 'en'\), \.\.\.fallback\.filter\(\(s\) => s\.lang === 'en'\)\];/);
     assert.match(read('js/api/index.js'), /export \{ listStreamServers, getEpisodeExtras, SUB_INDO_SOURCES \}/);
 });

@@ -111,7 +111,7 @@ test('server Sub Indo: dua tombol bernama AnimeKu & Animeloverz', () => {
     assert.match(watchJs, /function firstPerSite\(list\) \{/);
     assert.match(watchJs, /const subIndo = firstPerSite\(backendServers\.filter\(isSubIndoSource\)\);/);
     // Putaran 16: dua slot itu diisi placeholder saat sumber mati, tetap paling depan.
-    assert.match(watchJs, /return numbered\(\[\.\.\.fillSubIndoServers\(subIndo\), \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english\]\)/,
+    assert.match(watchJs, /return numbered\(\[\.\.\.fillSubIndoServers\(subIndo\), \.\.\.multi, \.\.\.local, \.\.\.otherFallback, \.\.\.english, \.\.\.dub\]\)/,
         'Sub Indo (AnimeKu & Animeloverz) tetap paling depan');
     assert.match(watchJs, /site \? `diputar langsung dari \$\{site\}` : ''/);
 });
