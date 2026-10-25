@@ -63,6 +63,14 @@ async function main() {
         await fs.mkdir(outDir, { recursive: true });
         await fs.writeFile(`${outDir}/aniwaves-home.html`, home.text);
         await fs.writeFile(`${outDir}/aniwaves-episode.html`, ep.text);
+        // Aset JS yang mengisi #w-servers (untuk memastikan endpoint daftar server).
+        for (const asset of ['/assets/js/main.js?6618798188235000', '/assets/js/alter.js?v=6618798188235000']) {
+            const js = await get(`https://aniwaves.ru${asset}`).catch(() => null);
+            if (!js) continue;
+            const name = asset.split('?')[0].split('/').pop();
+            await fs.writeFile(`${outDir}/${name}`, js.text);
+            console.log('SAVED_JS', name, js.status, js.text.length);
+        }
         await fs.writeFile(`${outDir}/aniwaves-summary.json`, JSON.stringify({
             at: new Date().toISOString(),
             home: { status: home.status, type: home.type, length: home.text.length, watchLinks: [...new Set(watchLinks)].slice(0, 20) },
