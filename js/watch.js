@@ -46,7 +46,7 @@ import {
 import { onBookmarksChange } from './services/bookmark.js';
 import { getWatchedEpisodes, markWatched } from './services/history.js';
 import { episodeKey, getReactionCounts, isLiked, likedCount, setReaction } from './services/reactions.js';
-import { fillSubIndoServers, SUB_INDO_OFFLINE_BADGE } from './services/subindo-slots.js';
+import { fillSubIndoServers, siteSlots, SUB_INDO_OFFLINE_BADGE } from './services/subindo-slots.js';
 import { storage } from './services/storage.js';
 import { icon } from './ui/icons.js';
 
@@ -129,8 +129,27 @@ const scrapeFirst = () => isBackendEnabled() && (Boolean(ref.slug) || PLAYER.ser
 const staticServers = () => listStreamServers(anime, ep);
 
 /** Badge & keterangan bahasa dan jenis subtitle untuk tombol server. */
-const LANG_BADGE = { id: 'Sub Indo', en: 'Sub Eng', multi: 'Multi Sub' };
-const LANG_DESC = { id: 'Subtitle Indonesia', en: 'Subtitle Inggris', multi: 'Beberapa pilihan subtitle' };
+const LANG_BADGE = { id: 'Sub Indo', en: 'Sub Eng', multi: 'Multi Sub', dub: 'Dub' };
+/**
+ * Putaran 25 (25 Okt 2026) — permintaan pengguna: *"pisahkan tombol nya agar tidak terlalu banyak
+ * jadi untuk english dipisah baris nya dan dub nya"*.
+ *
+ * Tombol server dikelompokkan per baris menurut jenisnya, supaya daftar yang panjang (Sub Indo +
+ * Sub Eng + Dub + Multi Sub) tidak menumpuk jadi satu blok tombol. Judul baris memakai nama jenis
+ * dan keterangan singkat; tombol di dalamnya tetap tombol biasa.
+ */
+const LANG_GROUP = {
+    id: { title: 'Sub Indo', hint: 'AnimeKu & Animeloverz' },
+    multi: { title: 'Multi Sub', hint: 'beberapa pilihan subtitle' },
+    en: { title: 'Subtitle Inggris', hint: 'Sub Eng — hardsub/softsub' },
+    dub: { title: 'Dub', hint: 'sulih suara' },
+};
+const LANG_DESC = {
+    id: 'Subtitle Indonesia',
+    en: 'Subtitle Inggris',
+    multi: 'Beberapa pilihan subtitle',
+    dub: 'Sulih suara (dub) — tanpa subtitle Indonesia',
+};
 const SUBTITLE_TYPE_BADGE = { hard: 'Hardsub', soft: 'Softsub' };
 const SUBTITLE_TYPE_DESC = { hard: 'Jenis subtitle: hardsub', soft: 'Jenis subtitle: softsub' };
 
@@ -165,9 +184,12 @@ function numbered(list) {
         const site = isSubIndoSource(s) ? PLAYER.siteLabels[siteOf(s)] : '';
         if (!site) counter += 1;
         const name = site || `Server ${counter}`;
+        // Putaran 25: kelompokkan per jenis supaya tombolnya terpisah baris.
+        const group = LANG_GROUP[s.lang] || null;
         return {
             ...s,
             name,
+            ...(group && !s.group ? { group: group.title, groupHint: group.hint } : {}),
             flag: '',
             // Putaran 16: tombol Sub Indo yang sumbernya tidak terjangkau tetap tampil dengan
             // badge "tidak terjangkau" (bukan disembunyikan) dan bisa diklik untuk mencari ulang.
@@ -180,21 +202,28 @@ function numbered(list) {
                     LANG_DESC[s.lang],
                     SUBTITLE_TYPE_DESC[s.subtitleType],
                     site ? `diputar langsung dari ${site}` : '',
+                    // Putaran 25: sebutkan opsi server situs (mis. Oploverz HD-1/HD-2).
+                    Array.isArray(s.options) && s.options.length > 1
+                        ? `opsi: ${s.options.map((option) => option.label).join(' / ')}`
+                        : '',
                     s.source === 'static' ? 'server cadangan' : '',
                 ].filter(Boolean).join(' • ') || name,
         };
     });
 }
 
-/** Satu server per situs Sub Indo (server pertama) supaya tombolnya tepat dua. */
+/**
+ * Satu slot per situs Sub Indo supaya tombolnya tepat dua (putaran 16).
+ *
+ * Putaran 25: bila satu situs mengirim beberapa server (Oploverz `HD-1` + `HD-2`), server
+ * tambahan TIDAK menjadi tombol baru — semuanya digabung menjadi `options` pada slot situs itu
+ * dan dipilih lewat dropdown "opsi". Jadi tombol situs tetap dua, tetapi Oploverz tetap punya
+ * dua server yang bisa dipakai.
+ * @param {import('./api/streams.js').StreamServer[]} list
+ */
 function firstPerSite(list) {
-    const seen = new Set();
-    return list.filter((server) => {
-        const site = siteOf(server);
-        if (seen.has(site)) return false;
-        seen.add(site);
-        return true;
-    });
+    const slots = siteSlots(list);
+    return Object.values(slots).filter(Boolean);
 }
 
 /**
@@ -228,10 +257,12 @@ const servers = () => {
     // untuk salah satunya, slot diisi placeholder "tidak terjangkau" yang bisa diklik (cari ulang).
     const rest = backendServers.filter((server) => !isSubIndoSource(server));
     const multi = [...rest.filter((s) => s.lang === 'multi'), ...fallback.filter((s) => s.lang === 'multi')];
-    const local = rest.filter((s) => s.lang !== 'en' && s.lang !== 'multi');
-    const otherFallback = fallback.filter((s) => s.lang !== 'multi' && s.lang !== 'en');
+    // Putaran 25: `dub` dipisahkan dari `en` — sulih suara selalu di baris/urutan terakhir.
+    const local = rest.filter((s) => !['en', 'multi', 'dub'].includes(s.lang));
+    const otherFallback = fallback.filter((s) => !['multi', 'en', 'dub'].includes(s.lang));
     const english = [...rest.filter((s) => s.lang === 'en'), ...fallback.filter((s) => s.lang === 'en')];
-    return numbered([...fillSubIndoServers(subIndo), ...multi, ...local, ...otherFallback, ...english]);
+    const dub = [...rest.filter((s) => s.lang === 'dub'), ...fallback.filter((s) => s.lang === 'dub')];
+    return numbered([...fillSubIndoServers(subIndo), ...multi, ...local, ...otherFallback, ...english, ...dub]);
 };
 
 /**

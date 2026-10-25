@@ -106,7 +106,7 @@ test('putaran 16: situs asal dikenali dari source maupun slug', () => {
 /* 2 · Halaman nonton memakai slot tersebut                            */
 /* ------------------------------------------------------------------ */
 test('watch: daftar server memakai fillSubIndoServers di kedua urutan', () => {
-    assert.match(watchCode, /import \{ fillSubIndoServers, SUB_INDO_OFFLINE_BADGE \} from '\.\/services\/subindo-slots\.js';/);
+    assert.match(watchCode, /import \{ fillSubIndoServers, siteSlots, SUB_INDO_OFFLINE_BADGE \} from '\.\/services\/subindo-slots\.js';/);
     // scrape-first (default) dan static-first sama-sama mengisi dua slot.
     assert.match(watchCode, /fillSubIndoServers\(subIndo\)/);
     assert.match(watchCode, /fillSubIndoServers\(subIndoStatic\)/);

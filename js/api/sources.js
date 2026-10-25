@@ -361,12 +361,15 @@ function toEpisodeMedia(json) {
                 available: true,
                 reason: '',
                 source: `backend:${site}`,
-                lang: ['id', 'en', 'multi'].includes(x.lang) ? x.lang : '',
+                lang: ['id', 'en', 'multi', 'dub'].includes(x.lang) ? x.lang : '',
                 // Bukti bahasa per episode dari backend ("episode-title", "download-label", …).
                 ...(x.subtitleEvidence ? { subtitleEvidence: String(x.subtitleEvidence).slice(0, 20) } : {}),
                 ...(x.subtitleType === 'hard' || x.subtitleType === 'soft' ? { subtitleType: x.subtitleType } : {}),
                 ...(kind ? { kind } : {}),
                 ...(subtitles.length ? { subtitles } : {}),
+                // Putaran 25: kelompok baris server (Aniwaves SUB / S-Sub / DUB).
+                ...(x.group ? { group: String(x.group).slice(0, 20) } : {}),
+                ...(x.groupHint ? { groupHint: String(x.groupHint).slice(0, 40) } : {}),
                 origins: [originOf(url)].filter(Boolean),
             };
         })

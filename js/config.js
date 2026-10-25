@@ -78,6 +78,14 @@ export const STORAGE_KEYS = Object.freeze({
      * "Coba lagi"/berhasil memutar server itu.
      */
     adRepeatBlock: 'kz:adrepeat',
+    /**
+     * Putaran 25 (25 Okt 2026) — permintaan pengguna: *"untuk Oploverz … kasih tombol opsi saja
+     * jadi oploverz punya 2 server"*. Situs Sub Indo kadang mengirim lebih dari satu server untuk
+     * satu episode (Oploverz: `HD-1` dan `HD-2`). Supaya jumlah tombol situs tetap dua, server
+     * tambahan dipilih lewat dropdown **opsi** pada tombol situs itu. Pilihannya diingat per server
+     * di `{ [serverId]: indeks }` agar tidak perlu diulang tiap episode.
+     */
+    mirrorChoice: 'kz:mirror',
 });
 
 /** 7 tema. 'sakura' = default (:root), sisanya pakai [data-theme]. */

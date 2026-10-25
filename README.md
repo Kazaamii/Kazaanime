@@ -1829,6 +1829,63 @@ tambahkan donghua dari sana"*.
    punya benih donghua, dan beranda/katalog tetap menautkan kedua panel. `server/test/oploverz.test.js`
    menambah 1 tes benih Oploverz. Total `npm test` **548 tes lulus**.
 
+### Perubahan perilaku (25 Okt 2026 — putaran kedua puluh lima: opsi server Animeloverz & baris tombol per bahasa)
+
+Permintaan pengguna: *"untuk Oploverz bisa di upayakan agar tidak bertabrakan kasih tombol opsi saja
+jadi oploverz punya 2 server sedang kan untuk animewave pisahkan tombol nya agar tidak terlalu banyak
+jadi untuk english dipisah baris nya dan dub nya. sesuai kan saja dengan baik dan benar"*.
+
+1. **Animeloverz punya dua server tanpa menambah tombol situs** (`js/services/subindo-slots.js`).
+   Oploverz/Animeloverz mengirim `HD-1` **dan** `HD-2` untuk satu episode (dibuktikan lewat API
+   produksi 25 Okt 2026 pada `ao-no-hako-season-2` ep 1 & `diamond-no-ace-act-ii-second-season-part-2`
+   ep 1). Karena aturan putaran 16 menetapkan **tepat dua tombol Sub Indo**, kedua server digabung
+   menjadi satu slot + `options`:
+   ```js
+   { id: 'backend-oploverz-0', name: 'Animeloverz', url: <HD-1>,
+     options: [{label:'HD-1',url:<HD-1>}, {label:'HD-2',url:<HD-2>}],
+     mirrors: [<HD-1>, <HD-2>], mirrorLabels: ['HD-1','HD-2'] }
+   ```
+   `fillSubIndoServers()` mengembalikan objek asli apa adanya bila situs hanya punya satu server,
+   jadi perilaku & kontrak lama tidak berubah. Opsi dibatasi 4 per situs, duplikat URL dibuang.
+2. **Dropdown "opsi" di panel server** (`js/ui/player.js`): server dengan lebih dari satu opsi
+   mendapat `<select data-server-option>` yang dirender **di baris tempat tombol situs itu**.
+   Pilihan disimpan per server di `kz:mirror` (`STORAGE_KEYS.mirrorChoice`, batas 40) sehingga
+   berpindah episode tidak mengembalikannya ke opsi pertama; API `player.serverOptions()` dan
+   `player.setOption()` tersedia. Pemilihan opsi juga dipakai jalur mirror otomatis saat embed gagal,
+   dan klik tombol server **tidak** mereset pilihan pengguna.
+3. **Tombol server dipisah per baris** (`js/watch.js` + `js/ui/player.js` + `css/watch.css`):
+   `LANG_GROUP` memberi `group`/`groupHint` untuk `Sub Indo`, `Multi Sub`, `Subtitle Inggris`, dan
+   `Dub`; `renderServers()` merender judul baris + tombolnya sendiri (`serverRows`). Sumber yang
+   sudah mengirim `group` sendiri (mis. Aniwaves `SUB`/`S-Sub`/`DUB`) dipakai apa adanya. Bila tidak
+   ada satu pun `group`, panel tetap datar seperti sebelumnya (tanpa regresi). Di ponsel, judul baris
+   dan dropdown opsi memakai `grid-column:1/-1`, tombolnya tetap grid dua kolom.
+4. **Bahasa `dub` didukung** dari backend sampai UI: `LANG_ORDER`/`LANG_RANK` menaruh `dub` setelah
+   semua subtitle, `js/api/sources.js` menerima `lang: 'dub'`, dan `js/watch.js` memisahkannya dari
+   `en` di urutan pemutaran (`...english, ...dub`) dengan badge **Dub**.
+5. **Dedupe di sumber** (`server/sources/oploverz.js`): kunci dedupe tetap per URL (dua URL identik
+   memutar berkas yang sama), tetapi nama server (`HD-1`, `HD-2`) kini selalu dibawa supaya bisa
+   menjadi label opsi.
+6. **Tes.** `server/test/round25-server-options.test.js` (14 tes) mengunci penggabungan slot,
+   penyimpanan pilihan, dropdown, pemisahan baris, dukungan `dub`, dan bukti pemeriksaan Aniwaves.
+   Tes putaran 6/8/16 diperbarui mengikuti urutan baru (`...english, ...dub`). Total `npm test`
+   **592 tes lulus**.
+
+### Aniwaves (aniwaves.ru) — diperiksa, belum bisa dijadikan sumber (25 Okt 2026)
+
+Permintaan pengguna: *"https://aniwaves.ru/home tambahkan sumber baru dari sini jika memungkinkan"*.
+
+**Hasil: katalognya terbaca, daftar server streaming tidak.** Halaman episode
+(`/watch/<slug>-<id>/episode/<n>`) memuat `<div id="w-servers"></div>` **kosong**; tombol server
+diisi JavaScript dari endpoint `ajax/episode/list/<id>` (butuh parameter `vrf` = tanda tangan
+ter-obfuscate dari `main.js`), lalu `ajax/server/list?servers=…`, lalu `ajax/sources?id=…` untuk URL
+embed. Ketiga endpoint itu **dilarang `robots.txt`** (`Disallow: /ajax`, `Disallow: /api`) dan
+menuntut token anti-bot — melewatinya berarti bypass, yang dilarang aturan proyek. Tidak ada satu pun
+`iframe`/`m3u8` di HTML mentah yang diambil dengan UA jujur `KazanimeBot/1.0`.
+
+Yang dikerjakan: `server/scripts/probe-aniwaves.js` (pemeriksa read-only, bisa dijalankan ulang) dan
+`docs/ANIWAVES.md` (bukti + langkah membuat adapter bila situs berubah). Pemisahan baris tombol yang
+diminta untuk Aniwaves **sudah aktif** dan dipakai untuk semua sumber.
+
 ### Perubahan perilaku (25 Okt 2026 — putaran kedua puluh empat: player 16:9 & tombol blokir AnimeKu/Animeloverz)
 
 Permintaan pengguna: *"di animeku kepotong tolong perbaiki dan sediakan tombol blokir di animeku

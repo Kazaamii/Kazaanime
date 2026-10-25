@@ -317,6 +317,26 @@ a.ep-btn{display:block;text-decoration:none}
 .server-btn .server-badge--offline{background:rgba(245,158,11,.16);color:#fbbf24;text-transform:none;letter-spacing:0}
 
 /* ==========================================================================
+   Putaran 25 (25 Okt 2026) — baris kelompok server & dropdown opsi situs
+   1) Sumber yang memisahkan tombolnya per baris (Aniwaves: SUB / S-Sub / DUB)
+      mendapat judul baris sendiri supaya tombolnya tidak menumpuk jadi satu.
+   2) Situs Sub Indo yang mengirim lebih dari satu server (Oploverz HD-1/HD-2)
+      memakai dropdown "opsi" di bawah tombol — bukan tombol situs tambahan.
+   ========================================================================== */
+.server-group{flex:1 1 100%;min-width:0;display:flex;flex-direction:column;gap:6px}
+.server-group+.server-group{margin-top:2px}
+.server-group-title{margin:0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-secondary);display:flex;align-items:baseline;gap:6px}
+.server-group-title small{font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;opacity:.75}
+.server-group-buttons{display:flex;flex-wrap:wrap;gap:8px}
+/* Dropdown opsi server situs (tetap satu baris dengan tombol situs). */
+.server-options{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:2px}
+.server-option{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);font-size:11.5px;color:var(--text-secondary)}
+.server-option-label{display:inline-flex;align-items:baseline;gap:5px;font-weight:600;color:var(--text-primary)}
+.server-option-label small{font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.65}
+.server-option select{padding:3px 6px;border-radius:7px;border:1px solid rgba(var(--primary-rgb),.35);background:var(--bg-dark);color:var(--text-primary);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;outline:0}
+.server-option select:focus-visible{border-color:var(--primary);box-shadow:0 0 0 2px rgba(var(--primary-rgb),.25)}
+
+/* ==========================================================================
    REKOMENDASI
    ========================================================================== */
 .watch-recommendations{padding-top:16px}
@@ -356,6 +376,11 @@ a.ep-btn{display:block;text-decoration:none}
     /* Putaran 9: server streaming berjejer ke samping (2 kolom) tepat di bawah player,
        lalu daftar episode di bawahnya. */
     .server-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    /* Putaran 25: baris kelompok server & dropdown opsi selebar panel di ponsel. */
+    .server-group,.server-options{grid-column:1/-1}
+    .server-group-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .server-option{width:100%;justify-content:space-between}
+    .server-option select{flex:1 1 auto;min-width:0}
     .server-btn{width:100%;min-width:0;justify-content:center;text-align:center;flex-wrap:wrap;row-gap:2px;padding:9px 8px;font-size:12px}
     .server-bar{margin-bottom:16px}
     .watch-info{grid-template-columns:90px 1fr;gap:14px;padding:16px}
