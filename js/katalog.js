@@ -28,6 +28,7 @@
  * memakainya (`season[]=fall-2024`), AnimeKu tidak punya musim sehingga kedua pilihan
  * disembunyikan saat tab AnimeKu aktif — bukan pura-pura menyaring.
  */
+import { initAnalytics } from './analytics.js';
 import { initLayout } from './ui/layout.js';
 import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
 import { showSkeleton } from './ui/skeleton.js';
@@ -38,6 +39,9 @@ import { onBookmarksChange } from './services/bookmark.js';
 import { html, $, delegate } from './ui/dom.js';
 import { icon } from './ui/icons.js';
 import { currentPage, katalogUrl } from './routes.js';
+
+// Initialize Vercel Web Analytics
+initAnalytics();
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);

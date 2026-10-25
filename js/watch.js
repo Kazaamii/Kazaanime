@@ -25,6 +25,7 @@
  *
  * Tidak ada fetch di sini: data dari js/api, tampilan dari js/ui.
  */
+import { initAnalytics } from './analytics.js';
 import { initLayout } from './ui/layout.js';
 import { createPlayer } from './ui/player.js';
 import { openAdGuide } from './ui/ad-guide.js';
@@ -49,6 +50,9 @@ import { episodeKey, getReactionCounts, isLiked, likedCount, setReaction } from 
 import { fillSubIndoServers, siteSlots, SUB_INDO_OFFLINE_BADGE } from './services/subindo-slots.js';
 import { storage } from './services/storage.js';
 import { icon } from './ui/icons.js';
+
+// Initialize Vercel Web Analytics
+initAnalytics();
 
 const ctx = initLayout();
 const isBookmarked = (a) => ctx.isBookmarked(a);
