@@ -74,14 +74,19 @@ test('player: sandbox dipasang hanya untuk server Sub Indo, server luar diberi t
     assert.ok(!playBlock.includes('sandbox.value'), 'server luar tidak pernah mendapat atribut sandbox');
 });
 
-test('player: tombol "Matikan blokir" hanya tampil untuk server luar', () => {
+test('player: tombol "Matikan blokir" tampil untuk server luar DAN Sub Indo (putaran 24)', () => {
     assert.match(playerCode, /function isExternalServer\(server\)/);
+    assert.match(playerCode, /function isFrameServer\(server\)/);
     assert.match(playerCode, /function syncAdBlockToggle\(\)/);
-    // Server HLS/native dikecualikan (tidak memakai iframe/sandbox).
-    const ext = playerCode.slice(playerCode.indexOf('function isExternalServer'), playerCode.indexOf('function isExternalServer') + 500);
-    assert.match(ext, /kind === 'hls'/);
-    assert.match(ext, /kind === 'video'/);
-    // Tombol disembunyikan untuk server Sub Indo dan saat tidak ada server aktif.
+    // Server HLS/native dikecualikan (tidak memakai iframe/lapisan anti-iklan).
+    const frame = playerCode.slice(playerCode.indexOf('function isFrameServer'), playerCode.indexOf('function isFrameServer') + 300);
+    assert.match(frame, /kind !== 'hls'/);
+    assert.match(frame, /kind !== 'video'/);
+    // Putaran 24: tombol memakai isFrameServer() sehingga AnimeKu/Animeloverz ikut punya tombol.
+    const sync = playerCode.slice(playerCode.indexOf('function syncAdBlockToggle'), playerCode.indexOf('function syncAdBlockToggle') + 700);
+    assert.match(sync, /const show = isFrameServer\(server\)/);
+    assert.match(sync, /const subIndo = isSubIndoServer\(server\);/);
+    // Tombol disembunyikan saat tidak ada server aktif / server belum punya URL.
     assert.match(playerCode, /adBlockBtn\.hidden = !show;/);
     assert.match(playerCode, /adBlockBtn\.setAttribute\('aria-pressed', off \? 'false' : 'true'\)/);
     assert.match(playerCode, /const off = !adBlockEnabled\(server\);/);
@@ -92,9 +97,11 @@ test('player: mematikan blokir melepas lapisan anti-iklan server itu & disimpan 
     assert.match(playerCode, /function writeAdBlockOff\(serverId, off\)/);
     assert.match(playerCode, /function adBlockEnabled\(server\)/);
     assert.match(playerCode, /STORAGE_KEYS\.adBlockOff/);
-    // Server Sub Indo selalu aktif; server luar mengikuti pilihan (default PLAYER.externalGuard).
-    const enabledFn = playerCode.slice(playerCode.indexOf('function adBlockEnabled'), playerCode.indexOf('function adBlockEnabled') + 700);
-    assert.match(enabledFn, /if \(!isExternalServer\(server\)\) return true;/);
+    // Server HLS/native selalu aktif. Putaran 24: Sub Indo & server luar mengikuti pilihan
+    // pengguna, dengan default dari config masing-masing.
+    const enabledFn = playerCode.slice(playerCode.indexOf('function adBlockEnabled'), playerCode.indexOf('function adBlockEnabled') + 900);
+    assert.match(enabledFn, /if \(!isFrameServer\(server\)\) return true;/);
+    assert.match(enabledFn, /if \(isSubIndoServer\(server\)\) return PLAYER\.subIndoGuard\?\.shieldDefault !== false;/);
     assert.match(enabledFn, /PLAYER\.externalGuard\?\.shieldDefault/);
     // mountAdShield menghormati pilihan pengguna.
     const mount = playerCode.slice(playerCode.indexOf('function mountAdShield'), playerCode.indexOf('function mountAdShield') + 700);
@@ -104,13 +111,15 @@ test('player: mematikan blokir melepas lapisan anti-iklan server itu & disimpan 
     assert.match(handler, /writeAdBlockOff\(server\.id, off\)/);
     assert.match(handler, /removeAdShield\(\)/);
     assert.match(handler, /mountAdShield\(token\)/);
-    assert.match(handler, /isExternalServer\(server\)/, 'server Sub Indo tidak bisa memakai tombol ini');
+    assert.match(handler, /if \(!isFrameServer\(server\)\) return;/, 'tombol berlaku untuk semua server iframe');
+    // Putaran 24: pesan untuk Sub Indo menegaskan sandbox tetap aktif (tab baru tetap diblokir).
+    assert.match(handler, /Sandbox tetap aktif, jadi iklan tetap tidak bisa membuka tab baru/);
 });
 
 /* ------------------------------------------------------------------ */
 /* 3 · Halaman nonton                                                  */
 /* ------------------------------------------------------------------ */
-test('watch: tombol #btnAdBlockToggle ada di baris kontrol, tersembunyi sampai server luar aktif', () => {
+test('watch: tombol #btnAdBlockToggle ada di baris kontrol, tersembunyi sampai server aktif', () => {
     const idx = watchHtml.indexOf('id="btnAdBlockToggle"');
     assert.ok(idx > -1, 'tombol ada di watch.html');
     const button = watchHtml.slice(watchHtml.lastIndexOf('<button', idx), watchHtml.indexOf('</button>', idx));
@@ -147,8 +156,11 @@ test('ad guide: menjelaskan sandbox Sub Indo & tombol untuk server luar', () => 
 /* ------------------------------------------------------------------ */
 /* 4 · Tidak ada regresi pengaman Sub Indo                             */
 /* ------------------------------------------------------------------ */
-test('player: tombol tidak bisa muncul untuk AnimeKu/Oploverz (sandbox tetap penuh)', () => {
-    // Penentu tampil = isExternalServer(); sumber Sub Indo selalu false di fungsi itu.
+test('player: tombol Sub Indo tidak melepas sandbox (putaran 24 tetap penuh)', () => {
+    // Putaran 24 membalik aturan tampil (tombol juga untuk Sub Indo), TAPI sandbox tetap
+    // dipasang: penentu sandbox masih isSubIndoServer(), bukan tombol blokir.
+    assert.match(playerCode, /const guarded = isSubIndoServer\(server\) \|\| PLAYER\.externalGuard\?\.sandbox === true;/);
+    assert.doesNotMatch(playerCode, /adBlockEnabled\(server\)[^;]*\)\s*\?\s*applyFramePolicy/);
     const ext = playerCode.slice(playerCode.indexOf('function isExternalServer'), playerCode.indexOf('function isExternalServer') + 400);
     assert.match(ext, /!isSubIndoServer\(server\)/);
     // Tidak ada lagi tombol/tautan pelepas sandbox gaya putaran 12–13.

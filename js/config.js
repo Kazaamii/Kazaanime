@@ -512,6 +512,20 @@ export const PLAYER = Object.freeze({
         maxServers: 40,
     }),
     /**
+     * Putaran 24 (25 Okt 2026) — permintaan pengguna: *"di animeku kepotong tolong perbaiki dan
+     * sediakan tombol blokir di animeku dan animeloverz juga"*.
+     *
+     * Putaran 15 dulu menyembunyikan tombol blokir untuk server Sub Indo supaya sandbox tidak
+     * bisa dilepas. Permintaan baru ini **tidak** melepas sandbox: yang bisa diatur pengguna
+     * hanya lapisan blokir tambahan milik Kazanime (`player-ad-shield`) untuk server itu.
+     * Sandbox (`frameGuard.policy`/`strictPolicy`) tetap terpasang apa pun pilihan tombolnya,
+     * jadi tidak ada jalur baru ke `allow-popups`/`allow-top-navigation`.
+     */
+    subIndoGuard: Object.freeze({
+        /** Lapisan anti-iklan menyala secara bawaan, sama seperti server luar. */
+        shieldDefault: true,
+    }),
+    /**
      * Layar penuh buatan sendiri (putaran 12): `requestFullscreen` pada wadah player + kunci
      * orientasi lanskap supaya video berputar di ponsel. Bila peramban menolak, dipakai
      * fullscreen bawaan elemen `<video>` (iOS).

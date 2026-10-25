@@ -65,8 +65,15 @@
  *    (AniList/Kitsu: MegaPlay, Vidnest, TryEmbed; juga embed scraping lain) dimuat **tanpa sandbox**
  *    supaya embed yang menolak sandbox tetap bisa diputar.
  *  - Sebagai gantinya, server luar mendapat tombol **"Matikan blokir"** di baris kontrol player:
- *    mematikan lapisan anti-iklan untuk server itu saja (diingat di `kz:adblock-off`). Tombol ini
- *    TIDAK ada pada server Sub Indo — perlindungan mereka tetap utuh.
+ *    mematikan lapisan anti-iklan untuk server itu saja (diingat di `kz:adblock-off`).
+ *
+ * Putaran 24 (25 Okt 2026) — pengguna: *"di animeku kepotong tolong perbaiki dan sediakan tombol
+ * blokir di animeku dan animeloverz juga"*:
+ *  - Tombol **"Matikan blokir"** kini juga tampil untuk server Sub Indo (AnimeKu & Oploverz).
+ *    Yang dimatikan hanya lapisan anti-iklan Kazanime; **sandbox tetap dipasang penuh** (tanpa
+ *    `allow-popups`/`allow-top-navigation`), jadi iklan tetap tidak bisa membuka tab baru.
+ *  - Kotak player dipaksa 16:9 oleh `aspect-ratio` (lihat css/watch.css) supaya pemutar tidak
+ *    lagi memanjang/terpotong seperti laporan "kepotong".
  *
  * Tidak ada fetch di sini. Daftar server (StreamServer[]) datang dari js/api.
  */
@@ -213,8 +220,17 @@ function isSubIndoServer(server) {
  * @param {{source?: string, kind?: string}|null} server
  */
 function isExternalServer(server) {
-    if (!server || server.kind === 'hls' || server.kind === 'video') return false;
+    if (!isFrameServer(server)) return false;
     return !isSubIndoServer(server);
+}
+
+/**
+ * Server yang dimuat sebagai iframe (bukan HLS/video bawaan). Hanya kelompok ini yang punya
+ * lapisan anti-iklan, jadi hanya mereka yang boleh menampilkan tombol blokir (putaran 24).
+ * @param {{kind?: string}|null} server
+ */
+function isFrameServer(server) {
+    return Boolean(server) && server.kind !== 'hls' && server.kind !== 'video';
 }
 
 /** Batas jumlah server yang pilihannya diingat (localStorage tetap kecil). */
@@ -299,8 +315,10 @@ function writeAdBlockOff(serverId, off) {
 }
 
 /**
- * Status blokir untuk satu server (putaran 15).
- *  - Server Sub Indo: SELALU aktif (tidak ada tombol pelepasan).
+ * Status blokir untuk satu server (putaran 15, diperluas putaran 24).
+ *  - Server HLS/native: selalu aktif (tidak memakai iframe/lapisan ini).
+ *  - Server Sub Indo (AnimeKu & Animeloverz): mengikuti pilihan pengguna, bawaan
+ *    `PLAYER.subIndoGuard.shieldDefault`. Sandbox TIDAK ikut dimatikan.
  *  - Server luar: mengikuti pilihan pengguna; bila belum pernah dipilih, dipakai
  *    `PLAYER.externalGuard.shieldDefault`.
  * @param {{id?: string, source?: string, kind?: string}|null} server
@@ -308,9 +326,10 @@ function writeAdBlockOff(serverId, off) {
  */
 function adBlockEnabled(server) {
     if (!server) return false;
-    if (!isExternalServer(server)) return true;
+    if (!isFrameServer(server)) return true;
     const saved = readAdBlockOff();
     if (Object.prototype.hasOwnProperty.call(saved, server.id)) return saved[server.id] !== true;
+    if (isSubIndoServer(server)) return PLAYER.subIndoGuard?.shieldDefault !== false;
     return PLAYER.externalGuard?.shieldDefault !== false;
 }
 
@@ -1002,42 +1021,52 @@ export function createPlayer({
     }
 
     /**
-     * Tampilkan/sembunyikan tombol "Matikan blokir" (putaran 15).
-     * Tombol HANYA ada untuk server luar (bukan AnimeKu/Oploverz, bukan HLS/native) — server Sub
-     * Indo tetap memakai sandbox penuh tanpa tombol pelepas.
+     * Tampilkan/sembunyikan tombol "Matikan blokir" (putaran 15, diperluas putaran 24).
+     * Putaran 24: tombol kini juga tampil untuk server Sub Indo (AnimeKu & Animeloverz) sesuai
+     * permintaan pengguna — *"sediakan tombol blokir di animeku dan animeloverz juga"*. Yang
+     * diatur tombol ini hanya lapisan anti-iklan; sandbox tetap terpasang (tidak ada
+     * `allow-popups`/`allow-top-navigation`), jadi mematikan blokir tidak membuka jalan tab baru.
+     * Server HLS/native tetap tanpa tombol karena tidak memakai iframe/lapisan ini.
      */
     function syncAdBlockToggle() {
         if (!adBlockBtn) return;
         const server = current();
-        const show = Boolean(server) && isExternalServer(server) && Boolean(server.url)
+        const show = isFrameServer(server) && Boolean(server.url)
             && (state === 'loading' || state === 'playing');
         adBlockBtn.hidden = !show;
         if (!show) return;
         const off = !adBlockEnabled(server);
+        const subIndo = isSubIndoServer(server);
         adBlockBtn.classList.toggle('is-off', off);
         adBlockBtn.setAttribute('aria-pressed', off ? 'false' : 'true');
         adBlockBtn.title = off
             ? `Blokir iklan untuk ${server.name} dimatikan. Klik untuk menyalakan lagi.`
-            : `Server luar (${server.name}) dimuat tanpa sandbox. Klik untuk mematikan blokir iklan bila video tidak muncul.`;
+            : subIndo
+                ? `Server Sub Indo (${server.name}) tetap memakai sandbox; tombol ini hanya mematikan lapisan blokir iklan Kazanime bila pemutar tidak bisa diklik.`
+                : `Server luar (${server.name}) dimuat tanpa sandbox. Klik untuk mematikan blokir iklan bila video tidak muncul.`;
         const label = adBlockBtn.querySelector('[data-toggle-label]');
         if (label) label.textContent = off ? 'Nyalakan blokir' : 'Matikan blokir';
     }
 
     /**
-     * Tombol "Matikan blokir" (putaran 15) — hanya untuk server luar.
-     * Mematikan lapisan anti-iklan + ingatan pilihan per server; sandbox server Sub Indo tidak
-     * tersentuh karena tombol ini tidak pernah tampil untuk mereka.
+     * Tombol "Matikan blokir" (putaran 15, diperluas putaran 24).
+     * Mematikan lapisan anti-iklan + ingatan pilihan per server. Untuk server Sub Indo sandbox
+     * TIDAK ikut dilepas — tab baru tetap tidak bisa dibuka iklan; yang dilepas hanya lapisan
+     * anti-iklan Kazanime (penahan klik pertama).
      */
     adBlockBtn?.addEventListener('click', () => {
         const server = current();
-        if (!server || !isExternalServer(server)) return;
+        if (!isFrameServer(server)) return;
         const off = adBlockEnabled(server); // sedang aktif → klik ini mematikannya
         writeAdBlockOff(server.id, off);
         if (off) removeAdShield();
         else if (state === 'playing') mountAdShield(token);
         syncAdBlockToggle();
+        const subIndo = isSubIndoServer(server);
         showToast(off
-            ? `Blokir iklan dimatikan untuk ${server.name}. Embed server luar bisa membuka tab baru — tutup tab yang tidak dikenal.`
+            ? subIndo
+                ? `Blokir iklan dimatikan untuk ${server.name}. Sandbox tetap aktif, jadi iklan tetap tidak bisa membuka tab baru.`
+                : `Blokir iklan dimatikan untuk ${server.name}. Embed server luar bisa membuka tab baru — tutup tab yang tidak dikenal.`
             : `Blokir iklan dinyalakan lagi untuk ${server.name}.`, 'info', 7000);
     });
 

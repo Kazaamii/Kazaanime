@@ -25,8 +25,22 @@
    PLAYER
    ========================================================================== */
 /* Stacking context di atas visual-effects agar kelopak/salju tidak menimpa video atau kontrol player. */
-.streaming-player-wrapper{position:relative;z-index:2;isolation:isolate;width:100%;padding-top:56.25%;background:#000}
-.streaming-player-wrapper iframe,.streaming-player-wrapper>div{position:absolute;top:0;left:0;width:100%;height:100%;border:none}
+.streaming-player-wrapper{position:relative;z-index:2;isolation:isolate;width:100%;min-width:100%;grid-column:1/-1;flex:1 0 auto;padding-top:56.25%;background:#000;overflow:hidden}
+/* Putaran 24 (25 Okt 2026) — "di animeku kepotong".
+   Penyebab yang terlihat: kotak player tidak lagi 16:9. `padding-top:56.25%` dihitung dari
+   lebar wadah INDUK, sedangkan lebar elemen ini bisa lebih kecil (mis. wadah flex/grid
+   menyusutkan player) → tingginya ikut lebar induk, player jadi memanjang dan kontrol embed
+   terpotong di tepi kanan. `aspect-ratio` selalu memakai lebar elemen ini sendiri, jadi kotak
+   player tetap 16:9 di ukuran apa pun. `min-width:100%` + `grid-column:1/-1` + `flex:1 0 auto`
+   mencegah player disusutkan atau dipersempit wadah (dulu tampak 70% lebar halaman).
+   Padding lama dipertahankan sebagai cadangan untuk peramban tanpa `aspect-ratio`. */
+@supports (aspect-ratio:16/9){
+    .streaming-player-wrapper{padding-top:0;aspect-ratio:16/9;height:auto}
+}
+.streaming-player-wrapper iframe,.streaming-player-wrapper>div{position:absolute;top:0;left:0;width:100%;height:100%;max-width:100%;max-height:100%;border:none}
+/* Isi player tidak boleh meluber keluar kotak 16:9 (dulu bisa "kepotong" di tepi halaman). */
+.streaming-player-wrapper>#playerStage{overflow:hidden}
+.streaming-player-wrapper iframe,.streaming-player-wrapper video{display:block}
 
 /* Pesan di dalam player: loading / error / info (dulu inline style berulang) */
 .player-message{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:#000;padding:30px;text-align:center}
@@ -74,7 +88,7 @@
 
 /* Wadah player saat layar penuh: penuh layar, tanpa letterbox 16:9. */
 .streaming-player-wrapper:fullscreen,
-.streaming-player-wrapper:-webkit-full-screen{position:fixed;inset:0;z-index:9999;padding-top:0;width:100vw;height:100vh;height:100dvh;background:#000;border-radius:0}
+.streaming-player-wrapper:-webkit-full-screen{position:fixed;inset:0;z-index:9999;padding-top:0;aspect-ratio:auto;width:100vw;height:100vh;height:100dvh;background:#000;border-radius:0}
 .streaming-player-wrapper:fullscreen>#playerStage,
 .streaming-player-wrapper:-webkit-full-screen>#playerStage{position:absolute;inset:0;width:100%;height:100%}
 .streaming-player-wrapper:fullscreen iframe,
@@ -118,8 +132,9 @@ html.player-fullscreen .navbar,html.player-fullscreen .footer,html.player-fullsc
 .player-ctrl-btn:disabled{opacity:.4;cursor:not-allowed}
 /* Status proteksi pop-up (24 Okt 2026): kuning = pengguna mengizinkan pop-up player. */
 .player-ctrl-btn.is-off{color:#fbbf24;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
-/* Putaran 15: tombol "Matikan blokir" — hanya untuk server luar (AniList/Kitsu, ReAnime, AniZone).
-   Server Sub Indo (AnimeKu/Oploverz) tidak pernah menampilkannya. */
+/* Putaran 15: tombol "Matikan blokir" — untuk mengatur lapisan anti-iklan per server.
+   Putaran 24: tombol juga tampil untuk server Sub Indo (AnimeKu/Oploverz) atas permintaan
+   pengguna; sandbox mereka tetap aktif, jadi ini hanya mematikan lapisan blokir tambahan. */
 .player-ctrl-btn--adblock{color:var(--text-secondary)}
 .player-ctrl-btn--adblock:hover:not(:disabled){background:rgba(251,191,36,.14);border-color:#fbbf24;color:#fde68a}
 .player-ctrl-btn--adblock .ic{width:15px;height:15px}
