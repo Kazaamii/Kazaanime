@@ -79,6 +79,7 @@ test('css: stage & iframe mengisi kotak player tanpa meluber', () => {
 });
 
 test('watch: aset halaman memakai versi di URL supaya CSS lama tidak dipakai peramban', () => {
+    // Putaran 25 menaikkan versi ke `b` — yang dijaga hanya polanya (tanggal + huruf urut).
     assert.match(watchHtml, /href="css\/watch\.css\?v=\d{8}[a-z]?"/);
     assert.match(watchHtml, /href="css\/base\.css\?v=\d{8}[a-z]?"/);
     assert.match(watchHtml, /href="css\/components\.css\?v=\d{8}[a-z]?"/);

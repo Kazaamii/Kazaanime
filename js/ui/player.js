@@ -1097,12 +1097,15 @@ export function createPlayer({
             return;
         }
         // Ada sumber yang memisahkan baris (Aniwaves): judul baris + tombolnya sendiri-sendiri.
+        // Opsi situs (mis. Animeloverz HD-1/HD-2) dirender di baris tempat servernya berada,
+        // supaya dropdown-nya menempel pada tombol situs itu — bukan di ujung daftar.
         serverBox.innerHTML = String(html`${serverRows(servers).map((row) => (row.key
             ? html`<div class="server-group">
                     <p class="server-group-title">${row.key}${row.hint ? html` <small>${row.hint}</small>` : ''}</p>
                     <div class="server-group-buttons">${row.list.map((s) => serverButton(s, currentId))}</div>
+                    ${optionRow(row.list)}
                 </div>`
-            : row.list.map((s) => serverButton(s, currentId))))}${optionRow(servers)}`);
+            : html`${row.list.map((s) => serverButton(s, currentId))}${optionRow(row.list)}`))}`);
         emit('servers', { count: available().length });
         // Putaran 15: tombol blokir hanya muncul untuk server luar yang sedang diputar.
         syncAdBlockToggle();

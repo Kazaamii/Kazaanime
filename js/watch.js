@@ -130,6 +130,20 @@ const staticServers = () => listStreamServers(anime, ep);
 
 /** Badge & keterangan bahasa dan jenis subtitle untuk tombol server. */
 const LANG_BADGE = { id: 'Sub Indo', en: 'Sub Eng', multi: 'Multi Sub', dub: 'Dub' };
+/**
+ * Putaran 25 (25 Okt 2026) — permintaan pengguna: *"pisahkan tombol nya agar tidak terlalu banyak
+ * jadi untuk english dipisah baris nya dan dub nya"*.
+ *
+ * Tombol server dikelompokkan per baris menurut jenisnya, supaya daftar yang panjang (Sub Indo +
+ * Sub Eng + Dub + Multi Sub) tidak menumpuk jadi satu blok tombol. Judul baris memakai nama jenis
+ * dan keterangan singkat; tombol di dalamnya tetap tombol biasa.
+ */
+const LANG_GROUP = {
+    id: { title: 'Sub Indo', hint: 'AnimeKu & Animeloverz' },
+    multi: { title: 'Multi Sub', hint: 'beberapa pilihan subtitle' },
+    en: { title: 'Subtitle Inggris', hint: 'Sub Eng — hardsub/softsub' },
+    dub: { title: 'Dub', hint: 'sulih suara' },
+};
 const LANG_DESC = {
     id: 'Subtitle Indonesia',
     en: 'Subtitle Inggris',
@@ -170,9 +184,12 @@ function numbered(list) {
         const site = isSubIndoSource(s) ? PLAYER.siteLabels[siteOf(s)] : '';
         if (!site) counter += 1;
         const name = site || `Server ${counter}`;
+        // Putaran 25: kelompokkan per jenis supaya tombolnya terpisah baris.
+        const group = LANG_GROUP[s.lang] || null;
         return {
             ...s,
             name,
+            ...(group && !s.group ? { group: group.title, groupHint: group.hint } : {}),
             flag: '',
             // Putaran 16: tombol Sub Indo yang sumbernya tidak terjangkau tetap tampil dengan
             // badge "tidak terjangkau" (bukan disembunyikan) dan bisa diklik untuk mencari ulang.
