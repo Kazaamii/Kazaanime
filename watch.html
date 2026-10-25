@@ -10,10 +10,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/watch.css">
-    <script type="module" src="js/watch.js"></script>
+    <!-- Putaran 24: versi aset ikut di-URL-kan supaya peramban tidak memakai CSS lama
+         (tata letak player lama membuat pemutar terlihat "kepotong"). Naikkan angka ini
+         setiap kali CSS/JS halaman nonton berubah. -->
+    <link rel="stylesheet" href="css/base.css?v=20261025a">
+    <link rel="stylesheet" href="css/components.css?v=20261025a">
+    <link rel="stylesheet" href="css/watch.css?v=20261025a">
+    <script type="module" src="js/watch.js?v=20261025a"></script>
 </head>
 <body data-page="watch">
 
@@ -71,10 +74,11 @@
                 <button type="button" class="player-ctrl-btn" id="btnPrevEp" disabled aria-label="Episode sebelumnya"><span class="ic-slot" data-icon="chevron-left"></span><span class="ctrl-long">Episode </span>Sebelumnya</button>
                 <button type="button" class="player-ctrl-btn" id="btnNextEp" disabled aria-label="Episode berikutnya"><span class="ctrl-long">Episode </span>Berikutnya<span class="ic-slot" data-icon="chevron-right"></span></button>
                 <button type="button" class="player-ctrl-btn" id="btnNextServer" disabled title="Coba server streaming berikutnya"><span class="ic-slot" data-icon="refresh-cw"></span>Server Lain</button>
-                <!-- Putaran 15: khusus server LUAR (AniList/Kitsu, ReAnime, AniZone). Server Sub Indo
-                     (AnimeKu/Oploverz) tetap ber-sandbox tanpa tombol pelepas, jadi tombol ini
-                     disembunyikan untuk mereka oleh ui/player.js. -->
-                <button type="button" class="player-ctrl-btn player-ctrl-btn--adblock" id="btnAdBlockToggle" aria-pressed="true" hidden title="Server luar dimuat tanpa sandbox. Matikan blokir iklan bila video tidak muncul."><span class="ic-slot" data-icon="shield-off"></span><span data-toggle-label>Matikan blokir</span></button>
+                <!-- Putaran 15: tombol lapisan blokir. Putaran 24 (permintaan pengguna: "sediakan
+                     tombol blokir di animeku dan animeloverz juga"): tombol ini kini juga tampil
+                     untuk AnimeKu/Animeloverz. Sandbox Sub Indo TIDAK dilepas — tombol hanya
+                     mematikan lapisan anti-iklan Kazanime untuk server itu. -->
+                <button type="button" class="player-ctrl-btn player-ctrl-btn--adblock" id="btnAdBlockToggle" aria-pressed="true" hidden title="Matikan lapisan blokir iklan Kazanime untuk server yang sedang diputar (AnimeKu, Animeloverz, atau server luar)."><span class="ic-slot" data-icon="shield-off"></span><span data-toggle-label>Matikan blokir</span></button>
                 <button type="button" class="player-ctrl-btn player-ctrl-btn--fullscreen" id="btnFullscreen" aria-pressed="false" title="Layar penuh: video mengisi layar dan otomatis berputar ke lanskap bila peramban mendukung"><span class="ic-slot" data-icon="maximize"></span>Layar Penuh</button>
                 <button type="button" class="player-ctrl-btn player-ctrl-btn--external" id="btnExternalPlayer" title="Buka server ini di tab baru — iklan embed tidak bisa membuka/membajak tab Kazanime"><span class="ic-slot" data-icon="external-link"></span><span class="ctrl-ext-long">Pemutar Eksternal</span><span class="ctrl-ext-short">Eksternal</span></button>
                 <div class="player-local-subtitle-tools" id="localSubtitleTools" hidden>
@@ -90,7 +94,7 @@
             <!-- SERVER STREAMING — tepat di bawah player, tombol berjejer ke samping (putaran 9) -->
             <section class="server-selector server-bar" aria-labelledby="serverHeading">
                 <h4 id="serverHeading"><span class="ic-slot" data-icon="server"></span>Server Streaming</h4>
-                <p class="server-hint"><button type="button" class="server-hint-link" id="btnAdGuide">Panduan blokir iklan</button> · Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Tombol <strong>AnimeKu/Animeloverz</strong> selalu ada; bila bertanda <strong>tidak terjangkau</strong>, klik tombol itu untuk mencari ulang. Server <strong>Sub Indo (AnimeKu &amp; Animeloverz)</strong> memakai penahan pop-up; server <strong>luar</strong> (MegaPlay, Vidnest, TryEmbed — AniList) dimuat tanpa sandbox — bila video tetap kosong, tekan <strong>Matikan blokir</strong>. Bila iklan yang sama muncul lagi setelah ditutup, server itu dilewati otomatis supaya popup tidak berulang. Untuk <strong>AnimeKu</strong> perlindungannya lebih ketat: server yang iklannya berulang tidak dipilih otomatis lagi (ingat sampai 6 jam) sampai Anda memilihnya sendiri, dan namanya diberi tanda <strong>iklan</strong>.</p>
+                <p class="server-hint"><button type="button" class="server-hint-link" id="btnAdGuide">Panduan blokir iklan</button> · Server dicoba otomatis berurutan. Jika video tidak bisa diputar, klik <strong>Server Lain</strong> atau pilih manual. Tombol <strong>AnimeKu/Animeloverz</strong> selalu ada; bila bertanda <strong>tidak terjangkau</strong>, klik tombol itu untuk mencari ulang. Server <strong>Sub Indo (AnimeKu &amp; Animeloverz)</strong> memakai penahan pop-up, dan tombol <strong>Matikan blokir</strong> di bawah pemutar tersedia untuk mereka juga — tombol itu hanya mematikan lapisan blokir iklan Kazanime, sandbox tetap aktif sehingga iklan tetap tidak bisa membuka tab baru. Server <strong>luar</strong> (MegaPlay, Vidnest, TryEmbed — AniList) dimuat tanpa sandbox — bila video tetap kosong, tekan <strong>Matikan blokir</strong>. Bila iklan yang sama muncul lagi setelah ditutup, server itu dilewati otomatis supaya popup tidak berulang. Untuk <strong>AnimeKu</strong> perlindungannya lebih ketat: server yang iklannya berulang tidak dipilih otomatis lagi (ingat sampai 6 jam) sampai Anda memilihnya sendiri, dan namanya diberi tanda <strong>iklan</strong>.</p>
                 <div class="server-buttons" id="serverButtons"></div>
             </section>
 

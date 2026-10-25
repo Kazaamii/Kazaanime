@@ -1829,6 +1829,39 @@ tambahkan donghua dari sana"*.
    punya benih donghua, dan beranda/katalog tetap menautkan kedua panel. `server/test/oploverz.test.js`
    menambah 1 tes benih Oploverz. Total `npm test` **548 tes lulus**.
 
+### Perubahan perilaku (25 Okt 2026 — putaran kedua puluh empat: player 16:9 & tombol blokir AnimeKu/Animeloverz)
+
+Permintaan pengguna: *"di animeku kepotong tolong perbaiki dan sediakan tombol blokir di animeku
+dan animeloverz juga"*.
+
+1. **Player tidak lagi "kepotong".** Kotak player dulu memakai `padding-top:56.25%`, yang dihitung
+   dari lebar **wadah induk**, bukan lebar player itu sendiri. Bila elemen player lebih sempit dari
+   wadahnya (mis. wadah flex/grid menyusutkannya, atau CSS lama masih ter-cache), tingginya tetap
+   mengikuti lebar induk → player memanjang (di laporan: 306×246, seharusnya 306×172) dan kontrol
+   embed terpotong di tepi kanan. Sekarang `css/watch.css` memakai `aspect-ratio:16/9` (memakai
+   lebar elemen sendiri), `padding-top:0`, dan `padding-top:56.25%` hanya sebagai cadangan lewat
+   `@supports` untuk peramban tua. Ditambah `min-width:100%`, `grid-column:1/-1`, `flex:1 0 auto`
+   (player tidak bisa dipersempit wadah), `overflow:hidden` pada wadah & `#playerStage`, serta
+   `max-width/max-height:100%` pada iframe — isi pemutar tidak bisa meluber keluar kotak 16:9.
+2. **Versi aset di URL** (`?v=20261025a` untuk `base.css`, `components.css`, `watch.css`, dan
+   `js/watch.js` di `watch.html`). Tanpa ini peramban bisa terus memakai CSS tata letak lama
+   (itulah yang membuat player terlihat 70% lebar halaman); angka versi dinaikkan setiap kali aset
+   halaman nonton berubah.
+3. **Tombol "Matikan blokir" untuk AnimeKu & Animeloverz.** Aturan putaran 15 ("tombol hanya untuk
+   server luar") dibalik atas permintaan pengguna, **tanpa** melepas satu pun pengaman:
+   `PLAYER.subIndoGuard.shieldDefault = true` menjadi bawaan baru untuk server Sub Indo, tombol
+   tampil untuk semua server iframe (`isFrameServer`: bukan `hls`/`video`), dan pilihan tetap
+   diingat per server (`kz:adblock-off`, batas 40). Yang dimatikan **hanya lapisan anti-iklan
+   Kazanime** (`player-ad-shield`, penahan klik pertama); sandbox `frameGuard.policy`/`strictPolicy`
+   tetap dipasang lewat `isSubIndoServer()` — tidak ada `allow-popups`, `allow-top-navigation`,
+   maupun `removeAttribute('sandbox')`. Pesan setelah menekan tombol pun menegaskan hal itu untuk
+   server Sub Indo, dan panduan iklan (`js/ui/ad-guide.js`) diperbarui.
+4. **Tes & verifikasi.** Tes baru `server/test/round24-player-fit-adblock.test.js` (11 tes) mengunci
+   geometri 16:9, pengaman lebar, versi aset, `subIndoGuard`, tampilan tombol untuk AnimeKu &
+   Animeloverz, penyimpanan pilihan, dan tidak adanya jalur pelepas sandbox. Tes putaran 15 & 19
+   diperbarui mengikuti aturan baru (tetap mengunci sandbox penuh untuk Sub Indo). Total `npm test`
+   **578 tes lulus**.
+
 ### Sumber anime di APK Miku Moe 3.6 (24 Okt 2026 — lanjutan peta sumber)
 
 Permintaan pengguna: *"saya ingin kamu memeriksa source yg anime dipake oleh aplikasi tersebut dan

@@ -213,10 +213,12 @@ test('pengaman putaran 15/16 tidak berubah', () => {
     assert.doesNotMatch(playerCode, /removeAttribute\(['"]sandbox['"]\)/);
     assert.doesNotMatch(playerCode, /allow-popups|allow-top-navigation|allow-modals/);
     assert.doesNotMatch(playerCode, /releaseFrameGuard|mountFrameHint|hostRefusesSandbox/);
-    // Tombol "Matikan blokir" hanya untuk server luar.
-    assert.match(playerCode, /if \(!server \|\| !isExternalServer\(server\)\) return;/);
-    // Server Sub Indo selalu memakai blokir.
-    assert.match(playerCode, /if \(!isExternalServer\(server\)\) return true;/);
+    // Putaran 24: tombol "Matikan blokir" juga untuk Sub Indo — tetapi hanya lapisan
+    // anti-iklannya; sandbox AnimeKu tetap dipasang penuh (tidak ada jalur pelepas).
+    assert.match(playerCode, /if \(!isFrameServer\(server\)\) return;/);
+    assert.match(playerCode, /if \(!isFrameServer\(server\)\) return true;/);
+    assert.doesNotMatch(playerCode, /removeAttribute\(['"]sandbox['"]\)/);
+    assert.match(playerCode, /if \(guarded && isStrictAdServer\(server\)\) applyStrictFramePolicy\(iframe\);/);
     // Petunjuk panel server menjelaskan perilaku baru.
     assert.match(watchHtml, /iklan yang sama muncul lagi setelah ditutup/);
 });
