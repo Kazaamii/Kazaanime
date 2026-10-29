@@ -366,6 +366,8 @@ function backoffDelay(attempt, retryAfter) {
  *   transform?: (json:any) => any,  hasilnya yang di-cache & dikembalikan
  *   force?: boolean,                abaikan circuit breaker (cek ulang manual)
  *   noCache?: boolean,              lewati cache memori/sessionStorage & HTTP cache (refresh manual)
+ *   cacheable?: (value:any) => boolean,  putaran 26: false = hasil TIDAK disimpan
+ *                                  (mis. respons yang kehilangan salah satu situs Sub Indo)
  * }} [options]
  */
 export function fetchJSON(url, options = {}) {
@@ -385,6 +387,7 @@ export function fetchJSON(url, options = {}) {
         transform,
         force = false,
         noCache = false,
+        cacheable,
     } = options;
 
     const payload = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
@@ -412,7 +415,8 @@ export function fetchJSON(url, options = {}) {
                     const valid = validate ? validate(json) : json;
                     const value = transform ? transform(valid) : valid;
                     markHealth(source, true);
-                    if (ttl > 0) cacheSet(key, value, ttl, persist);
+                    // cacheable=false → respons tetap dikembalikan, hanya tidak disimpan.
+                    if (ttl > 0 && (!cacheable || cacheable(value))) cacheSet(key, value, ttl, persist);
                     return value;
                 } catch (rawErr) {
                     const err = rawErr instanceof ApiError

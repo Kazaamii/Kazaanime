@@ -86,7 +86,7 @@ function call(path, opts = {}) {
 }
 
 /** GET <baseUrl><apiPath> lewat http.js (cache, timeout, dedupe, status backend). */
-function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform, force = false, noCache = false } = {}) {
+function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform, force = false, noCache = false, cacheable } = {}) {
     if (!isBackendEnabled()) return Promise.reject(disabledError());
     const base = String(cfg.baseUrl || '').replace(/\/+$/, '');
     return fetchJSON(`${base}${apiPath}`, {
@@ -98,6 +98,7 @@ function callApi(apiPath, { ttl = CACHE_TTL.browse, signal, transform, force = f
         transform,
         force,
         noCache,
+        cacheable,
     }).catch((err) => {
         throw noteAbsent(err);
     });
@@ -108,6 +109,12 @@ const toList = (json) => ({
     source: json.source || 'backend',
     /** true = data dari API metadata (semua scraper gagal), bukan dari situs sumber. */
     fallback: Boolean(json.fallback),
+    /**
+     * Sumber yang gagal pada permintaan ini (putaran 26). Dipakai supaya hasil yang
+     * kehilangan AnimeKu/Animeloverz tidak disimpan di cache — hasil seperti itu membuat
+     * Sub Indo "tidak terdeteksi" sampai cache kedaluwarsa (±15 menit).
+     */
+    errors: (Array.isArray(json.errors) ? json.errors : []).map((error) => fromBackendError(error)).filter(Boolean),
 });
 
 /** Rilis terbaru dari situs sumber → { items, source, fallback }. */
@@ -243,9 +250,32 @@ export function getSourceGenres({ signal } = {}) {
     });
 }
 
-/** Cari judul di situs sumber → { items, source, fallback }. */
-export function searchBackend(q, { signal } = {}) {
-    return call(`/search?q=${encodeURIComponent(q)}`, { ttl: CACHE_TTL.search, signal, transform: toList });
+/** Id situs Sub Indo — harus sama dengan SUB_INDO_SOURCES di js/api/streams.js. */
+const SUB_INDO_SITE_IDS = Object.freeze(['animeku', 'oploverz']);
+
+/**
+ * Cari judul di situs sumber → { items, source, fallback, errors }.
+ *
+ * Putaran 26: `sources` membatasi pencarian ke situs tertentu (dipakai pencarian ulang
+ * khusus AnimeKu/Animeloverz) dan `noCache` memaksa permintaan baru saat hasil lama
+ * tersimpan ketika salah satu situs Sub Indo sedang gagal.
+ * @param {string} q
+ * @param {{signal?: AbortSignal, sources?: string[], noCache?: boolean}} [opts]
+ */
+export function searchBackend(q, { signal, sources, noCache = false } = {}) {
+    const params = new URLSearchParams({ q: String(q || '') });
+    const list = (Array.isArray(sources) ? sources : [])
+        .map((site) => String(site || '').trim().toLowerCase())
+        .filter((site) => /^[a-z][a-z0-9-]{1,30}$/.test(site));
+    if (list.length) params.set('sources', [...new Set(list)].join(','));
+    return call(`/search?${params.toString()}`, {
+        ttl: CACHE_TTL.search,
+        signal,
+        noCache,
+        transform: toList,
+        // Hasil yang kehilangan situs Sub Indo tidak boleh masuk cache (lihat toList).
+        cacheable: (value) => !(value?.errors || []).some((error) => SUB_INDO_SITE_IDS.includes(String(error?.source || '').toLowerCase())),
+    });
 }
 
 /** Detail anime dari situs sumber → { anime: Anime } (dipakai watch.html bila ada slug). */

@@ -1829,6 +1829,59 @@ tambahkan donghua dari sana"*.
    punya benih donghua, dan beranda/katalog tetap menautkan kedua panel. `server/test/oploverz.test.js`
    menambah 1 tes benih Oploverz. Total `npm test` **548 tes lulus**.
 
+### Perubahan perilaku (29 Okt 2026 — putaran kedua puluh enam: deteksi Sub Indo diperkuat)
+
+Permintaan pengguna: *"tolong perbaiki Deteksi Anime Untuk Sub Indo Kadang Tidak Terdeteksi
+Perkuat Deteksi Dan Pencocokan Judul dan Fokus terhadap sub indo nya dlu apapun yang terjadi
+Harus bekerja."*
+
+Empat penyebab "anime ada di AnimeKu/Animeloverz tetapi Sub Indo tidak terdeteksi" diperbaiki:
+
+1. **Pencocokan judul memakai skor, bukan kesamaan huruf** (`js/api/normalize.js`).
+   `titleSignature()` memecah judul menjadi kata isi + nomor season + tahun + penanda jenis
+   karya. Kata tambahan situs (`Sub Indo`, `Batch`, `1080p`, `BD`, `TV`, `Uncensored`) dibuang,
+   angka Romawi (`Mushoku Tensei II`) dan `Part`/`Cour` dibaca sebagai musim, dan
+   `Season 2` = `2nd Season` = `S2`. `titleMatchScore()` lalu memberi skor 0–1:
+   - kata isi & musim sama → **1.0**;
+   - salah ketik/romanisasi berbeda (`Shingeki no Kyoujin`) → kemiripan bigram, ≥ 0.84;
+   - musim, arc, film, atau `Final Season` yang berbeda → **0** (tidak boleh salah pilih
+     season: `Sousou no Frieren` ≠ `… 2nd Season`, `Jujutsu Kaisen` ≠ `Jujutsu Kaisen 0`,
+     `One Piece` ≠ `One Piece Film: Red`, `Naruto` ≠ `Naruto Shippuden`).
+   `matchBackendItem()` sekarang memilih **skor tertinggi** (ambang `TITLE_MATCH_THRESHOLD` = 0.8),
+   bukan kandidat pertama yang kebetulan cocok. Dibuktikan dengan 22 kartu hasil pencarian
+   **produksi** 29 Okt 2026 (Frieren, Solo Leveling, Mushoku Tensei II/III, Kimetsu arc Hashira):
+   pilihan situs tidak berubah, dan kasus yang dulu gagal (judul Anoboy tanpa penanda season)
+   sekarang ikut cocok.
+2. **Kata kunci pencarian diperbanyak & diselang-seling** (`titleQueryVariants()` +
+   `searchQueries()` di `js/api/streams.js`). Pencarian WordPress situs sumber mewajibkan
+   **semua** kata ada, jadi tiap judul dicoba dalam beberapa gaya: judul utuh, tanpa penanda
+   season, tanpa angka Romawi, bagian sebelum titik dua, tanpa keterangan dalam kurung, dan
+   gaya season lain (`2nd Season` → `Season 2`). Varian judul utama & judul alternatif
+   (romaji) diselang-seling supaya romaji tidak pernah terlewat.
+3. **Pencarian ulang khusus Sub Indo** (`js/api/streams.js` + `?sources=` di backend).
+   Bila tahap pertama belum menemukan AnimeKu/Animeloverz, backend dipanggil lagi **hanya**
+   untuk dua situs itu (maks 3 kata kunci cadangan), lalu satu percobaan terakhir **tanpa cache**
+   (sekali per anime per sesi; tombol "cari ulang" mengulanginya). Endpoint
+   `GET /api/anime/search?q=…&sources=animeku,oploverz` memfilter adapter di
+   `registry.search(q, ctx, { sources })` sehingga situs lain tidak dibebani.
+4. **Hasil yang kehilangan Sub Indo tidak lagi di-cache.** Dulu satu kegagalan AnimeKu
+   (403/429/5xx sesaat) tersimpan **±15 menit** di CDN dan cache peramban → Sub Indo seolah
+   hilang. Sekarang route mengirim `Cache-Control: no-store` bila `errors` memuat AnimeKu/
+   Oploverz (`server/routes/anime.js`), dan `searchBackend()` memakai opsi `cacheable` baru di
+   `js/api/http.js` agar respons yang sama tidak disimpan di memori/sessionStorage. Daftar
+   `errors` kini ikut diteruskan ke pemanggil, dan cache padanan dinaikkan ke `kz:matches:v2`
+   supaya entri lama (yang mungkin tanpa Sub Indo) tidak dipakai.
+
+Batas yang dijaga: tidak ada UA palsu, solver, proxy, atau percobaan ulang setelah
+`403/429/challenge`; pengulangan hanya untuk kegagalan sesaat dan dibatasi jumlahnya. Bila
+anime memang tidak ada di AnimeKu/Animeloverz, tombol Sub Indo tetap tampil sebagai
+"tidak terjangkau" dengan alasannya (aturan putaran 16) — bukan disembunyikan, bukan diklaim ada.
+
+Berkas yang berubah: `js/api/normalize.js`, `js/api/streams.js`, `js/api/sources.js`,
+`js/api/http.js`, `server/sources/index.js`, `server/routes/anime.js`,
+`server/test/round26-subindo-detection.test.js` (24 tes), `server/test/round12-ads-fullscreen.test.js`
+(pola cache `v2`). Tes: **616/616**.
+
 ### Perubahan perilaku (25 Okt 2026 — putaran kedua puluh lima: opsi server Animeloverz & baris tombol per bahasa)
 
 Permintaan pengguna: *"untuk Oploverz bisa di upayakan agar tidak bertabrakan kasih tombol opsi saja
