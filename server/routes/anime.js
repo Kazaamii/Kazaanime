@@ -132,6 +132,31 @@ export function readCatalogQuery(value) {
     return q;
 }
 
+/** Situs Sub Indo. Hasil yang kehilangan salah satunya TIDAK boleh di-cache (putaran 26). */
+const SUB_INDO_SOURCE_IDS = new Set(['animeku', 'oploverz']);
+
+/**
+ * Daftar id situs untuk ?sources= (opsional): "animeku,oploverz".
+ * Dipakai frontend untuk mencari ulang HANYA di situs Sub Indo saat padanan belum
+ * ditemukan — lebih cepat dan tidak membebani situs lain.
+ * @param {unknown} value
+ * @returns {string[]} array id situs (kosong = semua sumber)
+ */
+export function readSourceList(value) {
+    if (value === undefined || value === null || value === '') return [];
+    const raw = Array.isArray(value) ? value : String(value).split(',');
+    const out = [];
+    for (const entry of raw) {
+        const item = String(entry || '').trim();
+        if (!item) continue;
+        if (!/^[a-z][a-z0-9-]{1,30}$/i.test(item)) throw badRequest('Parameter sources tidak valid.');
+        const id = item.toLowerCase();
+        if (!out.includes(id)) out.push(id);
+        if (out.length === 8) break;
+    }
+    return out;
+}
+
 /** Halaman katalog 1–500. */
 export function readPageNumber(value) {
     if (value === undefined || value === null || value === '') return 1;
@@ -155,6 +180,14 @@ export function readEpisode(value) {
  * supaya data asli segera muncul lagi begitu sumber pulih.
  */
 function setCacheHeaders(res, result, cdn) {
+    // Putaran 26: hasil yang kehilangan AnimeKu/Animeloverz (situs sempat gagal/rate limit)
+    // jangan disimpan CDN — kalau tersimpan, Sub Indo "tidak terdeteksi" selama cache hidup.
+    const subIndoMissing = Array.isArray(result?.errors)
+        && result.errors.some((error) => SUB_INDO_SOURCE_IDS.has(String(error?.source || '').toLowerCase()));
+    if (subIndoMissing) {
+        res.set('Cache-Control', 'no-store');
+        return;
+    }
     // partial = poster pengganti belum semuanya ketemu (masih dicari di belakang) → cache singkat
     const sMax = result.fallback || result.stale ? Math.min(120, cdn.cdnMaxAge) : result.partial ? Math.min(60, cdn.cdnMaxAge) : cdn.cdnMaxAge;
     res.set('Cache-Control', `public, max-age=${result.fallback || result.stale ? 0 : 60}, s-maxage=${sMax}, stale-while-revalidate=${cdn.cdnStale}`);
@@ -241,7 +274,9 @@ export function animeRouter(registry, { budgetMs, cdn = CACHE, signer = null, an
 
     router.get('/latest', handle((req, ctx) => registry.latest(ctx)));
     router.get('/latest-subindo', handle((req, ctx) => registry.latestSubIndo(ctx)));
-    router.get('/search', handle((req, ctx) => registry.search(readQuery(req.query.q), ctx)));
+    router.get('/search', handle((req, ctx) => registry.search(readQuery(req.query.q), ctx, {
+        sources: readSourceList(req.query.sources),
+    })));
     router.get('/downloads/kusonime', handle((req, ctx) => {
         const titles = readRomajiTitles(req.query.title);
         return typeof registry.kusonimeDownloads === 'function'

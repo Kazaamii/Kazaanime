@@ -127,6 +127,279 @@ export function stripSeasonSuffix(text) {
 
 const ORDINAL_WORDS = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };
 
+/* ------------------------------------------------------------------ */
+/* Pencocokan judul lintas situs (putaran 26, 29 Okt 2026)             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Kata yang sering DITAMBAHKAN situs pada judul kartu (bukan bagian judulnya):
+ * "Solo Leveling Sub Indo", "One Piece Batch 1080p", "Jujutsu Kaisen TV".
+ * Dibuang sebelum judul dibandingkan supaya tidak menggagalkan pencocokan.
+ */
+const TITLE_NOISE = new Set([
+    'sub', 'subs', 'indo', 'indonesia', 'subtitle', 'subtitles', 'subbed', 'hardsub', 'softsub',
+    'batch', 'lengkap', 'complete', 'completed', 'ongoing', 'eps', 'episode', 'episodes',
+    'hd', 'fhd', 'uhd', 'sd', 'bd', 'bdrip', 'bluray', 'web', 'webdl', 'webrip', 'tvrip', 'hdtv',
+    'uncensored', 'raw', 'raws', 'multi', 'duel', 'dubbing',
+]);
+
+/**
+ * Penanda JENIS KARYA. Bila hanya satu sisi punya penanda ini, keduanya adalah karya
+ * berbeda ("One Piece" ≠ "One Piece Film: Red", "Kimetsu no Yaiba" ≠ "... Movie").
+ */
+const TITLE_FORMAT_MARKERS = new Set(['movie', 'film', 'gekijouban', 'special', 'ova', 'oad', 'ona', 'recap', 'compilation', 'picture', 'drama']);
+
+/** Penanda season tanpa nomor ("The Final Season") — juga penanda karya berbeda. */
+const TITLE_SEASON_WORDS = new Set(['season', 'seasons', 'final', 'cour', 'part']);
+
+/**
+ * Penanda yang PASTI membedakan karya bila hanya ada di satu sisi:
+ * "Attack on Titan" ≠ "Attack on Titan: The Final Season".
+ */
+const TITLE_HARD_MARKERS = new Set(['season', 'seasons', 'final', 'part', 'cour']);
+
+/** Angka Romawi di tengah/akhir judul = season ("Mushoku Tensei II", "Overlord IV"). */
+const ROMAN_SEASONS = Object.freeze({ ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 });
+
+/** Kata sandang Inggris yang tidak membedakan judul. */
+const TITLE_ARTICLES = new Set(['the', 'a', 'an', 'and']);
+
+/**
+ * Tanda pengenal judul untuk pencocokan lintas situs.
+ *
+ * Situshasil scraping menulis judul dengan gaya berbeda-beda: "Sousou No Frieren 2Nd Season",
+ * "Mushoku Tensei II: Isekai Ittara Honki Dasu", "One Piece (2024) Sub Indo". Perbandingan
+ * huruf-ke-huruf gagal untuk hampir semua variasi itu, jadi judul dipecah menjadi:
+ *   - `tokens`  : kata isi (tanpa kata tambahan situs, tahun, season, kata sandang)
+ *   - `season`  : nomor season/part bila ada ("2nd Season", "S2", "Part 2", "II")
+ *   - `year`    : tahun rilis bila ditulis di judul
+ *   - `markers` : penanda yang membedakan karya (movie/special/"final season")
+ * @param {string} text
+ * @returns {{tokens: string[], compact: string, season: number|null, part: number|null, year: number|null, markers: string[]}}
+ */
+export function titleSignature(text) {
+    const base = ` ${String(text || '')
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[’'`´]/g, '')} `;
+    const markers = new Set();
+    let season = null;
+    let part = null;
+    let year = null;
+
+    const firstNumber = (re) => {
+        const m = re.exec(base);
+        return m ? Number.parseInt(m[1], 10) : null;
+    };
+    // Urutan penting: "2nd Season" & "Season 2" dulu, baru bentuk pendek "S2".
+    const seasonNo = firstNumber(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/)
+        ?? firstNumber(/\bseason\s*(\d{1,2})\b/)
+        ?? firstNumber(/\bs(\d{1,2})\b/);
+    const partNo = firstNumber(/\b(?:part|cour)\s*(\d{1,2})\b/);
+    const yearNo = firstNumber(/\b(19\d{2}|20\d{2})\b/);
+    if (seasonNo != null && seasonNo >= 1 && seasonNo <= 20) season = seasonNo;
+    if (partNo != null && partNo >= 1 && partNo <= 20) part = partNo;
+    if (yearNo != null) year = yearNo;
+
+    const words = base.split(/[^a-z0-9]+/).filter(Boolean);
+    const tokens = [];
+    for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        // "2nd season" / "season 2" / "s2" / "part 2" → sudah jadi musim, bukan kata judul.
+        if (/^\d{1,2}(?:st|nd|rd|th)$/.test(w) && /^(season|part|cour)$/.test(words[i + 1] || '')) { i += 1; continue; }
+        if (w === 'season' || w === 'seasons') {
+            const n = /^\d{1,2}$/.exec(words[i + 1] || '');
+            if (n) i += 1;
+            else markers.add('season');
+            continue;
+        }
+        if (w === 'part' || w === 'cour') {
+            const n = /^\d{1,2}$/.exec(words[i + 1] || '');
+            if (n) i += 1;
+            else markers.add('part');
+            continue;
+        }
+        if (/^s\d{1,2}$/.test(w)) continue; // "s2", "s03"
+        if (year && w === String(year)) continue; // tahun rilis bukan bagian judul
+        if (TITLE_NOISE.has(w)) continue;
+        if (TITLE_ARTICLES.has(w)) continue;
+        if (TITLE_SEASON_WORDS.has(w)) { markers.add(w); continue; }
+        if (TITLE_FORMAT_MARKERS.has(w)) { markers.add(w); continue; }
+        if (w === 'eps' || w === 'ep') continue;
+        if (ROMAN_SEASONS[w] && i > 0) {
+            // "Mushoku Tensei II" / "Overlord IV" → season, bukan kata judul.
+            if (season == null) season = ROMAN_SEASONS[w];
+            continue;
+        }
+        tokens.push(w);
+    }
+
+    return {
+        tokens,
+        compact: tokens.join(''),
+        season,
+        part,
+        year,
+        markers: [...markers].sort(),
+    };
+}
+
+/** Kemiripan Dice atas pasangan huruf (bigram) — tahan salah ketik/romanisasi. */
+function bigramDice(a, b) {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
+    const grams = new Map();
+    for (let i = 0; i < a.length - 1; i++) {
+        const g = a.slice(i, i + 2);
+        grams.set(g, (grams.get(g) || 0) + 1);
+    }
+    let hit = 0;
+    for (let i = 0; i < b.length - 1; i++) {
+        const g = b.slice(i, i + 2);
+        const n = grams.get(g) || 0;
+        if (n > 0) { grams.set(g, n - 1); hit += 1; }
+    }
+    return (2 * hit) / (a.length - 1 + b.length - 1);
+}
+
+/** Nomor musim efektif: "Season 2" dan "Part 2" dianggap penanda musim yang sama. */
+const seasonKeyOf = (sig) => sig.season ?? sig.part ?? null;
+
+/** Skor 0–1 untuk satu pasang tanda pengenal judul. */
+function signatureScore(a, b) {
+    const markersA = new Set(a.markers);
+    const markersB = new Set(b.markers);
+    // Karya berbeda: penanda musim tanpa nomor ("The Final Season") hanya ada di satu sisi.
+    const hardDiff = [...markersA].some((m) => TITLE_HARD_MARKERS.has(m) && !markersB.has(m))
+        || [...markersB].some((m) => TITLE_HARD_MARKERS.has(m) && !markersA.has(m));
+    if (hardDiff) return 0;
+    // Penanda jenis karya ("Movie", "Special") hanya di satu sisi → masih mungkin karya yang
+    // sama ("Jujutsu Kaisen 0" vs "Jujutsu Kaisen 0 Movie"), tetapi jelas kurang tepat.
+    const softDiff = [...markersA].some((m) => !TITLE_HARD_MARKERS.has(m) && !markersB.has(m))
+        || [...markersB].some((m) => !TITLE_HARD_MARKERS.has(m) && !markersA.has(m));
+
+    // Season berbeda = anime berbeda ("Mushoku Tensei II" ≠ "III", "Frieren" ≠ "Frieren S2").
+    // Judul tanpa penanda dianggap musim pertama — situs yang tidak menulis nomor season
+    // memang menaruh seri pertamanya di judul polos.
+    const keyA = seasonKeyOf(a);
+    const keyB = seasonKeyOf(b);
+    if ((keyA ?? 1) !== (keyB ?? 1)) return 0;
+
+    const A = a.tokens;
+    const B = b.tokens;
+    if (!A.length || !B.length) return 0;
+
+    let penalty = 1;
+    if (softDiff) penalty *= 0.8;
+    // Hanya satu sisi menyebut "Part 2": masih mungkin entri yang sama, tetapi entri yang
+    // sama-sama menyebut part jelas lebih tepat.
+    if ((a.part == null) !== (b.part == null)) penalty *= 0.97;
+    if (a.year != null && b.year != null && Math.abs(a.year - b.year) > 1) penalty *= 0.9;
+
+    const setA = new Set(A);
+    const setB = new Set(B);
+    const inter = [...setA].filter((t) => setB.has(t)).length;
+    const minLen = Math.min(setA.size, setB.size);
+    const maxLen = Math.max(setA.size, setB.size);
+    const union = minLen === 0 ? 0 : setA.size + setB.size - inter;
+
+    let score = 0;
+    if (inter === minLen && inter === maxLen) {
+        score = 1; // kata isi sama persis
+    } else {
+        const extra = maxLen - inter;
+        // Selisih HANYA berupa angka ("Jujutsu Kaisen" vs "Jujutsu Kaisen 0", "Title" vs
+        // "Title 2") = karya/season lain, bukan variasi penulisan.
+        const longer = setA.size >= setB.size ? A : B;
+        const shorter = new Set(setA.size >= setB.size ? B : A);
+        const extraTokens = [...new Set(longer)].filter((token) => !shorter.has(token));
+        if (extraTokens.length && extraTokens.every((token) => /^\d+$/.test(token))) return 0;
+        // CATATAN: kata tambahan TIDAK boleh dianggap padanan hanya karena "judul sama +
+        // satu kata" — "Kimetsu no Yaiba" + "Yuukaku-hen" adalah arc yang berbeda. Kata
+        // tambahan situs ("Sub Indo", "Batch", "2024", "BD") sudah dibuang di titleSignature.
+        const dice = bigramDice(a.compact, b.compact);
+        if (dice >= 0.84 && (A[0] === B[0] || inter >= 2)) score = Math.max(score, Math.min(dice, 0.97));
+        if (union > 0 && inter >= 2 && inter / union >= 0.66) score = Math.max(score, (inter / union) * 0.9);
+    }
+    return Math.min(1, score * penalty);
+}
+
+/** Batas skor minimum untuk menerima dua judul sebagai anime yang sama. */
+export const TITLE_MATCH_THRESHOLD = 0.8;
+
+/**
+ * Skor kemiripan judul (0–1). Sisi mana pun boleh berupa daftar judul (judul utama +
+ * alternatif); skor terbaik yang dipakai.
+ * @param {string|string[]} left
+ * @param {string|string[]} right
+ * @returns {number}
+ */
+export function titleMatchScore(left, right) {
+    const listOf = (value) => (Array.isArray(value) ? value : [value])
+        .flatMap((v) => titleVariants(v))
+        .map((v) => titleSignature(v))
+        .filter((sig) => sig.tokens.length);
+    const a = listOf(left);
+    const b = listOf(right);
+    let best = 0;
+    for (const x of a) {
+        for (const y of b) {
+            const score = signatureScore(x, y);
+            if (score > best) best = score;
+            if (best >= 1) return 1;
+        }
+    }
+    return best;
+}
+
+/**
+ * Varian kata kunci pencarian untuk satu judul, urut dari yang paling spesifik.
+ * Pencarian WordPress situs sumber mewajibkan SEMUA kata ada, jadi judul yang ditulis
+ * berbeda ("Mushoku Tensei II" vs "Mushoku Tensei: ... Season 2") tidak pernah muncul
+ * bila hanya judul utuh yang dikirim. Varian ini menutup celah tersebut.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function titleQueryVariants(text) {
+    const full = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!full) return [];
+    const out = [];
+    const push = (value) => {
+        const v = String(value || '').replace(/\s+/g, ' ').replace(/^[\s:–-]+|[\s:–-]+$/g, '').trim();
+        if (v.length < 2 || v.length > 100) return;
+        const key = titleKey(v);
+        if (!key || out.some((seen) => titleKey(seen) === key)) return;
+        out.push(v);
+    };
+    push(full);
+    push(stripSeasonSuffix(full));
+    // "Mushoku Tensei II: Isekai ..." → "Mushoku Tensei: Isekai ..." (angka Romawi = season).
+    push(full.replace(/\s+(ii|iii|iv|v|vi|vii|viii|ix|x)\b/gi, ' ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s{2,}/g, ' '));
+    // Situs menulis season dengan gaya berbeda-beda: "2nd Season" ≠ "Season 2" bagi
+    // pencarian WordPress (semua kata wajib ada), jadi kedua gaya dicoba.
+    const ordinalToSeason = full.replace(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/gi, (_, n) => `Season ${n}`);
+    if (ordinalToSeason !== full) push(ordinalToSeason);
+    const SUFFIX = { 1: 'st', 2: 'nd', 3: 'rd' };
+    const seasonToOrdinal = full.replace(/\bseason\s*(\d{1,2})\b/gi, (_, n) => {
+        const num = Number(n);
+        const suffix = SUFFIX[num] || (num % 10 === 1 && num % 100 !== 11 ? 'st'
+            : num % 10 === 2 && num % 100 !== 12 ? 'nd'
+                : num % 10 === 3 && num % 100 !== 13 ? 'rd' : 'th');
+        return `${num}${suffix} Season`;
+    }).replace(/\bs(\d{1,2})\b/gi, (_, n) => `Season ${n}`);
+    if (seasonToOrdinal !== full) push(seasonToOrdinal);
+    // "Frieren: Beyond Journey's End" → "Frieren" (bagian utama sebelum titik dua).
+    const main = /^([^:–]+?)\s*(?::|–|\s-\s)/.exec(full);
+    if (main && main[1].trim().split(/\s+/).length >= 2) push(main[1]);
+    // Tanpa keterangan dalam kurung: "One Piece (2024)" → "One Piece".
+    push(full.replace(/\s*[[(][^\])]{1,40}[\])]\s*$/, ''));
+    return out;
+}
+
 /**
  * Kunci judul "longgar": penulisan season disamakan ("3rd Season" = "Season 3" = "S3",
  * "Season 1" = tanpa season), kata sandang & tanda baca diabaikan. Nomor season tetap

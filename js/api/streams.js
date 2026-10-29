@@ -41,7 +41,9 @@
  */
 import { STREAMING_SERVERS } from '../config.js';
 import { ApiError } from './http.js';
-import { looseTitleKey, originOf, stripSeasonSuffix, titleKey, titleVariants, toHttpUrl } from './normalize.js';
+import {
+    TITLE_MATCH_THRESHOLD, originOf, titleKey, titleMatchScore, titleQueryVariants, titleVariants, toHttpUrl,
+} from './normalize.js';
 import * as backend from './sources.js';
 
 /**
@@ -115,21 +117,35 @@ function titleList(source) {
 }
 
 /**
- * Item backend yang mewakili anime yang sama. Dua tahap:
- *  1. judul persis (titleKey) — termasuk bagian dalam/luar kurung "Pinyin [English]"
- *  2. judul longgar (looseTitleKey) — "3rd Season" = "Season 3", tanpa kata sandang
- * Nomor season tetap harus sama, jadi season lain tidak ikut tercocokkan.
+ * Item backend yang mewakili anime yang sama.
+ *
+ * Putaran 26 (29 Okt 2026) — permintaan pengguna: *"perbaiki deteksi anime untuk Sub Indo
+ * kadang tidak terdeteksi … perkuat deteksi dan pencocokan judul"*. Versi lama hanya menerima
+ * judul yang SAMA PERSIS setelah dinormalisasi (`titleKey`/`looseTitleKey`), sehingga anime
+ * yang ada di AnimeKu/Animeloverz tetap "tidak terdeteksi" bila situs menulis judulnya sedikit
+ * berbeda (angka Romawi "II", tahun rilis, "Sub Indo", tanda baca, atau satu kata tambahan).
+ *
+ * Sekarang setiap kandidat dinilai dengan `titleMatchScore` (lihat api/normalize.js) dan
+ * kandidat dengan skor TERTINGGI yang dipakai — bukan yang pertama kebetulan cocok. Season &
+ * jenis karya tetap harus sama supaya season lain tidak ikut tercocokkan.
  * @param {{title?: string, titleAlt?: string}|string[]} anime  objek anime atau daftar judulnya
  * @param {import('./normalize.js').Anime[]} items
  */
 export function matchBackendItem(anime, items) {
     const mine = titleList(anime).flatMap(titleVariants);
-    const strict = new Set(mine.map(titleKey).filter(Boolean));
-    const loose = new Set(mine.map(looseTitleKey).filter(Boolean));
-    const variantsOf = (item) => [item.title, item.titleAlt].flatMap(titleVariants);
-    return items.find((item) => variantsOf(item).some((t) => strict.has(titleKey(t))))
-        || items.find((item) => variantsOf(item).some((t) => loose.has(looseTitleKey(t))))
-        || null;
+    if (!mine.length) return null;
+    let best = null;
+    let bestScore = 0;
+    (Array.isArray(items) ? items : []).forEach((item) => {
+        const candidates = [item?.title, item?.titleAlt].flatMap(titleVariants);
+        if (!candidates.length) return;
+        const score = titleMatchScore(mine, candidates);
+        if (score > bestScore) {
+            best = item;
+            bestScore = score;
+        }
+    });
+    return bestScore >= TITLE_MATCH_THRESHOLD ? best : null;
 }
 
 /**
@@ -154,9 +170,12 @@ export async function findBackendMatch(anime, opts = {}) {
  */
 /** Cache padanan situs per anime (sesi ini) — menjaga daftar server tetap konsisten antar episode. */
 const MATCH_TTL_MS = 30 * 60 * 1000;
-const MATCH_STORAGE_KEY = 'kz:matches:v1';
+const MATCH_STORAGE_KEY = 'kz:matches:v2';
 
 const matchCacheKey = (titles) => [...new Set(titles.map((t) => titleKey(t)).filter(Boolean))].sort().join('|');
+
+/** Anime yang sudah dicoba ulang tanpa cache pada sesi ini (maks. sekali per anime). */
+const retriedTitles = new Set();
 
 /** @returns {{at:number, list:{slug:string,title:string,source:string}[]}|null} */
 function readMatchCache(key) {
@@ -204,38 +223,139 @@ const wait = (ms, signal) => new Promise((resolve) => {
     signal?.addEventListener?.('abort', () => { clearTimeout(id); resolve(); }, { once: true });
 });
 
-export async function findBackendMatches(anime, { titles: extra, signal } = {}) {
-    const titles = titleList(extra?.length ? extra : anime);
-    if (!titles.length) return [];
-    // Kata kunci: judul lengkap dulu, lalu judul tanpa penanda season (pencarian WordPress = semua kata
-    // wajib ada). Pencocokan tetap memakai judul LENGKAP, jadi season lain tidak ikut tercocokkan.
-    const queries = uniqueTitles([...titles, ...titles.map(stripSeasonSuffix)]).slice(0, MAX_SEARCH_TITLES);
-    const cached = readMatchCache(matchCacheKey(titles));
-    const settled = await Promise.allSettled(queries.map((q) => backend.searchBackend(q, { signal })));
-    const ok = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-    if (!ok.length) {
-        // Semua pencarian gagal (throttle/offline) tetapi padanan sudah pernah ditemukan → pakai itu.
-        if (cached) return cached.list;
-        throw settled[0].reason;
+/**
+ * Batas kueri cadangan (khusus AnimeKu/Animeloverz) saat pencarian pertama belum
+ * menemukan kedua situs Sub Indo. Putaran 26.
+ */
+const MAX_FALLBACK_QUERIES = 3;
+
+/**
+ * Kata kunci pencarian dari daftar judul, diselang-seling per peringkat varian:
+ * judul utuh semua judul dulu, lalu varian tanpa penanda season, lalu varian lain.
+ * Interleave penting: bila hanya varian judul pertama yang dicoba, judul romaji
+ * (yang biasanya dipakai situs) tidak pernah ikut dicari.
+ * @param {string[]} titles
+ * @returns {string[]}
+ */
+function searchQueries(titles) {
+    const perTitle = titles.map((title) => titleQueryVariants(title));
+    const max = Math.max(0, ...perTitle.map((list) => list.length));
+    const out = [];
+    for (let rank = 0; rank < max; rank++) {
+        for (const list of perTitle) {
+            if (list[rank]) out.push(list[rank]);
+        }
     }
-    const items = ok.filter((r) => !r.fallback).flatMap((r) => r.items).filter((a) => a.slug);
+    return uniqueTitles(out);
+}
+
+/**
+ * Satu padanan per situs dari daftar item hasil pencarian.
+ * @param {import('./normalize.js').Anime[]} items
+ * @param {string[]} titles
+ * @returns {{slug: string, title: string, source: string}[]}
+ */
+function matchBySite(items, titles) {
     const bySource = new Map();
-    for (const it of items) {
-        const site = String(it.source || '').replace(/^backend:/, '');
+    for (const item of Array.isArray(items) ? items : []) {
+        if (!item?.slug) continue;
+        const site = String(item.source || '').replace(/^backend:/, '');
+        if (!site) continue;
         if (!bySource.has(site)) bySource.set(site, []);
-        bySource.get(site).push(it);
+        bySource.get(site).push(item);
     }
     const out = [];
     for (const [site, list] of bySource) {
         const hit = matchBackendItem(titles, list);
         if (hit) out.push({ slug: hit.slug, title: hit.title, source: site });
     }
+    return out;
+}
+
+/** Gabungkan hasil dua tahap pencarian; satu padanan per situs, tahap pertama diutamakan. */
+function mergeMatches(base, extra) {
+    const out = [...base];
+    const seen = new Set(out.map((match) => match.source));
+    for (const match of extra) {
+        if (!seen.has(match.source)) {
+            out.push(match);
+            seen.add(match.source);
+        }
+    }
+    return out;
+}
+
+/**
+ * Jalankan beberapa kata kunci pencarian di backend.
+ * @param {string[]} queries
+ * @param {{signal?: AbortSignal, sources?: string[], noCache?: boolean}} [opts]
+ */
+async function searchTitles(queries, { signal, sources, noCache = false } = {}) {
+    if (!queries.length) return { ok: [], items: [], failed: [] };
+    const settled = await Promise.allSettled(
+        queries.map((query) => backend.searchBackend(query, { signal, sources, noCache })),
+    );
+    const ok = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value);
+    const items = ok.filter((result) => !result.fallback).flatMap((result) => result.items).filter((item) => item.slug);
+    return { ok, items, failed: settled.filter((result) => result.status === 'rejected') };
+}
+
+export async function findBackendMatches(anime, { titles: extra, signal, refresh = false } = {}) {
+    const titles = titleList(extra?.length ? extra : anime);
+    if (!titles.length) return [];
+    // Kata kunci: judul lengkap dulu, lalu varian tanpa penanda season/angka Romawi, bagian
+    // utama sebelum titik dua, dan judul tanpa keterangan dalam kurung. Pencarian WordPress
+    // (AnimeKu/Oploverz) mewajibkan SEMUA kata ada — varian inilah yang menemukan judul
+    // yang ditulis situs dengan gaya berbeda. Pencocokan tetap memakai judul lengkap.
+    const queries = searchQueries(titles);
+    const primaryQueries = queries.slice(0, MAX_SEARCH_TITLES);
+    const fallbackQueries = queries.slice(MAX_SEARCH_TITLES, MAX_SEARCH_TITLES + MAX_FALLBACK_QUERIES);
+
+    // Padanan yang sudah lengkap (kedua situs Sub Indo ada) dipakai ulang: pergantian
+    // episode tidak perlu mencari lagi, dan daftar server tetap konsisten.
+    const cacheKey = matchCacheKey(titles);
+    const cached = readMatchCache(cacheKey);
+    // refresh = tombol "cari ulang" Sub Indo: padanan lama diabaikan dan percobaan tanpa
+    // cache boleh dijalankan lagi (hasil lama mungkin disimpan saat situs sedang gagal).
+    if (refresh) retriedTitles.delete(cacheKey);
+    if (!refresh && cached && SUB_INDO_SOURCES.every((site) => cached.list.some((match) => match.source === site))) {
+        return cached.list;
+    }
+
+    const first = await searchTitles(primaryQueries, { signal });
+    if (!first.ok.length) {
+        // Semua pencarian gagal (throttle/offline) tetapi padanan sudah pernah ditemukan → pakai itu.
+        if (cached) return cached.list;
+        throw first.failed[0]?.reason || new Error('Pencarian anime gagal.');
+    }
+
+    let matches = matchBySite(first.items, titles);
+    const missingSubIndo = () => SUB_INDO_SOURCES.some((site) => !matches.some((match) => match.source === site));
+
+    // Putaran 26: bila AnimeKu/Animeloverz belum ketemu, cari lagi KHUSUS di dua situs itu
+    // dengan kata kunci cadangan. Ini yang membuat Sub Indo tetap terdeteksi walau judul di
+    // situs ditulis berbeda dari metadata.
+    if (missingSubIndo() && fallbackQueries.length && !signal?.aborted) {
+        const second = await searchTitles(fallbackQueries, { signal, sources: [...SUB_INDO_SOURCES] });
+        if (second.items.length) matches = mergeMatches(matches, matchBySite(second.items, titles));
+    }
+    // Masih belum lengkap → satu percobaan terakhir TANPA cache (hasil lama bisa tersimpan
+    // saat salah satu situs Sub Indo sedang gagal). Dibatasi sekali per anime per sesi
+    // supaya situs tidak dibanjiri permintaan untuk judul yang memang tidak ada di sana.
+    if (missingSubIndo() && !retriedTitles.has(cacheKey) && !signal?.aborted) {
+        retriedTitles.add(cacheKey);
+        const third = await searchTitles(primaryQueries.slice(0, 2), { signal, sources: [...SUB_INDO_SOURCES], noCache: true });
+        if (third.items.length) matches = mergeMatches(matches, matchBySite(third.items, titles));
+    }
+
+    const out = mergeMatches([], matches);
     // Hasil pertama disimpan per sesi: pergantian episode memakai daftar situs yang SAMA,
     // sehingga Sub Indo tidak "hilang" hanya karena pencarian ulang sedang gagal/di-throttle.
-    if (out.length) writeMatchCache(matchCacheKey(titles), [...out].sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source)));
+    if (out.length) writeMatchCache(cacheKey, [...out].sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source)));
     // AnimeKu & Oploverz (Sub Indo) dicoba lebih dulu; sisanya tetap tersedia setelahnya.
     return out.sort((a, b) => subIndoRank(a.source) - subIndoRank(b.source));
 }
+
 
 // Putaran 25: dub (sulih suara) selalu setelah semua jenis subtitle.
 const LANG_RANK = { multi: 0, id: 1, en: 2, dub: 3 };
@@ -322,7 +442,7 @@ export async function getEpisodeExtras(anime, ep, { slug, titles, signal, refres
         const needsAllSources = !own || !hasIndonesianServer(primary);
         let targets = [];
         try {
-            const matches = await findBackendMatches(anime, { titles, signal });
+            const matches = await findBackendMatches(anime, { titles, signal, refresh });
             const alternatives = matches.filter((match) => match.slug && match.slug !== own);
             const picked = needsAllSources
                 ? alternatives

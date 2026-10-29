@@ -542,14 +542,28 @@ export function createRegistry({
             return { source: sources.map((item) => item.id).join(','), data: { sources }, fallback: false, stale, errors };
         },
 
-        async search(q, ctx = {}) {
+        /**
+         * @param {string} q kata kunci
+         * @param {object} [ctx]
+         * @param {{sources?: string[]}} [opts] sources = batasi ke id situs tertentu
+         *   (putaran 26: pencarian ulang khusus AnimeKu/Oploverz saat Sub Indo belum terdeteksi)
+         */
+        async search(q, ctx = {}, { sources } = {}) {
             const key = q.toLowerCase();
-            const candidates = usable().filter((a) => a.supportsSearch !== false && typeof a.search === 'function');
+            // Daftar putih id situs: hanya id yang dikenal yang dipakai; kosong = semua sumber.
+            const only = Array.isArray(sources) && sources.length
+                ? new Set(sources.map((id) => String(id || '').toLowerCase()).filter((id) => byId.has(id)))
+                : null;
+            const candidates = usable()
+                .filter((a) => a.supportsSearch !== false && typeof a.search === 'function')
+                .filter((a) => !only || only.has(a.id));
+            if (!candidates.length) throw notFound('Tidak ada situs sumber yang cocok untuk pencarian ini.');
             const r = await fanOut((a) => `search:${a.id}:${key}`, ttl.searchTtlMs, (a) => a.search(q, ctx), candidates);
             if (r.used.length) {
                 return { source: r.used.join(','), data: mergeLists(r.groups, 60, { perSource: true }), fallback: false, stale: r.stale, errors: r.errors };
             }
-            if (metadata) {
+            // Cadangan metadata hanya bila pencarian tidak dibatasi ke situs tertentu.
+            if (metadata && !only) {
                 try {
                     const m = await wrap(`search:metadata:${key}`, ttl.searchTtlMs, () => metadata.search(q, ctx));
                     return { source: 'metadata', provider: m.value.provider, data: m.value.items, fallback: true, stale: m.cache === 'stale', errors: r.errors };

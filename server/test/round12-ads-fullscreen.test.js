@@ -164,13 +164,14 @@ test('watch: tombol layar penuh tersinkron + tersedia di CSS dan mobile', () => 
 /* ------------------------------------------------------------------ */
 test('streams: daftar situs padanan disimpan per sesi (tidak hilang saat ganti episode)', () => {
     assert.match(streamsJs, /const MATCH_TTL_MS = 30 \* 60 \* 1000;/);
-    assert.match(streamsJs, /const MATCH_STORAGE_KEY = 'kz:matches:v1';/);
+    // Putaran 26: cache dinaikkan ke v2 (entri lama bisa berisi hasil tanpa Sub Indo).
+    assert.match(streamsJs, /const MATCH_STORAGE_KEY = 'kz:matches:v2';/);
     assert.match(streamsJs, /function readMatchCache\(key\)/);
     assert.match(streamsJs, /function writeMatchCache\(key, list\)/);
     assert.match(streamsJs, /export function cachedBackendMatches\(anime, \{ titles \} = \{\}\)/);
     // Pencarian gagal semua (throttle/offline) tetapi padanan sudah pernah ada → pakai cache.
-    assert.match(streamsJs, /if \(!ok\.length\) \{[\s\S]{0,250}?if \(cached\) return cached\.list;/);
-    assert.match(streamsJs, /if \(out\.length\) writeMatchCache\(matchCacheKey\(titles\)/);
+    assert.match(streamsJs, /if \(!first\.ok\.length\) \{[\s\S]{0,250}?if \(cached\) return cached\.list;/);
+    assert.match(streamsJs, /if \(out\.length\) writeMatchCache\(cacheKey/);
 });
 
 test('streams: sumber Sub Indo yang gagal dicoba ulang, bukan langsung hilang', () => {
