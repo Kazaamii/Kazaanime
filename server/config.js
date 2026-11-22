@@ -301,8 +301,17 @@ export const REACTIONS = Object.freeze({
 
 export const STREAMS = Object.freeze({
     enabled: list('STREAM_PROVIDERS', ['reanime', 'anizone']).map((s) => s.toLowerCase()),
+    /**
+     * Putaran 27 (22 Nov 2026) — `reanime.to` sudah tidak bisa dihubungi (TLS diputus, bahkan
+     * `/` gagal) sehingga SEMUA request ReAnime berakhir `policy` dan panel server kosong.
+     * Situs yang sama masih hidup di `reanime.cz` dan `/api/flix/<id>/<ep>` merespons normal
+     * (diperiksa 22 Nov 2026, robots.txt mengizinkan semua). Basis lama tetap dicoba sebagai
+     * cadangan bila operator belum mengisi env — keduanya domain resmi ReAnime, bukan bypass.
+     */
     reanime: Object.freeze({
-        baseUrl: (env.REANIME_BASE_URL || 'https://reanime.to').replace(/\/+$/, ''),
+        baseUrl: (env.REANIME_BASE_URL || 'https://reanime.cz').replace(/\/+$/, ''),
+        /** Basis cadangan (hanya dipakai bila basis utama gagal jaringan/timeout). */
+        fallbackBaseUrl: 'https://reanime.to',
         /** Host embed yang boleh dipasang sebagai iframe dari respons API ReAnime. */
         embedHosts: list('REANIME_EMBED_HOSTS', ['flixcloud.cc']).map((s) => s.toLowerCase()),
     }),
@@ -321,8 +330,21 @@ export const STREAMS = Object.freeze({
     secretFromEnv: Boolean(STREAM_SECRET_ENV),
     /** Rate limit request proxy (/api/stream/hls & /sub) per IP per menit. 0 = nonaktif. */
     proxyRateLimitPerMinute: int('STREAM_PROXY_RATE_LIMIT_PER_MIN', 900, { min: 0, max: 100000 }),
+    /**
+     * Putaran 27 (22 Nov 2026) — *"Stream selalu bufering"*.
+     *  - `proxyTimeoutMs` = batas **tanpa kemajuan** (idle), bukan batas total: timer direset
+     *    setiap ada chunk dari CDN. Segmen 1080p yang butuh 25 dtk tetapi terus mengalir tidak
+     *    lagi diputus di tengah (dulu satu `AbortSignal.timeout` untuk seluruh body → hls.js
+     *    mengulang segmen yang sama dan pemutar terlihat buffering tanpa akhir).
+     *  - `proxyMaxDurationMs` = batas total per request proxy (fungsi Vercel 60 dtk; sisakan
+     *    ruang untuk playlist + segmen berikutnya). Tetap jauh di atas 20 dtk lama.
+     *  - `maxSegmentBytes`: batas respons Vercel (4,5 MB untuk fungsi) lebih kecil dari nilai
+     *    lama 40 MB. Segmen di atas batas itu tidak akan pernah sampai utuh ke browser (dipotong
+     *    platform) → pakai batas yang bisa dilayani, lalu biarkan pemutar meminta Range berikutnya.
+     */
     proxyTimeoutMs: int('STREAM_PROXY_TIMEOUT_MS', 20000, { min: 3000, max: 28000 }),
-    maxSegmentBytes: 40 * 1024 * 1024,
+    proxyMaxDurationMs: int('STREAM_PROXY_MAX_DURATION_MS', 45000, { min: 5000, max: 55000 }),
+    maxSegmentBytes: 4 * 1024 * 1024,
     // Challenge/HTTP 403/429 never trigger retries, regardless of other retry settings.
     subtitleAttempts: 1,
 });

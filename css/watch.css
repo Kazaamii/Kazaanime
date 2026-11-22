@@ -77,6 +77,31 @@
 .player-ad-recovery-btn--ghost{background:transparent;border-color:rgba(255,255,255,.16);color:var(--text-secondary)}
 .player-ad-recovery-btn--ghost:hover{color:var(--text-primary);border-color:rgba(255,255,255,.3)}
 
+/* ---------- Putaran 27: bilah "video belum berjalan?" (embed tanpa progres) ---------- */
+/*
+ * Tidak menutupi gambar pemutar: menempel di bawah, latar gelap semi-transparan, dan tombolnya
+ * kecil. Pemutar tetap bisa diklik di area lain (bar tidak memakai `inset:0` seperti ad shield).
+ */
+.player-playback-hint{position:absolute;left:10px;right:10px;bottom:10px;z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:12px;background:rgba(12,14,22,.94);border:1px solid rgba(245,158,11,.4);box-shadow:0 12px 30px rgba(0,0,0,.45);font-size:12px;color:var(--text-primary);backdrop-filter:blur(6px)}
+.player-playback-hint-text{display:inline-flex;align-items:center;gap:7px;line-height:1.35}
+.player-playback-hint-text .ic{width:15px;height:15px;color:#fbbf24;flex:0 0 15px}
+.player-playback-hint-actions{display:inline-flex;align-items:center;gap:6px}
+.player-playback-hint-btn{padding:6px 12px;border-radius:9px;border:1px solid rgba(var(--primary-rgb),.4);background:rgba(var(--primary-rgb),.14);color:var(--primary);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s}
+.player-playback-hint-btn:hover{background:rgba(var(--primary-rgb),.24);border-color:var(--primary)}
+.player-playback-hint-btn--ghost{background:transparent;border-color:rgba(255,255,255,.16);color:var(--text-secondary)}
+.player-playback-hint-btn--ghost:hover{color:var(--text-primary);border-color:rgba(255,255,255,.3)}
+.player-playback-hint-close{width:24px;height:24px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text-secondary);font-size:15px;line-height:1;cursor:pointer}
+.player-playback-hint-close:hover{background:rgba(255,255,255,.16);color:var(--text-primary)}
+/* Di layar penuh bilah dinaikkan supaya tidak tertutup kontrol peramban. */
+.streaming-player-wrapper:fullscreen .player-playback-hint,
+.streaming-player-wrapper:-webkit-full-screen .player-playback-hint{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+/* Ponsel: baris teks & tombol tidak berdampingan sempit. */
+@media (max-width:560px){
+  .player-playback-hint{left:8px;right:8px;bottom:8px;padding:7px 9px;gap:7px}
+  .player-playback-hint-text{font-size:11px}
+  .player-playback-hint-btn{padding:5px 10px;font-size:11px}
+}
+
 /* Tanda server yang host-nya ada di daftar blokir iklan (tetap bisa dipilih). */
 .server-badge--ad{background:rgba(245,158,11,.16);color:#fbbf24;border:1px solid rgba(245,158,11,.35)}
 .server-badge--adblock{background:rgba(239,68,68,.14);color:#fca5a5;border:1px solid rgba(239,68,68,.35)}

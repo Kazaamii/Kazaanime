@@ -587,11 +587,28 @@ export function createClient(net, opts) {
      * Tetap: allowlist host (anti-SSRF, termasuk host akhir setelah redirect), timeout, batas ukuran.
      * Tanpa robots.txt/crawl throttle: ini bukan crawling. Allowlist, timeout, proxy, dan circuit
      * pembatasan tetap berlaku; rate limit per IP di route melindungi CDN.
+     * Putaran 27 (22 Nov 2026) — *"Stream selalu bufering"*:
+     *  - `timeoutMs` dulu satu `AbortSignal.timeout` untuk **seluruh** request, termasuk unduhan
+     *    body. Segmen 1080p dari CDN lambat sering butuh >20 dtk → koneksi ke CDN diputus di
+     *    tengah, hls.js mengulang segmen yang sama berkali-kali, dan pengguna melihat buffering
+     *    tanpa akhir. Sekarang `timeoutMs` = batas TANPA KEMAJUAN (idle): timer direset setiap
+     *    ada chunk baru, jadi transfer yang lambat tetapi terus berjalan tidak diputus;
+     *    `maxDurationMs` (opsional) tetap menjadi batas total agar request tidak menggantung.
+     *  - Kegagalan timeout/putus di tengah body TIDAK membuka circuit breaker: satu segmen
+     *    lambat bukan tanda sumbernya diblokir, dan circuit terbuka membuat semua segmen
+     *    berikutnya langsung gagal (buffering permanen di pemutar).
      * @param {string} url
-     * @param {{signal?: AbortSignal, headers?: Record<string,string>, timeoutMs?: number, maxBytes?: number}} [o]
+     * @param {{signal?: AbortSignal, headers?: Record<string,string>, timeoutMs?: number,
+     *   maxDurationMs?: number, maxBytes?: number}} [o]
      * @returns {Promise<{status: number, headers: Headers, body: ReadableStream<Uint8Array>|null, url: string}>}
      */
-    async function stream(url, { signal, headers, timeoutMs: t = timeoutMs, maxBytes = 64 * 1024 * 1024 } = {}) {
+    async function stream(url, {
+        signal,
+        headers,
+        timeoutMs: t = timeoutMs,
+        maxDurationMs = 0,
+        maxBytes = 64 * 1024 * 1024,
+    } = {}) {
         let u;
         try {
             u = new URL(url);
@@ -609,7 +626,41 @@ export function createClient(net, opts) {
         }
         let res;
         let streamUrl = u.href;
-        const requestSignal = combineSignals(t, signal);
+        /**
+         * Satu pengendali untuk seluruh permintaan. `idleTimer` direset setiap ada chunk baru
+         * (lihat `progressSignal()` di bawah), `maxTimer` hanya dipasang bila pemanggil memberi
+         * `maxDurationMs`. Keduanya dilepas di `finally` supaya tidak ada timer yatim.
+         */
+        const ac = new AbortController();
+        const onCallerAbort = () => ac.abort(signal?.reason || new DOMException('Aborted', 'AbortError'));
+        if (signal) {
+            if (signal.aborted) throw new SourceError('Permintaan dibatalkan.', { kind: 'abort', source });
+            signal.addEventListener('abort', onCallerAbort, { once: true });
+        }
+        let idleTimer = 0;
+        let maxTimer = 0;
+        const clearTimers = () => {
+            clearTimeout(idleTimer);
+            clearTimeout(maxTimer);
+            idleTimer = 0;
+            maxTimer = 0;
+            signal?.removeEventListener('abort', onCallerAbort);
+        };
+        const armIdle = () => {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                ac.abort(new DOMException(`Idle ${Math.round(t / 1000)}s`, 'TimeoutError'));
+            }, Math.max(1000, Math.round(t)));
+            idleTimer.unref?.();
+        };
+        armIdle();
+        if (maxDurationMs > 0) {
+            maxTimer = setTimeout(() => {
+                ac.abort(new DOMException('Duration cap', 'TimeoutError'));
+            }, Math.max(2000, Math.round(maxDurationMs)));
+            maxTimer.unref?.();
+        }
+        const requestSignal = ac.signal;
         try {
             const fetched = await fetchAllowed(u.href, {
                 headers: { 'User-Agent': net.userAgent, Accept: '*/*', ...baseHeaders, ...headers },
@@ -623,6 +674,7 @@ export function createClient(net, opts) {
             res = fetched.response;
             streamUrl = fetched.url;
         } catch (err) {
+            clearTimers();
             if (err instanceof SourceError) {
                 if (err.kind === 'network' || err.kind === 'timeout') net.circuit.failure(source, { reason: err.kind });
                 throw err;
@@ -637,6 +689,7 @@ export function createClient(net, opts) {
         }
         const finalHost = hostOf(res.url) || hostOf(streamUrl) || u.hostname;
         if (!hostAllowed(finalHost)) {
+            clearTimers();
             await res.body?.cancel().catch(() => {});
             throw new SourceError(`${source} mengalihkan ke host lain (${finalHost}) — tidak diikuti.`, { kind: 'policy', source });
         }
@@ -646,24 +699,42 @@ export function createClient(net, opts) {
         }
         const restriction = net.challengeHandler.inspect({ source, status: res.status, headers: res.headers, text: challengeText, blockedMs });
         if (restriction) {
+            clearTimers();
             await res.body?.cancel().catch(() => {});
             throw restriction;
         }
         if (res.status >= 200 && res.status < 400) net.circuit.success(source);
         const declared = Number(res.headers.get('content-length'));
         if (Number.isFinite(declared) && declared > maxBytes) {
+            clearTimers();
             await res.body?.cancel().catch(() => {});
             throw new SourceError('Berkas media terlalu besar.', { kind: 'parse', source });
+        }
+        if (!res.body) {
+            clearTimers();
+            return { status: res.status, headers: res.headers, body: null, url: res.url || streamUrl };
         }
         let seen = 0;
         const limiter = new TransformStream({
             transform(chunk, controller) {
                 seen += chunk.byteLength;
-                if (seen > maxBytes) controller.error(new SourceError('Berkas media terlalu besar.', { kind: 'parse', source }));
-                else controller.enqueue(chunk);
+                if (seen > maxBytes) {
+                    controller.error(new SourceError('Berkas media terlalu besar.', { kind: 'parse', source }));
+                    return;
+                }
+                // Setiap chunk = kemajuan nyata → timer idle dimulai lagi. Transfer lambat
+                // (mis. 2 dtk per potongan) tetap dibiarkan selesai, sesuai babak 27.
+                if (idleTimer) armIdle();
+                controller.enqueue(chunk);
+            },
+            flush() {
+                clearTimers();
+            },
+            cancel() {
+                clearTimers();
             },
         });
-        return { status: res.status, headers: res.headers, body: res.body ? res.body.pipeThrough(limiter) : null, url: res.url || streamUrl };
+        return { status: res.status, headers: res.headers, body: res.body.pipeThrough(limiter), url: res.url || streamUrl };
     }
 
     return {

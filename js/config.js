@@ -609,6 +609,26 @@ export const PLAYER = Object.freeze({
      * dari CDN (tanpa proxy); browser lain lewat proxy /api/stream/hls (CORS CDN dikunci ke anizone.to).
      */
     hlsScript: '/js/vendor/hls.min.js',
+    /**
+     * Putaran 27 (22 Nov 2026) — *"Stream selalu bufering"*.
+     *
+     * `state = 'playing'` hanya berarti dokumen pemutar sudah dimuat: embed pihak ketiga tetap
+     * mengirim `load` walau videonya gagal ("This video file cannot be played"), dan hls.js hanya
+     * melapor bila sudah menyerah. Tanpa pengawas, pengguna melihat buffering tanpa akhir dan
+     * tidak ada fallback. Nilai di bawah dipakai js/ui/playback-watch.js:
+     *  - `startupMs`  : batas menunggu gambar pertama sebelum pemulihan pertama;
+     *  - `stallMs`    : batas tanpa kemajuan setelah video sempat berjalan;
+     *  - `hardStallMs`: tambahan diam sebelum menyimpulkan server rusak → pindah server;
+     *  - `maxRecoveries`: berapa kali pemulihan dicoba sebelum pindah server;
+     *  - `checkEveryMs`: interval pemeriksaan (timer dihentikan saat server/episode berganti).
+     */
+    buffering: Object.freeze({
+        startupMs: 20000,
+        stallMs: 12000,
+        hardStallMs: 20000,
+        maxRecoveries: 2,
+        checkEveryMs: 2500,
+    }),
     /** Urutan subtitle yang dipilih otomatis (kode bahasa). */
     subtitlePriority: Object.freeze(['id', 'en']),
     /**

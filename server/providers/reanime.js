@@ -1,7 +1,7 @@
 /**
  * Kazanime backend — providers/reanime.js
- * Penyedia server "ReAnime" (https://reanime.to) — pengganti server cadangan #2 (MegaPlay-MAL),
- * ditambahkan 22 Okt 2026 atas permintaan pemilik proyek.
+ * Penyedia server "ReAnime" (https://reanime.cz, dulu reanime.to) — pengganti server cadangan #2
+ * (MegaPlay-MAL), ditambahkan 22 Okt 2026 atas permintaan pemilik proyek.
  *
  * Diverifikasi langsung 22 Okt 2026:
  *   robots.txt  : "User-agent: * / Disallow:" (semua diizinkan)
@@ -12,6 +12,13 @@
  *   frame-ancestors). Tidak ada dekripsi apa pun — player embed bekerja sendiri di browser pengguna.
  * Subtitle ReAnime berbahasa Inggris. Hanya server "sub" yang dipakai (HD-2 lalu HD-1, urutan situsnya).
  * Challenge Cloudflare dihentikan tanpa retry; circuit memberi cooldown dan provider lain tetap dicoba.
+ *
+ * Putaran 27 (22 Nov 2026) — *"Stream selalu bufering"*:
+ *   `reanime.to` berhenti menerima koneksi (TLS diputus untuk SEMUA jalur, termasuk `/`), sehingga
+ *   tiap request jatuh sebagai `policy`/jaringan dan panel server kosong. Situsnya pindah ke
+ *   `reanime.cz` dan `/api/flix/154587/1` di sana menjawab normal (diperiksa 22 Nov 2026).
+ *   Basis utama sekarang `.cz`; `.to` hanya **cadangan** untuk kegagalan jaringan/timeout —
+ *   tidak ada percobaan ulang untuk 403/429/challenge, dan tidak ada host di luar domain resmi.
  */
 import { notFound } from '../lib/errors.js';
 import { bestTitleMatch, uniqueTitles } from './match.js';
@@ -20,6 +27,7 @@ export const ID = 'reanime';
 export const NAME = 'ReAnime';
 
 const ORDER = { 'HD-2': 0, 'HD-1': 1 };
+const NETWORK_KINDS = new Set(['network', 'timeout']);
 
 /** anilist_id hasil pencarian ReAnime (0 → dari URL cover AniList "…/bx159042-…"). */
 export function anilistIdOf(item) {
@@ -57,18 +65,64 @@ export function parseFlix(json, embedHosts) {
 }
 
 /**
- * @param {{network: any, createClient: Function, baseUrl?: string, embedHosts?: string[]}} deps
+ * Daftar basis yang dicoba berurutan. Basis cadangan hanya dipakai bila basis sebelumnya gagal
+ * JARINGAN/TIMEOUT — 403/429/challenge/`policy` tidak pernah memicu percobaan ke basis lain.
+ * @param {string} primary
+ * @param {string} fallback
+ * @returns {{base: string, host: string}[]}
  */
-export function createReanime({ network, createClient, baseUrl = 'https://reanime.to', embedHosts = ['flixcloud.cc'] }) {
-    const base = String(baseUrl).replace(/\/+$/, '');
-    const host = new URL(base).hostname.replace(/^www\./, '');
-    const client = createClient(network, {
-        source: ID,
-        allowedHosts: [host, `www.${host}`],
-        blockedMs: 3 * 60 * 1000,
-    });
+export function streamBases(primary, fallback = '') {
+    const out = [];
+    for (const value of [primary, fallback]) {
+        const base = String(value || '').replace(/\/+$/, '');
+        if (!base) continue;
+        let host;
+        try { host = new URL(base).hostname.replace(/^www\./, ''); } catch { continue; }
+        if (!host || out.some((b) => b.host === host)) continue;
+        out.push({ base, host });
+    }
+    return out;
+}
 
-    async function findAnilistId(titles, year, ctx) {
+/**
+ * @param {{network: any, createClient: Function, baseUrl?: string, fallbackBaseUrl?: string,
+ *   embedHosts?: string[]}} deps
+ */
+export function createReanime({
+    network,
+    createClient,
+    baseUrl = 'https://reanime.cz',
+    fallbackBaseUrl = 'https://reanime.to',
+    embedHosts = ['flixcloud.cc'],
+}) {
+    const bases = streamBases(baseUrl, fallbackBaseUrl);
+    const clients = new Map();
+    for (const b of bases) {
+        clients.set(b.host, createClient(network, {
+            source: ID,
+            allowedHosts: [b.host, `www.${b.host}`],
+            blockedMs: 3 * 60 * 1000,
+        }));
+    }
+
+    /**
+     * Jalankan `fn(base, client)` pada basis pertama; pindah ke basis cadangan HANYA untuk
+     * kegagalan jaringan/timeout (situs pindah domain), bukan pembatasan akses.
+     */
+    async function withBase(fn) {
+        let lastErr = null;
+        for (const b of bases) {
+            try {
+                return await fn(b, clients.get(b.host));
+            } catch (err) {
+                lastErr = err;
+                if (!NETWORK_KINDS.has(err?.kind)) throw err;
+            }
+        }
+        throw lastErr || notFound('ReAnime tidak dapat dihubungi.', ID);
+    }
+
+    async function findAnilistId(titles, year, ctx, base, client) {
         for (const q of uniqueTitles(titles, 2)) {
             const url = new URL(`${base}/api/v1/search`);
             url.searchParams.set('q', q);
@@ -90,7 +144,7 @@ export function createReanime({ network, createClient, baseUrl = 'https://reanim
     return {
         id: ID,
         name: NAME,
-        baseUrl: base,
+        baseUrl: bases[0]?.base || baseUrl,
 
         /**
          * @param {{anilist?: number|null, ep: number, titles?: string[], year?: number|null}} q
@@ -98,12 +152,14 @@ export function createReanime({ network, createClient, baseUrl = 'https://reanim
          * @returns {Promise<{servers: object[], anilist: number}>}
          */
         async servers({ anilist, ep, titles = [], year = null }, ctx = {}) {
-            const id = anilist || (titles.length ? await findAnilistId(titles, year, ctx) : null);
-            if (!id) throw notFound('Anime ini tidak ditemukan di ReAnime.', ID);
-            const json = await client.json(`${base}/api/flix/${id}/${ep}`, ctx);
-            const servers = parseFlix(json, embedHosts);
-            if (!servers.length) throw notFound(`Episode ${ep} belum tersedia di ReAnime.`, ID);
-            return { servers, anilist: id };
+            return withBase(async (b, client) => {
+                const id = anilist || (titles.length ? await findAnilistId(titles, year, ctx, b.base, client) : null);
+                if (!id) throw notFound('Anime ini tidak ditemukan di ReAnime.', ID);
+                const json = await client.json(`${b.base}/api/flix/${id}/${ep}`, ctx);
+                const servers = parseFlix(json, embedHosts);
+                if (!servers.length) throw notFound(`Episode ${ep} belum tersedia di ReAnime.`, ID);
+                return { servers, anilist: id };
+            });
         },
     };
 }
