@@ -135,17 +135,45 @@ function providerClient(routes) {
 test('reanime provider: pakai id AniList langsung; tanpa id → cari judul dulu', async () => {
     const flix = fixture('reanime-flix.json');
     const { createClient, calls } = providerClient({
-        'https://reanime.to/api/flix/21/1': flix,
-        'https://reanime.to/api/v1/search?q=Reincarnated+as+a+Sword+Season+2&limit=8': fixture('reanime-search.json'),
-        'https://reanime.to/api/flix/159042/3': flix,
+        'https://reanime.cz/api/flix/21/1': flix,
+        'https://reanime.cz/api/v1/search?q=Reincarnated+as+a+Sword+Season+2&limit=8': fixture('reanime-search.json'),
+        'https://reanime.cz/api/flix/159042/3': flix,
     });
     const r = createReanime({ network: {}, createClient });
     const a = await r.servers({ anilist: 21, ep: 1 });
     assert.equal(a.servers[0].label, 'HD-2');
     const b = await r.servers({ ep: 3, titles: ['Reincarnated as a Sword Season 2'] });
     assert.equal(b.anilist, 159042);
-    assert.ok(calls.includes('https://reanime.to/api/flix/159042/3'));
+    assert.ok(calls.includes('https://reanime.cz/api/flix/159042/3'));
     await assert.rejects(r.servers({ ep: 1, titles: [] }), (e) => e.kind === 'not_found');
+});
+
+test('reanime provider (putaran 27): basis utama reanime.cz, cadangan reanime.to hanya untuk kegagalan jaringan', async () => {
+    const flix = fixture('reanime-flix.json');
+    // Situs pindah domain: basis utama gagal jaringan → satu percobaan ke basis cadangan.
+    const moved = providerClient({
+        'https://reanime.cz/api/flix/21/1': new SourceError('TLS diputus', { kind: 'network', source: 'reanime' }),
+        'https://reanime.to/api/flix/21/1': flix,
+    });
+    const r1 = createReanime({ network: {}, createClient: moved.createClient });
+    const okMoved = await r1.servers({ anilist: 21, ep: 1 });
+    assert.equal(okMoved.servers[0].label, 'HD-2');
+    assert.deepEqual(moved.calls, ['https://reanime.cz/api/flix/21/1', 'https://reanime.to/api/flix/21/1']);
+
+    // Pembatasan akses TIDAK boleh memicu basis cadangan (tanpa retry untuk 403/429/challenge).
+    const blocked = providerClient({
+        'https://reanime.cz/api/flix/21/1': new SourceError('challenge', { kind: 'blocked', source: 'reanime' }),
+        'https://reanime.to/api/flix/21/1': flix,
+    });
+    const r2 = createReanime({ network: {}, createClient: blocked.createClient });
+    await assert.rejects(r2.servers({ anilist: 21, ep: 1 }), (e) => e.kind === 'blocked');
+    assert.deepEqual(blocked.calls, ['https://reanime.cz/api/flix/21/1'], 'tidak ada percobaan kedua');
+
+    // Basis cadangan bisa dimatikan operator (env tunggal) tanpa mengubah perilaku pembatasan.
+    const only = providerClient({ 'https://reanime.cz/api/flix/21/1': flix });
+    const r3 = createReanime({ network: {}, createClient: only.createClient, fallbackBaseUrl: '' });
+    assert.equal((await r3.servers({ anilist: 21, ep: 1 })).servers.length, 2);
+    assert.deepEqual(only.calls, ['https://reanime.cz/api/flix/21/1']);
 });
 
 test('anizone provider: cari slug lewat judul → halaman episode → server HLS', async () => {

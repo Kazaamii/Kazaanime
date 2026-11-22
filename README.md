@@ -1882,6 +1882,57 @@ Berkas yang berubah: `js/api/normalize.js`, `js/api/streams.js`, `js/api/sources
 `server/test/round26-subindo-detection.test.js` (24 tes), `server/test/round12-ads-fullscreen.test.js`
 (pola cache `v2`). Tes: **616/616**.
 
+### Perubahan perilaku (22 Nov 2026 — putaran kedua puluh tujuh: stream yang selalu buffering)
+
+Permintaan pengguna: *"Perbaiki Web Error kembali Stream selalu bufering"*.
+
+Diagnosa dari produksi (22 Nov 2026, `https://kazanime.vercel.app`):
+
+| Bukti | Akar masalah |
+| --- | --- |
+| `GET /api/stream/servers?ep=1&anilist=154587…` → `servers: []`, `status:{reanime:'error', anizone:'blocked'}` dengan error reanime `policy` "redirect menuju host/protokol yang tidak diizinkan" | `reanime.to` **menolak koneksi TLS untuk semua jalur** (termasuk `/`). Situsnya pindah ke **`reanime.cz`** — `/api/flix/<id>/<ep>` di sana menjawab normal |
+| Embed statis (MegaPlay/VidNest) membalas `load` walau isinya `This video file cannot be played (Error Code: 232011)` | `state='playing'` dipasang begitu iframe mengirim `load`; tidak ada yang memeriksa apakah video benar-benar bergerak |
+| `AbortSignal.timeout(20 dtk)` di `fetcher.combineSignals` berlaku untuk **seluruh** body segmen | Segmen 1080p lambat diputus di tengah → hls.js mengulang segmen yang sama terus-menerus |
+
+Perbaikan:
+
+1. **Pengawas pemutaran** `js/ui/playback-watch.js` (murni, diuji tanpa browser). `load` iframe
+   hanya berarti "dokumen pemutar selesai dimuat"; pengawas menunggu kemajuan nyata
+   (`timeupdate`/`postMessage` progres). Batasnya di `PLAYER.buffering`:
+   - `startupMs` 20 dtk → pemulihan pertama, `hardStallMs` tambahan → **pindah server**;
+   - video yang sempat berjalan lalu berhenti → `stallMs` 12 dtk → pulihkan dulu, baru pindah;
+   - `pause`/`play`/`seeking` dari `<video>` men-suspend hitungan, jadi **video yang dijeda
+     pengguna tidak pernah dianggap macet**;
+   - embed lintas-domain (`autoRecover:false`) **tidak** dimuat ulang otomatis — kita tidak bisa
+     membedakan buffering, video dijeda, dan embed yang tidak melapor; pengawas hanya memberi
+     petunjuk di status bar. Keputusan tetap di pengguna (tombol server / Server Lain).
+2. **hls.js disetel ulang**: `maxBufferLength` 30→40 dtk, `maxMaxBufferLength` 120,
+   `maxBufferSize` 60 MB, `startFragPrefetch`, `nudgeMaxRetry` 5, `manifestLoadPolicy` &
+   `fragLoadPolicy` dengan batas waktu/ retry lebih sabar, `abrEwmaDefaultEstimate` 800 kbps.
+   Error non-fatal dicatat untuk diagnosa; error fatal tetap memicu pindah server.
+3. **Timeout proxy berbasis kemajuan** (`server/lib/fetcher.js`): `timeoutMs` = batas **tanpa
+   kemajuan** — timer direset setiap chunk — sehingga transfer lambat yang tetap mengalir selesai
+   utuh. `STREAM_PROXY_MAX_DURATION_MS` (default 45 dtk, di bawah batas fungsi Vercel 60 dtk)
+   mencegah request menggantung. Satu segmen lambat **tidak lagi membuka circuit breaker**
+   (dulu circuit terbuka = semua segmen berikutnya gagal = buffering permanen).
+4. **Batas segmen realistis**: `STREAMS.maxSegmentBytes` 40 MB → 4 MB, sesuai batas respons
+   fungsi Vercel (±4,5 MB); segmen lebih besar tidak akan pernah sampai utuh ke browser.
+5. **ReAnime pindah domain**: `STREAMS.reanime.baseUrl` = `https://reanime.cz`, dengan
+   `fallbackBaseUrl` `https://reanime.to` yang **hanya** dipakai untuk kegagalan jaringan/timeout.
+   403/429/challenge tidak pernah memicu percobaan kedua (tanpa retry/bypass).
+6. **Bilah "Video belum berjalan di server ini?"** (`#playerPlaybackHint`, `css/watch.css`)
+   muncul untuk embed yang termuat tetapi tidak menunjukkan kemajuan — tidak menutupi gambar,
+   dengan tombol **Muat ulang** (server yang sama, pengawas dilanjutkan) dan **Server lain**.
+   Ini penting karena embed lintas-domain tidak bisa dibaca isinya (banyak yang tidak mengirim
+   `postMessage` progres), sehingga pemulihan otomatis justru berisiko.
+7. **Layar "tidak ada server" menjelaskan penyebab** ("Sumber Sub Indo biasanya pulih beberapa
+   menit lagi — tekan Coba lagi…"), bukan spinner yang berputar selamanya.
+8. Aset `watch.html` memakai `?v=20261122a` supaya perbaikan tidak tertahan cache lama.
+9. **Tes**: `server/test/round27-stream-buffering.test.js` (17 tes) mengunci pengawas, tuning
+   hls.js, batas idle fetcher (transfer 720 ms dengan batas idle 250 ms tetap utuh; body yang
+   benar-benar diam tetap diputus tanpa membuka circuit), segmen lewat `/api/stream/hls`, dan
+   perpindahan domain ReAnime. Total `npm test` **634 tes lulus**.
+
 ### Perubahan perilaku (25 Okt 2026 — putaran kedua puluh lima: opsi server Animeloverz & baris tombol per bahasa)
 
 Permintaan pengguna: *"untuk Oploverz bisa di upayakan agar tidak bertabrakan kasih tombol opsi saja

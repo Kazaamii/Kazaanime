@@ -83,6 +83,7 @@ import { showToast } from './toast.js';
 import { icon, hasIcon } from './icons.js';
 import { createAiSubtitle, aiErrorText } from './ai-subtitle.js';
 import { attachLocalSubtitleTrack, readLocalSubtitleFile } from './local-subtitle.js';
+import { createPlaybackWatch, playbackProblemText } from './playback-watch.js';
 import { storage } from '../services/storage.js';
 import { filterAdServers } from '../services/adblock.js';
 
@@ -129,6 +130,8 @@ const ICON_LOCK = icon('lock');
  * Karena itu tombol pemutar eksternal disediakan sebagai jalan aman.
  */
 const AD_SHIELD_ID = 'playerAdShield';
+/** Bilah "video belum berjalan?" (putaran 27) — non-blocking, tidak menutupi pemutar. */
+const PLAYBACK_HINT_ID = 'playerPlaybackHint';
 
 /** Bersihkan sisa preferensi sandbox dari versi lama (kalau tidak, pengguna tetap terkunci). */
 function dropLegacyGuardFlag() {
@@ -574,6 +577,17 @@ export function createPlayer({
     let ownTabAt = 0;
     /** Timer pelepasan tanda setelah server bertanda berputar normal (putaran 19). */
     let healthyTimer = 0;
+    /**
+     * Putaran 27: pengawas buffering. `state = 'playing'` hanya berarti "dokumen pemutar sudah
+     * dimuat"; pengawas ini yang memastikan video benar-benar bergerak, dan bila tidak, memulihkan
+     * atau pindah server — bukan menampilkan buffering tanpa akhir.
+     * @type {ReturnType<typeof createPlaybackWatch>|null}
+     */
+    let watch = null;
+    /** Timer pemeriksaan pengawas (dibersihkan setiap ganti server/episode). */
+    let watchTimer = 0;
+    /** Bilah "video belum berjalan" untuk embed yang termuat tetapi tidak memutar (putaran 27). */
+    let playbackHint = null;
     /** Tandai server aktif "termuat" (dipakai event load & pesan progres dari player). */
     let markLoaded = null;
     let token = 0;
@@ -839,6 +853,9 @@ export function createPlayer({
         clearTimeout(overlayTimer);
         timer = 0;
         overlayTimer = 0;
+        // Putaran 27: pengawas buffering milik pemutaran sebelumnya ikut berhenti (tidak ada
+        // timer yatim saat berpindah server/episode).
+        stopWatch();
         markLoaded = null;
         if (frame) {
             frame.remove(); // melepas iframe = video/audio benar-benar berhenti
@@ -861,6 +878,7 @@ export function createPlayer({
         }
         removeAdShield();
         removeAdRecovery();
+        removePlaybackHint();
         clearTimeout(healthyTimer);
         healthyTimer = 0;
         lastFrameLoadAt = 0;
@@ -955,6 +973,59 @@ export function createPlayer({
         if (!adRecovery) return;
         adRecovery.remove();
         adRecovery = null;
+    }
+
+    /**
+     * Putaran 27 — *"Stream selalu bufering"*.
+     *
+     * Embed lintas-domain tidak bisa dibaca isinya: ada yang hanya menampilkan
+     * "This video file cannot be played" padahal dokumennya sudah `load`, dan ada yang tidak
+     * pernah mengirim pesan progres. Pengawas sengaja TIDAK memindahkan server otomatis untuk
+     * embed (bisa memutus video yang sehat atau yang sedang dijeda), jadi pengguna diberi bilah
+     * kecil di bawah pemutar: *"Video belum berjalan?"* dengan tombol muat ulang (tetap di server
+     * yang sama) dan server lain. Bilah ini tidak menutupi gambar dan tidak menghalangi klik ke
+     * pemutar (seperti halnya lapisan anti-iklan).
+     * @param {number} my token pemutaran
+     * @param {StreamServer} server
+     */
+    function mountPlaybackHint(my, server) {
+        removePlaybackHint();
+        if (my !== token) return;
+        const bar = document.createElement('div');
+        bar.className = 'player-playback-hint';
+        bar.id = PLAYBACK_HINT_ID;
+        bar.setAttribute('role', 'status');
+        bar.innerHTML = String(html`
+            <span class="player-playback-hint-text">${icon('triangle-alert')} Video belum berjalan di server ini?</span>
+            <span class="player-playback-hint-actions">
+                <button type="button" class="player-playback-hint-btn" data-hint-action="reload">Muat ulang</button>
+                <button type="button" class="player-playback-hint-btn player-playback-hint-btn--ghost" data-hint-action="next">Server lain</button>
+                <button type="button" class="player-playback-hint-close" data-hint-action="dismiss" aria-label="Tutup petunjuk">×</button>
+            </span>`);
+        bar.addEventListener('click', (event) => {
+            const btn = event.target instanceof Element ? event.target.closest('[data-hint-action]') : null;
+            if (!btn) return;
+            const action = btn.getAttribute('data-hint-action');
+            if (action === 'reload') {
+                if (my !== token) return;
+                removePlaybackHint();
+                watch?.resume();
+                play(byId(server.id) || server);
+                showToast('Memuat ulang server ini…', 'info');
+            } else if (action === 'next') {
+                nextServer();
+            } else {
+                removePlaybackHint();
+            }
+        });
+        stage.append(bar);
+        playbackHint = bar;
+    }
+
+    function removePlaybackHint() {
+        if (!playbackHint) return;
+        playbackHint.remove();
+        playbackHint = null;
     }
 
     /**
@@ -1292,6 +1363,77 @@ export function createPlayer({
     /* ---------------------------------------------------------------- */
     /* Memutar & fallback                                                */
     /* ---------------------------------------------------------------- */
+    /* ---------------------------------------------------------------- */
+    /* Pengawas buffering (putaran 27)                                   */
+    /* ---------------------------------------------------------------- */
+    /**
+     * Mulai mengawasi pemutaran server ini.
+     *
+     * Permintaan pengguna 22 Nov 2026: *"Stream selalu bufering"*. Dulu `state = 'playing'`
+     * dipasang saat iframe mengirim `load` — padahal embed yang menampilkan "This video file
+     * cannot be played" pun mengirim `load`. Hasilnya pengguna melihat pemutar yang tidak pernah
+     * mulai dan tidak ada fallback. Sekarang:
+     *  - tidak ada kemajuan selama `PLAYER.buffering.startupMs` saat memuat → muat ulang sumber
+     *    sekali (nudge), lalu pindah server;
+     *  - video sempat berjalan lalu berhenti (`stalled`) → pulihkan dulu, baru pindah server;
+     *  - setiap keputusan ditulis di status bar supaya pengguna tahu apa yang terjadi.
+     * @param {StreamServer} server
+     * @param {number} my token pemutaran
+     * @param {{onReload?: () => void, failBeforeProgress?: boolean, autoRecover?: boolean}} [hooks]
+     *   failBeforeProgress: `true` untuk pemutar video bawaan (kita tahu pasti video bergerak
+     *   atau tidak), `false` untuk embed pihak ketiga yang sering tidak mengirim pesan progres.
+     *   autoRecover: `false` untuk embed lintas-domain — kita tidak bisa membedakan buffering,
+     *   video yang dijeda pengguna, dan embed yang tidak melapor, jadi jangan sentuh pemutarnya.
+     */
+    function startWatch(server, my, hooks = {}) {
+        stopWatch();
+        const cfg = PLAYER.buffering || {};
+        watch = createPlaybackWatch({
+            stallTimeoutMs: cfg.stallMs,
+            hardStallMs: cfg.hardStallMs,
+            startupTimeoutMs: cfg.startupMs,
+            maxRecoveries: cfg.maxRecoveries,
+            failBeforeProgress: hooks.failBeforeProgress !== false,
+            autoRecover: hooks.autoRecover !== false,
+            onEvent: (event) => {
+                if (my !== token) return;
+                if (event.phase === 'failed') {
+                    setStatus(playbackProblemText(event.reason), 'error');
+                    fail(server, event.reason);
+                } else if (event.phase === 'stalled' && event.actions.includes('hint')) {
+                    // Embed tidak melaporkan progres: beri tahu, jangan pindah server otomatis.
+                    setStatus('Pemutar belum memberi tanda berjalan. Bila layar tetap gelap, pilih server lain.', 'loading');
+                    mountPlaybackHint(my, server);
+                } else if (event.phase === 'stalled') {
+                    setStatus(`${playbackProblemText(event.reason)} Mencoba memulihkan…`, 'loading');
+                }
+            },
+            onRecover: () => {
+                if (my !== token) return;
+                showToast('Pemutaran berhenti (buffering) — mencoba memulihkan…', 'info', 4000);
+                try { hooks.onReload?.(); } catch { /* pemulihan tidak boleh memutus pemutar */ }
+            },
+        });
+        const tick = () => {
+            if (my !== token || !watch) return;
+            watch.tick();
+        };
+        watchTimer = setInterval(tick, Math.max(1000, cfg.checkEveryMs || 2500));
+        return watch;
+    }
+
+    function stopWatch() {
+        clearInterval(watchTimer);
+        watchTimer = 0;
+        watch?.stop();
+        watch = null;
+    }
+
+    /** Pemutaran benar-benar bergerak (dipakai `timeupdate` dan pesan progres embed). */
+    function noteMediaProgress(info) {
+        watch?.progress(info);
+    }
+
     /** @param {StreamServer} server */
     function play(server) {
         clearFrame();
@@ -1335,10 +1477,50 @@ export function createPlayer({
             overlay.remove();
             setStatus(`${server.name} | Episode ${ep}${langSuffix(server)}`, 'ok');
             renderServers();
+            // Putaran 27: `load` iframe ≠ video berjalan. Pengawas memastikan ada kemajuan
+            // (pesan `time`/`progress` dari embed); bila tidak, server tidak dibiarkan buffering.
+            watch?.start('iframe-loaded');
             mountAdShield(my);
             emit('loaded', { ep, server });
         };
         markLoaded = loaded;
+        startWatch(server, my, {
+            /*
+             * Embed pihak ketiga sering tidak mengirim `postMessage` progres (MegaPlay hanya
+             * mengirim `time` pada sebagian pemutarnya; VidNest tidak sama sekali). Karena itu
+             * "belum ada kabar" bukan bukti server rusak → pengawas hanya memberi `hint`;
+             * pindah server tetap terjadi bila video SEMPAT bergerak lalu berhenti.
+             */
+            failBeforeProgress: false,
+            /*
+             * Putaran 27: embed lintas-domain TIDAK dipulihkan/dipindah otomatis.
+             * Kita tidak bisa membaca isi iframe, jadi "tidak ada progres" tidak bisa dibedakan
+             * dari "video sedang dijeda" atau "embed ini tidak mengirim postMessage" (banyak
+             * embed seperti VidNest tidak). Memuat ulang atau pindah server otomatis justru
+             * memutus tontonan yang sehat. Pengawas hanya memberi petunjuk di status bar;
+             * keputusan tetap di tangan pengguna (tombol server / Server Lain).
+             */
+            autoRecover: false,
+            // Muat ulang embed yang sama sekali tidak memberi tanda kemajuan (bukan buka tab).
+            onReload: () => {
+                if (my !== token) return;
+                overlay.remove();
+                frame?.remove();
+                const again = document.createElement('iframe');
+                again.className = 'player-frame';
+                again.title = `Player ${getTitle()} - Episode ${ep}`.trim();
+                again.allow = PLAYER.allow;
+                again.allowFullscreen = true;
+                again.referrerPolicy = PLAYER.referrerPolicy;
+                if (guarded) applyFramePolicy(again);
+                else again.dataset.frameGuard = 'off';
+                if (guarded && isStrictAdServer(server)) applyStrictFramePolicy(again);
+                again.addEventListener('load', () => { if (my === token) markLoaded?.(); });
+                again.src = urlOf(server);
+                stage.replaceChildren(again);
+                frame = again;
+            },
+        });
         let firstLoad = true;
         iframe.addEventListener('load', () => {
             if (my !== token) return;
@@ -1468,8 +1650,43 @@ export function createPlayer({
             completedFor = ep;
             emit('complete', { ep, server });
         });
+        /*
+         * Putaran 27: pengawas buffering untuk pemutar video bawaan.
+         *  - `timeupdate` + `waiting`/`playing` memberi tahu pengawas kapan video benar-benar
+         *    bergerak; pengawas yang memutuskan kapan harus memulihkan / pindah server.
+         *  - `progress()` di sini memakai `currentTime` nyata (bukan persen status bar) sehingga
+         *    video yang hanya mengulang segmen di posisi yang sama tetap dianggap macet.
+         */
+        startWatch(server, my, {
+            onReload: () => {
+                if (my !== token) return;
+                // hls.js: mulai ulang pemuatan playlist pada level yang sama dulu (lebih ringan
+                // daripada memuat ulang seluruh halaman pemutar).
+                if (hls) {
+                    try {
+                        hls.startLoad();
+                        return;
+                    } catch { /* jatuh ke pemuatan ulang sumber di bawah */ }
+                }
+                try { v.load(); } catch { /* peramban menolak: biarkan pengawas memutuskan */ }
+            },
+        });
+        v.addEventListener('loadedmetadata', () => { if (my === token) watch?.start('metadata'); }, { once: true });
+        v.addEventListener('playing', () => { if (my === token) watch?.playing(); });
+        v.addEventListener('waiting', () => { if (my === token) watch?.waiting(); });
+        v.addEventListener('stalled', () => { if (my === token) watch?.waiting(); });
+        /*
+         * Putaran 27: video yang DIJEDA pengguna bukan buffering. Tanpa kabar pause/play ini,
+         * pengawas akan menganggap diam >12 dtk sebagai macet lalu memuat ulang sumber — justru
+         * merusak tontonan. Jeda = suspend (tanpa hitungan), lanjut = resume.
+         */
+        v.addEventListener('pause', () => { if (my === token && !v.ended) watch?.suspend(); });
+        v.addEventListener('play', () => { if (my === token) watch?.resume(); });
+        v.addEventListener('seeking', () => { if (my === token) watch?.resume(); });
         v.addEventListener('timeupdate', () => {
-            if (my !== token || !Number.isFinite(v.duration) || v.duration <= 0) return;
+            if (my !== token) return;
+            noteMediaProgress({ time: v.currentTime });
+            if (!Number.isFinite(v.duration) || v.duration <= 0) return;
             const pct = clamp01(v.currentTime / v.duration);
             if (Math.abs(pct - lastPct) < 0.02 && pct < 0.99) return;
             lastPct = pct;
@@ -1546,15 +1763,67 @@ export function createPlayer({
                 fail(server, 'browser tidak mendukung HLS');
                 return;
             }
-            hls = new Hls({ capLevelToPlayerSize: true, maxBufferLength: 30, backBufferLength: 30, enableWorker: true });
+            /*
+             * Putaran 27: penyetelan ulang hls.js untuk kondisi "selalu buffering".
+             *
+             *  - `maxBufferLength` 30 → 40 dtk dan `maxMaxBufferLength` 120: buffer lebih panjang
+             *    supaya fluktuasi CDN/proxy tidak langsung mengosongkan buffer.
+             *  - `maxBufferSize` 60 MB: batas berdasarkan ukuran, bukan hanya detik — segmen
+             *    1080p besar tidak lagi membuat hls.js berhenti mengunduh.
+             *  - `manifestLoadPolicy`/`fragLoadPolicy`: waktu tunggu per segmen diperpanjang dan
+             *    percobaan ulang dibuat sabar (proxy bisa butuh beberapa detik untuk segmen
+             *    pertama). Retry di sini HANYA untuk kegagalan jaringan/timeout CDN, bukan
+             *    challenge — halaman error HTTP tetap memicu `fail()`.
+             *  - `startFragPrefetch`: unduh segmen pertama bersamaan dengan playlist varian.
+             *  - `nudgeMaxRetry`: hls.js mencoba menambal lubang buffer sebelum menyerah.
+             *  - `abrEwmaDefaultEstimate` 800 kbps: perkiraan awal yang lebih realistis daripada
+             *    default 500 kbps → tidak memilih 144p lalu naik-turun kualitas (penyebab sensasi
+             *    buffering pada beberapa perangkat).
+             */
+            const stallMs = PLAYER.buffering?.stallMs || 12000;
+            hls = new Hls({
+                capLevelToPlayerSize: true,
+                enableWorker: true,
+                maxBufferLength: 40,
+                maxMaxBufferLength: 120,
+                maxBufferSize: 60 * 1000 * 1000,
+                backBufferLength: 30,
+                startFragPrefetch: true,
+                nudgeMaxRetry: 5,
+                abrEwmaDefaultEstimate: 800_000,
+                manifestLoadPolicy: {
+                    default: {
+                        maxTimeToFirstByteMs: 20000,
+                        maxLoadTimeMs: 30000,
+                        timeoutRetry: { maxNumRetry: 2, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+                        errorRetry: { maxNumRetry: 2, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+                    },
+                },
+                fragLoadPolicy: {
+                    default: {
+                        maxTimeToFirstByteMs: Math.max(20000, stallMs * 2),
+                        maxLoadTimeMs: Math.max(60000, stallMs * 3),
+                        // Segmen lambat diulang beberapa kali (jaringan), tetapi tidak pernah
+                        // menunggu tanpa batas: pengawas buffering yang memutuskan pindah server.
+                        timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+                        errorRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+                    },
+                },
+            });
             let recovered = false;
             hls.on(Hls.Events.ERROR, (_event, data) => {
-                if (my !== token || !data?.fatal) return;
+                if (my !== token) return;
+                if (!data?.fatal) {
+                    // Non-fatal (satu frag gagal lalu diulang) tetap dicatat untuk diagnosa.
+                    console.warn(`[player] hls non-fatal: ${data?.details || data?.type || '?'}`);
+                    return;
+                }
                 if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
                     recovered = true;
                     hls.recoverMediaError();
                     return;
                 }
+                watch?.fail(`hls ${data.details || data.type}`);
                 fail(server, `hls ${data.details || data.type}`);
             });
             hls.loadSource(server.url);
@@ -1603,13 +1872,21 @@ export function createPlayer({
         state = 'exhausted';
         renderServers();
         const hasAny = available().length > 0;
+        /*
+         * Putaran 27: pengguna *"Stream selalu bufering"* juga melihat layar pemutar tanpa
+         * penjelasan saat backend tidak mengirim satu server pun. Pesannya sekarang menyebut
+         * penyebab yang bisa ditindaklanjuti (bukan "buffering" tanpa akhir): server sumber
+         * sedang tidak bisa diakses, dan tombol Coba lagi benar-benar mengulang pencarian.
+         */
         stage.replaceChildren(messageEl({
             icon: 'triangle-alert',
             title: 'Streaming Tidak Tersedia',
             text: hasAny
                 ? `Semua server gagal memuat Episode ${ep}.`
-                : 'ID anime untuk server streaming tidak ditemukan.',
-            sub: 'Gunakan platform streaming legal di bawah atau coba server lain',
+                : 'Belum ada server yang bisa memutar episode ini dari sumber Sub Indo.',
+            sub: hasAny
+                ? 'Gunakan platform streaming legal di bawah atau coba server lain'
+                : 'Sumber Sub Indo biasanya pulih beberapa menit lagi — tekan Coba lagi, atau pilih server lain di daftar bawah.',
             actions: [{ label: html`${icon('refresh-cw')} Coba lagi`, className: 'btn-ext btn-ext--retry', onClick: retry }, ...legalActions()],
         }));
         setStatus(`Streaming Episode ${ep} tidak tersedia`, 'error');
@@ -1658,6 +1935,8 @@ export function createPlayer({
             const pct = percentOf(data);
             if (pct == null) return;
             if (state === 'loading') markLoaded?.(); // player sudah bicara → anggap termuat
+            // Putaran 27: progres nyata dari embed = video bergerak (pengawas tidak menghukum server).
+            noteMediaProgress({ percent: pct, time: Number(data.currentTime ?? data.position) });
             setStatus(`${server.name} | EP ${ep} | ${Math.round(pct * 100)}%`, 'ok', { quiet: true });
             emit('progress', { ep, percent: pct });
         } else if (name === 'error') {

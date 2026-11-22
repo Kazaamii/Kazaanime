@@ -14,7 +14,12 @@ import { uniqueTitles } from './match.js';
 import { createReanime } from './reanime.js';
 
 export const PROVIDER_FACTORIES = Object.freeze({
-    reanime: (deps) => createReanime({ ...deps, baseUrl: STREAMS.reanime.baseUrl, embedHosts: STREAMS.reanime.embedHosts }),
+    reanime: (deps) => createReanime({
+        ...deps,
+        baseUrl: STREAMS.reanime.baseUrl,
+        fallbackBaseUrl: STREAMS.reanime.fallbackBaseUrl,
+        embedHosts: STREAMS.reanime.embedHosts,
+    }),
     anizone: (deps) => createAnizone({ ...deps, baseUrl: STREAMS.anizone.baseUrl, mediaHosts: STREAMS.anizone.mediaHosts }),
 });
 

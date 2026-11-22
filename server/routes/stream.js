@@ -195,7 +195,11 @@ export function streamRouter({ providers, mediaClient, animeOnsenMediaClient = n
         const fetchUp = () => client.stream(target, {
             signal: ac.signal,
             headers: { ...mediaHeaders(scope), ...(range ? { Range: range } : {}) },
+            // Putaran 27: `timeoutMs` = batas TANPA KEMAJUAN (timer direset tiap chunk), jadi
+            // segmen lambat tetap selesai; `maxDurationMs` mencegah request menggantung selamanya
+            // (batas fungsi Vercel 60 dtk, proxy sendiri di bawahnya).
             timeoutMs: STREAMS.proxyTimeoutMs,
+            maxDurationMs: STREAMS.proxyMaxDurationMs,
             maxBytes: STREAMS.maxSegmentBytes,
         });
         const up = await fetchUp();
