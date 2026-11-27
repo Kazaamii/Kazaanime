@@ -10,6 +10,7 @@
  *
  * Tidak ada request jaringan: bookmark dibaca dari localStorage akun.
  */
+import { initAnalytics } from './analytics.js';
 import { initLayout } from './ui/layout.js';
 import { renderCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
 import { getBookmarks, onBookmarksChange } from './services/bookmark.js';
@@ -18,6 +19,9 @@ import { openAuthModal } from './ui/auth-modal.js';
 import { html, $, delegate } from './ui/dom.js';
 import { icon } from './ui/icons.js';
 import { homeSectionUrl } from './routes.js';
+
+// Initialize Vercel Web Analytics
+initAnalytics();
 
 const ctx = initLayout();
 

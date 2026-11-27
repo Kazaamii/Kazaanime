@@ -20,6 +20,7 @@
  *  - Satu sumber gagal tidak menggagalkan pencarian; keterangan + tombol coba lagi.
  *  - Request lama diabaikan jika user mengganti filter sebelum selesai.
  */
+import { initAnalytics } from './analytics.js';
 import { initLayout } from './ui/layout.js';
 import { renderCards, appendCards, gridMessage, bindCardActions, syncBookmarkButtons } from './ui/card.js';
 import { showSkeleton } from './ui/skeleton.js';
@@ -35,6 +36,9 @@ import { sourceLabel } from './api/normalize.js';
 import { onBookmarksChange } from './services/bookmark.js';
 import { icon } from './ui/icons.js';
 import { SITE_SOURCES, SITE_LABELS, siteOfSuggestion, siteResults } from './ui/search-suggest.js';
+
+// Initialize Vercel Web Analytics
+initAnalytics();
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);

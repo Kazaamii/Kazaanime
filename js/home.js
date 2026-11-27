@@ -15,6 +15,7 @@
  *  3. Jadwal dimuat hanya saat section-nya mendekati layar (lazy).
  *  4. Bookmark/login mengubah tombol & section Bookmark tanpa request jaringan.
  */
+import { initAnalytics } from './analytics.js';
 import { initLayout } from './ui/layout.js';
 import { createHeroSlider } from './ui/hero.js';
 import { renderCards, bindCardActions, syncBookmarkButtons, gridMessage } from './ui/card.js';
@@ -33,6 +34,9 @@ import { isPolicyStop, safeHomeUrl, sourceDiagnosis, sourceStatusLabel } from '.
 import { panelSections } from './api/subindo.js';
 import { withAutoRetry } from './api/retry.js';
 import { getSourceBrowse } from './api/sources.js';
+
+// Initialize Vercel Web Analytics
+initAnalytics();
 
 const ctx = initLayout();
 const isBookmarked = (anime) => ctx.isBookmarked(anime);
